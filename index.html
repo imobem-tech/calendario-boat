@@ -4,6 +4,21 @@
   <title>Calendário Boat</title>
 </head>
 <body>
-  <h1>Funcionando 🚀</h1>
+  <h1>Testando conexão com banco...</h1>
+
+  <div id="resultado"></div>
+
+  <script>
+    fetch('/api/teste')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('resultado').innerHTML =
+          '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      })
+      .catch(err => {
+        document.getElementById('resultado').innerHTML =
+          'Erro: ' + err;
+      });
+  </script>
 </body>
 </html>
