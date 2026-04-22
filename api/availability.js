@@ -11,6 +11,18 @@ function formatDateLocal(date) {
   return `${y}-${m}-${d}`;
 }
 
+function parseDbDateAsLocal(value) {
+  if (!value) return null;
+
+  const dt = new Date(value);
+
+  return new Date(
+    dt.getFullYear(),
+    dt.getMonth(),
+    dt.getDate()
+  );
+}
+
 export default async function handler(req, res) {
   try {
     const pb = parseInt(req.query.pb, 10);
@@ -26,7 +38,6 @@ export default async function handler(req, res) {
     endDate.setMonth(endDate.getMonth() + months);
     endDate.setDate(endDate.getDate() - 1);
 
-    // ✅ QUERY CORRIGIDA (AGORA TRAZ LETRA + NÚMERO)
     const result = await pool.query(
       `
       SELECT
@@ -35,28 +46,25 @@ export default async function handler(req, res) {
         "Código"
       FROM public."P_BOAT_z_10_Saida_Emb"
       WHERE "Cod_Emb_PB" = $1
-        AND "Dt_Saída" BETWEEN $2 AND $3
+        AND "Dt_Saída" >= $2
+        AND "Dt_Saída" < ($3::date + interval '1 day')
         AND "Dt_Cancela_saida" IS NULL
         AND "Dt_Desistencia" IS NULL
+      ORDER BY "Dt_Saída"
       `,
-      [pb, startDate, endDate]
+      [pb, formatDateLocal(startDate), formatDateLocal(endDate)]
     );
 
     const agendamentos = {};
 
-    result.rows.forEach(r => {
-      const data = new Date(r["Dt_Saída"]);
-      const d = formatDateLocal(data);
+    result.rows.forEach((r) => {
+      const dataLocal = parseDbDateAsLocal(r["Dt_Saída"]);
+      if (!dataLocal) return;
 
-      const letra = (r["Grupo_Comp_letra"] || "").toUpperCase();
+      const d = formatDateLocal(dataLocal);
+      const grupo = String(r["Grupo_Comp_letra"] || "").trim().toUpperCase();
 
-      // ⚠️ AJUSTE AQUI SE EXISTIR CAMPO DE NÚMERO DO GRUPO
-      // Se não existir, usamos fallback "1"
-      const numero = "1";
-
-      const grupo = letra ? `${letra}${numero}` : "AG";
-
-      agendamentos[d] = grupo;
+      agendamentos[d] = grupo || "AG";
     });
 
     const resp = [];
@@ -68,14 +76,14 @@ export default async function handler(req, res) {
       let status = "free";
       let label = null;
 
-      const dow = cur.getDay();
+      const dow = cur.getDay(); // 0=dom, 1=seg
 
-      // 🟡 folga = segunda
+      // folga de segunda
       if (dow === 1) {
         status = "folga";
       }
 
-      // 🔴 ocupado (PRIORIDADE MÁXIMA)
+      // ocupado tem prioridade
       if (agendamentos[d]) {
         status = "busy";
         label = agendamentos[d];
@@ -90,10 +98,10 @@ export default async function handler(req, res) {
       cur.setDate(cur.getDate() + 1);
     }
 
-    res.status(200).json(resp);
+    return res.status(200).json(resp);
 
   } catch (err) {
     console.error("ERRO availability:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
