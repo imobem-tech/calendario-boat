@@ -11,325 +11,70 @@
       --text: #10213d;
       --muted: #6b7280;
       --line: #dbe2ea;
-
       --primary: #1d4ed8;
       --primary-soft: #e8efff;
       --header-bg: #1d4ed8;
       --header-text: #ffffff;
-
       --slot: #ffffff;
       --slot-border: #d1d5db;
       --slot-active: #1d4ed8;
       --slot-active-text: #ffffff;
-
       --warn-bg: #fff7ed;
       --warn-text: #c2410c;
       --warn-line: #fdba74;
-
       --err-bg: #fff1f2;
       --err-text: #dc2626;
       --err-line: #fecdd3;
-
       --ok-bg: #ecfdf5;
       --ok-text: #15803d;
       --ok-line: #bbf7d0;
     }
 
     *{ box-sizing:border-box; }
-
-    body{
-      margin:0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    .wrap{
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 12px 12px 120px;
-    }
-
-    .top-card{
-      background: var(--header-bg);
-      color: var(--header-text);
-      border: 1px solid var(--header-bg);
-      border-radius: 22px;
-      padding: 14px 14px 12px;
-      margin-bottom: 14px;
-      box-shadow: 0 1px 0 rgba(16,33,61,.03);
-    }
-
-    .title-row{
-      display:flex;
-      align-items:baseline;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-bottom: 12px;
-    }
-
-    .title{
-      margin:0;
-      font-size: clamp(26px, 7vw, 42px);
-      line-height:1;
-      font-weight: 900;
-      letter-spacing:.2px;
-      color:#fff;
-    }
-
-    .sub-inline{
-      color: rgba(255,255,255,.92);
-      font-size: 14px;
-      font-weight: 700;
-      line-height:1.2;
-    }
-
-    .summary{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-    }
-
-    .info-card{
-      background: rgba(255,255,255,.14);
-      border: 1px solid rgba(255,255,255,.18);
-      border-radius: 16px;
-      padding: 12px 12px 10px;
-      min-width: 0;
-    }
-
-    .info-label{
-      font-size: 12px;
-      color: rgba(255,255,255,.9);
-      font-weight: 800;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: .3px;
-    }
-
-    .info-value{
-      font-size: clamp(18px, 4.6vw, 28px);
-      font-weight: 900;
-      line-height: 1.1;
-      color: #fff;
-      word-break: break-word;
-    }
-
-    .section-card{
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 18px 16px 18px;
-      box-shadow: 0 1px 0 rgba(16,33,61,.03);
-    }
-
-    .section-title{
-      margin:0 0 8px;
-      font-size: 24px;
-      line-height:1.1;
-      font-weight: 900;
-    }
-
-    .section-desc{
-      margin:0 0 16px;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.4;
-      font-weight: 700;
-    }
-
-    .slots{
-      display:grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap:12px;
-    }
-
-    .slot-btn{
-      width:100%;
-      min-height: 76px;
-      border-radius: 18px;
-      border:2px solid var(--slot-border);
-      background: var(--slot);
-      color: var(--text);
-      font-size: 22px;
-      font-weight: 900;
-      cursor:pointer;
-      transition: .15s ease;
-      padding: 0 10px;
-    }
-
-    .slot-btn.active{
-      background: var(--slot-active);
-      color: var(--slot-active-text);
-      border-color: var(--slot-active);
-      box-shadow: 0 8px 22px rgba(29,78,216,.18);
-    }
-
-    .slot-btn:disabled{
-      opacity:.45;
-      cursor:not-allowed;
-    }
-
-    .warn,
-    .msg{
-      display:none;
-      margin-top: 14px;
-      border-radius: 18px;
-      padding: 14px;
-      font-size: 16px;
-      line-height: 1.4;
-      font-weight: 800;
-    }
-
-    .warn.show{
-      display:block;
-      background: var(--warn-bg);
-      color: var(--warn-text);
-      border:1px solid var(--warn-line);
-    }
-
-    .msg.error{
-      display:block;
-      background: var(--err-bg);
-      color: var(--err-text);
-      border:1px solid var(--err-line);
-    }
-
-    .msg.success{
-      display:block;
-      background: var(--ok-bg);
-      color: var(--ok-text);
-      border:1px solid var(--ok-line);
-    }
-
-    .fixed-action{
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-      background: linear-gradient(to top, rgba(243,245,249,1) 72%, rgba(243,245,249,0));
-      z-index: 50;
-    }
-
-    .confirm-btn{
-      width: min(760px, calc(100vw - 28px));
-      display:block;
-      margin: 0 auto;
-      height: 64px;
-      border:0;
-      border-radius: 18px;
-      background: var(--primary-soft);
-      color: var(--primary);
-      font-size: 21px;
-      font-weight: 900;
-      letter-spacing: .2px;
-      cursor:pointer;
-      box-shadow: 0 8px 24px rgba(16,33,61,.08);
-    }
-
-    .confirm-btn:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
-
-    .brand-footer{
-  text-align:center;
-  margin-top: 18px;
-  padding: 6px 4px 0;
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .3px;
-  opacity: 0.8;
-}
-
-    @media (min-width: 640px){
-      .slots{
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-
-    @media (min-width: 900px){
-      .slots{
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-    }
-
+    body{ margin:0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+    .wrap{ max-width: 760px; margin: 0 auto; padding: 12px 12px 120px; }
+    .top-card{ background: var(--header-bg); color: var(--header-text); border: 1px solid var(--header-bg); border-radius: 22px; padding: 14px 14px 12px; margin-bottom: 14px; box-shadow: 0 1px 0 rgba(16,33,61,.03); }
+    .title-row{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom: 12px; }
+    .title{ margin:0; font-size: clamp(26px, 7vw, 42px); line-height:1; font-weight: 900; letter-spacing:.2px; color:#fff; }
+    .sub-inline{ color: rgba(255,255,255,.92); font-size: 14px; font-weight: 700; line-height:1.2; }
+    .summary{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .info-card{ background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 12px 12px 10px; min-width: 0; }
+    .info-label{ font-size: 12px; color: rgba(255,255,255,.9); font-weight: 800; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+    .info-value{ font-size: clamp(18px, 4.6vw, 28px); font-weight: 900; line-height: 1.1; color: #fff; word-break: break-word; }
+    .section-card{ background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 18px 16px 18px; box-shadow: 0 1px 0 rgba(16,33,61,.03); }
+    .section-title{ margin:0 0 8px; font-size: 24px; line-height:1.1; font-weight: 900; }
+    .section-desc{ margin:0 0 16px; color: var(--muted); font-size: 16px; line-height: 1.4; font-weight: 700; }
+    .slots{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px; }
+    .slot-btn{ width:100%; min-height: 76px; border-radius: 18px; border:2px solid var(--slot-border); background: var(--slot); color: var(--text); font-size: 22px; font-weight: 900; cursor:pointer; transition: .15s ease; padding: 0 10px; }
+    .slot-btn.active{ background: var(--slot-active); color: var(--slot-active-text); border-color: var(--slot-active); box-shadow: 0 8px 22px rgba(29,78,216,.18); }
+    .slot-btn:disabled{ opacity:.45; cursor:not-allowed; }
+    .warn,.msg{ display:none; margin-top: 14px; border-radius: 18px; padding: 14px; font-size: 16px; line-height: 1.4; font-weight: 800; }
+    .warn.show{ display:block; background: var(--warn-bg); color: var(--warn-text); border:1px solid var(--warn-line); }
+    .msg.error{ display:block; background: var(--err-bg); color: var(--err-text); border:1px solid var(--err-line); }
+    .msg.success{ display:block; background: var(--ok-bg); color: var(--ok-text); border:1px solid var(--ok-line); }
+    .fixed-action{ position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(243,245,249,1) 72%, rgba(243,245,249,0)); z-index: 50; }
+    .confirm-btn{ width: min(760px, calc(100vw - 28px)); display:block; margin: 0 auto; height: 64px; border:0; border-radius: 18px; background: var(--primary-soft); color: var(--primary); font-size: 21px; font-weight: 900; letter-spacing: .2px; cursor:pointer; box-shadow: 0 8px 24px rgba(16,33,61,.08); }
+    .confirm-btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .brand-footer{ text-align:center; margin-top: 18px; padding: 6px 4px 0; color: var(--primary); font-size: 13px; font-weight: 700; letter-spacing: .3px; opacity: 0.8; }
+    @media (min-width: 640px){ .slots{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (min-width: 900px){ .slots{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
     @media (max-width: 420px){
-      .wrap{
-        padding: 10px 8px 122px;
-      }
-
-      .top-card{
-        padding: 12px 12px 10px;
-        border-radius: 20px;
-      }
-
-      .title-row{
-        gap:6px;
-        margin-bottom: 10px;
-      }
-
-      .title{
-        font-size: 24px;
-      }
-
-      .sub-inline{
-        font-size: 12px;
-      }
-
-      .summary{
-        gap:8px;
-      }
-
-      .info-card{
-        padding: 10px 10px 9px;
-        border-radius: 14px;
-      }
-
-      .info-label{
-        font-size: 11px;
-        margin-bottom: 5px;
-      }
-
-      .info-value{
-        font-size: 16px;
-      }
-
-      .section-card{
-        padding: 16px 12px 16px;
-        border-radius: 20px;
-      }
-
-      .section-title{
-        font-size: 22px;
-      }
-
-      .section-desc{
-        font-size: 14px;
-        margin-bottom: 14px;
-      }
-
-      .slots{
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap:10px;
-      }
-
-      .slot-btn{
-        min-height: 66px;
-        font-size: 18px;
-        border-radius: 16px;
-      }
-
-      .confirm-btn{
-        height: 60px;
-        font-size: 18px;
-      }
-
-      .brand-footer{
-        font-size: 13px;
-      }
+      .wrap{ padding: 10px 8px 122px; }
+      .top-card{ padding: 12px 12px 10px; border-radius: 20px; }
+      .title-row{ gap:6px; margin-bottom: 10px; }
+      .title{ font-size: 24px; }
+      .sub-inline{ font-size: 12px; }
+      .summary{ gap:8px; }
+      .info-card{ padding: 10px 10px 9px; border-radius: 14px; }
+      .info-label{ font-size: 11px; margin-bottom: 5px; }
+      .info-value{ font-size: 16px; }
+      .section-card{ padding: 16px 12px 16px; border-radius: 20px; }
+      .section-title{ font-size: 22px; }
+      .section-desc{ font-size: 14px; margin-bottom: 14px; }
+      .slots{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+      .slot-btn{ min-height: 66px; font-size: 18px; border-radius: 16px; }
+      .confirm-btn{ height: 60px; font-size: 18px; }
+      .brand-footer{ font-size: 13px; }
     }
   </style>
 </head>
@@ -338,7 +83,7 @@
     <section class="top-card">
       <div class="title-row">
         <h1 class="title">Agendar</h1>
-        <div class="sub-inline">— escolha um horário_2</div>
+        <div class="sub-inline">— escolha um horário</div>
       </div>
 
       <div class="summary">
@@ -374,21 +119,53 @@
   </div>
 
   <script>
-    const MAP = {
-      a:"1", b:"2", c:"3", d:"4", e:"5",
-      f:"6", g:"7", h:"8", i:"9", j:"0"
+    const MAP_LETRA_PARA_NUM = {
+      a: "1", b: "2", c: "3", d: "4", e: "5",
+      f: "6", g: "7", h: "8", i: "9", j: "0"
     };
+
+    function somenteDigitos(txt){
+      return String(txt || "").replace(/\D+/g, "");
+    }
+
+    function decodificarDigitosCodificados(txt){
+      return String(txt || "")
+        .split("")
+        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
+        .join("");
+    }
+
+    function calcularDvEsperado(pb, grupoNum, codAutorizado){
+      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}`;
+      const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
+      return String(soma).padStart(2, "0");
+    }
 
     function decode(token){
       const t = String(token || "").trim().toLowerCase();
-      const m = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
       if(!m) return null;
 
-      const pb = m[1].split("").map(x => MAP[x]).join("");
-      const grupo = m[2].toUpperCase() + MAP[m[3]];
+      const pb = decodificarDigitosCodificados(m[1]);
+      const grupoLetra = m[2].toUpperCase();
+      const grupoNum = decodificarDigitosCodificados(m[3]);
+      const codAutorizado = decodificarDigitosCodificados(m[4]);
+      const dvInformado = decodificarDigitosCodificados(m[5]);
 
-      if(!pb || !grupo) return null;
-      return { pb, grupo, token: t };
+      if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
+      if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
+
+      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado);
+      if(dvInformado !== dvEsperado) return null;
+
+      return {
+        pb,
+        grupo: `${grupoLetra}${grupoNum}`,
+        grupoLetra,
+        grupoNum,
+        codAutorizado,
+        token: t
+      };
     }
 
     function formatarDataBR(iso){
@@ -434,9 +211,7 @@
     function setMsg(texto, tipo){
       msgEl.className = "msg";
       msgEl.textContent = "";
-
       if(!texto) return;
-
       msgEl.classList.add(tipo === "success" ? "success" : "error");
       msgEl.textContent = texto;
     }
@@ -447,7 +222,6 @@
         warningEl.textContent = "";
         return;
       }
-
       warningEl.className = "warn show";
       warningEl.textContent = texto;
     }
@@ -458,31 +232,25 @@
 
     function selecionarHora(hora){
       horaSelecionada = hora;
-
       document.querySelectorAll(".slot-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.hora === hora);
       });
-
       atualizarBotao();
     }
 
     function criarBotoesHorario(){
       slotsEl.innerHTML = "";
-
       for(let h = 10; h <= 17; h++){
         for(let m = 0; m < 60; m += 15){
           if(h === 17 && m > 0) break;
-
           const hh = String(h).padStart(2, "0");
           const mm = String(m).padStart(2, "0");
           const hora = `${hh}:${mm}`;
-
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "slot-btn";
           btn.textContent = hora;
           btn.dataset.hora = hora;
-
           btn.addEventListener("click", () => selecionarHora(hora));
           slotsEl.appendChild(btn);
         }
@@ -493,7 +261,6 @@
       const hoje = hojeIsoLocal();
       const dow = diaSemanaLocal(hoje);
       const mesmaData = data === hoje;
-
       if(mesmaData && dow >= 2 && dow <= 4){
         setWarning("Agendamento sob regra de contingência.");
       }else{
@@ -510,14 +277,8 @@
       try{
         const resp = await fetch("/api/agendar", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            token,
-            data,
-            hora: horaSelecionada
-          })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, data, hora: horaSelecionada })
         });
 
         const json = await resp.json();
@@ -534,7 +295,6 @@
           const ym = data.slice(0, 7);
           window.location.href = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
         }, 1600);
-
       }catch(err){
         setMsg(err.message || "Erro ao enviar agendamento.", "error");
         btnConfirmar.disabled = false;
@@ -545,14 +305,13 @@
       embGrupoEl.textContent = "-";
       dataDiaEl.textContent = "-";
       setMsg("Link de agendamento inválido.", "error");
+      btnConfirmar.disabled = true;
     }else{
       embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
       dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
-
       criarBotoesHorario();
       avaliarContingencia();
       atualizarBotao();
-
       btnConfirmar.addEventListener("click", agendar);
     }
   </script>
