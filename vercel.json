@@ -1,7 +1,8 @@
 {
-  "routes": [
-    { "src": "^/$", "dest": "/index.html" },
-    { "src": "^/agendar$", "dest": "/agendar.html" },
-    { "src": "^/(.*)$", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/agendar", "destination": "/agendar.html" },
+    { "source": "/([a-j]+[a-z][a-j])", "destination": "/index.html" },
+    { "source": "/", "destination": "/index.html" }
   ]
 }
