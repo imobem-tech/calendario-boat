@@ -14,13 +14,18 @@ function formatDateLocal(date) {
 function parseDbDateAsLocal(value) {
   if (!value) return null;
 
-  // evita deslocamento por fuso horário
   const s = String(value).slice(0, 10);
   const [y, m, d] = s.split("-").map(Number);
 
   if (!y || !m || !d) return null;
 
   return new Date(y, m - 1, d);
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 export default async function handler(req, res) {
@@ -46,56 +51,110 @@ export default async function handler(req, res) {
     endDate.setMonth(endDate.getMonth() + months);
     endDate.setDate(endDate.getDate() - 1);
 
-    const result = await pool.query(
+    const startStr = formatDateLocal(startDate);
+    const endStr = formatDateLocal(endDate);
+
+    // 1) Agendamentos - igual conceito do VBA: Dt_Agendamento
+    const agResult = await pool.query(
       `
       SELECT
+        "ID",
+        "Código",
         "Dt_Agendamento",
-        "Grupo_Comp_letra",
-        "Código"
+        "Grupo_Comp_letra"
       FROM public."P_BOAT_z_10_Saida_Emb"
       WHERE "Cod_Emb_PB" = $1
-        AND "Dt_Agendamento" >= $2
-        AND "Dt_Agendamento" < ($3::date + interval '1 day')
+        AND "Dt_Agendamento" >= $2::date
+        AND "Dt_Agendamento" <= $3::date
         AND "Dt_Cancela_saida" IS NULL
         AND "Dt_Desistencia" IS NULL
-      ORDER BY "Dt_Agendamento", "Código"
+      ORDER BY "Dt_Agendamento", "ID"
       `,
-      [pb, formatDateLocal(startDate), formatDateLocal(endDate)]
+      [pb, startStr, endStr]
     );
 
     const agendamentos = Object.create(null);
 
-    result.rows.forEach((r) => {
+    for (const r of agResult.rows) {
       const dataLocal = parseDbDateAsLocal(r["Dt_Agendamento"]);
-      if (!dataLocal) return;
+      if (!dataLocal) continue;
 
       const d = formatDateLocal(dataLocal);
       const grupo = String(r["Grupo_Comp_letra"] || "").trim().toUpperCase();
 
-      // mantém o primeiro grupo encontrado do dia, igual à lógica do VBA
+      // mesmo comportamento do VBA: mantém o primeiro grupo do dia
       if (!agendamentos[d]) {
         agendamentos[d] = grupo || "AG";
       }
-    });
+    }
 
+    // 2) Feriados
+    const ferResult = await pool.query(
+      `
+      SELECT "Dt_Feriado"
+      FROM public."Agenda_comp_02_feriados"
+      WHERE "Dt_Exclusao" IS NULL
+        AND "Dt_Feriado" >= $1::date
+        AND "Dt_Feriado" <= $2::date
+      ORDER BY "Dt_Feriado"
+      `,
+      [startStr, endStr]
+    );
+
+    const feriados = Object.create(null);
+
+    for (const r of ferResult.rows) {
+      const dataLocal = parseDbDateAsLocal(r["Dt_Feriado"]);
+      if (!dataLocal) continue;
+
+      feriados[formatDateLocal(dataLocal)] = true;
+    }
+
+    // 3) Montagem da resposta no mesmo espírito do VBA
     const resp = [];
-    const cur = new Date(startDate);
+    let cur = new Date(startDate);
+    let emSeqFeriado = false;
 
     while (cur <= endDate) {
       const d = formatDateLocal(cur);
+      const dow = cur.getDay(); // 0=dom, 1=seg, ...
+      const ehFeriado = !!feriados[d];
 
       let status = "free";
       let label = null;
 
-      const dow = cur.getDay(); // 0=dom, 1=seg
-
-      // segunda = folga
-      if (dow === 1) {
-        status = "folga";
+      // regra igual ao VBA
+      if (emSeqFeriado) {
+        if (ehFeriado) {
+          status = "holiday";
+          label = "F";
+        } else if (dow !== 0) {
+          // no VBA: se saiu da sequência e não é domingo, vira FOL
+          status = "folga";
+          label = "fol";
+          emSeqFeriado = false;
+        } else {
+          // domingo fora do feriado: apenas encerra a sequência
+          emSeqFeriado = false;
+        }
+      } else if (dow === 1) {
+        // segunda-feira
+        if (ehFeriado) {
+          status = "holiday";
+          label = "F";
+          emSeqFeriado = true;
+        } else {
+          status = "folga";
+          label = "fol";
+        }
+      } else if (ehFeriado) {
+        // feriado isolado fora da sequência iniciada na segunda
+        status = "holiday";
+        label = "F";
       }
 
-      // agendamento tem prioridade sobre folga
-      if (agendamentos[d]) {
+      // igual ao VBA: agendamento NÃO sobrescreve folga
+      if (status !== "folga" && agendamentos[d]) {
         status = "busy";
         label = agendamentos[d];
       }
@@ -106,7 +165,7 @@ export default async function handler(req, res) {
         label,
       });
 
-      cur.setDate(cur.getDate() + 1);
+      cur = addDays(cur, 1);
     }
 
     return res.status(200).json(resp);
