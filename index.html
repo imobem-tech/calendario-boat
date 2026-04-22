@@ -20,8 +20,11 @@ fetch('/api/teste')
 
       el.innerHTML = `
         <b>ID:</b> ${item.ID} <br>
-        <b>Saída:</b> ${item.Dt_Saída} <br>
-        <b>Retorno:</b> ${item.Dt_Retorno} <br>
+
+        const saida = new Date(item.Dt_Saida).toLocaleString('pt-BR')
+const retorno = new Date(item.Dt_Retorno).toLocaleString('pt-BR')
+       <b>Saída:</b> ${saida} <br>
+<b>Retorno:</b> ${retorno} <br>
         <b>Responsável:</b> ${item.Colab_Responsavel}
         <hr>
       `
