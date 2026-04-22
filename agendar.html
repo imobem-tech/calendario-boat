@@ -1,113 +1,368 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Agendamento</title>
-<style>
-body { font-family: Arial; padding:20px; background:#f3f5f9 }
-.card { background:#fff; padding:20px; border-radius:12px; max-width:400px; margin:auto }
-h2 { margin-top:0 }
-select, button { width:100%; padding:10px; margin-top:10px; font-size:16px }
-.msg { margin-top:10px; font-weight:bold }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendar</title>
+  <style>
+    :root{
+      --bg:#f3f5f9;
+      --card:#ffffff;
+      --text:#10213d;
+      --muted:#6b7280;
+      --line:#dbe2ea;
+      --primary:#243c89;
+      --primary-soft:#e6e9f4;
+      --danger:#dc2626;
+      --success:#15803d;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:Arial, Helvetica, sans-serif;
+      min-height:100vh;
+    }
+
+    .wrap{
+      max-width:760px;
+      margin:0 auto;
+      padding:20px 16px 40px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:24px;
+      padding:24px 20px 22px;
+      box-shadow:0 1px 0 rgba(16,33,61,.03);
+    }
+
+    h1{
+      margin:0 0 18px;
+      font-size:clamp(30px, 6vw, 48px);
+      line-height:1;
+      font-weight:900;
+    }
+
+    .info{
+      display:grid;
+      gap:12px;
+      margin-bottom:22px;
+    }
+
+    .info-row{
+      font-size:clamp(20px, 4.6vw, 28px);
+      line-height:1.25;
+    }
+
+    .label{
+      color:var(--muted);
+      font-weight:700;
+      margin-right:8px;
+    }
+
+    .value{
+      font-weight:900;
+      color:var(--text);
+    }
+
+    .field{
+      margin-top:10px;
+    }
+
+    .field label{
+      display:block;
+      margin-bottom:10px;
+      font-size:clamp(20px, 4.5vw, 26px);
+      font-weight:900;
+    }
+
+    select{
+      width:100%;
+      min-height:68px;
+      border:1px solid #cfd6e3;
+      border-radius:16px;
+      padding:0 16px;
+      font-size:clamp(22px, 5vw, 30px);
+      color:var(--text);
+      background:#fff;
+      outline:none;
+    }
+
+    button{
+      width:100%;
+      min-height:70px;
+      margin-top:18px;
+      border:0;
+      border-radius:18px;
+      background:var(--primary-soft);
+      color:var(--primary);
+      font-size:clamp(22px, 5vw, 30px);
+      font-weight:900;
+      cursor:pointer;
+    }
+
+    button:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+    }
+
+    .msg{
+      margin-top:18px;
+      font-size:clamp(20px, 4.8vw, 28px);
+      line-height:1.3;
+      font-weight:900;
+      min-height:1.4em;
+    }
+
+    .msg.error{ color:var(--danger); }
+    .msg.success{ color:var(--success); }
+
+    .aviso{
+      margin-top:16px;
+      background:#fff7ed;
+      color:#c2410c;
+      border:1px solid #fed7aa;
+      border-radius:16px;
+      padding:14px 16px;
+      font-size:clamp(18px, 4.2vw, 24px);
+      line-height:1.35;
+      font-weight:800;
+      display:none;
+    }
+
+    .back-link{
+      display:inline-block;
+      margin-top:18px;
+      font-size:clamp(18px, 4vw, 24px);
+      font-weight:800;
+      color:#2563eb;
+      text-decoration:underline;
+    }
+
+    @media (max-width:700px){
+      .wrap{
+        padding:14px 12px 28px;
+      }
+
+      .card{
+        border-radius:22px;
+        padding:20px 16px 18px;
+      }
+
+      select{
+        min-height:64px;
+      }
+
+      button{
+        min-height:66px;
+      }
+    }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Agendar</h1>
 
-<div class="card">
-  <h2>Agendar</h2>
+      <div class="info">
+        <div class="info-row">
+          <span class="label">Embarcação:</span>
+          <span class="value" id="emb">-</span>
+        </div>
 
-  <div>Embarcação: <b id="emb"></b></div>
-  <div>Grupo: <b id="grupo"></b></div>
-  <div>Data: <b id="data"></b></div>
+        <div class="info-row">
+          <span class="label">Grupo:</span>
+          <span class="value" id="grupo">-</span>
+        </div>
 
-  <select id="hora"></select>
+        <div class="info-row">
+          <span class="label">Data:</span>
+          <span class="value" id="data">-</span>
+        </div>
+      </div>
 
-  <button onclick="agendar()">CONFIRMAR</button>
+      <div class="field">
+        <label for="hora">Escolha o horário</label>
+        <select id="hora"></select>
+      </div>
 
-  <div id="msg" class="msg"></div>
-</div>
+      <div class="aviso" id="aviso"></div>
 
-<script>
-// ===== DECODIFICADOR =====
-const MAP = { a:"1",b:"2",c:"3",d:"4",e:"5",f:"6",g:"7",h:"8",i:"9",j:"0" };
+      <button id="btnConfirmar" type="button">CONFIRMAR</button>
 
-function decode(token){
-  const m = token.match(/^([a-j]+)([a-z])([a-j])$/);
-  if(!m) return null;
+      <div id="msg" class="msg"></div>
 
-  const pb = m[1].split("").map(x=>MAP[x]).join("");
-  const grupo = m[2].toUpperCase() + MAP[m[3]];
+      <a href="#" id="lnkVoltar" class="back-link">Voltar ao calendário</a>
+    </div>
+  </div>
 
-  return { pb, grupo };
-}
+  <script>
+    const MAP = {
+      a:"1", b:"2", c:"3", d:"4", e:"5",
+      f:"6", g:"7", h:"8", i:"9", j:"0"
+    };
 
-// ===== URL =====
-const qs = new URLSearchParams(location.search);
-const token = qs.get("token");
-const data = qs.get("data");
+    function decode(token){
+      const t = String(token || "").trim().toLowerCase();
+      const m = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      if(!m) return null;
 
-const acesso = decode(token);
+      const pb = m[1].split("").map(x => MAP[x] || "").join("");
+      const grupo = m[2].toUpperCase() + (MAP[m[3]] || "");
 
-if(!acesso){
-  alert("Link inválido");
-}
+      if(!pb || !grupo) return null;
+      return { pb, grupo, token: t };
+    }
 
-// ===== UI =====
-document.getElementById("emb").innerText = acesso.pb;
-document.getElementById("grupo").innerText = acesso.grupo;
-document.getElementById("data").innerText = data;
+    function formatarDataBR(iso){
+      const [y,m,d] = String(iso || "").split("-");
+      if(!y || !m || !d) return iso || "";
+      return `${d}/${m}/${y}`;
+    }
 
-// ===== HORÁRIOS =====
-const sel = document.getElementById("hora");
+    function obterYm(dataIso){
+      const [y,m] = String(dataIso || "").split("-");
+      if(!y || !m) return "";
+      return `${y}-${m}`;
+    }
 
-for(let h=10; h<=17; h++){
-  for(let m=0; m<60; m+=15){
+    const qs = new URLSearchParams(location.search);
+    const token = qs.get("token") || "";
+    const data = qs.get("data") || "";
 
-    if(h===17 && m>0) break;
+    const acesso = decode(token);
 
-    const hh = String(h).padStart(2,"0");
-    const mm = String(m).padStart(2,"0");
+    const embEl = document.getElementById("emb");
+    const grupoEl = document.getElementById("grupo");
+    const dataEl = document.getElementById("data");
+    const horaEl = document.getElementById("hora");
+    const btn = document.getElementById("btnConfirmar");
+    const msgEl = document.getElementById("msg");
+    const avisoEl = document.getElementById("aviso");
+    const lnkVoltar = document.getElementById("lnkVoltar");
 
-    const opt = document.createElement("option");
-    opt.value = `${hh}:${mm}`;
-    opt.text = `${hh}:${mm}`;
+    function setMsg(texto, tipo){
+      msgEl.className = "msg" + (tipo ? ` ${tipo}` : "");
+      msgEl.textContent = texto || "";
+    }
 
-    sel.appendChild(opt);
-  }
-}
+    function urlVoltaCalendario(){
+      if(!acesso || !data) return "/";
+      const ym = obterYm(data);
+      const ts = Date.now();
+      return `/${encodeURIComponent(acesso.token)}?ym=${encodeURIComponent(ym)}&r=${ts}`;
+    }
 
-// ===== AGENDAR =====
-async function agendar(){
+    function preencherHoras(){
+      horaEl.innerHTML = "";
 
-  const hora = sel.value;
+      for(let h = 10; h <= 17; h++){
+        for(let m = 0; m < 60; m += 15){
+          if(h === 17 && m > 0) break;
 
-  const r = await fetch("/api/agendar",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      token,
-      data,
-      hora
-    })
-  });
+          const hh = String(h).padStart(2, "0");
+          const mm = String(m).padStart(2, "0");
 
-  const j = await r.json();
+          const opt = document.createElement("option");
+          opt.value = `${hh}:${mm}`;
+          opt.textContent = `${hh}:${mm}`;
+          horaEl.appendChild(opt);
+        }
+      }
+    }
 
-  const msg = document.getElementById("msg");
+    async function verificarPrevia(){
+      try{
+        const resp = await fetch(
+          `/api/agendar?token=${encodeURIComponent(token)}&data=${encodeURIComponent(data)}`,
+          { cache: "no-store" }
+        );
 
-  if(!r.ok){
-    msg.style.color="red";
-    msg.innerText = j.error;
-  }else{
-    msg.style.color="green";
-    msg.innerText = j.msg;
+        const j = await resp.json();
 
-    setTimeout(()=>{
-      window.location.href = "/";
-    },1500);
-  }
-}
-</script>
+        if(!resp.ok){
+          setMsg(j.error || "Falha ao consultar disponibilidade.", "error");
+          btn.disabled = true;
+          return;
+        }
 
+        if(j.contingencia){
+          avisoEl.style.display = "block";
+          avisoEl.textContent = "Agendamento sob regra de contingência.";
+        }else{
+          avisoEl.style.display = "none";
+          avisoEl.textContent = "";
+        }
+
+      }catch(err){
+        setMsg("Falha ao consultar disponibilidade.", "error");
+        btn.disabled = true;
+      }
+    }
+
+    async function agendar(){
+      setMsg("", "");
+      btn.disabled = true;
+
+      try{
+        const hora = horaEl.value;
+
+        const r = await fetch("/api/agendar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            data,
+            hora
+          })
+        });
+
+        const j = await r.json();
+
+        if(!r.ok){
+          setMsg(j.error || "Falha ao gravar agendamento.", "error");
+          btn.disabled = false;
+          return;
+        }
+
+        let texto = j.msg || "Agendamento realizado com sucesso.";
+        if(j.contingencia){
+          texto += " Agendamento sob regra de contingência.";
+        }
+
+        setMsg(texto, "success");
+
+        setTimeout(() => {
+          window.location.href = urlVoltaCalendario();
+        }, 1200);
+
+      }catch(err){
+        setMsg("Falha ao gravar agendamento.", "error");
+        btn.disabled = false;
+      }
+    }
+
+    if(!acesso || !data){
+      embEl.textContent = "-";
+      grupoEl.textContent = "-";
+      dataEl.textContent = "-";
+      btn.disabled = true;
+      setMsg("Link de agendamento inválido.", "error");
+    }else{
+      embEl.textContent = acesso.pb;
+      grupoEl.textContent = acesso.grupo;
+      dataEl.textContent = formatarDataBR(data);
+      lnkVoltar.href = urlVoltaCalendario();
+      preencherHoras();
+      verificarPrevia();
+    }
+
+    btn.addEventListener("click", agendar);
+  </script>
 </body>
 </html>
