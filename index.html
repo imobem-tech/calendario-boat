@@ -12,6 +12,11 @@
       --muted: #6b7280;
       --line: #dbe2ea;
 
+      --primary: #1d4ed8;
+      --primary-soft: #e8efff;
+      --header-bg: #1d4ed8;
+      --header-text: #ffffff;
+
       --livre: #22c55e;
       --ocupado: #d946ef;
       --feriado: #22c55e;
@@ -36,8 +41,9 @@
     }
 
     .top-card{
-      background: var(--card);
-      border: 1px solid var(--line);
+      background: var(--header-bg);
+      color: var(--header-text);
+      border: 1px solid var(--header-bg);
       border-radius: 22px;
       padding: 16px 18px 18px;
       margin-bottom: 16px;
@@ -58,11 +64,12 @@
       line-height:1;
       font-weight: 900;
       letter-spacing:.2px;
+      color:#fff;
     }
 
     .title-box p{
       margin:8px 0 0;
-      color: var(--muted);
+      color: rgba(255,255,255,.92);
       font-size: clamp(14px, 2.8vw, 20px);
     }
 
@@ -91,7 +98,7 @@
 
     .link-btn{
       background: transparent;
-      color: #2563eb;
+      color: #ffffff;
       text-decoration: underline;
       min-height:auto;
       padding: 0;
@@ -99,8 +106,9 @@
     }
 
     .today-btn{
-      background: #e6e9f4;
-      color: #243c89;
+      background: rgba(255,255,255,.18);
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,.24);
     }
 
     .month-nav{
@@ -115,14 +123,15 @@
       height:64px;
       border:0;
       border-radius: 18px;
-      background: #e6e9f4;
-      color: #2442b5;
+      background: rgba(255,255,255,.18);
+      color: #ffffff;
       font-size: 34px;
       font-weight: 900;
       cursor: pointer;
       display:flex;
       align-items:center;
       justify-content:center;
+      border: 1px solid rgba(255,255,255,.24);
     }
 
     .month-title{
@@ -131,6 +140,7 @@
       font-weight: 900;
       line-height:1.1;
       text-transform: lowercase;
+      color:#fff;
     }
 
     .error{
@@ -297,6 +307,17 @@
       line-height: 1.4;
     }
 
+    .brand-footer{
+      text-align:center;
+      margin-top: 18px;
+      padding: 6px 4px 0;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      opacity: 0.8;
+    }
+
     @media (max-width: 700px){
       .wrap{ padding: 10px 8px 30px; }
 
@@ -357,9 +378,10 @@
   <div class="wrap">
     <section class="top-card">
       <div class="top-row">
-  <div class="title-box">
-  <h1 id="tituloEmb">EMB_</h1>
-</div>
+        <div class="title-box">
+          <h1 id="tituloEmb">EMB_</h1>
+          <p id="subTitulo">Calendário de agendamento</p>
+        </div>
 
         <div class="actions">
           <a href="#" class="link-btn" id="abrirLegenda">Legenda</a>
@@ -387,6 +409,8 @@
     </div>
 
     <section class="calendar" id="calendar"></section>
+
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas®</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -438,31 +462,75 @@
       j: "0"
     };
 
+    const MAP_NUM_PARA_LETRA = {
+      "1": "a",
+      "2": "b",
+      "3": "c",
+      "4": "d",
+      "5": "e",
+      "6": "f",
+      "7": "g",
+      "8": "h",
+      "9": "i",
+      "0": "j"
+    };
+
+    function somenteDigitos(txt){
+      return String(txt || "").replace(/\D+/g, "");
+    }
+
+    function decodificarDigitosCodificados(txt){
+      return String(txt || "")
+        .split("")
+        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
+        .join("");
+    }
+
+    function calcularDvEsperado(pb, grupoNum, codAutorizado){
+      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}`;
+      const soma = base
+        .split("")
+        .reduce((acc, n) => acc + Number(n), 0);
+
+      return String(soma).padStart(2, "0");
+    }
+
     function decodificarToken(token){
       const t = String(token || "").trim().toLowerCase();
 
-      // embarcação codificada + letra do grupo + número do grupo codificado
-      // exemplo: egfxa = egf + x + a = 576 + X1
-      const match = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      // Formato novo:
+      // [emb codificado][letra grupo][numero grupo codificado][autorizado 4 digitos codificado][dv 2 digitos codificado]
+      // Ex: egfxdabcdcb = 576 + X4 + 1234 + 32
+      const match = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
       if(!match) return null;
 
       const embCod = match[1];
       const grupoLetra = match[2].toUpperCase();
       const grupoNumCod = match[3];
+      const autorizadoCod = match[4];
+      const dvCod = match[5];
 
-      const pb = embCod
-        .split("")
-        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
-        .join("");
+      const pb = decodificarDigitosCodificados(embCod);
+      const grupoNum = decodificarDigitosCodificados(grupoNumCod);
+      const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
+      const dvInformado = decodificarDigitosCodificados(dvCod);
 
-      const grupoNum = MAP_LETRA_PARA_NUM[grupoNumCod];
+      if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
+      if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
 
-      if(!pb || !grupoNum) return null;
+      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado);
+      const dvOk = dvInformado === dvEsperado;
 
       return {
         token: t,
         pb,
-        grupo: `${grupoLetra}${grupoNum}`
+        grupo: `${grupoLetra}${grupoNum}`,
+        grupoLetra,
+        grupoNum,
+        codAutorizado,
+        dvInformado,
+        dvEsperado,
+        dvOk
       };
     }
 
@@ -480,7 +548,7 @@
     const acesso = decodificarToken(tokenUrl);
 
     const tituloEmb = document.getElementById("tituloEmb");
-   
+    const subTitulo = document.getElementById("subTitulo");
     const tituloMes = document.getElementById("tituloMes");
     const calendar = document.getElementById("calendar");
     const erroBox = document.getElementById("erroBox");
@@ -548,10 +616,10 @@
     }
 
     function navegarParaAgendamento(data){
-      if(!acesso) return;
+      if(!acesso || !acesso.dvOk) return;
 
       const dataStr = isoDate(data);
-    window.location.href = `/agendar.html?token=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+      window.location.href = `/agendar.html?token=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
     }
 
     function criarCelulaDia(data, info){
@@ -668,36 +736,25 @@
       }
     }
 
-    if(!acesso){
-      tituloEmb.textContent = "LINK INVÁLIDO";
-      subTitulo.textContent = "Não foi possível identificar embarcação e grupo.";
-      mostrarErro("Link inválido. Verifique o endereço enviado.");
-      btnPrev.disabled = true;
-      btnNext.disabled = true;
-      btnHoje.disabled = true;
-    }else{
-     tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
+    const hoje = zerarHora(new Date());
+
+    function obterMesInicial(){
+      const qs = new URLSearchParams(window.location.search);
+      const ym = qs.get("ym") || "";
+      const m = ym.match(/^(\d{4})-(\d{2})$/);
+
+      if(m){
+        const ano = Number(m[1]);
+        const mes = Number(m[2]);
+        if(ano >= 2000 && mes >= 1 && mes <= 12){
+          return new Date(ano, mes - 1, 1);
+        }
+      }
+
+      return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     }
 
-  const hoje = zerarHora(new Date());
-
-function obterMesInicial(){
-  const qs = new URLSearchParams(window.location.search);
-  const ym = qs.get("ym") || "";
-  const m = ym.match(/^(\d{4})-(\d{2})$/);
-
-  if(m){
-    const ano = Number(m[1]);
-    const mes = Number(m[2]);
-    if(ano >= 2000 && mes >= 1 && mes <= 12){
-      return new Date(ano, mes - 1, 1);
-    }
-  }
-
-  return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-}
-
-let mesAtual = obterMesInicial();
+    let mesAtual = obterMesInicial();
 
     abrirLegenda.addEventListener("click", (e) => {
       e.preventDefault();
@@ -721,7 +778,18 @@ let mesAtual = obterMesInicial();
       carregarMes();
     });
 
-    if(acesso){
+    if(!acesso || !acesso.dvOk){
+      tituloEmb.textContent = "LINK INVÁLIDO";
+      subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
+      mostrarErro("Link inválido. Verifique o endereço enviado.");
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      btnHoje.disabled = true;
+      abrirLegenda.style.pointerEvents = "none";
+      abrirLegenda.style.opacity = "0.6";
+    }else{
+      tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
+      subTitulo.textContent = `Autorizado ${acesso.codAutorizado}`;
       carregarMes();
     }
   </script>
