@@ -119,54 +119,53 @@
   </div>
 
   <script>
-    const MAP_LETRA_PARA_NUM = {
-      a: "1", b: "2", c: "3", d: "4", e: "5",
-      f: "6", g: "7", h: "8", i: "9", j: "0"
-    };
+    
+    const MAP = {
+  a:"1", b:"2", c:"3", d:"4", e:"5",
+  f:"6", g:"7", h:"8", i:"9", j:"0"
+};
 
-    function somenteDigitos(txt){
-      return String(txt || "").replace(/\D+/g, "");
-    }
+function somenteDigitos(txt){
+  return String(txt || "").replace(/\D+/g, "");
+}
 
-    function decodificarDigitosCodificados(txt){
-      return String(txt || "")
-        .split("")
-        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
-        .join("");
-    }
+function decodificar(txt){
+  return String(txt || "")
+    .split("")
+    .map(ch => MAP[ch] || "")
+    .join("");
+}
 
-    function calcularDvEsperado(pb, grupoNum, codAutorizado){
-      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}`;
-      const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
-      return String(soma).padStart(2, "0");
-    }
+function calcularDV(pb, grupoNum, autorizado){
+  const base = `${pb}${grupoNum}${autorizado}`;
+  const soma = base.split("").reduce((acc,n)=>acc+Number(n),0);
+  return String(soma).padStart(2,"0");
+}
 
-    function decode(token){
-      const t = String(token || "").trim().toLowerCase();
-      const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
-      if(!m) return null;
+function decode(token){
+  const t = String(token || "").trim().toLowerCase();
 
-      const pb = decodificarDigitosCodificados(m[1]);
-      const grupoLetra = m[2].toUpperCase();
-      const grupoNum = decodificarDigitosCodificados(m[3]);
-      const codAutorizado = decodificarDigitosCodificados(m[4]);
-      const dvInformado = decodificarDigitosCodificados(m[5]);
+  const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+  if(!m) return null;
 
-      if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
-      if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
+  const pb = decodificar(m[1]);
+  const grupoLetra = m[2].toUpperCase();
+  const grupoNum = decodificar(m[3]);
+  const autorizado = decodificar(m[4]);
+  const dv = decodificar(m[5]);
 
-      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado);
-      if(dvInformado !== dvEsperado) return null;
+  if(!pb || !grupoNum || !autorizado || !dv) return null;
 
-      return {
-        pb,
-        grupo: `${grupoLetra}${grupoNum}`,
-        grupoLetra,
-        grupoNum,
-        codAutorizado,
-        token: t
-      };
-    }
+  const dvCalc = calcularDV(pb, grupoNum, autorizado);
+  if(dv !== dvCalc) return null;
+
+  return {
+    pb,
+    grupo: `${grupoLetra}${grupoNum}`,
+    codAutorizado: autorizado,
+    token: t
+  };
+}
 
     function formatarDataBR(iso){
       if(!iso) return "-";
