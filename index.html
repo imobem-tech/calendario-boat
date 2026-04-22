@@ -14,7 +14,7 @@
 
       --livre: #22c55e;
       --ocupado: #d946ef;
-      --feriado: #f59e0b;
+      --feriado: #22c55e; /* agora feriado usa verde */
       --folga: #facc15;
       --passado: #cfd5dd;
       --vazio: #e5e7eb;
@@ -177,7 +177,8 @@
       text-align:left;
     }
 
-    .day.free{
+    .day.free,
+    .day.holiday{
       cursor:pointer;
     }
 
@@ -407,23 +408,18 @@
         </div>
 
         <div class="legend-item">
-          <div class="legend-color" style="background:#f59e0b"></div>
-          <div><strong>Feriado</strong> — aparece <strong>F</strong>.</div>
+          <div class="legend-color" style="background:#22c55e"></div>
+          <div><strong>Feriado</strong> — aparece no canto como <strong>22-F</strong> e continua clicável se não estiver agendado.</div>
         </div>
 
         <div class="legend-item">
           <div class="legend-color" style="background:#facc15"></div>
           <div><strong>Folga</strong> — aparece <strong>fol</strong>.</div>
         </div>
-
-        <div class="legend-item">
-          <div class="legend-color" style="background:#cfd5dd"></div>
-          <div><strong>Passado</strong> — fica cinza, sem número e sem clique.</div>
-        </div>
       </div>
 
       <div class="footer-note">
-        Apenas dias livres ficam clicáveis.
+        Apenas dias livres e feriados ficam clicáveis.
       </div>
     </div>
   </dialog>
@@ -490,7 +486,7 @@
       return `${y}-${m}-${d}`;
     }
 
-    function normalizarLabel(status, label){
+    function normalizarLabel(status, label, data){
       const txt = (label || "").toString().trim().toUpperCase();
 
       if(status === "busy"){
@@ -498,7 +494,7 @@
       }
 
       if(status === "holiday"){
-        return "F";
+        return `${data.getDate()}-F`;
       }
 
       if(status === "folga"){
@@ -559,12 +555,19 @@
       return div;
     }
 
+    function navegarParaAgendamento(data){
+      const dataStr = isoDate(data);
+      window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
+    }
+
     function criarCelulaDia(data, info){
       const status = info?.status || "free";
-      const label = normalizarLabel(status, info?.label);
+      const label = normalizarLabel(status, info?.label, data);
 
-      const el = document.createElement(status === "free" ? "button" : "div");
-      if(status === "free"){
+      const clicavel = status === "free" || status === "holiday";
+
+      const el = document.createElement(clicavel ? "button" : "div");
+      if(clicavel){
         el.type = "button";
       }
 
@@ -572,17 +575,16 @@
 
       const num = document.createElement("div");
       num.className = "day-number";
-      num.textContent = data.getDate();
+      num.textContent = status === "holiday" ? `${data.getDate()}-F` : data.getDate();
 
       const center = document.createElement("div");
       center.className = "day-center";
-      center.textContent = label;
+      center.textContent = status === "holiday" ? "" : label;
 
-      if(status === "free"){
+      if(clicavel){
         el.classList.add("empty-current");
         el.addEventListener("click", () => {
-          const dataStr = isoDate(data);
-          window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
+          navegarParaAgendamento(data);
         });
       }
 
