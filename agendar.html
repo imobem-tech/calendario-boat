@@ -483,9 +483,10 @@
 
         setMsg(json.msg || "Agendamento realizado.", "success");
 
-        setTimeout(() => {
-          window.location.href = `/${encodeURIComponent(token)}`;
-        }, 1600);
+       setTimeout(() => {
+  const mesRef = data.slice(0, 7); // ex: 2026-06
+  window.location.href = `/${encodeURIComponent(token)}?mes=${encodeURIComponent(mesRef)}`;
+}, 1600);
 
       }catch(err){
         setMsg(err.message || "Erro ao enviar agendamento.", "error");
