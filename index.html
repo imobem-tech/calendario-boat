@@ -1,201 +1,654 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calendário Boat</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendário Boat</title>
+  <style>
+    :root{
+      --bg: #f3f5f9;
+      --card: #ffffff;
+      --text: #10213d;
+      --muted: #6b7280;
+      --line: #dbe2ea;
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f3f4f6;
-  margin: 0;
-  padding: 10px;
-}
+      --livre: #22c55e;    /* verde */
+      --ocupado: #d946ef;  /* magenta */
+      --feriado: #f59e0b;  /* laranja */
+      --folga: #facc15;    /* amarelo */
+      --passado: #cfd5dd;  /* cinza */
+      --vazio: #e5e7eb;
+      --botao: #2f66ff;
+    }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
+    *{ box-sizing: border-box; }
 
-button {
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: white;
-  font-weight: bold;
-}
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
 
-.calendar {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 14px 12px 40px;
+    }
 
-.day-cell {
-  position: relative;
-  border-radius: 10px;
-  height: 60px;
-  padding: 6px;
-}
+    .top-card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px 18px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 0 rgba(16,33,61,.03);
+    }
 
-/* número */
-.day-number {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  font-size: 12px;
-  font-weight: bold;
-}
+    .top-row{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 14px;
+    }
 
-/* centro */
-.day-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-weight: bold;
-}
+    .title-box h1{
+      margin:0;
+      font-size: clamp(24px, 4.8vw, 40px);
+      line-height:1;
+      font-weight: 900;
+      letter-spacing:.2px;
+    }
 
-/* cores */
-.free { background: #22c55e; color: white; }
-.busy { background: #d946ef; color: white; }
-.holiday { background: #f97316; color: white; }
-.folga { background: #facc15; color: black; }
+    .title-box p{
+      margin:8px 0 0;
+      color: var(--muted);
+      font-size: clamp(14px, 2.8vw, 20px);
+    }
 
-/* passado */
-.past { background: #d1d5db; }
+    .actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
 
-.weekday {
-  text-align: center;
-  font-weight: bold;
-  font-size: 12px;
-}
-</style>
+    .link-btn,
+    .today-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height: 54px;
+      padding: 0 18px;
+      border-radius: 16px;
+      text-decoration:none;
+      font-weight: 800;
+      font-size: 18px;
+      border: none;
+      cursor:pointer;
+    }
+
+    .link-btn{
+      background: transparent;
+      color: #2563eb;
+      text-decoration: underline;
+      min-height:auto;
+      padding: 0;
+      border-radius:0;
+    }
+
+    .today-btn{
+      background: #e6e9f4;
+      color: #243c89;
+    }
+
+    .month-nav{
+      display:grid;
+      grid-template-columns: 64px 1fr 64px;
+      align-items:center;
+      gap: 12px;
+    }
+
+    .nav-btn{
+      width:64px;
+      height:64px;
+      border:0;
+      border-radius: 18px;
+      background: #e6e9f4;
+      color: #2442b5;
+      font-size: 34px;
+      font-weight: 900;
+      cursor: pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .month-title{
+      text-align:center;
+      font-size: clamp(22px, 4.3vw, 40px);
+      font-weight: 900;
+      line-height:1.1;
+      text-transform: lowercase;
+    }
+
+    .error{
+      display:none;
+      margin: 0 0 16px;
+      background: #fff1f2;
+      color: #dc2626;
+      border: 1px solid #fecdd3;
+      border-radius: 18px;
+      padding: 18px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .weekdays{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:8px;
+      margin-bottom:8px;
+      padding: 0 2px;
+    }
+
+    .weekday{
+      text-align:center;
+      font-weight: 800;
+      font-size: clamp(14px, 2.3vw, 18px);
+      padding: 8px 2px 4px;
+      color: #111827;
+    }
+
+    .calendar{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:8px;
+    }
+
+    .day{
+      position:relative;
+      min-height: 92px;
+      border-radius: 16px;
+      padding: 8px;
+      overflow:hidden;
+      border: 0;
+      text-align:left;
+    }
+
+    .day.visible{
+      cursor:pointer;
+    }
+
+    .day.past,
+    .day.blank{
+      background: var(--passado);
+      cursor: default;
+    }
+
+    .day.free{ background: var(--livre); }
+    .day.busy{ background: var(--ocupado); color: #fff; }
+    .day.holiday{ background: var(--feriado); }
+    .day.folga{ background: var(--folga); }
+
+    .day-number{
+      position:absolute;
+      top:8px;
+      left:10px;
+      font-size: 15px;
+      font-weight: 900;
+      line-height:1;
+    }
+
+    .day-center{
+      width:100%;
+      height:100%;
+      min-height: 76px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      font-size: clamp(18px, 3vw, 28px);
+      font-weight: 900;
+      letter-spacing: .3px;
+      padding: 10px 4px 0;
+    }
+
+    .busy .day-center{
+      font-size: clamp(16px, 2.8vw, 24px);
+    }
+
+    .day.empty-current .day-center{
+      color: transparent;
+      user-select:none;
+    }
+
+    .legend-dialog{
+      border: none;
+      border-radius: 20px;
+      padding: 0;
+      width: min(92vw, 420px);
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(0,0,0,.18);
+    }
+
+    .legend-dialog::backdrop{
+      background: rgba(0,0,0,.28);
+    }
+
+    .legend-box{
+      padding: 20px;
+    }
+
+    .legend-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 14px;
+    }
+
+    .legend-head h2{
+      margin:0;
+      font-size: 24px;
+    }
+
+    .close-btn{
+      border:0;
+      background:#eef2ff;
+      color:#1d4ed8;
+      border-radius:12px;
+      width:42px;
+      height:42px;
+      font-size:24px;
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .legend-list{
+      display:grid;
+      gap:10px;
+    }
+
+    .legend-item{
+      display:grid;
+      grid-template-columns: 28px 1fr;
+      align-items:center;
+      gap:10px;
+      font-size:16px;
+      line-height:1.35;
+    }
+
+    .legend-color{
+      width:28px;
+      height:28px;
+      border-radius:8px;
+      border:1px solid rgba(0,0,0,.08);
+    }
+
+    .footer-note{
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 700px){
+      .wrap{ padding: 10px 8px 30px; }
+
+      .top-card{
+        padding: 14px 14px 16px;
+        border-radius: 18px;
+      }
+
+      .top-row{
+        align-items:flex-start;
+      }
+
+      .actions{
+        align-items:flex-end;
+        gap:8px;
+      }
+
+      .today-btn{
+        min-height: 46px;
+        padding: 0 14px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+
+      .month-nav{
+        grid-template-columns: 56px 1fr 56px;
+      }
+
+      .nav-btn{
+        width:56px;
+        height:56px;
+        border-radius:16px;
+        font-size: 30px;
+      }
+
+      .calendar{
+        gap:6px;
+      }
+
+      .weekdays{
+        gap:6px;
+      }
+
+      .day{
+        min-height: 82px;
+        border-radius: 14px;
+      }
+
+      .day-number{
+        font-size: 13px;
+        top:7px;
+        left:8px;
+      }
+
+      .day-center{
+        min-height: 66px;
+        font-size: 22px;
+      }
+
+      .busy .day-center{
+        font-size: 20px;
+      }
+    }
+  </style>
 </head>
-
 <body>
+  <div class="wrap">
+    <section class="top-card">
+      <div class="top-row">
+        <div class="title-box">
+          <h1 id="tituloEmb">EMBARCAÇÃO 576</h1>
+          <p>Calendário de disponibilidade</p>
+        </div>
 
-<div class="header">
-  <button onclick="prevMonth()">◀</button>
-  <h3 id="monthTitle"></h3>
-  <button onclick="nextMonth()">▶</button>
-</div>
+        <div class="actions">
+          <a href="#" class="link-btn" id="abrirLegenda">Legenda</a>
+          <button class="today-btn" id="btnHoje" type="button">Hoje</button>
+        </div>
+      </div>
 
-<div class="calendar" id="weekdays"></div>
-<div class="calendar" id="calendar"></div>
+      <div class="month-nav">
+        <button class="nav-btn" id="btnPrev" type="button" aria-label="Mês anterior">‹</button>
+        <div class="month-title" id="tituloMes">abril de 2026</div>
+        <button class="nav-btn" id="btnNext" type="button" aria-label="Próximo mês">›</button>
+      </div>
+    </section>
 
-<script>
-const API = "/api/availability";
-const PB = 576;
+    <div class="error" id="erroBox"></div>
 
-let currentDate = new Date();
-currentDate.setDate(1);
+    <div class="weekdays">
+      <div class="weekday">Dom</div>
+      <div class="weekday">Seg</div>
+      <div class="weekday">Ter</div>
+      <div class="weekday">Qua</div>
+      <div class="weekday">Qui</div>
+      <div class="weekday">Sex</div>
+      <div class="weekday">Sáb</div>
+    </div>
 
-const weekdays = ["Dom","Seg","Ter","Qua","Qui","Sex","Sab"];
+    <section class="calendar" id="calendar"></section>
+  </div>
 
-document.getElementById("weekdays").innerHTML =
-  weekdays.map(d => `<div class="weekday">${d}</div>`).join("");
+  <dialog class="legend-dialog" id="legendDialog">
+    <div class="legend-box">
+      <div class="legend-head">
+        <h2>Legenda</h2>
+        <button class="close-btn" id="fecharLegenda" type="button">×</button>
+      </div>
 
-function pad(n){ return String(n).padStart(2,"0"); }
+      <div class="legend-list">
+        <div class="legend-item">
+          <div class="legend-color" style="background:#22c55e"></div>
+          <div><strong>Livre</strong> — apenas o número do dia.</div>
+        </div>
 
-function formatMonth(d){
-  return d.toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
-}
+        <div class="legend-item">
+          <div class="legend-color" style="background:#d946ef"></div>
+          <div><strong>Ocupado</strong> — aparece o grupo no centro. Se não houver grupo, aparece <strong>AG</strong>.</div>
+        </div>
 
-function toYMD(d){
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
+        <div class="legend-item">
+          <div class="legend-color" style="background:#f59e0b"></div>
+          <div><strong>Feriado</strong> — aparece <strong>F</strong>.</div>
+        </div>
 
-function renderDay(item){
-  const hoje = new Date();
-  hoje.setHours(0,0,0,0);
+        <div class="legend-item">
+          <div class="legend-color" style="background:#facc15"></div>
+          <div><strong>Folga</strong> — aparece <strong>fol</strong>.</div>
+        </div>
 
-  const data = new Date(item.date + "T00:00:00");
-  const isPast = data < hoje;
+        <div class="legend-item">
+          <div class="legend-color" style="background:#cfd5dd"></div>
+          <div><strong>Passado</strong> — dias anteriores a hoje ficam cinza, sem número e sem clique.</div>
+        </div>
+      </div>
 
-  if(isPast){
-    return `<div class="day-cell past"></div>`;
-  }
+      <div class="footer-note">
+        O dia de hoje aparece normalmente. Toque em um dia visível para a próxima etapa de agendamento.
+      </div>
+    </div>
+  </dialog>
 
-  const dia = data.getDate();
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const PB = params.get("pb") || "576";
 
-  let center = "";
+    const tituloEmb = document.getElementById("tituloEmb");
+    const tituloMes = document.getElementById("tituloMes");
+    const calendar = document.getElementById("calendar");
+    const erroBox = document.getElementById("erroBox");
 
-  if(item.status === "busy"){
-    center = item.label || "AG";
-  }
-  else if(item.status === "holiday"){
-    center = "F";
-  }
-  else if(item.status === "folga"){
-    center = "fol";
-  }
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+    const btnHoje = document.getElementById("btnHoje");
 
-  return `
-  <div class="day-cell ${item.status}"
-       onclick="selecionarDia('${item.date}','${item.status}')">
-    <div class="day-number">${dia}</div>
-    ${center ? `<div class="day-center">${center}</div>` : ""}
-  </div>`;
-}
+    const legendDialog = document.getElementById("legendDialog");
+    const abrirLegenda = document.getElementById("abrirLegenda");
+    const fecharLegenda = document.getElementById("fecharLegenda");
 
-function selecionarDia(data, status){
-  if(status !== "free") return;
-  alert("Selecionado: " + data);
-}
+    tituloEmb.textContent = `EMBARCAÇÃO ${PB}`;
 
-async function loadCalendar(){
-  document.getElementById("monthTitle").innerText = formatMonth(currentDate);
+    const hoje = zerarHora(new Date());
+    let mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
 
-  const start = toYMD(currentDate);
+    abrirLegenda.addEventListener("click", (e) => {
+      e.preventDefault();
+      legendDialog.showModal();
+    });
 
-  const res = await fetch(`${API}?pb=${PB}&start=${start}&months=1`);
-  const data = await res.json();
+    fecharLegenda.addEventListener("click", () => legendDialog.close());
 
-  const map = new Map(data.map(d => [d.date, d]));
+    btnHoje.addEventListener("click", () => {
+      mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      carregarMes();
+    });
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
+    btnPrev.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
+      carregarMes();
+    });
 
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month+1, 0);
+    btnNext.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1);
+      carregarMes();
+    });
 
-  const startWeek = firstDay.getDay();
+    function zerarHora(d){
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
 
-  let html = "";
+    function formatMesAno(data){
+      return data.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric"
+      });
+    }
 
-  for(let i=0;i<startWeek;i++){
-    html += `<div></div>`;
-  }
+    function isoDate(data){
+      const y = data.getFullYear();
+      const m = String(data.getMonth() + 1).padStart(2, "0");
+      const d = String(data.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
 
-  for(let d=1; d<=lastDay.getDate(); d++){
-    const date = new Date(year, month, d);
-    const ymd = toYMD(date);
+    function normalizarLabel(status, label){
+      const txt = (label || "").toString().trim().toUpperCase();
 
-    const item = map.get(ymd) || {date: ymd, status:"free"};
+      if(status === "busy"){
+        return txt || "AG";
+      }
 
-    html += renderDay(item);
-  }
+      if(status === "holiday"){
+        return "F";
+      }
 
-  document.getElementById("calendar").innerHTML = html;
-}
+      if(status === "folga"){
+        return "fol";
+      }
 
-function prevMonth(){
-  currentDate.setMonth(currentDate.getMonth()-1);
-  loadCalendar();
-}
+      return "";
+    }
 
-function nextMonth(){
-  currentDate.setMonth(currentDate.getMonth()+1);
-  loadCalendar();
-}
+    async function buscarDisponibilidade(dataMes){
+      const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
+      const start = isoDate(inicio);
 
-loadCalendar();
-</script>
+      const url = `/api/availability?pb=${encodeURIComponent(PB)}&start=${encodeURIComponent(start)}&months=1`;
+      const resp = await fetch(url, { cache: "no-store" });
 
+      if(!resp.ok){
+        throw new Error(`Falha ao carregar calendário (${resp.status})`);
+      }
+
+      return await resp.json();
+    }
+
+    function montarMapa(lista){
+      const mapa = new Map();
+
+      (lista || []).forEach(item => {
+        if(!item || !item.date) return;
+
+        mapa.set(item.date, {
+          status: item.status || "free",
+          label: item.label || ""
+        });
+      });
+
+      return mapa;
+    }
+
+    function mostrarErro(msg){
+      erroBox.style.display = "block";
+      erroBox.textContent = msg;
+    }
+
+    function esconderErro(){
+      erroBox.style.display = "none";
+      erroBox.textContent = "";
+    }
+
+    function criarCelulaVazia(){
+      const div = document.createElement("div");
+      div.className = "day blank";
+      return div;
+    }
+
+    function criarCelulaPassado(){
+      const div = document.createElement("div");
+      div.className = "day past";
+      return div;
+    }
+
+    function criarCelulaDia(data, info){
+      const status = info?.status || "free";
+      const label = normalizarLabel(status, info?.label);
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `day visible ${status}`;
+
+      const num = document.createElement("div");
+      num.className = "day-number";
+      num.textContent = data.getDate();
+
+      const center = document.createElement("div");
+      center.className = "day-center";
+      center.textContent = label;
+
+      if(status === "free"){
+        btn.classList.add("empty-current");
+      }
+
+      btn.appendChild(num);
+      btn.appendChild(center);
+
+      btn.addEventListener("click", () => {
+        const dataStr = isoDate(data);
+
+        // Próxima etapa: página de agendamento
+        // Quando você criar a página, o clique já estará pronto.
+        window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
+      });
+
+      return btn;
+    }
+
+    function renderizarCalendario(mapa){
+      calendar.innerHTML = "";
+
+      const ano = mesAtual.getFullYear();
+      const mes = mesAtual.getMonth();
+
+      tituloMes.textContent = formatMesAno(mesAtual);
+
+      const primeiroDia = new Date(ano, mes, 1);
+      const ultimoDia = new Date(ano, mes + 1, 0);
+      const totalDias = ultimoDia.getDate();
+
+      const inicioSemana = primeiroDia.getDay(); // 0=Dom
+
+      for(let i = 0; i < inicioSemana; i++){
+        calendar.appendChild(criarCelulaVazia());
+      }
+
+      for(let dia = 1; dia <= totalDias; dia++){
+        const data = new Date(ano, mes, dia);
+        const iso = isoDate(data);
+
+        if(data < hoje){
+          calendar.appendChild(criarCelulaPassado());
+          continue;
+        }
+
+        const info = mapa.get(iso) || { status: "free", label: "" };
+        calendar.appendChild(criarCelulaDia(data, info));
+      }
+    }
+
+    async function carregarMes(){
+      esconderErro();
+
+      try{
+        const lista = await buscarDisponibilidade(mesAtual);
+        const mapa = montarMapa(lista);
+        renderizarCalendario(mapa);
+      }catch(err){
+        renderizarCalendario(new Map());
+        mostrarErro(err.message || "Falha ao carregar calendário.");
+      }
+    }
+
+    carregarMes();
+  </script>
 </body>
 </html>
