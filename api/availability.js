@@ -182,10 +182,17 @@ export default async function handler(req, res) {
       }
 
       // Igual ao VBA: folga não é sobrescrita por agendamento
-      if (status !== "folga" && agendamentos[d]) {
-        status = "busy";
-        label = agendamentos[d];
-      }
+   
+      
+// prioridade: feriado vence tudo
+if (ehFeriado) {
+  status = "holiday";
+  label = "F";
+}
+else if (status !== "folga" && agendamentos[d]) {
+  status = "busy";
+  label = agendamentos[d];
+}
 
       resp.push({
         date: d,
