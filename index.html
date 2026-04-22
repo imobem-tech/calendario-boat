@@ -1,38 +1,792 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Calendário Boat</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #142033;
+      --muted: #6b7280;
+      --border: #d9dfeb;
+      --shadow: 0 10px 30px rgba(20, 32, 51, 0.08);
+
+      --free: #22c55e;
+      --busy: #d946ef;
+      --holiday: #f97316;
+      --off: #facc15;
+
+      --free-soft: #dcfce7;
+      --busy-soft: #fae8ff;
+      --holiday-soft: #ffedd5;
+      --off-soft: #fef9c3;
+
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 14px;
+    }
+
+    .app {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      position: sticky;
+      top: 10px;
+      z-index: 20;
+      margin-bottom: 14px;
+    }
+
+    .topbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .link-btn,
+    .ghost-btn,
+    .nav-btn,
+    .primary-btn,
+    .secondary-btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      transition: 0.18s ease;
+    }
+
+    .link-btn {
+      background: transparent;
+      color: #2563eb;
+      font-weight: 700;
+      padding: 8px 2px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .ghost-btn {
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .month-nav {
+      display: grid;
+      grid-template-columns: 52px 1fr 52px;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .nav-btn {
+      height: 52px;
+      border-radius: 14px;
+      background: #eef2ff;
+      color: #1e3a8a;
+      font-size: 1.3rem;
+      font-weight: 800;
+    }
+
+    .nav-btn:active,
+    .ghost-btn:active,
+    .primary-btn:active,
+    .secondary-btn:active,
+    .day:active {
+      transform: scale(0.98);
+    }
+
+    .month-title {
+      text-align: center;
+      font-size: 1.12rem;
+      font-weight: 800;
+    }
+
+    .calendar-card,
+    .helper-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .weekdays,
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .weekdays {
+      padding-bottom: 0;
+    }
+
+    .weekday {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.77rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      min-width: 0;
+    }
+
+    .grid {
+      padding-top: 10px;
+      padding-bottom: 14px;
+    }
+
+    .day,
+    .day-empty {
+      min-height: 78px;
+      border-radius: 16px;
+    }
+
+    .day-empty {
+      background: transparent;
+    }
+
+    .day {
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8px 4px;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .day.free {
+      background: var(--free-soft);
+      border-color: #86efac;
+      cursor: pointer;
+    }
+
+    .day.busy {
+      background: var(--busy-soft);
+      border-color: #f0abfc;
+      color: #86198f;
+    }
+
+    .day.holiday {
+      background: var(--holiday-soft);
+      border-color: #fdba74;
+      color: #9a3412;
+    }
+
+    .day.folga {
+      background: var(--off-soft);
+      border-color: #fde047;
+      color: #854d0e;
+    }
+
+    .day-number {
+      position: absolute;
+      top: 7px;
+      left: 8px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: rgba(20, 32, 51, 0.9);
+      line-height: 1;
+    }
+
+    .day-label {
+      font-size: 1rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.01em;
+    }
+
+    .busy .day-label {
+      font-size: 1.05rem;
+    }
+
+    .loading,
+    .error-box,
+    .empty-box {
+      margin: 14px 0;
+      padding: 14px;
+      border-radius: 16px;
+      font-weight: 600;
+    }
+
+    .loading {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .error-box {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .empty-box {
+      background: #f8fafc;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+      padding: 12px;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 760px;
+      background: var(--card);
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -18px 40px rgba(15, 23, 42, 0.18);
+      padding: 16px 16px 24px;
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .sheet-handle {
+      width: 54px;
+      height: 6px;
+      border-radius: 999px;
+      background: #d1d5db;
+      margin: 0 auto 12px;
+    }
+
+    .sheet-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .sheet-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .sheet-subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .close-btn {
+      background: #f3f4f6;
+      color: #111827;
+      border-radius: 12px;
+      width: 42px;
+      height: 42px;
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      font: inherit;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .field textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    .helper {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .primary-btn {
+      background: #111827;
+      color: #fff;
+      padding: 15px 16px;
+      border-radius: 15px;
+      font-weight: 800;
+    }
+
+    .secondary-btn {
+      background: #eef2ff;
+      color: #312e81;
+      padding: 14px 16px;
+      border-radius: 15px;
+      font-weight: 800;
+    }
+
+    .legend-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    .legend-swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .legend-swatch.free { background: var(--free); }
+    .legend-swatch.busy { background: var(--busy); }
+    .legend-swatch.holiday { background: var(--holiday); }
+    .legend-swatch.folga { background: var(--off); }
+
+    .status-bar {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      font-weight: 700;
+      display: none;
+    }
+
+    .status-bar.show { display: block; }
+    .status-bar.ok { background: #ecfdf5; color: #166534; border: 1px solid #bbf7d0; }
+    .status-bar.err { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    @media (min-width: 700px) {
+      body { padding: 24px; }
+      .day,
+      .day-empty { min-height: 92px; }
+      .day-label { font-size: 1.1rem; }
+      .actions { grid-template-columns: 1fr 1fr; }
+      .sheet { border-radius: 24px; max-width: 560px; }
+      .modal-backdrop { align-items: center; }
+    }
+  </style>
 </head>
 <body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-row">
+        <div>
+          <div class="title" id="boatTitle">EMBARCAÇÃO 576</div>
+          <div class="subtitle">Calendário de disponibilidade</div>
+        </div>
+        <div class="header-actions">
+          <button class="link-btn" id="legendBtn">Legenda</button>
+          <button class="ghost-btn" id="todayBtn">Hoje</button>
+        </div>
+      </div>
 
-<h1>Calendário (teste)</h1>
+      <div class="month-nav">
+        <button class="nav-btn" id="prevBtn" aria-label="Mês anterior">‹</button>
+        <div class="month-title" id="monthTitle">Abril 2026</div>
+        <button class="nav-btn" id="nextBtn" aria-label="Próximo mês">›</button>
+      </div>
+    </header>
 
-<div id="dados"></div>
+    <div id="loadingBox" class="loading">Carregando calendário...</div>
+    <div id="errorBox" class="error-box" style="display:none"></div>
 
-<script>
-fetch('/api/teste')
-  .then(res => res.json())
-  .then(data => {
-    const div = document.getElementById('dados')
+    <section class="calendar-card" aria-label="Calendário mensal">
+      <div class="weekdays" id="weekdays"></div>
+      <div class="grid" id="calendarGrid"></div>
+    </section>
+  </div>
 
-    data.forEach(item => {
-      const el = document.createElement('div')
+  <div class="modal-backdrop" id="legendModal">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="legendTitle">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div>
+          <h2 class="sheet-title" id="legendTitle">Legenda</h2>
+          <p class="sheet-subtitle">Significado das cores e siglas no calendário.</p>
+        </div>
+        <button class="close-btn" data-close="legendModal">×</button>
+      </div>
 
-      el.innerHTML = `
-        <b>ID:</b> ${item.ID} <br>
+      <div class="legend-list">
+        <div class="legend-item"><span class="legend-swatch free"></span><div><strong>Livre</strong><br><span class="helper">Dia disponível para solicitar agendamento.</span></div></div>
+        <div class="legend-item"><span class="legend-swatch busy"></span><div><strong>Ocupado</strong><br><span class="helper">Mostra o grupo no centro, por exemplo X1.</span></div></div>
+        <div class="legend-item"><span class="legend-swatch holiday"></span><div><strong>Feriado</strong><br><span class="helper">Exibido como F.</span></div></div>
+        <div class="legend-item"><span class="legend-swatch folga"></span><div><strong>Folga</strong><br><span class="helper">Exibido como fol.</span></div></div>
+      </div>
+    </div>
+  </div>
 
-        const saida = new Date(item.Dt_Saida).toLocaleString('pt-BR')
-const retorno = new Date(item.Dt_Retorno).toLocaleString('pt-BR')
-       <b>Saída:</b> ${saida} <br>
-<b>Retorno:</b> ${retorno} <br>
-        <b>Responsável:</b> ${item.Colab_Responsavel}
-        <hr>
-      `
+  <div class="modal-backdrop" id="bookingModal">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bookingTitle">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div>
+          <h2 class="sheet-title" id="bookingTitle">Nova solicitação</h2>
+          <p class="sheet-subtitle" id="bookingSubtitle">Escolha os dados do agendamento.</p>
+        </div>
+        <button class="close-btn" data-close="bookingModal">×</button>
+      </div>
 
-      div.appendChild(el)
-    })
-  })
-</script>
+      <form id="bookingForm">
+        <div class="form-grid">
+          <div class="field">
+            <label for="bookingDate">Data</label>
+            <input id="bookingDate" name="date" type="text" readonly />
+          </div>
 
+          <div class="field">
+            <label for="bookingGroup">Grupo</label>
+            <input id="bookingGroup" name="group" type="text" maxlength="2" placeholder="Ex.: X1" />
+            <div class="helper">Informe a letra e o número do grupo.</div>
+          </div>
+
+          <div class="field">
+            <label for="bookingTime">Hora pretendida</label>
+            <input id="bookingTime" name="time" type="text" placeholder="Ex.: 08:00" />
+          </div>
+
+          <div class="field">
+            <label for="bookingObs">Observação</label>
+            <textarea id="bookingObs" name="observation" placeholder="Opcional"></textarea>
+          </div>
+        </div>
+
+        <div id="formStatus" class="status-bar"></div>
+
+        <div class="actions">
+          <button type="submit" class="primary-btn">Enviar solicitação</button>
+          <button type="button" class="secondary-btn" data-close="bookingModal">Voltar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "/api";
+    const PB = 576;
+    const BOAT_LABEL = `EMBARCAÇÃO ${PB}`;
+
+    const monthTitle = document.getElementById("monthTitle");
+    const boatTitle = document.getElementById("boatTitle");
+    const calendarGrid = document.getElementById("calendarGrid");
+    const weekdays = document.getElementById("weekdays");
+    const loadingBox = document.getElementById("loadingBox");
+    const errorBox = document.getElementById("errorBox");
+    const legendBtn = document.getElementById("legendBtn");
+    const todayBtn = document.getElementById("todayBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const legendModal = document.getElementById("legendModal");
+    const bookingModal = document.getElementById("bookingModal");
+    const bookingSubtitle = document.getElementById("bookingSubtitle");
+    const bookingDate = document.getElementById("bookingDate");
+    const bookingGroup = document.getElementById("bookingGroup");
+    const bookingTime = document.getElementById("bookingTime");
+    const bookingObs = document.getElementById("bookingObs");
+    const bookingForm = document.getElementById("bookingForm");
+    const formStatus = document.getElementById("formStatus");
+
+    const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    weekdays.innerHTML = weekdayNames.map(d => `<div class="weekday">${d}</div>`).join("");
+
+    let currentMonth = new Date();
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    let monthData = [];
+    let selectedDate = null;
+
+    boatTitle.textContent = BOAT_LABEL;
+
+    function pad(n) {
+      return String(n).padStart(2, "0");
+    }
+
+    function toYmd(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function formatMonthTitle(date) {
+      return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+        .replace(/^./, c => c.toUpperCase());
+    }
+
+    function formatDatePt(ymd) {
+      const [y, m, d] = ymd.split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    function openModal(modal) {
+      modal.classList.add("show");
+    }
+
+    function closeModal(modal) {
+      modal.classList.remove("show");
+    }
+
+    function setFormStatus(type, message) {
+      formStatus.className = `status-bar show ${type}`;
+      formStatus.textContent = message;
+    }
+
+    function clearFormStatus() {
+      formStatus.className = "status-bar";
+      formStatus.textContent = "";
+    }
+
+    function dayContent(item, dayNumber) {
+      if (item.status === "free") {
+        return `<span class="day-number">${dayNumber}</span>`;
+      }
+
+      if (item.status === "busy") {
+        const label = item.label && item.label.trim() ? item.label.trim() : "AG";
+        return `<span class="day-label">${label}</span>`;
+      }
+
+      if (item.status === "holiday") {
+        return `<span class="day-label">F</span>`;
+      }
+
+      if (item.status === "folga") {
+        return `<span class="day-label">fol</span>`;
+      }
+
+      return `<span class="day-number">${dayNumber}</span>`;
+    }
+
+    async function loadMonth() {
+      loadingBox.style.display = "block";
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+      calendarGrid.innerHTML = "";
+
+      const start = toYmd(currentMonth);
+      monthTitle.textContent = formatMonthTitle(currentMonth);
+
+      try {
+        const res = await fetch(`${API_BASE}/availability?pb=${PB}&start=${start}&months=1`, {
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!res.ok) {
+          throw new Error(`Falha ao carregar calendário (${res.status})`);
+        }
+
+        monthData = await res.json();
+        renderCalendar();
+      } catch (err) {
+        errorBox.style.display = "block";
+        errorBox.textContent = err.message || "Erro ao carregar calendário.";
+      } finally {
+        loadingBox.style.display = "none";
+      }
+    }
+
+    function renderCalendar() {
+      calendarGrid.innerHTML = "";
+
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const leading = firstDay.getDay();
+      const totalDays = lastDay.getDate();
+      const dataMap = new Map(monthData.map(item => [item.date, item]));
+
+      for (let i = 0; i < leading; i++) {
+        const empty = document.createElement("div");
+        empty.className = "day-empty";
+        calendarGrid.appendChild(empty);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const date = new Date(year, month, day);
+        const ymd = toYmd(date);
+        const item = dataMap.get(ymd) || { date: ymd, status: "free", label: null };
+
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = `day ${item.status}`;
+        cell.innerHTML = dayContent(item, day);
+        cell.setAttribute("aria-label", `${ymd} - ${item.status}`);
+
+        if (item.status === "free") {
+          cell.addEventListener("click", () => openBooking(ymd));
+        } else {
+          cell.disabled = true;
+        }
+
+        calendarGrid.appendChild(cell);
+      }
+    }
+
+    function openBooking(ymd) {
+      selectedDate = ymd;
+      bookingDate.value = formatDatePt(ymd);
+      bookingSubtitle.textContent = `${BOAT_LABEL} • ${formatDatePt(ymd)}`;
+      bookingGroup.value = "";
+      bookingTime.value = "";
+      bookingObs.value = "";
+      clearFormStatus();
+      openModal(bookingModal);
+    }
+
+    prevBtn.addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      loadMonth();
+    });
+
+    nextBtn.addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      loadMonth();
+    });
+
+    todayBtn.addEventListener("click", () => {
+      const now = new Date();
+      currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      loadMonth();
+    });
+
+    legendBtn.addEventListener("click", () => openModal(legendModal));
+
+    document.querySelectorAll("[data-close]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-close");
+        closeModal(document.getElementById(id));
+      });
+    });
+
+    [legendModal, bookingModal].forEach(modal => {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal(modal);
+      });
+    });
+
+    bookingForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearFormStatus();
+
+      if (!selectedDate) {
+        setFormStatus("err", "Nenhuma data selecionada.");
+        return;
+      }
+
+      const payload = {
+        pb: PB,
+        date: selectedDate,
+        group: bookingGroup.value.trim(),
+        time: bookingTime.value.trim(),
+        observation: bookingObs.value.trim()
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/schedule`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          throw new Error(text || `Falha ao enviar (${res.status})`);
+        }
+
+        setFormStatus("ok", "Solicitação enviada com sucesso.");
+        setTimeout(() => {
+          closeModal(bookingModal);
+        }, 900);
+      } catch (err) {
+        setFormStatus("err", err.message || "Erro ao enviar solicitação.");
+      }
+    });
+
+    loadMonth();
+  </script>
 </body>
 </html>
+
