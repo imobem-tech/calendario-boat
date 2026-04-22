@@ -293,7 +293,7 @@
     <section class="top-card">
       <div class="title-row">
         <h1 class="title">Agendar</h1>
-        <div class="sub-inline">— escolha um horário_x</div>
+        <div class="sub-inline">— escolha um horário_1</div>
       </div>
 
       <div class="summary">
@@ -484,8 +484,8 @@
         setMsg(json.msg || "Agendamento realizado.", "success");
 
        setTimeout(() => {
-  const mesRef = data.slice(0, 7); // ex: 2026-06
-  window.location.href = `/${encodeURIComponent(token)}?mes=${encodeURIComponent(mesRef)}`;
+  const ym = data.slice(0, 7); // ex: 2026-06
+  window.location.href = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
 }, 1600);
 
       }catch(err){
