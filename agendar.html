@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" horácontent="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agendar</title>
   <style>
     :root{
@@ -14,6 +14,8 @@
 
       --primary: #1d4ed8;
       --primary-soft: #e8efff;
+      --header-bg: #1d4ed8;
+      --header-text: #ffffff;
 
       --slot: #ffffff;
       --slot-border: #d1d5db;
@@ -45,69 +47,71 @@
     .wrap{
       max-width: 760px;
       margin: 0 auto;
-      padding: 16px 14px 120px;
+      padding: 12px 12px 120px;
     }
 
     .top-card{
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 20px 16px 16px;
+      background: var(--header-bg);
+      color: var(--header-text);
+      border: 1px solid var(--header-bg);
+      border-radius: 22px;
+      padding: 14px 14px 12px;
       margin-bottom: 14px;
       box-shadow: 0 1px 0 rgba(16,33,61,.03);
     }
 
     .title-row{
       display:flex;
-      align-items:flex-end;
-      gap:12px;
+      align-items:baseline;
+      gap:8px;
       flex-wrap:wrap;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .title{
       margin:0;
-      font-size: clamp(34px, 8vw, 48px);
+      font-size: clamp(26px, 7vw, 42px);
       line-height:1;
       font-weight: 900;
       letter-spacing:.2px;
+      color:#fff;
     }
 
     .sub-inline{
-      color: var(--muted);
-      font-size: 18px;
+      color: rgba(255,255,255,.92);
+      font-size: 14px;
       font-weight: 700;
       line-height:1.2;
-      margin-bottom: 4px;
     }
 
     .summary{
       display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
     }
 
     .info-card{
-      background:#f8fafc;
-      border: 1px solid #eceff3;
-      border-radius: 18px;
-      padding: 16px 16px 14px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 16px;
+      padding: 12px 12px 10px;
+      min-width: 0;
     }
 
     .info-label{
-      font-size: 14px;
-      color: var(--muted);
+      font-size: 12px;
+      color: rgba(255,255,255,.9);
       font-weight: 800;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       text-transform: uppercase;
       letter-spacing: .3px;
     }
 
     .info-value{
-      font-size: 28px;
+      font-size: clamp(18px, 4.6vw, 28px);
       font-weight: 900;
-      line-height: 1.15;
-      color: var(--text);
+      line-height: 1.1;
+      color: #fff;
       word-break: break-word;
     }
 
@@ -141,6 +145,7 @@
     }
 
     .slot-btn{
+      width:100%;
       min-height: 76px;
       border-radius: 18px;
       border:2px solid var(--slot-border);
@@ -228,11 +233,18 @@
       cursor:not-allowed;
     }
 
-    @media (min-width: 640px){
-      .summary{
-        grid-template-columns: 1fr 1fr;
-      }
+    .brand-footer{
+  text-align:center;
+  margin-top: 18px;
+  padding: 6px 4px 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  opacity: 0.8;
+}
 
+    @media (min-width: 640px){
       .slots{
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
@@ -246,44 +258,77 @@
 
     @media (max-width: 420px){
       .wrap{
-        padding: 14px 10px 122px;
+        padding: 10px 8px 122px;
       }
 
-      .top-card,
-      .section-card{
-        padding: 16px 14px 14px;
-        border-radius: 22px;
+      .top-card{
+        padding: 12px 12px 10px;
+        border-radius: 20px;
       }
 
       .title-row{
-        gap:8px;
+        gap:6px;
+        margin-bottom: 10px;
       }
 
       .title{
-        font-size: 34px;
+        font-size: 24px;
       }
 
       .sub-inline{
-        font-size: 15px;
-        margin-bottom: 2px;
+        font-size: 12px;
+      }
+
+      .summary{
+        gap:8px;
+      }
+
+      .info-card{
+        padding: 10px 10px 9px;
+        border-radius: 14px;
+      }
+
+      .info-label{
+        font-size: 11px;
+        margin-bottom: 5px;
       }
 
       .info-value{
-        font-size: 26px;
+        font-size: 16px;
+      }
+
+      .section-card{
+        padding: 16px 12px 16px;
+        border-radius: 20px;
+      }
+
+      .section-title{
+        font-size: 22px;
+      }
+
+      .section-desc{
+        font-size: 14px;
+        margin-bottom: 14px;
       }
 
       .slots{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap:10px;
       }
 
       .slot-btn{
-        min-height: 72px;
-        font-size: 20px;
+        min-height: 66px;
+        font-size: 18px;
+        border-radius: 16px;
       }
 
       .confirm-btn{
-        height: 64px;
-        font-size: 21px;
+        height: 60px;
+        font-size: 18px;
+      }
+
+      .brand-footer{
+        font-size: 13px;
       }
     }
   </style>
@@ -293,7 +338,7 @@
     <section class="top-card">
       <div class="title-row">
         <h1 class="title">Agendar</h1>
-        <div class="sub-inline">— escolha um horário_1</div>
+        <div class="sub-inline">— escolha um horário_2</div>
       </div>
 
       <div class="summary">
@@ -318,6 +363,8 @@
       <div id="warning" class="warn"></div>
       <div id="msg" class="msg"></div>
     </section>
+
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas®</div>
   </div>
 
   <div class="fixed-action">
@@ -483,10 +530,10 @@
 
         setMsg(json.msg || "Agendamento realizado.", "success");
 
-       setTimeout(() => {
-  const ym = data.slice(0, 7); // ex: 2026-06
-  window.location.href = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
-}, 1600);
+        setTimeout(() => {
+          const ym = data.slice(0, 7);
+          window.location.href = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
+        }, 1600);
 
       }catch(err){
         setMsg(err.message || "Erro ao enviar agendamento.", "error");
