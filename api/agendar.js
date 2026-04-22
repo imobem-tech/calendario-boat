@@ -106,27 +106,30 @@ export default async function handler(req, res) {
       const proxCodigo = Number(seq.rows[0].prox_codigo);
 
       try {
-        await pool.query(`
-          INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-          (
-            "ID",
-            "Código",
-            "Cod_Emb_PB",
-            "Cod_Autorizado",
-            "Grupo_Comp_letra",
-            "Dt_Agendamento",
-            "Dt_Solicitacao"
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        `, [
-          proxId,
-          proxCodigo,
-          pb,
-          4255,
-          grupo,
-          dtAgendamento
-        ]);
+        
 
+        await pool.query(`
+  INSERT INTO public."P_BOAT_z_10_Saida_Emb"
+  (
+    "ID",
+    "Código",
+    "Cod_Emb_PB",
+    "Cod_Proprietário",
+    "Cod_Autorizado",
+    "Grupo_Comp_letra",
+    "Dt_Agendamento",
+    "Dt_Solicitacao"
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+`, [
+  proxId,
+  proxCodigo,
+  pb,
+  4255,
+  4255,
+  grupo,
+  dtAgendamento
+]);
         inserted = true;
         break;
       } catch (e) {
