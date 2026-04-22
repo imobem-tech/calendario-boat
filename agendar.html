@@ -1,189 +1,419 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendar</title>
+  <style>
+    :root{
+      --bg: #f3f5f9;
+      --card: #ffffff;
+      --text: #10213d;
+      --muted: #6b7280;
+      --line: #dbe2ea;
+      --primary: #1d4ed8;
+      --primary-soft: #e8efff;
+      --danger-bg: #fff1f2;
+      --danger-text: #dc2626;
+      --danger-line: #fecdd3;
+      --ok-bg: #ecfdf5;
+      --ok-text: #15803d;
+      --ok-line: #bbf7d0;
+    }
 
-<!-- ESSENCIAL PARA MOBILE -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    *{ box-sizing:border-box; }
 
-<title>Agendar</title>
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
 
-<style>
-body{
-  font-family: Arial;
-  background:#f3f5f9;
-  margin:0;
-  padding:20px;
-}
+    .wrap{
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 16px 14px 32px;
+    }
 
-/* CARD CENTRAL */
-.card{
-  background:#fff;
-  border-radius:20px;
-  padding:30px 20px;
-  max-width:500px;
-  margin:auto;
-  box-shadow:0 0 10px rgba(0,0,0,0.05);
-}
+    .card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 20px 16px 18px;
+      box-shadow: 0 1px 0 rgba(16,33,61,.03);
+    }
 
-/* TÍTULO */
-h1{
-  font-size:36px;
-  margin:0 0 20px;
-  font-weight:900;
-}
+    .title{
+      margin:0 0 14px;
+      font-size: clamp(28px, 7vw, 40px);
+      line-height:1;
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
 
-/* TEXTOS GRANDES */
-.info{
-  font-size:24px;
-  margin-bottom:15px;
-}
+    .info-box{
+      display:grid;
+      gap:10px;
+      margin-bottom: 18px;
+      padding: 14px;
+      border-radius: 16px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+    }
 
-.info b{
-  font-size:28px;
-}
+    .info-row{
+      display:grid;
+      grid-template-columns: 110px 1fr;
+      gap:10px;
+      align-items:center;
+      font-size: 18px;
+      line-height:1.3;
+    }
 
-/* SELECT GRANDE */
-select{
-  width:100%;
-  height:65px;
-  font-size:26px;
-  border-radius:12px;
-  padding:5px 10px;
-  margin-top:10px;
-}
+    .info-label{
+      font-weight: 800;
+      color: var(--muted);
+    }
 
-/* BOTÃO GRANDE */
-button{
-  width:100%;
-  height:70px;
-  font-size:28px;
-  margin-top:20px;
-  border-radius:15px;
-  border:none;
-  background:#dbe2f1;
-  color:#1e2a5a;
-  font-weight:900;
-}
+    .info-value{
+      font-weight: 900;
+      color: var(--text);
+      word-break: break-word;
+    }
 
-/* MENSAGEM */
-.msg{
-  margin-top:20px;
-  font-size:24px;
-  font-weight:bold;
-}
+    .field-label{
+      display:block;
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+    }
 
-.ok{ color:green }
-.erro{ color:red }
+    select{
+      width:100%;
+      height: 58px;
+      border-radius: 16px;
+      border:1px solid #cbd5e1;
+      background:#fff;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 800;
+      padding: 0 14px;
+      outline: none;
+    }
 
-/* MOBILE MAIS AGRESSIVO */
-@media (max-width:600px){
+    select:focus{
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+    }
 
-  h1{ font-size:40px }
+    .hint{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.4;
+    }
 
-  .info{ font-size:26px }
-  .info b{ font-size:32px }
+    .warning{
+      display:none;
+      margin-top: 14px;
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fdba74;
+      border-radius: 16px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
 
-  select{ font-size:28px; height:70px }
+    .msg{
+      display:none;
+      margin-top: 14px;
+      border-radius: 16px;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
 
-  button{ font-size:30px; height:75px }
+    .msg.error{
+      display:block;
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      border: 1px solid var(--danger-line);
+    }
 
-  .msg{ font-size:26px }
-}
-</style>
+    .msg.success{
+      display:block;
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border: 1px solid var(--ok-line);
+    }
+
+    .btn{
+      width:100%;
+      height: 60px;
+      margin-top: 18px;
+      border:0;
+      border-radius: 18px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: .3px;
+      cursor:pointer;
+    }
+
+    .btn:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+    }
+
+    .top-space{
+      height: 2px;
+    }
+
+    @media (max-width: 520px){
+      .wrap{
+        padding: 14px 10px 28px;
+      }
+
+      .card{
+        padding: 18px 14px 16px;
+        border-radius: 20px;
+      }
+
+      .title{
+        font-size: 36px;
+      }
+
+      .info-row{
+        grid-template-columns: 1fr;
+        gap:4px;
+        font-size: 18px;
+      }
+
+      .info-label{
+        font-size: 15px;
+      }
+
+      .info-value{
+        font-size: 21px;
+      }
+
+      .field-label{
+        font-size: 17px;
+      }
+
+      select{
+        height: 60px;
+        font-size: 22px;
+      }
+
+      .btn{
+        height: 62px;
+        font-size: 21px;
+      }
+    }
+  </style>
 </head>
-
 <body>
+  <div class="wrap">
+    <div class="top-space"></div>
 
-<div class="card">
+    <section class="card">
+      <h1 class="title">Agendar</h1>
 
-<h1>Agendar</h1>
+      <div class="info-box">
+        <div class="info-row">
+          <div class="info-label">Embarcação</div>
+          <div class="info-value" id="emb">-</div>
+        </div>
 
-<div class="info">Embarcação: <b id="emb"></b></div>
-<div class="info">Grupo: <b id="grupo"></b></div>
-<div class="info">Data: <b id="data"></b></div>
+        <div class="info-row">
+          <div class="info-label">Grupo</div>
+          <div class="info-value" id="grupo">-</div>
+        </div>
 
-<select id="hora"></select>
+        <div class="info-row">
+          <div class="info-label">Data</div>
+          <div class="info-value" id="data">-</div>
+        </div>
+      </div>
 
-<button onclick="agendar()">CONFIRMAR</button>
+      <label class="field-label" for="hora">Escolha o horário</label>
+      <select id="hora"></select>
 
-<div id="msg" class="msg"></div>
+      <div class="hint">
+        Horários disponíveis de 10:00 até 17:00, em intervalos de 15 minutos.
+      </div>
 
-</div>
+      <div id="warning" class="warning"></div>
+      <div id="msg" class="msg"></div>
 
-<script>
-const MAP = { a:"1",b:"2",c:"3",d:"4",e:"5",f:"6",g:"7",h:"8",i:"9",j:"0" };
+      <button id="btnConfirmar" class="btn" type="button">CONFIRMAR</button>
+    </section>
+  </div>
 
-function decode(token){
-  const m = token.match(/^([a-j]+)([a-z])([a-j])$/);
-  if(!m) return null;
+  <script>
+    const MAP = {
+      a:"1", b:"2", c:"3", d:"4", e:"5",
+      f:"6", g:"7", h:"8", i:"9", j:"0"
+    };
 
-  const pb = m[1].split("").map(x=>MAP[x]).join("");
-  const grupo = m[2].toUpperCase() + MAP[m[3]];
+    function decode(token){
+      const t = String(token || "").trim().toLowerCase();
+      const m = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      if(!m) return null;
 
-  return { pb, grupo };
-}
+      const pb = m[1].split("").map(x => MAP[x]).join("");
+      const grupo = m[2].toUpperCase() + MAP[m[3]];
 
-// URL
-const qs = new URLSearchParams(location.search);
-const token = qs.get("token");
-const data = qs.get("data");
+      if(!pb || !grupo) return null;
 
-const acesso = decode(token);
+      return { pb, grupo, token: t };
+    }
 
-document.getElementById("emb").innerText = acesso.pb;
-document.getElementById("grupo").innerText = acesso.grupo;
-document.getElementById("data").innerText = data;
+    function formatarDataBR(iso){
+      if(!iso) return "-";
+      const [y,m,d] = iso.split("-");
+      if(!y || !m || !d) return iso;
+      return `${d}/${m}/${y}`;
+    }
 
-// HORAS
-const sel = document.getElementById("hora");
+    function hojeIsoLocal(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
 
-for(let h=10; h<=17; h++){
-  for(let m=0; m<60; m+=15){
-    if(h===17 && m>0) break;
+    function diaSemanaLocal(iso){
+      const [y,m,d] = iso.split("-").map(Number);
+      return new Date(y, m - 1, d).getDay(); // 0 dom ... 6 sab
+    }
 
-    const hh = String(h).padStart(2,"0");
-    const mm = String(m).padStart(2,"0");
+    const qs = new URLSearchParams(window.location.search);
+    const token = qs.get("token") || "";
+    const data = qs.get("data") || "";
 
-    const opt = document.createElement("option");
-    opt.value = `${hh}:${mm}`;
-    opt.text = `${hh}:${mm}`;
+    const acesso = decode(token);
 
-    sel.appendChild(opt);
-  }
-}
+    const embEl = document.getElementById("emb");
+    const grupoEl = document.getElementById("grupo");
+    const dataEl = document.getElementById("data");
+    const horaEl = document.getElementById("hora");
+    const msgEl = document.getElementById("msg");
+    const warningEl = document.getElementById("warning");
+    const btnConfirmar = document.getElementById("btnConfirmar");
 
-// AGENDAR
-async function agendar(){
+    function setMsg(texto, tipo){
+      msgEl.className = "msg";
+      msgEl.textContent = "";
 
-  const msg = document.getElementById("msg");
-  msg.innerText = "";
+      if(!texto) return;
 
-  const r = await fetch("/api/agendar",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      token,
-      data,
-      hora: sel.value
-    })
-  });
+      msgEl.classList.add(tipo === "success" ? "success" : "error");
+      msgEl.textContent = texto;
+    }
 
-  const j = await r.json();
+    function setWarning(texto){
+      if(!texto){
+        warningEl.style.display = "none";
+        warningEl.textContent = "";
+        return;
+      }
 
-  if(!r.ok){
-    msg.className = "msg erro";
-    msg.innerText = j.error;
-  }else{
-    msg.className = "msg ok";
-    msg.innerText = j.msg;
+      warningEl.style.display = "block";
+      warningEl.textContent = texto;
+    }
 
-    setTimeout(()=>{
-      window.location.href = `/${token}?ym=${data.slice(0,7)}&r=${Date.now()}`;
-    },1200);
-  }
-}
-</script>
+    function preencherHorarios(){
+      horaEl.innerHTML = "";
 
+      for(let h = 10; h <= 17; h++){
+        for(let m = 0; m < 60; m += 15){
+          if(h === 17 && m > 0) break;
+
+          const hh = String(h).padStart(2, "0");
+          const mm = String(m).padStart(2, "0");
+
+          const opt = document.createElement("option");
+          opt.value = `${hh}:${mm}`;
+          opt.textContent = `${hh}:${mm}`;
+          horaEl.appendChild(opt);
+        }
+      }
+    }
+
+    function avaliarContingencia(){
+      const hoje = hojeIsoLocal();
+      const dow = diaSemanaLocal(hoje); // 2,3,4 = ter,qua,qui
+      const mesmaData = data === hoje;
+
+      if(mesmaData && dow >= 2 && dow <= 4){
+        setWarning("Agendamento sob regra de contingência.");
+      }else{
+        setWarning("");
+      }
+    }
+
+    async function agendar(){
+      setMsg("", "");
+      btnConfirmar.disabled = true;
+
+      try{
+        const hora = horaEl.value;
+
+        const resp = await fetch("/api/agendar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            token,
+            data,
+            hora
+          })
+        });
+
+        const json = await resp.json();
+
+        if(!resp.ok){
+          setMsg(json.error || "Falha ao agendar.", "error");
+          btnConfirmar.disabled = false;
+          return;
+        }
+
+        setMsg(json.msg || "Agendamento realizado.", "success");
+
+        setTimeout(() => {
+          window.location.href = `/${encodeURIComponent(token)}`;
+        }, 1500);
+
+      }catch(err){
+        setMsg(err.message || "Erro ao enviar agendamento.", "error");
+        btnConfirmar.disabled = false;
+      }
+    }
+
+    if(!acesso || !data){
+      embEl.textContent = "-";
+      grupoEl.textContent = "-";
+      dataEl.textContent = "-";
+      setMsg("Link de agendamento inválido.", "error");
+      btnConfirmar.disabled = true;
+    }else{
+      embEl.textContent = acesso.pb;
+      grupoEl.textContent = acesso.grupo;
+      dataEl.textContent = formatarDataBR(data);
+      preencherHorarios();
+      avaliarContingencia();
+      btnConfirmar.addEventListener("click", agendar);
+    }
+  </script>
 </body>
 </html>
