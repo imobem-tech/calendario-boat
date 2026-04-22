@@ -358,8 +358,8 @@
     <section class="top-card">
       <div class="top-row">
         <div class="title-box">
-          <h1 id="tituloEmb">EMBARCAÇÃO 576</h1>
-          <p>Calendário de disponibilidade</p>
+          <h1 id="tituloEmb">EMBARCAÇÃO</h1>
+          <p id="subTitulo">Calendário de disponibilidade</p>
         </div>
 
         <div class="actions">
@@ -426,10 +426,62 @@
   </dialog>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const PB = params.get("pb") || "576";
+    const MAP_LETRA_PARA_NUM = {
+      a: "1",
+      b: "2",
+      c: "3",
+      d: "4",
+      e: "5",
+      f: "6",
+      g: "7",
+      h: "8",
+      i: "9",
+      j: "0"
+    };
+
+    function decodificarToken(token){
+      const t = String(token || "").trim().toLowerCase();
+
+      // embarcação codificada + letra do grupo + número do grupo codificado
+      // exemplo: egfxa = egf + x + a = 576 + X1
+      const match = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      if(!match) return null;
+
+      const embCod = match[1];
+      const grupoLetra = match[2].toUpperCase();
+      const grupoNumCod = match[3];
+
+      const pb = embCod
+        .split("")
+        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
+        .join("");
+
+      const grupoNum = MAP_LETRA_PARA_NUM[grupoNumCod];
+
+      if(!pb || !grupoNum) return null;
+
+      return {
+        token: t,
+        pb,
+        grupo: `${grupoLetra}${grupoNum}`
+      };
+    }
+
+    function obterTokenDaUrl(){
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+      if(path && path.toLowerCase() !== "index.html"){
+        return path.toLowerCase();
+      }
+
+      const qs = new URLSearchParams(window.location.search);
+      return (qs.get("token") || "").toLowerCase();
+    }
+
+    const tokenUrl = obterTokenDaUrl();
+    const acesso = decodificarToken(tokenUrl);
 
     const tituloEmb = document.getElementById("tituloEmb");
+    const subTitulo = document.getElementById("subTitulo");
     const tituloMes = document.getElementById("tituloMes");
     const calendar = document.getElementById("calendar");
     const erroBox = document.getElementById("erroBox");
@@ -441,33 +493,6 @@
     const legendDialog = document.getElementById("legendDialog");
     const abrirLegenda = document.getElementById("abrirLegenda");
     const fecharLegenda = document.getElementById("fecharLegenda");
-
-    tituloEmb.textContent = `EMBARCAÇÃO ${PB}`;
-
-    const hoje = zerarHora(new Date());
-    let mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-
-    abrirLegenda.addEventListener("click", (e) => {
-      e.preventDefault();
-      legendDialog.showModal();
-    });
-
-    fecharLegenda.addEventListener("click", () => legendDialog.close());
-
-    btnHoje.addEventListener("click", () => {
-      mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      carregarMes();
-    });
-
-    btnPrev.addEventListener("click", () => {
-      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
-      carregarMes();
-    });
-
-    btnNext.addEventListener("click", () => {
-      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1);
-      carregarMes();
-    });
 
     function zerarHora(d){
       return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -501,36 +526,6 @@
       return "";
     }
 
-    async function buscarDisponibilidade(dataMes){
-      const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
-      const start = isoDate(inicio);
-
-      const url = `/api/availability?pb=${encodeURIComponent(PB)}&start=${encodeURIComponent(start)}&months=1`;
-      const resp = await fetch(url, { cache: "no-store" });
-
-      if(!resp.ok){
-        throw new Error(`Falha ao carregar calendário (${resp.status})`);
-      }
-
-      return await resp.json();
-    }
-
-    function montarMapa(lista){
-      const mapa = new Map();
-
-      (lista || []).forEach(item => {
-        if(!item || !item.date) return;
-
-        mapa.set(item.date, {
-          status: item.status || "free",
-          label: item.label || "",
-          holiday: !!item.holiday
-        });
-      });
-
-      return mapa;
-    }
-
     function mostrarErro(msg){
       erroBox.style.display = "block";
       erroBox.textContent = msg;
@@ -554,8 +549,10 @@
     }
 
     function navegarParaAgendamento(data){
+      if(!acesso) return;
+
       const dataStr = isoDate(data);
-      window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
+      window.location.href = `/agendar.html?token=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
     }
 
     function criarCelulaDia(data, info){
@@ -590,6 +587,22 @@
       el.appendChild(num);
       el.appendChild(center);
       return el;
+    }
+
+    function montarMapa(lista){
+      const mapa = new Map();
+
+      (lista || []).forEach(item => {
+        if(!item || !item.date) return;
+
+        mapa.set(item.date, {
+          status: item.status || "free",
+          label: item.label || "",
+          holiday: !!item.holiday
+        });
+      });
+
+      return mapa;
     }
 
     function renderizarCalendario(mapa){
@@ -629,6 +642,20 @@
       }
     }
 
+    async function buscarDisponibilidade(dataMes){
+      const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
+      const start = isoDate(inicio);
+
+      const url = `/api/availability?pb=${encodeURIComponent(acesso.pb)}&start=${encodeURIComponent(start)}&months=1`;
+      const resp = await fetch(url, { cache: "no-store" });
+
+      if(!resp.ok){
+        throw new Error(`Falha ao carregar calendário (${resp.status})`);
+      }
+
+      return await resp.json();
+    }
+
     async function carregarMes(){
       esconderErro();
 
@@ -642,7 +669,46 @@
       }
     }
 
-    carregarMes();
+    if(!acesso){
+      tituloEmb.textContent = "LINK INVÁLIDO";
+      subTitulo.textContent = "Não foi possível identificar embarcação e grupo.";
+      mostrarErro("Link inválido. Verifique o endereço enviado.");
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      btnHoje.disabled = true;
+    }else{
+      tituloEmb.textContent = `EMBARCAÇÃO ${acesso.pb}`;
+      subTitulo.textContent = `Calendário de disponibilidade — grupo ${acesso.grupo}`;
+    }
+
+    const hoje = zerarHora(new Date());
+    let mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    abrirLegenda.addEventListener("click", (e) => {
+      e.preventDefault();
+      legendDialog.showModal();
+    });
+
+    fecharLegenda.addEventListener("click", () => legendDialog.close());
+
+    btnHoje.addEventListener("click", () => {
+      mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      carregarMes();
+    });
+
+    btnPrev.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
+      carregarMes();
+    });
+
+    btnNext.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1);
+      carregarMes();
+    });
+
+    if(acesso){
+      carregarMes();
+    }
   </script>
 </body>
 </html>
