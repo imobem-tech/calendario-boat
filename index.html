@@ -480,7 +480,7 @@
     const acesso = decodificarToken(tokenUrl);
 
     const tituloEmb = document.getElementById("tituloEmb");
-    const subTitulo = document.getElementById("subTitulo");
+   
     const tituloMes = document.getElementById("tituloMes");
     const calendar = document.getElementById("calendar");
     const erroBox = document.getElementById("erroBox");
@@ -676,8 +676,7 @@
       btnNext.disabled = true;
       btnHoje.disabled = true;
     }else{
-      tituloEmb.textContent = `EMBARCAÇÃO ${acesso.pb}`;
-      subTitulo.textContent = `Calendário de disponibilidade — grupo ${acesso.grupo}`;
+     tituloEmb.textContent = `EMBARCAÇÃO ${acesso.pb} - ${acesso.grupo}`;
     }
 
   const hoje = zerarHora(new Date());
