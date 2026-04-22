@@ -1,9 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/agendar", "destination": "/agendar.html" },
     { "source": "/agendar.html", "destination": "/agendar.html" },
-    { "source": "/:token([a-z]+)", "destination": "/index.html" },
-    { "source": "/", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
