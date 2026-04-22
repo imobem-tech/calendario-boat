@@ -14,7 +14,7 @@
 
       --livre: #22c55e;
       --ocupado: #d946ef;
-      --feriado: #22c55e; /* agora feriado usa verde */
+      --feriado: #22c55e;
       --folga: #facc15;
       --passado: #cfd5dd;
       --vazio: #e5e7eb;
@@ -200,6 +200,7 @@
       font-size: 15px;
       font-weight: 900;
       line-height:1;
+      z-index: 2;
     }
 
     .day-center{
@@ -409,7 +410,7 @@
 
         <div class="legend-item">
           <div class="legend-color" style="background:#22c55e"></div>
-          <div><strong>Feriado</strong> — aparece no canto como <strong>22-F</strong> e continua clicável se não estiver agendado.</div>
+          <div><strong>Feriado</strong> — aparece no canto como <strong>12-F</strong> e continua clicável.</div>
         </div>
 
         <div class="legend-item">
@@ -486,15 +487,11 @@
       return `${y}-${m}-${d}`;
     }
 
-    function normalizarLabel(status, label, data){
+    function normalizarLabel(status, label){
       const txt = (label || "").toString().trim().toUpperCase();
 
       if(status === "busy"){
         return txt || "AG";
-      }
-
-      if(status === "holiday"){
-        return `${data.getDate()}-F`;
       }
 
       if(status === "folga"){
@@ -526,7 +523,8 @@
 
         mapa.set(item.date, {
           status: item.status || "free",
-          label: item.label || ""
+          label: item.label || "",
+          holiday: !!item.holiday
         });
       });
 
@@ -562,11 +560,12 @@
 
     function criarCelulaDia(data, info){
       const status = info?.status || "free";
-      const label = normalizarLabel(status, info?.label, data);
+      const label = normalizarLabel(status, info?.label);
+      const ehFeriado = !!info?.holiday;
 
       const clicavel = status === "free" || status === "holiday";
-
       const el = document.createElement(clicavel ? "button" : "div");
+
       if(clicavel){
         el.type = "button";
       }
@@ -575,11 +574,11 @@
 
       const num = document.createElement("div");
       num.className = "day-number";
-      num.textContent = status === "holiday" ? `${data.getDate()}-F` : data.getDate();
+      num.textContent = ehFeriado ? `${data.getDate()}-F` : data.getDate();
 
       const center = document.createElement("div");
       center.className = "day-center";
-      center.textContent = status === "holiday" ? "" : label;
+      center.textContent = label;
 
       if(clicavel){
         el.classList.add("empty-current");
@@ -620,7 +619,12 @@
           continue;
         }
 
-        const info = mapa.get(iso) || { status: "free", label: "" };
+        const info = mapa.get(iso) || {
+          status: "free",
+          label: "",
+          holiday: false
+        };
+
         calendar.appendChild(criarCelulaDia(data, info));
       }
     }
