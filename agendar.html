@@ -73,11 +73,11 @@
       line-height: 1.35;
     }
 
-    .summary{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:10px;
-    }
+.summary{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:10px;
+}
 
     .info-card{
       background:#f8fafc;
@@ -214,15 +214,15 @@
       cursor:not-allowed;
     }
 
-    @media (min-width: 640px){
-      .summary{
-        grid-template-columns: repeat(3, 1fr);
-      }
+   @media (min-width: 640px){
+  .summary{
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-      .slots{
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-    }
+  .slots{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
 
     @media (max-width: 420px){
       .wrap{
@@ -265,22 +265,17 @@
       <h1 class="title">Agendar</h1>
       <p class="sub">Escolha um horário para confirmar o agendamento.</p>
 
-      <div class="summary">
-        <div class="info-card">
-          <div class="info-label">Embarcação</div>
-          <div class="info-value" id="emb">-</div>
-        </div>
+<div class="summary">
+  <div class="info-card">
+    <div class="info-label">Embarcação / Grupo</div>
+    <div class="info-value" id="embGrupo">-</div>
+  </div>
 
-        <div class="info-card">
-          <div class="info-label">Grupo</div>
-          <div class="info-value" id="grupo">-</div>
-        </div>
-
-        <div class="info-card">
-          <div class="info-label">Data</div>
-          <div class="info-value" id="data">-</div>
-        </div>
-      </div>
+  <div class="info-card">
+    <div class="info-label">Data / Dia</div>
+    <div class="info-value" id="dataDia">-</div>
+  </div>
+</div>
     </section>
 
     <section class="section-card">
@@ -325,6 +320,13 @@
       return `${d}/${m}/${y}`;
     }
 
+function nomeDiaSemana(iso){
+  const [y,m,d] = iso.split("-").map(Number);
+  const data = new Date(y, m - 1, d);
+  const dias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  return dias[data.getDay()];
+}
+    
     function hojeIsoLocal(){
       const d = new Date();
       const y = d.getFullYear();
@@ -343,9 +345,8 @@
     const data = qs.get("data") || "";
     const acesso = decode(token);
 
-    const embEl = document.getElementById("emb");
-    const grupoEl = document.getElementById("grupo");
-    const dataEl = document.getElementById("data");
+    const embGrupoEl = document.getElementById("embGrupo");
+const dataDiaEl = document.getElementById("dataDia");
     const slotsEl = document.getElementById("slots");
     const warningEl = document.getElementById("warning");
     const msgEl = document.getElementById("msg");
@@ -462,22 +463,20 @@
       }
     }
 
-    if(!acesso || !data){
-      embEl.textContent = "-";
-      grupoEl.textContent = "-";
-      dataEl.textContent = "-";
-      setMsg("Link de agendamento inválido.", "error");
-    }else{
-      embEl.textContent = acesso.pb;
-      grupoEl.textContent = acesso.grupo;
-      dataEl.textContent = formatarDataBR(data);
+  if(!acesso || !data){
+  embGrupoEl.textContent = "-";
+  dataDiaEl.textContent = "-";
+  setMsg("Link de agendamento inválido.", "error");
+}else{
+  embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
+  dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
 
-      criarBotoesHorario();
-      avaliarContingencia();
-      atualizarBotao();
+  criarBotoesHorario();
+  avaliarContingencia();
+  atualizarBotao();
 
-      btnConfirmar.addEventListener("click", agendar);
-    }
+  btnConfirmar.addEventListener("click", agendar);
+}
   </script>
 </body>
 </html>
