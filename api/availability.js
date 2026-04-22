@@ -7,7 +7,7 @@ const pool = new Pool({
 // ================================
 // Helpers
 // ================================
-
+// prioridade: feriado vence tudo
 function formatDateLocal(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -183,13 +183,7 @@ export default async function handler(req, res) {
 
       // Igual ao VBA: folga não é sobrescrita por agendamento
    
-      
-// prioridade: feriado vence tudo
-if (ehFeriado) {
-  status = "holiday";
-  label = "F";
-}
-else if (status !== "folga" && agendamentos[d]) {
+if (status !== "folga" && agendamentos[d]) {
   status = "busy";
   label = agendamentos[d];
 }
