@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agendamento</title>
+<style>
+body { font-family: Arial; padding:20px; background:#f3f5f9 }
+.card { background:#fff; padding:20px; border-radius:12px; max-width:400px; margin:auto }
+h2 { margin-top:0 }
+select, button { width:100%; padding:10px; margin-top:10px; font-size:16px }
+.msg { margin-top:10px; font-weight:bold }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Agendar</h2>
+
+  <div>Embarcação: <b id="emb"></b></div>
+  <div>Grupo: <b id="grupo"></b></div>
+  <div>Data: <b id="data"></b></div>
+
+  <select id="hora"></select>
+
+  <button onclick="agendar()">CONFIRMAR</button>
+
+  <div id="msg" class="msg"></div>
+</div>
+
+<script>
+// ===== DECODIFICADOR =====
+const MAP = { a:"1",b:"2",c:"3",d:"4",e:"5",f:"6",g:"7",h:"8",i:"9",j:"0" };
+
+function decode(token){
+  const m = token.match(/^([a-j]+)([a-z])([a-j])$/);
+  if(!m) return null;
+
+  const pb = m[1].split("").map(x=>MAP[x]).join("");
+  const grupo = m[2].toUpperCase() + MAP[m[3]];
+
+  return { pb, grupo };
+}
+
+// ===== URL =====
+const qs = new URLSearchParams(location.search);
+const token = qs.get("token");
+const data = qs.get("data");
+
+const acesso = decode(token);
+
+if(!acesso){
+  alert("Link inválido");
+}
+
+// ===== UI =====
+document.getElementById("emb").innerText = acesso.pb;
+document.getElementById("grupo").innerText = acesso.grupo;
+document.getElementById("data").innerText = data;
+
+// ===== HORÁRIOS =====
+const sel = document.getElementById("hora");
+
+for(let h=10; h<=17; h++){
+  for(let m=0; m<60; m+=15){
+
+    if(h===17 && m>0) break;
+
+    const hh = String(h).padStart(2,"0");
+    const mm = String(m).padStart(2,"0");
+
+    const opt = document.createElement("option");
+    opt.value = `${hh}:${mm}`;
+    opt.text = `${hh}:${mm}`;
+
+    sel.appendChild(opt);
+  }
+}
+
+// ===== AGENDAR =====
+async function agendar(){
+
+  const hora = sel.value;
+
+  const r = await fetch("/api/agendar",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      token,
+      data,
+      hora
+    })
+  });
+
+  const j = await r.json();
+
+  const msg = document.getElementById("msg");
+
+  if(!r.ok){
+    msg.style.color="red";
+    msg.innerText = j.error;
+  }else{
+    msg.style.color="green";
+    msg.innerText = j.msg;
+
+    setTimeout(()=>{
+      window.location.href = "/";
+    },1500);
+  }
+}
+</script>
+
+</body>
+</html>
