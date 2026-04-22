@@ -681,8 +681,25 @@
       subTitulo.textContent = `Calendário de disponibilidade — grupo ${acesso.grupo}`;
     }
 
-    const hoje = zerarHora(new Date());
-    let mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const hoje = zerarHora(new Date());
+
+function obterMesInicial(){
+  const qs = new URLSearchParams(window.location.search);
+  const ym = qs.get("ym") || "";
+  const m = ym.match(/^(\d{4})-(\d{2})$/);
+
+  if(m){
+    const ano = Number(m[1]);
+    const mes = Number(m[2]);
+    if(ano >= 2000 && mes >= 1 && mes <= 12){
+      return new Date(ano, mes - 1, 1);
+    }
+  }
+
+  return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+}
+
+let mesAtual = obterMesInicial();
 
     abrirLegenda.addEventListener("click", (e) => {
       e.preventDefault();
