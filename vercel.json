@@ -2,7 +2,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/agendar", "destination": "/agendar.html" },
-    { "source": "/([a-j]+[a-z][a-j])", "destination": "/index.html" },
+    { "source": "/agendar.html", "destination": "/agendar.html" },
+    { "source": "/([a-j]+)", "destination": "/index.html" },
     { "source": "/", "destination": "/index.html" }
   ]
 }
