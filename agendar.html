@@ -1,297 +1,512 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Agendar</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendar</title>
+  <style>
+    :root{
+      --bg: #f3f5f9;
+      --card: #ffffff;
+      --text: #10213d;
+      --muted: #6b7280;
+      --line: #dbe2ea;
 
-<style>
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Arial;
-  background:#f3f4f6;
-}
+      --primary: #1d4ed8;
+      --primary-soft: #e8efff;
 
-.wrap{
-  max-width:720px;
-  margin:20px auto;
-  padding:12px;
-}
+      --slot: #ffffff;
+      --slot-border: #d1d5db;
+      --slot-active: #1d4ed8;
+      --slot-active-text: #ffffff;
 
-.top-card{
-  background:#fff;
-  border-radius:16px;
-  padding:16px;
-  box-shadow:0 2px 8px rgba(0,0,0,.06);
-}
+      --warn-bg: #fff7ed;
+      --warn-text: #c2410c;
+      --warn-line: #fdba74;
 
-/* HEADER */
-.title{
-  font-size:32px;
-  font-weight:800;
-  margin:0;
-}
+      --err-bg: #fff1f2;
+      --err-text: #dc2626;
+      --err-line: #fecdd3;
 
-.sub-inline{
-  font-size:18px;
-  font-weight:400;
-  color:#6b7280;
-  margin-left:6px;
-}
+      --ok-bg: #ecfdf5;
+      --ok-text: #15803d;
+      --ok-line: #bbf7d0;
+    }
 
-/* INFO */
-.summary{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-  margin-top:14px;
-}
+    *{ box-sizing:border-box; }
 
-.info-card{
-  background:#f9fafb;
-  border-radius:12px;
-  padding:12px;
-}
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
 
-.info-label{
-  font-size:13px;
-  color:#6b7280;
-}
+    .wrap{
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 16px 14px 120px;
+    }
 
-.info-value{
-  font-size:26px;
-  font-weight:700;
-  margin-top:4px;
-}
+    .top-card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px 16px 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 0 rgba(16,33,61,.03);
+    }
 
-/* HORÁRIOS */
-.slots{
-  margin-top:16px;
-  display:grid;
-  grid-template-columns: repeat(2,1fr);
-  gap:10px;
-}
+    .title-row{
+      display:flex;
+      align-items:flex-end;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom: 16px;
+    }
 
-.slot{
-  background:#fff;
-  border-radius:12px;
-  padding:16px;
-  text-align:center;
-  font-weight:700;
-  border:2px solid #e5e7eb;
-  cursor:pointer;
-}
+    .title{
+      margin:0;
+      font-size: clamp(34px, 8vw, 48px);
+      line-height:1;
+      font-weight: 900;
+      letter-spacing:.2px;
+    }
 
-.slot.active{
-  background:#2563eb;
-  color:#fff;
-  border-color:#2563eb;
-}
+    .sub-inline{
+      color: var(--muted);
+      font-size: 18px;
+      font-weight: 700;
+      line-height:1.2;
+      margin-bottom: 4px;
+    }
 
-/* BOTÃO */
-.btn{
-  margin-top:16px;
-  width:100%;
-  padding:16px;
-  border:none;
-  border-radius:12px;
-  background:#2563eb;
-  color:#fff;
-  font-size:18px;
-  font-weight:700;
-}
+    .summary{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
 
-.btn:disabled{
-  background:#cbd5f5;
-}
+    .info-card{
+      background:#f8fafc;
+      border: 1px solid #eceff3;
+      border-radius: 18px;
+      padding: 16px 16px 14px;
+    }
 
-/* RESPONSIVO */
-@media (min-width:640px){
-  .summary{
-    grid-template-columns:repeat(2,1fr);
-  }
-  .slots{
-    grid-template-columns: repeat(4,1fr);
-  }
-}
+    .info-label{
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
 
-@media (max-width:420px){
-  .title{
-    font-size:26px;
-  }
-  .sub-inline{
-    display:block;
-    margin-left:0;
-    font-size:15px;
-    margin-top:4px;
-  }
-  .info-value{
-    font-size:22px;
-  }
-}
-</style>
+    .info-value{
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1.15;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .section-card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px 16px 18px;
+      box-shadow: 0 1px 0 rgba(16,33,61,.03);
+    }
+
+    .section-title{
+      margin:0 0 8px;
+      font-size: 24px;
+      line-height:1.1;
+      font-weight: 900;
+    }
+
+    .section-desc{
+      margin:0 0 16px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 700;
+    }
+
+    .slots{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .slot-btn{
+      min-height: 76px;
+      border-radius: 18px;
+      border:2px solid var(--slot-border);
+      background: var(--slot);
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 900;
+      cursor:pointer;
+      transition: .15s ease;
+      padding: 0 10px;
+    }
+
+    .slot-btn.active{
+      background: var(--slot-active);
+      color: var(--slot-active-text);
+      border-color: var(--slot-active);
+      box-shadow: 0 8px 22px rgba(29,78,216,.18);
+    }
+
+    .slot-btn:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+
+    .warn,
+    .msg{
+      display:none;
+      margin-top: 14px;
+      border-radius: 18px;
+      padding: 14px;
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .warn.show{
+      display:block;
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border:1px solid var(--warn-line);
+    }
+
+    .msg.error{
+      display:block;
+      background: var(--err-bg);
+      color: var(--err-text);
+      border:1px solid var(--err-line);
+    }
+
+    .msg.success{
+      display:block;
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border:1px solid var(--ok-line);
+    }
+
+    .fixed-action{
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(243,245,249,1) 72%, rgba(243,245,249,0));
+      z-index: 50;
+    }
+
+    .confirm-btn{
+      width: min(760px, calc(100vw - 28px));
+      display:block;
+      margin: 0 auto;
+      height: 64px;
+      border:0;
+      border-radius: 18px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: .2px;
+      cursor:pointer;
+      box-shadow: 0 8px 24px rgba(16,33,61,.08);
+    }
+
+    .confirm-btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+
+    @media (min-width: 640px){
+      .summary{
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .slots{
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 900px){
+      .slots{
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 420px){
+      .wrap{
+        padding: 14px 10px 122px;
+      }
+
+      .top-card,
+      .section-card{
+        padding: 16px 14px 14px;
+        border-radius: 22px;
+      }
+
+      .title-row{
+        gap:8px;
+      }
+
+      .title{
+        font-size: 34px;
+      }
+
+      .sub-inline{
+        font-size: 15px;
+        margin-bottom: 2px;
+      }
+
+      .info-value{
+        font-size: 26px;
+      }
+
+      .slots{
+        gap:10px;
+      }
+
+      .slot-btn{
+        min-height: 72px;
+        font-size: 20px;
+      }
+
+      .confirm-btn{
+        height: 64px;
+        font-size: 21px;
+      }
+    }
+  </style>
 </head>
-
 <body>
-
-<div class="wrap">
-  <section class="top-card">
-
-    <!-- HEADER -->
-    <h1 class="title">
-      Agendar <span class="sub-inline">— escolha um horário</span>
-    </h1>
-
-    <!-- RESUMO -->
-    <div class="summary">
-
-      <div class="info-card">
-        <div class="info-label">Embarcação / Grupo</div>
-        <div class="info-value" id="embGrupo">-</div>
+  <div class="wrap">
+    <section class="top-card">
+      <div class="title-row">
+        <h1 class="title">Agendar</h1>
+        <div class="sub-inline">— escolha um horário</div>
       </div>
 
-      <div class="info-card">
-        <div class="info-label">Data / Dia</div>
-        <div class="info-value" id="dataDia">-</div>
+      <div class="summary">
+        <div class="info-card">
+          <div class="info-label">Embarcação / Grupo</div>
+          <div class="info-value" id="embGrupo">-</div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-label">Data / Dia</div>
+          <div class="info-value" id="dataDia">-</div>
+        </div>
       </div>
+    </section>
 
-    </div>
+    <section class="section-card">
+      <h2 class="section-title">Horário</h2>
+      <p class="section-desc">Toque em um horário disponível entre 10:00 e 17:00.</p>
 
-    <!-- HORÁRIOS -->
-    <div class="slots" id="slots"></div>
+      <div class="slots" id="slots"></div>
 
-    <!-- BOTÃO -->
-    <button class="btn" id="btnConfirmar" disabled>
+      <div id="warning" class="warn"></div>
+      <div id="msg" class="msg"></div>
+    </section>
+  </div>
+
+  <div class="fixed-action">
+    <button id="btnConfirmar" class="confirm-btn" type="button" disabled>
       CONFIRMAR AGENDAMENTO
     </button>
+  </div>
 
-  </section>
-</div>
+  <script>
+    const MAP = {
+      a:"1", b:"2", c:"3", d:"4", e:"5",
+      f:"6", g:"7", h:"8", i:"9", j:"0"
+    };
 
-<script>
+    function decode(token){
+      const t = String(token || "").trim().toLowerCase();
+      const m = t.match(/^([a-j]+)([a-z])([a-j])$/);
+      if(!m) return null;
 
-/* ================= TOKEN ================= */
+      const pb = m[1].split("").map(x => MAP[x]).join("");
+      const grupo = m[2].toUpperCase() + MAP[m[3]];
 
-function decodeToken(token){
-  if(!token) return null;
-
-  const letras = "abcdefghijklmnopqrstuvwxyz";
-  const map = {};
-  for(let i=0;i<=9;i++){
-    map[letras[i]] = i.toString();
-  }
-
-  const numeros = token.slice(0,-1).split("").map(l => map[l]).join("");
-  const grupoNum = map[token.slice(-1)];
-
-  if(!numeros || grupoNum === undefined) return null;
-
-  return {
-    pb: parseInt(numeros),
-    grupo: "X" + grupoNum
-  };
-}
-
-/* ================= DATA ================= */
-
-function formatarDataBR(iso){
-  const [y,m,d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function nomeDiaSemana(iso){
-  const [y,m,d] = iso.split("-").map(Number);
-  const data = new Date(y, m - 1, d);
-  const dias = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
-  return dias[data.getDay()];
-}
-
-/* ================= ELEMENTOS ================= */
-
-const embGrupoEl = document.getElementById("embGrupo");
-const dataDiaEl = document.getElementById("dataDia");
-const slotsEl = document.getElementById("slots");
-const btn = document.getElementById("btnConfirmar");
-
-let horaSelecionada = null;
-
-/* ================= QUERY ================= */
-
-const params = new URLSearchParams(window.location.search);
-const token = params.get("token");
-const data = params.get("data");
-
-const acesso = decodeToken(token);
-
-/* ================= UI ================= */
-
-function criarSlots(){
-  for(let h=10; h<=17; h++){
-    for(let m=0; m<60; m+=15){
-
-      if(h===17 && m>0) continue;
-
-      const hora = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-
-      const div = document.createElement("div");
-      div.className = "slot";
-      div.textContent = hora;
-
-      div.onclick = () => {
-        document.querySelectorAll(".slot").forEach(s=>s.classList.remove("active"));
-        div.classList.add("active");
-        horaSelecionada = hora;
-        btn.disabled = false;
-      };
-
-      slotsEl.appendChild(div);
+      if(!pb || !grupo) return null;
+      return { pb, grupo, token: t };
     }
-  }
-}
 
-/* ================= INIT ================= */
+    function formatarDataBR(iso){
+      if(!iso) return "-";
+      const [y,m,d] = iso.split("-");
+      if(!y || !m || !d) return iso;
+      return `${d}/${m}/${y}`;
+    }
 
-if(!acesso || !data){
-  embGrupoEl.textContent = "-";
-  dataDiaEl.textContent = "-";
-  alert("Link inválido");
-}else{
-  embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
-  dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
+    function nomeDiaSemana(iso){
+      const [y,m,d] = iso.split("-").map(Number);
+      const dias = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+      return dias[new Date(y, m - 1, d).getDay()];
+    }
 
-  criarSlots();
-}
+    function hojeIsoLocal(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
 
-/* ================= CLICK ================= */
+    function diaSemanaLocal(iso){
+      const [y,m,d] = iso.split("-").map(Number);
+      return new Date(y, m - 1, d).getDay();
+    }
 
-btn.onclick = async () => {
+    const qs = new URLSearchParams(window.location.search);
+    const token = qs.get("token") || "";
+    const data = qs.get("data") || "";
+    const acesso = decode(token);
 
-  if(!horaSelecionada) return;
+    const embGrupoEl = document.getElementById("embGrupo");
+    const dataDiaEl = document.getElementById("dataDia");
+    const slotsEl = document.getElementById("slots");
+    const warningEl = document.getElementById("warning");
+    const msgEl = document.getElementById("msg");
+    const btnConfirmar = document.getElementById("btnConfirmar");
 
-  const dt = `${data} ${horaSelecionada}:00`;
+    let horaSelecionada = "";
 
-  const resp = await fetch("/api/agendar", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      Cod_Emb_PB: acesso.pb,
-      Grupo_Comp_letra: acesso.grupo,
-      Dt_Agendamento: dt
-    })
-  });
+    function setMsg(texto, tipo){
+      msgEl.className = "msg";
+      msgEl.textContent = "";
 
-  const json = await resp.json();
+      if(!texto) return;
 
-  if(json.erro){
-    alert(json.erro);
-  }else{
-    alert("Agendado com sucesso!");
-    location.href = "/";
-  }
+      msgEl.classList.add(tipo === "success" ? "success" : "error");
+      msgEl.textContent = texto;
+    }
 
-};
+    function setWarning(texto){
+      if(!texto){
+        warningEl.className = "warn";
+        warningEl.textContent = "";
+        return;
+      }
 
-</script>
+      warningEl.className = "warn show";
+      warningEl.textContent = texto;
+    }
 
+    function atualizarBotao(){
+      btnConfirmar.disabled = !horaSelecionada;
+    }
+
+    function selecionarHora(hora){
+      horaSelecionada = hora;
+
+      document.querySelectorAll(".slot-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.hora === hora);
+      });
+
+      atualizarBotao();
+    }
+
+    function criarBotoesHorario(){
+      slotsEl.innerHTML = "";
+
+      for(let h = 10; h <= 17; h++){
+        for(let m = 0; m < 60; m += 15){
+          if(h === 17 && m > 0) break;
+
+          const hh = String(h).padStart(2, "0");
+          const mm = String(m).padStart(2, "0");
+          const hora = `${hh}:${mm}`;
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "slot-btn";
+          btn.textContent = hora;
+          btn.dataset.hora = hora;
+
+          btn.addEventListener("click", () => selecionarHora(hora));
+          slotsEl.appendChild(btn);
+        }
+      }
+    }
+
+    function avaliarContingencia(){
+      const hoje = hojeIsoLocal();
+      const dow = diaSemanaLocal(hoje);
+      const mesmaData = data === hoje;
+
+      if(mesmaData && dow >= 2 && dow <= 4){
+        setWarning("Agendamento sob regra de contingência.");
+      }else{
+        setWarning("");
+      }
+    }
+
+    async function agendar(){
+      if(!horaSelecionada) return;
+
+      setMsg("", "");
+      btnConfirmar.disabled = true;
+
+      try{
+        const resp = await fetch("/api/agendar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            token,
+            data,
+            hora: horaSelecionada
+          })
+        });
+
+        const json = await resp.json();
+
+        if(!resp.ok){
+          setMsg(json.error || "Falha ao agendar.", "error");
+          btnConfirmar.disabled = false;
+          return;
+        }
+
+        setMsg(json.msg || "Agendamento realizado.", "success");
+
+        setTimeout(() => {
+          window.location.href = `/${encodeURIComponent(token)}`;
+        }, 1600);
+
+      }catch(err){
+        setMsg(err.message || "Erro ao enviar agendamento.", "error");
+        btnConfirmar.disabled = false;
+      }
+    }
+
+    if(!acesso || !data){
+      embGrupoEl.textContent = "-";
+      dataDiaEl.textContent = "-";
+      setMsg("Link de agendamento inválido.", "error");
+    }else{
+      embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
+      dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
+
+      criarBotoesHorario();
+      avaliarContingencia();
+      atualizarBotao();
+
+      btnConfirmar.addEventListener("click", agendar);
+    }
+  </script>
 </body>
 </html>
