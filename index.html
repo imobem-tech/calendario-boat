@@ -12,13 +12,12 @@
       --muted: #6b7280;
       --line: #dbe2ea;
 
-      --livre: #22c55e;    /* verde */
-      --ocupado: #d946ef;  /* magenta */
-      --feriado: #f59e0b;  /* laranja */
-      --folga: #facc15;    /* amarelo */
-      --passado: #cfd5dd;  /* cinza */
+      --livre: #22c55e;
+      --ocupado: #d946ef;
+      --feriado: #f59e0b;
+      --folga: #facc15;
+      --passado: #cfd5dd;
       --vazio: #e5e7eb;
-      --botao: #2f66ff;
     }
 
     *{ box-sizing: border-box; }
@@ -178,7 +177,7 @@
       text-align:left;
     }
 
-    .day.visible{
+    .day.free{
       cursor:pointer;
     }
 
@@ -304,10 +303,6 @@
         border-radius: 18px;
       }
 
-      .top-row{
-        align-items:flex-start;
-      }
-
       .actions{
         align-items:flex-end;
         gap:8px;
@@ -331,13 +326,8 @@
         font-size: 30px;
       }
 
-      .calendar{
-        gap:6px;
-      }
-
-      .weekdays{
-        gap:6px;
-      }
+      .calendar{ gap:6px; }
+      .weekdays{ gap:6px; }
 
       .day{
         min-height: 82px;
@@ -413,7 +403,7 @@
 
         <div class="legend-item">
           <div class="legend-color" style="background:#d946ef"></div>
-          <div><strong>Ocupado</strong> — aparece o grupo no centro. Se não houver grupo, aparece <strong>AG</strong>.</div>
+          <div><strong>Ocupado</strong> — aparece o grupo no centro, como <strong>S1</strong>.</div>
         </div>
 
         <div class="legend-item">
@@ -428,12 +418,12 @@
 
         <div class="legend-item">
           <div class="legend-color" style="background:#cfd5dd"></div>
-          <div><strong>Passado</strong> — dias anteriores a hoje ficam cinza, sem número e sem clique.</div>
+          <div><strong>Passado</strong> — fica cinza, sem número e sem clique.</div>
         </div>
       </div>
 
       <div class="footer-note">
-        O dia de hoje aparece normalmente. Toque em um dia visível para a próxima etapa de agendamento.
+        Apenas dias livres ficam clicáveis.
       </div>
     </div>
   </dialog>
@@ -573,9 +563,12 @@
       const status = info?.status || "free";
       const label = normalizarLabel(status, info?.label);
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `day visible ${status}`;
+      const el = document.createElement(status === "free" ? "button" : "div");
+      if(status === "free"){
+        el.type = "button";
+      }
+
+      el.className = `day ${status}`;
 
       const num = document.createElement("div");
       num.className = "day-number";
@@ -586,21 +579,16 @@
       center.textContent = label;
 
       if(status === "free"){
-        btn.classList.add("empty-current");
+        el.classList.add("empty-current");
+        el.addEventListener("click", () => {
+          const dataStr = isoDate(data);
+          window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
+        });
       }
 
-      btn.appendChild(num);
-      btn.appendChild(center);
-
-      btn.addEventListener("click", () => {
-        const dataStr = isoDate(data);
-
-        // Próxima etapa: página de agendamento
-        // Quando você criar a página, o clique já estará pronto.
-        window.location.href = `/agendar.html?pb=${encodeURIComponent(PB)}&data=${encodeURIComponent(dataStr)}`;
-      });
-
-      return btn;
+      el.appendChild(num);
+      el.appendChild(center);
+      return el;
     }
 
     function renderizarCalendario(mapa){
@@ -615,7 +603,7 @@
       const ultimoDia = new Date(ano, mes + 1, 0);
       const totalDias = ultimoDia.getDate();
 
-      const inicioSemana = primeiroDia.getDay(); // 0=Dom
+      const inicioSemana = primeiroDia.getDay();
 
       for(let i = 0; i < inicioSemana; i++){
         calendar.appendChild(criarCelulaVazia());
