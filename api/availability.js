@@ -6,9 +6,9 @@ const pool = new Pool({
 
 export default async function handler(req, res) {
   try {
-    const pb = parseInt(req.query.pb);
+    const pb = parseInt(req.query.pb, 10);
     const start = req.query.start || new Date().toISOString().slice(0, 10);
-    const months = parseInt(req.query.months || "1");
+    const months = parseInt(req.query.months || "1", 10);
 
     if (!pb || pb <= 0) {
       return res.status(400).json({ error: "pb inválido" });
@@ -19,59 +19,8 @@ export default async function handler(req, res) {
     endDate.setMonth(endDate.getMonth() + months);
     endDate.setDate(endDate.getDate() - 1);
 
-    // 🔥 QUERY CORRIGIDA
-    const result = await pool.query(`
-      SELECT 
-        "Dt_Agendamento",
+    const result = await pool.query(
+      `
+      SELECT
+        "Dt_Saída",
         "Grupo_Comp_letra"
-      FROM public."P_BOAT_z_10_Saida_Emb"
-      WHERE "Cod_Emb_PB" = $1
-        AND "Dt_Agendamento" BETWEEN $2 AND $3
-        AND "Dt_Cancela_saida" IS NULL
-        AND "Dt_Desistencia" IS NULL
-    `, [pb, startDate, endDate]);
-
-    const agendamentos = {};
-    result.rows.forEach(r => {
-      const d = r.Dt_Agendamento.toISOString().slice(0,10);
-      agendamentos[d] = r.Grupo_Comp_letra || "AG";
-    });
-
-    const resp = [];
-    let cur = new Date(startDate);
-
-    while (cur <= endDate) {
-      const d = cur.toISOString().slice(0,10);
-
-      let status = "free";
-      let label = null;
-
-      const dow = cur.getDay(); // 0=Dom
-
-      // segunda = folga
-      if (dow === 1) {
-        status = "folga";
-      }
-
-      // ocupado
-      if (agendamentos[d]) {
-        status = "busy";
-        label = agendamentos[d];
-      }
-
-      resp.push({
-        date: d,
-        status,
-        label
-      });
-
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    res.status(200).json(resp);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-}
