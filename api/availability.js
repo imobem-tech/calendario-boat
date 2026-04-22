@@ -188,11 +188,12 @@ if (status !== "folga" && agendamentos[d]) {
   label = agendamentos[d];
 }
 
-      resp.push({
-        date: d,
-        status,
-        label,
-      });
+resp.push({
+  date: d,
+  status,
+  label,
+  holiday: ehFeriado
+});
 
       cur = addDays(cur, 1);
     }
