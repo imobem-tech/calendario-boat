@@ -4,26 +4,32 @@
   <title>Calendário Boat</title>
 </head>
 <body>
-  <h1>Testando conexão com banco...</h1>
-  <div id="resultado">Carregando...</div>
 
-  <script>
-    fetch('/api/teste')
-      .then(async (res) => {
-        const texto = await res.text();
-        try {
-          const json = JSON.parse(texto);
-          document.getElementById('resultado').innerHTML =
-            '<pre>' + JSON.stringify(json, null, 2) + '</pre>';
-        } catch (e) {
-          document.getElementById('resultado').innerHTML =
-            '<pre>' + texto + '</pre>';
-        }
-      })
-      .catch(err => {
-        document.getElementById('resultado').innerHTML =
-          'Erro: ' + err.message;
-      });
-  </script>
+<h1>Calendário (teste)</h1>
+
+<div id="dados"></div>
+
+<script>
+fetch('/api/teste')
+  .then(res => res.json())
+  .then(data => {
+    const div = document.getElementById('dados')
+
+    data.forEach(item => {
+      const el = document.createElement('div')
+
+      el.innerHTML = `
+        <b>ID:</b> ${item.ID} <br>
+        <b>Saída:</b> ${item.Dt_Saída} <br>
+        <b>Retorno:</b> ${item.Dt_Retorno} <br>
+        <b>Responsável:</b> ${item.Colab_Responsavel}
+        <hr>
+      `
+
+      div.appendChild(el)
+    })
+  })
+</script>
+
 </body>
 </html>
