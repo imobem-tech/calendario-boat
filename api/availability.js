@@ -18,12 +18,30 @@ function formatDateLocal(date) {
 function parseDbDateAsLocal(value) {
   if (!value) return null;
 
-  const s = String(value).slice(0, 10);
-  const [y, m, d] = s.split("-").map(Number);
+  // Caso o pg já entregue um Date do JavaScript
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
 
-  if (!y || !m || !d) return null;
+  // Caso venha string ISO / timestamp / date
+  const s = String(value).trim();
 
-  return new Date(y, m - 1, d);
+  // Pega só a parte YYYY-MM-DD se existir
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    return new Date(y, mo - 1, d);
+  }
+
+  // Fallback final
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) {
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+
+  return null;
 }
 
 function addDays(date, days) {
@@ -63,22 +81,21 @@ export default async function handler(req, res) {
     const endStr = formatDateLocal(endDate);
 
     // ================================
-    // AGENDAMENTOS (CORRIGIDO COM DATE())
+    // AGENDAMENTOS
     // ================================
-
     const agResult = await pool.query(
       `
       SELECT
-        "ID",
-        "Código",
-        "Dt_Agendamento",
-        "Grupo_Comp_letra"
+        "ID"                AS id,
+        "Código"            AS codigo,
+        "Dt_Agendamento"    AS dt_agendamento,
+        "Grupo_Comp_letra"  AS grupo
       FROM public."P_BOAT_z_10_Saida_Emb"
       WHERE "Cod_Emb_PB" = $1
-        AND DATE("Dt_Agendamento") BETWEEN $2::date AND $3::date
         AND "Dt_Cancela_saida" IS NULL
         AND "Dt_Desistencia" IS NULL
-      ORDER BY "Dt_Agendamento", "ID"
+        AND DATE("Dt_Agendamento") BETWEEN $2::date AND $3::date
+      ORDER BY DATE("Dt_Agendamento"), "ID"
       `,
       [pb, startStr, endStr]
     );
@@ -86,12 +103,13 @@ export default async function handler(req, res) {
     const agendamentos = Object.create(null);
 
     for (const r of agResult.rows) {
-      const dataLocal = parseDbDateAsLocal(r["Dt_Agendamento"]);
+      const dataLocal = parseDbDateAsLocal(r.dt_agendamento);
       if (!dataLocal) continue;
 
       const d = formatDateLocal(dataLocal);
-      const grupo = String(r["Grupo_Comp_letra"] || "").trim().toUpperCase();
+      const grupo = String(r.grupo || "").trim().toUpperCase();
 
+      // mantém o primeiro grupo do dia
       if (!agendamentos[d]) {
         agendamentos[d] = grupo || "AG";
       }
@@ -100,14 +118,14 @@ export default async function handler(req, res) {
     // ================================
     // FERIADOS
     // ================================
-
     const ferResult = await pool.query(
       `
-      SELECT "Dt_Feriado"
+      SELECT
+        "Dt_Feriado" AS dt_feriado
       FROM public."Agenda_comp_02_feriados"
       WHERE "Dt_Exclusao" IS NULL
         AND DATE("Dt_Feriado") BETWEEN $1::date AND $2::date
-      ORDER BY "Dt_Feriado"
+      ORDER BY DATE("Dt_Feriado")
       `,
       [startStr, endStr]
     );
@@ -115,7 +133,7 @@ export default async function handler(req, res) {
     const feriados = Object.create(null);
 
     for (const r of ferResult.rows) {
-      const dataLocal = parseDbDateAsLocal(r["Dt_Feriado"]);
+      const dataLocal = parseDbDateAsLocal(r.dt_feriado);
       if (!dataLocal) continue;
 
       const d = formatDateLocal(dataLocal);
@@ -123,9 +141,8 @@ export default async function handler(req, res) {
     }
 
     // ================================
-    // GERA CALENDÁRIO (LÓGICA DO VBA)
+    // GERA CALENDÁRIO
     // ================================
-
     const resp = [];
     let cur = new Date(startDate);
     let emSeqFeriado = false;
@@ -138,10 +155,7 @@ export default async function handler(req, res) {
       let status = "free";
       let label = null;
 
-      // ========================
-      // LÓGICA DO VBA
-      // ========================
-
+      // Regra do VBA
       if (emSeqFeriado) {
         if (ehFeriado) {
           status = "holiday";
@@ -167,10 +181,7 @@ export default async function handler(req, res) {
         label = "F";
       }
 
-      // ========================
-      // AGENDAMENTO NÃO SOBRESCREVE FOLGA
-      // ========================
-
+      // Igual ao VBA: folga não é sobrescrita por agendamento
       if (status !== "folga" && agendamentos[d]) {
         status = "busy";
         label = agendamentos[d];
@@ -186,7 +197,6 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json(resp);
-
   } catch (err) {
     console.error("ERRO availability:", err);
     return res.status(500).json({
