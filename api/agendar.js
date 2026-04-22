@@ -1,157 +1,123 @@
-import { Pool } from "pg";
+import pkg from "pg";
+const { Pool } = pkg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.POSTGRES_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-// ===== DECODER =====
-const MAP = { a:"1", b:"2", c:"3", d:"4", e:"5", f:"6", g:"7", h:"8", i:"9", j:"0" };
+const MAP = {
+  a:"1", b:"2", c:"3", d:"4", e:"5",
+  f:"6", g:"7", h:"8", i:"9", j:"0"
+};
 
-function decode(token) {
-  const t = String(token || "").trim().toLowerCase();
-  const m = t.match(/^([a-j]+)([a-z])([a-j])$/);
-  if (!m) return null;
-
-  const pb = m[1].split("").map(x => MAP[x]).join("");
-  const grupo = m[2].toUpperCase() + MAP[m[3]];
-
-  return { pb, grupo };
+function somenteDigitos(txt){
+  return String(txt || "").replace(/\D+/g, "");
 }
 
-export default async function handler(req, res) {
-  try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Método não permitido" });
-    }
+function decodificar(txt){
+  return String(txt || "")
+    .split("")
+    .map(ch => MAP[ch] || "")
+    .join("");
+}
 
+function calcularDV(pb, grupoNum, autorizado){
+  const base = `${pb}${grupoNum}${autorizado}`;
+  const soma = base.split("").reduce((acc,n)=>acc+Number(n),0);
+  return String(soma).padStart(2,"0");
+}
+
+function decodeToken(token){
+  const t = String(token || "").trim().toLowerCase();
+
+  const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+  if(!m) return null;
+
+  const pb = decodificar(m[1]);
+  const grupoLetra = m[2].toUpperCase();
+  const grupoNum = decodificar(m[3]);
+  const autorizado = decodificar(m[4]);
+  const dv = decodificar(m[5]);
+
+  if(!pb || !grupoNum || !autorizado || !dv) return null;
+
+  const dvCalc = calcularDV(pb, grupoNum, autorizado);
+  if(dv !== dvCalc) return null;
+
+  return {
+    pb,
+    grupo: `${grupoLetra}${grupoNum}`,
+    codAutorizado: autorizado
+  };
+}
+
+export default async function handler(req, res){
+  if(req.method !== "POST"){
+    return res.status(405).json({ error: "Método não permitido" });
+  }
+
+  try{
     const { token, data, hora } = req.body || {};
 
-    const acesso = decode(token);
-    if (!acesso) {
-      return res.status(400).json({ error: "token inválido" });
+    if(!token || !data || !hora){
+      return res.status(400).json({ error: "Dados incompletos" });
     }
 
-    if (!data || !hora) {
-      return res.status(400).json({ error: "data/hora inválidas" });
+    const acesso = decodeToken(token);
+    if(!acesso){
+      return res.status(400).json({ error: "Token inválido" });
     }
 
-    const pb = Number(acesso.pb);
-    const grupo = acesso.grupo;
-    const dtAgendamento = `${data} ${hora}:00`;
+    const { pb, grupo, codAutorizado } = acesso;
 
-    // ===== 1. BLOQUEIO DA EMBARCAÇÃO (POR DIA, INDEPENDENTE DO HORÁRIO)
-    const existe = await pool.query(`
-      SELECT 1
-      FROM public."P_BOAT_z_10_Saida_Emb"
-      WHERE "Cod_Emb_PB" = $1
-        AND DATE("Dt_Agendamento") = $2::date
-        AND "Dt_Cancela_saida" IS NULL
-        AND "Dt_Desistencia" IS NULL
-      LIMIT 1
-    `, [pb, data]);
+    const dataHora = `${data} ${hora}:00`;
 
-    if (existe.rows.length) {
-      return res.status(400).json({
-        error: "data não está mais disponível"
-      });
-    }
+    const client = await pool.connect();
 
-    // ===== 2. CAPACIDADE DO GRUPO
-    const capacidade = parseInt(grupo.slice(-1), 10);
+    try{
+      await client.query("BEGIN");
 
-    const aberto = await pool.query(`
-      SELECT COUNT(*)::int AS total
-      FROM public."P_BOAT_z_10_Saida_Emb"
-      WHERE "Grupo_Comp_letra" = $1
-        AND "Dt_Cancela_saida" IS NULL
-        AND "Dt_Desistencia" IS NULL
-        AND (
-          DATE("Dt_Agendamento") > CURRENT_DATE
-          OR (
-            DATE("Dt_Agendamento") = CURRENT_DATE
-            AND CURRENT_TIME < TIME '17:00'
-          )
-        )
-    `, [grupo]);
+      // verifica conflito
+      const check = await client.query(
+        `SELECT 1
+         FROM "P_BOAT_10_Agendamento"
+         WHERE "PB" = $1
+           AND "Dt_Agendamento" = $2
+         LIMIT 1`,
+        [pb, dataHora]
+      );
 
-    const usados = aberto.rows[0]?.total || 0;
-
-    // ===== 3. CONTINGÊNCIA
-    const agora = new Date();
-    const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-    const hojeStr = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, "0")}-${String(hojeLocal.getDate()).padStart(2, "0")}`;
-    const diaSemana = hojeLocal.getDay(); // 0=dom ... 6=sab
-    const mesmaData = data === hojeStr;
-    const contingencia = (diaSemana >= 2 && diaSemana <= 4 && mesmaData); // ter-qui e mesmo dia
-
-    if (usados >= capacidade && !contingencia) {
-      return res.status(400).json({
-        error: `disponibilidade ${capacidade} já utilizada(s), na(s) data(s) em aberto`
-      });
-    }
-
-    // ===== 4. GERA ID E CÓDIGO COM RETRY
-    let inserted = false;
-    let ultimoErro = null;
-
-    for (let i = 0; i < 8; i++) {
-      const seq = await pool.query(`
-        SELECT
-          COALESCE(MAX("ID"), 0) + 1       AS prox_id,
-          COALESCE(MAX("Código"), 0) + 1   AS prox_codigo
-        FROM public."P_BOAT_z_10_Saida_Emb"
-      `);
-
-      const proxId = Number(seq.rows[0].prox_id);
-      const proxCodigo = Number(seq.rows[0].prox_codigo);
-
-      try {
-        
-
-        await pool.query(`
-  INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-  (
-    "ID",
-    "Código",
-    "Cod_Emb_PB",
-    "Cod_Proprietário",
-    "Cod_Autorizado",
-    "Grupo_Comp_letra",
-    "Dt_Agendamento",
-    "Dt_Solicitacao"
-  )
-  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-`, [
-  proxId,
-  proxCodigo,
-  pb,
-  4255,
-  4255,
-  grupo,
-  dtAgendamento
-]);
-        inserted = true;
-        break;
-      } catch (e) {
-        ultimoErro = e;
+      if(check.rowCount > 0){
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "Horário já ocupado." });
       }
+
+      await client.query(
+        `INSERT INTO "P_BOAT_10_Agendamento"
+        ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
+        VALUES ($1,$2,$3,$4,$5)`,
+        [
+          pb,
+          4255,              // FIXO
+          codAutorizado,     // DO TOKEN
+          grupo,
+          dataHora
+        ]
+      );
+
+      await client.query("COMMIT");
+
+      return res.status(200).json({ msg: "Agendamento realizado com sucesso." });
+
+    }catch(err){
+      await client.query("ROLLBACK");
+      throw err;
+    }finally{
+      client.release();
     }
 
-    if (!inserted) {
-      throw ultimoErro || new Error("Falha ao gravar agendamento");
-    }
-
-    let msg = "agendamento realizado";
-    if (contingencia) {
-      msg += " (agendamento sob regra de contingência)";
-    }
-
-    return res.status(200).json({ msg });
-
-  } catch (err) {
-    console.error("ERRO agendar:", err);
-    return res.status(500).json({
-      error: err.message || "Erro ao gravar agendamento"
-    });
+  }catch(err){
+    return res.status(500).json({ error: err.message || "Erro interno" });
   }
 }
