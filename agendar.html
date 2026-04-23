@@ -212,7 +212,7 @@
     };
 
     const LINK_WPP = "https://chat.whatsapp.com/JMfwtBtIdSm8SNoQ8hUE71";
-    const VERSAO_HTML = "V.2604231548";
+    const VERSAO_HTML = "V.2604231602";
 
     function somenteDigitos(txt){
       return String(txt || "").replace(/\D+/g, "");
@@ -454,7 +454,13 @@
         const dataBr = formatarDataBR(data);
         const hora = horaSelecionada;
 
-        const textoCopiar = `${embarcacaoGrupo} - ${dataBr}: ${hora}h`;
+       const embarcacaoGrupoFmt = `${acesso.pb}-${acesso.grupo}`;
+const diaSemanaExtenso = nomeDiaSemana(data).toLowerCase();
+
+const textoCopiar =
+  `*SOLICITAÇÃO DE AGENDAMENTO*\n\n` +
+  `Embarcação *${embarcacaoGrupoFmt}*\n\n` +
+  `*${dataBr}* ${hora}h - ${diaSemanaExtenso}`;
 
         try {
           await navigator.clipboard.writeText(textoCopiar);
