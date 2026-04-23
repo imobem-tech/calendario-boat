@@ -43,7 +43,7 @@ function decodeToken(token) {
 
   return {
     pb,
-    grupo: `${grupoLetra}${grupoNum}`, // ex.: X4
+    grupo: `${grupoLetra}${grupoNum}`,
     codAutorizado: autorizado
   };
 }
@@ -51,6 +51,20 @@ function decodeToken(token) {
 function extrairLimiteDoGrupo(grupo) {
   const m = String(grupo || "").match(/(\d+)$/);
   return m ? Number(m[1]) : 0;
+}
+
+function normalizarHora(hora) {
+  const h = String(hora || "").trim();
+
+  if (/^\d{2}:\d{2}$/.test(h)) {
+    return `${h}:00`;
+  }
+
+  if (/^\d{2}:\d{2}:\d{2}$/.test(h)) {
+    return h;
+  }
+
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -81,15 +95,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Dados do token inválidos." });
     }
 
-    // Pela sua regra, a validação é por DIA, não por data/hora.
-    // Se quiser manter o horário só para exibição no front, tudo bem,
-    // mas ele não está sendo gravado nessa tabela.
-    const dataAgendamento = data; // yyyy-mm-dd
+    const horaNormalizada = normalizarHora(hora);
+    if (!horaNormalizada) {
+      return res.status(400).json({ error: "Hora inválida. Use HH:MM ou HH:MM:SS." });
+    }
+
+    // Ex.: 2026-04-23 09:41:28
+    const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
     await client.query("BEGIN");
 
-    // 1) Verifica se a embarcação já tem agendamento ABERTO no mesmo dia
+    // trava a tabela para evitar dois usuários pegarem o mesmo MAX("Código")+1
+    await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
+
+    // 1) Verifica se a embarcação já tem agendamento aberto no mesmo dia
     const conflitoDia = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -98,7 +118,7 @@ export default async function handler(req, res) {
           AND "Dt_Desistencia" IS NULL
           AND "Dt_Cancela_saida" IS NULL
         LIMIT 1`,
-      [codEmbPB, dataAgendamento]
+      [codEmbPB, data]
     );
 
     if (conflitoDia.rowCount > 0) {
@@ -108,8 +128,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2) Conta quantos agendamentos em aberto existem, a partir de hoje,
-    // para o mesmo autorizado + embarcação + grupo
+    // 2) Conta quantos agendamentos em aberto existem a partir de hoje
     const emAberto = await client.query(
       `SELECT COUNT(*)::int AS total
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -131,10 +150,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3) Insere o agendamento
+    // 3) Busca o próximo Código = MAX + 1
+    const rsCodigo = await client.query(
+      `SELECT COALESCE(MAX("Código"), 0) + 1 AS proximo_codigo
+         FROM public."P_BOAT_z_10_Saida_Emb"`
+    );
+
+    const proximoCodigo = rsCodigo.rows[0].proximo_codigo;
+
+    // 4) Insere o agendamento com data + hora
     await client.query(
       `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
        (
+         "Código",
          "Cod_Emb_PB",
          "Cod_Proprietário",
          "Cod_Autorizado",
@@ -143,12 +171,23 @@ export default async function handler(req, res) {
          "Grupo_Comp_letra",
          "updated_at"
        )
-       VALUES ($1, $2, $3, CURRENT_DATE, $4::date, $5, CURRENT_DATE)`,
+       VALUES
+       (
+         $1,
+         $2,
+         $3,
+         $4,
+         NOW(),
+         $5::timestamp,
+         $6,
+         NOW()
+       )`,
       [
+        proximoCodigo,
         codEmbPB,
         4255,
         codAutorizado,
-        dataAgendamento,
+        dataHoraAgendamento,
         grupo
       ]
     );
@@ -156,13 +195,17 @@ export default async function handler(req, res) {
     await client.query("COMMIT");
 
     return res.status(200).json({
-      msg: `Agendamento realizado com sucesso para ${dataAgendamento} às ${hora}.`
+      msg: `Agendamento realizado com sucesso para ${data} às ${horaNormalizada}.`,
+      codigo: proximoCodigo
     });
 
   } catch (err) {
     if (client) {
-      try { await client.query("ROLLBACK"); } catch {}
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
     }
+
     return res.status(500).json({
       error: err.message || "Erro interno"
     });
