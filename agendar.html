@@ -443,19 +443,14 @@
 
         const json = await resp.json();
 
-        if(!resp.ok){
-          const textoErro = json.versao
-            ? `${json.error || "Falha ao agendar."}\n${json.versao}`
-            : (json.error || "Falha ao agendar.");
+if(!resp.ok){
+  const textoErro = json.error || "Falha ao agendar.";
 
-          setMsg(textoErro, "error", true);
-          btnConfirmar.disabled = false;
-          return;
-        }
-
-        const textoSucesso = json.versao
-          ? `${json.msg || "Agendamento realizado."}\n${json.versao}`
-          : (json.msg || "Agendamento realizado.");
+  setMsg(textoErro, "error", true);
+  btnConfirmar.disabled = false;
+  return;
+}
+       const textoSucesso = json.msg || "Agendamento realizado.";
 
         setMsg(textoSucesso, "success", true);
 
