@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "v. 2604231400";
+const VERSAO_API = "v. 2604231449";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -98,6 +98,23 @@ function montarMensagemLimite(limiteGrupo, rows) {
   return linhas.join("\n");
 }
 
+function ehDiaContingenciaHoje(dataIso) {
+  const hoje = new Date();
+  const [ano, mes, dia] = String(dataIso).split("-").map(Number);
+
+  const dataInformada = new Date(ano, mes - 1, dia);
+
+  const mesmaData =
+    dataInformada.getFullYear() === hoje.getFullYear() &&
+    dataInformada.getMonth() === hoje.getMonth() &&
+    dataInformada.getDate() === hoje.getDate();
+
+  if (!mesmaData) return false;
+
+  const diaSemana = hoje.getDay(); // 0=domingo ... 6=sábado
+  return diaSemana >= 2 && diaSemana <= 4; // terça a quinta
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -146,6 +163,7 @@ export default async function handler(req, res) {
       });
     }
 
+    const contingenciaHoje = ehDiaContingenciaHoje(data);
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
@@ -172,39 +190,41 @@ export default async function handler(req, res) {
       });
     }
 
-    const emAberto = await client.query(
-      `SELECT COUNT(*)::int AS total
-         FROM public."P_BOAT_z_10_Saida_Emb"
-        WHERE "Cod_Emb_PB" = $1
-          AND "Cod_Autorizado" = $2
-          AND "Grupo_Comp_letra" = $3
-          AND "Dt_Agendamento"::date >= CURRENT_DATE
-          AND "Dt_Desistencia" IS NULL
-          AND "Dt_Cancela_saida" IS NULL`,
-      [codEmbPB, codAutorizado, grupo]
-    );
-
-    const totalEmAberto = emAberto.rows[0]?.total || 0;
-
-    if (totalEmAberto >= limiteGrupo) {
-      const datasFuturas = await client.query(
-        `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
+    if (!contingenciaHoje) {
+      const emAberto = await client.query(
+        `SELECT COUNT(*)::int AS total
            FROM public."P_BOAT_z_10_Saida_Emb"
           WHERE "Cod_Emb_PB" = $1
             AND "Cod_Autorizado" = $2
             AND "Grupo_Comp_letra" = $3
             AND "Dt_Agendamento"::date >= CURRENT_DATE
             AND "Dt_Desistencia" IS NULL
-            AND "Dt_Cancela_saida" IS NULL
-          ORDER BY data_agendada`,
+            AND "Dt_Cancela_saida" IS NULL`,
         [codEmbPB, codAutorizado, grupo]
       );
 
-      await client.query("ROLLBACK");
-      return res.status(409).json({
-        error: montarMensagemLimite(limiteGrupo, datasFuturas.rows),
-        versao: VERSAO_API
-      });
+      const totalEmAberto = emAberto.rows[0]?.total || 0;
+
+      if (totalEmAberto >= limiteGrupo) {
+        const datasFuturas = await client.query(
+          `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
+             FROM public."P_BOAT_z_10_Saida_Emb"
+            WHERE "Cod_Emb_PB" = $1
+              AND "Cod_Autorizado" = $2
+              AND "Grupo_Comp_letra" = $3
+              AND "Dt_Agendamento"::date >= CURRENT_DATE
+              AND "Dt_Desistencia" IS NULL
+              AND "Dt_Cancela_saida" IS NULL
+            ORDER BY data_agendada`,
+          [codEmbPB, codAutorizado, grupo]
+        );
+
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error: montarMensagemLimite(limiteGrupo, datasFuturas.rows),
+          versao: VERSAO_API
+        });
+      }
     }
 
     const rsCodigo = await client.query(
