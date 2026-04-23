@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604231449";
+const VERSAO_API = "Allmax®2604231515";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -252,10 +252,10 @@ export default async function handler(req, res) {
          $2,
          $3,
          $4,
-         NOW(),
-         $5::timestamp,
-         $6,
-         NOW()
+         (NOW() AT TIME ZONE 'America/Sao_Paulo'),
+  $5::timestamp,
+  $6,
+  (NOW() AT TIME ZONE 'America/Sao_Paulo')
        )`,
       [
         proximoCodigo,
