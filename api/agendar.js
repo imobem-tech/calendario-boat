@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     // 1) Verifica se a embarcação já tem agendamento ABERTO no mesmo dia
     const conflitoDia = await client.query(
       `SELECT 1
-         FROM public."P_BOAT_10_Agendamento"
+         FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "Cod_Emb_PB" = $1
           AND "Dt_Agendamento"::date = $2::date
           AND "Dt_Desistencia" IS NULL
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     // para o mesmo autorizado + embarcação + grupo
     const emAberto = await client.query(
       `SELECT COUNT(*)::int AS total
-         FROM public."P_BOAT_10_Agendamento"
+         FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "Cod_Emb_PB" = $1
           AND "Cod_Autorizado" = $2
           AND "Grupo_Comp_letra" = $3
@@ -133,7 +133,7 @@ export default async function handler(req, res) {
 
     // 3) Insere o agendamento
     await client.query(
-      `INSERT INTO public."P_BOAT_10_Agendamento"
+      `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
        (
          "Cod_Emb_PB",
          "Cod_Proprietário",
