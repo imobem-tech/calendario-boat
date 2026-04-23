@@ -26,8 +26,8 @@ function calcularDV(pb, grupoNum, autorizado) {
 
 function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
-
   const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+
   if (!m) return null;
 
   const pb = decodificar(m[1]);
@@ -75,7 +75,6 @@ export default async function handler(req, res) {
     client = await pool.connect();
     await client.query("BEGIN");
 
-    // 🔎 Verifica conflito de horário
     const check = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -90,39 +89,37 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Horário já ocupado." });
     }
 
-    // 🔢 Buscar próximo Código
     const resultMax = await client.query(
       `SELECT COALESCE(MAX("Código"), 0) AS max_codigo
          FROM public."P_BOAT_z_10_Saida_Emb"`
     );
 
-    let novoCodigo = Number(resultMax.rows[0].max_codigo) + 1;
+    const maxCodigoAtual = Number(resultMax.rows[0].max_codigo) || 0;
+    const codigo1 = maxCodigoAtual + 1;
+    const codigo2 = maxCodigoAtual + 2;
 
-    // 🔁 Função de tentativa de insert
     async function tentarInsert(codigo) {
       try {
         await client.query(
           `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-           ("Código","Cod_Emb_PB","Cod_Proprietário","Cod_Autorizado","Grupo_Comp_letra","Dt_Solicitacao","Dt_Agendamento")
-           VALUES ($1,$2,$3,$4,$5,NOW(),$6)`,
+           ("Código", "Cod_Emb_PB", "Cod_Proprietário", "Cod_Autorizado", "Grupo_Comp_letra", "Dt_Solicitacao", "Dt_Agendamento")
+           VALUES ($1, $2, $3, $4, $5, NOW(), $6)`,
           [codigo, codEmbPB, 4255, codAutorizadoNum, grupoCompLetra, dataHora]
         );
-        return true;
+        return codigo;
       } catch (err) {
-        // conflito de chave única (caso exista)
-        if (err.code === "23505") return false;
+        if (err.code === "23505") return null;
         throw err;
       }
     }
 
-    let ok = await tentarInsert(novoCodigo);
+    let codigoGravado = await tentarInsert(codigo1);
 
-    if (!ok) {
-      console.log("Conflito no Código, tentando próximo...");
-      ok = await tentarInsert(novoCodigo + 1);
+    if (codigoGravado === null) {
+      codigoGravado = await tentarInsert(codigo2);
     }
 
-    if (!ok) {
+    if (codigoGravado === null) {
       await client.query("ROLLBACK");
       return res.status(500).json({ error: "Falha ao gerar Código único." });
     }
@@ -131,12 +128,14 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       msg: "Agendamento realizado com sucesso.",
-      codigo: novoCodigo
+      codigo: codigoGravado
     });
 
   } catch (err) {
     if (client) {
-      try { await client.query("ROLLBACK"); } catch {}
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
     }
 
     return res.status(500).json({
