@@ -48,6 +48,16 @@ function decodeToken(token) {
   };
 }
 
+function isContingenciaHoje(dataStr) {
+  const hoje = new Date();
+  const hojeISO = hoje.toISOString().slice(0, 10);
+
+  if (dataStr !== hojeISO) return false;
+
+  const dow = hoje.getDay(); // 0=dom ... 6=sab
+  return dow >= 2 && dow <= 4; // terça, quarta, quinta
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
@@ -70,25 +80,54 @@ export default async function handler(req, res) {
     const codEmbPB = Number(acesso.pb);
     const codAutorizadoNum = Number(acesso.codAutorizado);
     const grupoCompLetra = acesso.grupo;
+
     const dataHora = `${data}T${hora}:00`;
 
     client = await pool.connect();
     await client.query("BEGIN");
 
-    const check = await client.query(
+    // 🔒 1. BLOQUEIO POR EMBARCAÇÃO NA MESMA DATA
+    const checkEmb = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "Cod_Emb_PB" = $1
-          AND "Dt_Agendamento" = $2
+          AND DATE("Dt_Agendamento") = $2
+          AND "Dt_Cancela_saida" IS NULL
+          AND "Dt_Desistencia" IS NULL
         LIMIT 1`,
-      [codEmbPB, dataHora]
+      [codEmbPB, data]
     );
 
-    if (check.rowCount > 0) {
+    if (checkEmb.rowCount > 0) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ error: "Horário já ocupado." });
+      return res.status(409).json({ error: "Embarcação já possui agendamento neste dia." });
     }
 
+    // 🔢 2. CAPACIDADE DO GRUPO
+    const capacidade = parseInt(grupoCompLetra.slice(-1), 10) || 0;
+
+    // 🔢 3. CONTAGEM DE AGENDAMENTOS ATIVOS DO GRUPO
+    const usadosRes = await client.query(
+      `SELECT COUNT(*) AS total
+         FROM public."P_BOAT_z_10_Saida_Emb"
+        WHERE "Grupo_Comp_letra" = $1
+          AND "Dt_Cancela_saida" IS NULL
+          AND "Dt_Desistencia" IS NULL`,
+      [grupoCompLetra]
+    );
+
+    const usados = Number(usadosRes.rows[0].total) || 0;
+
+    const contingencia = isContingenciaHoje(data);
+
+    if (usados >= capacidade && !contingencia) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: `Limite do grupo (${capacidade}) atingido.`
+      });
+    }
+
+    // 🔢 4. GERAÇÃO DO CÓDIGO
     const resultMax = await client.query(
       `SELECT COALESCE(MAX("Código"), 0) AS max_codigo
          FROM public."P_BOAT_z_10_Saida_Emb"`
@@ -100,26 +139,27 @@ export default async function handler(req, res) {
 
     async function tentarInsert(codigo) {
       try {
-        await client.query(
+        const result = await client.query(
           `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-           ("Código", "Cod_Emb_PB", "Cod_Proprietário", "Cod_Autorizado", "Grupo_Comp_letra", "Dt_Solicitacao", "Dt_Agendamento")
-           VALUES ($1, $2, $3, $4, $5, NOW(), $6)`,
+           ("Código","Cod_Emb_PB","Cod_Proprietário","Cod_Autorizado","Grupo_Comp_letra","Dt_Solicitacao","Dt_Agendamento")
+           VALUES ($1,$2,$3,$4,$5,NOW(),$6)
+           RETURNING "ID","Código"`,
           [codigo, codEmbPB, 4255, codAutorizadoNum, grupoCompLetra, dataHora]
         );
-        return codigo;
+        return result.rows[0];
       } catch (err) {
         if (err.code === "23505") return null;
         throw err;
       }
     }
 
-    let codigoGravado = await tentarInsert(codigo1);
+    let registro = await tentarInsert(codigo1);
 
-    if (codigoGravado === null) {
-      codigoGravado = await tentarInsert(codigo2);
+    if (!registro) {
+      registro = await tentarInsert(codigo2);
     }
 
-    if (codigoGravado === null) {
+    if (!registro) {
       await client.query("ROLLBACK");
       return res.status(500).json({ error: "Falha ao gerar Código único." });
     }
@@ -128,14 +168,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       msg: "Agendamento realizado com sucesso.",
-      codigo: codigoGravado
+      registro
     });
 
   } catch (err) {
     if (client) {
-      try {
-        await client.query("ROLLBACK");
-      } catch {}
+      try { await client.query("ROLLBACK"); } catch {}
     }
 
     return res.status(500).json({
