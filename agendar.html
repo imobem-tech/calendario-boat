@@ -212,7 +212,7 @@
     };
 
     const LINK_WPP = "https://chat.whatsapp.com/JMfwtBtIdSm8SNoQ8hUE71";
-    const VERSAO_HTML = "V.2604231602";
+    const VERSAO_HTML = "V.2604231609";
 
     function somenteDigitos(txt){
       return String(txt || "").replace(/\D+/g, "");
@@ -331,11 +331,30 @@
     }
 
     modalBtn.addEventListener("click", function(){
-      if (redirectOnClose) {
+
+  if (redirectOnClose) {
+
+    try {
+      const texto = encodeURIComponent(window.textoCopiarGlobal || "");
+
+      // tentativa 1 → abrir com mensagem pronta
+      const urlComTexto = `https://wa.me/?text=${texto}`;
+
+      window.open(urlComTexto, "_blank");
+
+      // fallback leve → abre grupo também
+      setTimeout(() => {
         window.open(LINK_WPP, "_blank");
-      }
-      fecharModal();
-    });
+      }, 1200);
+
+    } catch (e) {
+      console.warn("Erro ao abrir WhatsApp:", e);
+      window.open(LINK_WPP, "_blank");
+    }
+  }
+
+  fecharModal();
+});
 
     modalOverlay.addEventListener("click", function(e){
       if(e.target === modalOverlay){
@@ -461,6 +480,8 @@ const textoCopiar =
   `*SOLICITAÇÃO DE AGENDAMENTO*\n\n` +
   `Embarcação *${embarcacaoGrupoFmt}*\n\n` +
   `*${dataBr}* ${hora}h - ${diaSemanaExtenso}`;
+
+window.textoCopiarGlobal = textoCopiar;
 
         try {
           await navigator.clipboard.writeText(textoCopiar);
