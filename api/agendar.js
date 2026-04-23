@@ -80,31 +80,31 @@ export default async function handler(req, res){
 
       // verifica conflito
       const check = await client.query(
-        `SELECT 1
-         FROM "P_BOAT_10_Agendamento"
-         WHERE "PB" = $1
-           AND "Dt_Agendamento" = $2
-         LIMIT 1`,
-        [pb, dataHora]
-      );
+  `SELECT 1
+   FROM public."P_BOAT_10_Agendamento"
+   WHERE "PB" = $1
+     AND "Dt_Agendamento" = $2
+   LIMIT 1`,
+  [pb, dataHora]
+);
 
       if(check.rowCount > 0){
         await client.query("ROLLBACK");
         return res.status(409).json({ error: "Horário já ocupado." });
       }
 
-      await client.query(
-        `INSERT INTO "P_BOAT_10_Agendamento"
-        ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
-        VALUES ($1,$2,$3,$4,$5)`,
-        [
-          pb,
-          4255,              // FIXO
-          codAutorizado,     // DO TOKEN
-          grupo,
-          dataHora
-        ]
-      );
+await client.query(
+  `INSERT INTO public."P_BOAT_10_Agendamento"
+   ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
+   VALUES ($1,$2,$3,$4,$5)`,
+  [
+    pb,
+    4255,
+    codAutorizado,
+    grupo,
+    dataHora
+  ]
+);
 
       await client.query("COMMIT");
 
