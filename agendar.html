@@ -323,12 +323,17 @@ function aplicarAssinatura(){
       modalOverlay.classList.remove("show");
       modalOverlay.setAttribute("aria-hidden", "true");
 
-      if (redirectOnClose) {
-        const destino = redirectOnClose;
-        redirectOnClose = "";
-        window.location.href = destino;
-      }
-    }
+   if (redirectOnClose) {
+  const destino = redirectOnClose;
+  redirectOnClose = "";
+
+  // abre WhatsApp primeiro
+  window.open(LINK_WPP, "_blank");
+
+  // depois volta pro calendário
+  window.location.href = destino;
+}
+          }
 
     modalBtn.addEventListener("click", fecharModal);
 
@@ -445,7 +450,24 @@ if(!resp.ok){
 }
        const textoSucesso = json.msg || "Agendamento realizado.";
 
-        setMsg(textoSucesso, "success", true);
+// monta texto da saída
+const grupo = acesso.grupo;
+const dataBr = formatarDataBR(data);
+const hora = horaSelecionada;
+
+const textoCopiar = `${grupo} - ${dataBr}: ${hora}h`;
+
+// copia pro clipboard
+try {
+  await navigator.clipboard.writeText(textoCopiar);
+} catch (e) {
+  console.warn("Falha ao copiar:", e);
+}
+
+// mensagem final (em linha como você pediu)
+const mensagemFinal = `${textoSucesso}\n${textoCopiar}`;
+
+setMsg(mensagemFinal, "success", true);
 
         const ym = data.slice(0, 7);
         redirectOnClose = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
