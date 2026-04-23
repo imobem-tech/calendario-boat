@@ -200,7 +200,7 @@
       <div id="modalTitle" class="modal-head">Aviso</div>
       <div id="modalBody" class="modal-body"></div>
       <div class="modal-actions">
-        <button id="modalBtn" type="button" class="modal-btn">Fechar</button>
+        <button id="modalBtn" type="button" class="modal-btn">OK</button>
       </div>
     </div>
   </div>
@@ -210,6 +210,9 @@
       a:"1", b:"2", c:"3", d:"4", e:"5",
       f:"6", g:"7", h:"8", i:"9", j:"0"
     };
+
+    const LINK_WPP = "https://chat.whatsapp.com/JMfwtBtIdSm8SNoQ8hUE71";
+    const VERSAO_HTML = "V.2604231540";
 
     function somenteDigitos(txt){
       return String(txt || "").replace(/\D+/g, "");
@@ -279,15 +282,12 @@
       return new Date(y, m - 1, d).getDay();
     }
 
-   
-    const VERSAO_HTML = "V.2604231540";
-
-function aplicarAssinatura(){
-  const el = document.getElementById("brandFooter");
-  if (el) {
-    el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
-  }
-}
+    function aplicarAssinatura(){
+      const el = document.getElementById("brandFooter");
+      if (el) {
+        el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
+      }
+    }
 
     const qs = new URLSearchParams(window.location.search);
     const token = qs.get("token") || "";
@@ -323,19 +323,19 @@ function aplicarAssinatura(){
       modalOverlay.classList.remove("show");
       modalOverlay.setAttribute("aria-hidden", "true");
 
-   if (redirectOnClose) {
-  const destino = redirectOnClose;
-  redirectOnClose = "";
+      if (redirectOnClose) {
+        const destino = redirectOnClose;
+        redirectOnClose = "";
+        window.location.href = destino;
+      }
+    }
 
-  // abre WhatsApp primeiro
-  window.open(LINK_WPP, "_blank");
-
-  // depois volta pro calendário
-  window.location.href = destino;
-}
-          }
-
-    modalBtn.addEventListener("click", fecharModal);
+    modalBtn.addEventListener("click", function(){
+      if (redirectOnClose) {
+        window.open(LINK_WPP, "_blank");
+      }
+      fecharModal();
+    });
 
     modalOverlay.addEventListener("click", function(e){
       if(e.target === modalOverlay){
@@ -441,33 +441,29 @@ function aplicarAssinatura(){
 
         const json = await resp.json();
 
-if(!resp.ok){
-  const textoErro = json.error || "Falha ao agendar.";
+        if(!resp.ok){
+          const textoErro = json.error || "Falha ao agendar.";
+          setMsg(textoErro, "error", true);
+          btnConfirmar.disabled = false;
+          return;
+        }
 
-  setMsg(textoErro, "error", true);
-  btnConfirmar.disabled = false;
-  return;
-}
-       const textoSucesso = json.msg || "Agendamento realizado.";
+        const textoSucesso = json.msg || "Agendamento realizado.";
 
-// monta texto da saída
-const grupo = acesso.grupo;
-const dataBr = formatarDataBR(data);
-const hora = horaSelecionada;
+        const embarcacaoGrupo = `${acesso.pb}${acesso.grupo}`;
+        const dataBr = formatarDataBR(data);
+        const hora = horaSelecionada;
 
-const textoCopiar = `${grupo} - ${dataBr}: ${hora}h`;
+        const textoCopiar = `${embarcacaoGrupo} - ${dataBr}: ${hora}h`;
 
-// copia pro clipboard
-try {
-  await navigator.clipboard.writeText(textoCopiar);
-} catch (e) {
-  console.warn("Falha ao copiar:", e);
-}
+        try {
+          await navigator.clipboard.writeText(textoCopiar);
+        } catch (e) {
+          console.warn("Falha ao copiar:", e);
+        }
 
-// mensagem final (em linha como você pediu)
-const mensagemFinal = `${textoSucesso}\n${textoCopiar}`;
-
-setMsg(mensagemFinal, "success", true);
+        const mensagemFinal = `${textoSucesso}\n${textoCopiar}`;
+        setMsg(mensagemFinal, "success", true);
 
         const ym = data.slice(0, 7);
         redirectOnClose = `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`;
