@@ -75,6 +75,7 @@ export default async function handler(req, res) {
     client = await pool.connect();
     await client.query("BEGIN");
 
+    // 🔎 Verifica conflito de horário
     const check = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -89,21 +90,53 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Horário já ocupado." });
     }
 
-    await client.query(
-      `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-       ("Cod_Emb_PB", "Cod_Proprietário", "Cod_Autorizado", "Grupo_Comp_letra", "Dt_Solicitacao", "Dt_Agendamento")
-       VALUES ($1, $2, $3, $4, NOW(), $5)`,
-      [codEmbPB, 4255, codAutorizadoNum, grupoCompLetra, dataHora]
+    // 🔢 Buscar próximo Código
+    const resultMax = await client.query(
+      `SELECT COALESCE(MAX("Código"), 0) AS max_codigo
+         FROM public."P_BOAT_z_10_Saida_Emb"`
     );
 
+    let novoCodigo = Number(resultMax.rows[0].max_codigo) + 1;
+
+    // 🔁 Função de tentativa de insert
+    async function tentarInsert(codigo) {
+      try {
+        await client.query(
+          `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
+           ("Código","Cod_Emb_PB","Cod_Proprietário","Cod_Autorizado","Grupo_Comp_letra","Dt_Solicitacao","Dt_Agendamento")
+           VALUES ($1,$2,$3,$4,$5,NOW(),$6)`,
+          [codigo, codEmbPB, 4255, codAutorizadoNum, grupoCompLetra, dataHora]
+        );
+        return true;
+      } catch (err) {
+        // conflito de chave única (caso exista)
+        if (err.code === "23505") return false;
+        throw err;
+      }
+    }
+
+    let ok = await tentarInsert(novoCodigo);
+
+    if (!ok) {
+      console.log("Conflito no Código, tentando próximo...");
+      ok = await tentarInsert(novoCodigo + 1);
+    }
+
+    if (!ok) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({ error: "Falha ao gerar Código único." });
+    }
+
     await client.query("COMMIT");
-    return res.status(200).json({ msg: "Agendamento realizado com sucesso." });
+
+    return res.status(200).json({
+      msg: "Agendamento realizado com sucesso.",
+      codigo: novoCodigo
+    });
 
   } catch (err) {
     if (client) {
-      try {
-        await client.query("ROLLBACK");
-      } catch {}
+      try { await client.query("ROLLBACK"); } catch {}
     }
 
     return res.status(500).json({
