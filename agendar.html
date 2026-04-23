@@ -279,22 +279,15 @@
       return new Date(y, m - 1, d).getDay();
     }
 
-    function gerarVersaoFrontCompacta(){
-      const agora = new Date();
-      const yy = String(agora.getFullYear()).slice(-2);
-      const mm = String(agora.getMonth() + 1).padStart(2, "0");
-      const dd = String(agora.getDate()).padStart(2, "0");
-      const hh = String(agora.getHours()).padStart(2, "0");
-      const nn = String(agora.getMinutes()).padStart(2, "0");
-      return `${yy}${mm}${dd}${hh}${nn}`;
-    }
+   
+    const VERSAO_HTML = "V.2604231212";
 
-    function aplicarAssinatura(){
-      const el = document.getElementById("brandFooter");
-      if (el) {
-        el.textContent = `Powered by Allmax Gestão de Cotas® V.${gerarVersaoFrontCompacta()}`;
-      }
-    }
+function aplicarAssinatura(){
+  const el = document.getElementById("brandFooter");
+  if (el) {
+    el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
+  }
+}
 
     const qs = new URLSearchParams(window.location.search);
     const token = qs.get("token") || "";
