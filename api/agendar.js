@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "v. 2604231449";
+const VERSAO_API = "Allmax®2604231449";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     if (conflitoDia.rowCount > 0) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        error: `A embarcação ${codEmbPB} já possui agendamento em aberto para o dia selecionado.`,
+        error: `Embarcação ${codEmbPB} já possui agenda para o dia!`,
         versao: VERSAO_API
       });
     }
@@ -273,10 +273,14 @@ export default async function handler(req, res) {
     const diaSemana = obterDiaSemanaPtBr(data);
     const horaExibicao = horaNormalizada.slice(0, 5);
 
-    return res.status(200).json({
-      msg: `Agendamento com sucesso ${dataFormatada} ${diaSemana} às ${horaExibicao}`,
-      versao: VERSAO_API
-    });
+    const prefixo = contingenciaHoje
+  ? "Agendamento de contingência"
+  : "Agendamento com sucesso";
+
+return res.status(200).json({
+  msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
+  versao: VERSAO_API
+});
 
   } catch (err) {
     if (client) {
