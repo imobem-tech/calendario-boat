@@ -11,10 +11,6 @@ const MAP = {
   f:"6", g:"7", h:"8", i:"9", j:"0"
 };
 
-function somenteDigitos(txt){
-  return String(txt || "").replace(/\D+/g, "");
-}
-
 function decodificar(txt){
   return String(txt || "")
     .split("")
@@ -24,15 +20,15 @@ function decodificar(txt){
 
 function calcularDV(pb, grupoNum, autorizado){
   const base = `${pb}${grupoNum}${autorizado}`;
-  const soma = base.split("").reduce((acc,n)=>acc+Number(n),0);
-  return String(soma).padStart(2,"0");
+  const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
+  return String(soma).padStart(2, "0");
 }
 
 function decodeToken(token){
   const t = String(token || "").trim().toLowerCase();
 
   const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
-  if(!m) return null;
+  if (!m) return null;
 
   const pb = decodificar(m[1]);
   const grupoLetra = m[2].toUpperCase();
@@ -40,10 +36,10 @@ function decodeToken(token){
   const autorizado = decodificar(m[4]);
   const dv = decodificar(m[5]);
 
-  if(!pb || !grupoNum || !autorizado || !dv) return null;
+  if (!pb || !grupoNum || !autorizado || !dv) return null;
 
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
-  if(dv !== dvCalc) return null;
+  if (dv !== dvCalc) return null;
 
   return {
     pb,
@@ -53,71 +49,62 @@ function decodeToken(token){
 }
 
 export default async function handler(req, res){
-  if(req.method !== "POST"){
+  if (req.method !== "POST"){
     return res.status(405).json({ error: "Método não permitido" });
   }
 
-  try{
+  let client;
+
+  try {
     const { token, data, hora } = req.body || {};
 
-    if(!token || !data || !hora){
+    if (!token || !data || !hora){
       return res.status(400).json({ error: "Dados incompletos" });
     }
 
     const acesso = decodeToken(token);
-    if(!acesso){
+    if (!acesso){
       return res.status(400).json({ error: "Token inválido" });
     }
 
-    const { pb, grupo, codAutorizado } = acesso;
+    const pbNum = Number(acesso.pb);
+    const codAutorizadoNum = Number(acesso.codAutorizado);
+    const grupo = acesso.grupo;
+    const dataHora = `${data}T${hora}:00`;
 
-    const dataHora = `${data} ${hora}:00`;
+    client = await pool.connect();
+    await client.query("BEGIN");
 
-    const client = await pool.connect();
+    const check = await client.query(
+      `SELECT 1
+         FROM public."P_BOAT_10_Agendamento"
+        WHERE "PB" = $1
+          AND "Dt_Agendamento" = $2
+        LIMIT 1`,
+      [pbNum, dataHora]
+    );
 
-    try{
-      await client.query("BEGIN");
-
-      // verifica conflito
-      const check = await client.query(
-  `SELECT 1
-   FROM public."P_BOAT_10_Agendamento"
-   WHERE "PB" = $1
-     AND "Dt_Agendamento" = $2
-   LIMIT 1`,
-  [pb, dataHora]
-);
-
-      if(check.rowCount > 0){
-        await client.query("ROLLBACK");
-        return res.status(409).json({ error: "Horário já ocupado." });
-      }
-
-await client.query(
-  `INSERT INTO public."P_BOAT_10_Agendamento"
-   ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
-   VALUES ($1,$2,$3,$4,$5)`,
-  [
-    pb,
-    4255,
-    codAutorizado,
-    grupo,
-    dataHora
-  ]
-);
-
-      await client.query("COMMIT");
-
-      return res.status(200).json({ msg: "Agendamento realizado com sucesso." });
-
-    }catch(err){
+    if (check.rowCount > 0){
       await client.query("ROLLBACK");
-      throw err;
-    }finally{
-      client.release();
+      return res.status(409).json({ error: "Horário já ocupado." });
     }
 
-  }catch(err){
+    await client.query(
+      `INSERT INTO public."P_BOAT_10_Agendamento"
+       ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
+       VALUES ($1,$2,$3,$4,$5)`,
+      [pbNum, 4255, codAutorizadoNum, grupo, dataHora]
+    );
+
+    await client.query("COMMIT");
+    return res.status(200).json({ msg: "Agendamento realizado com sucesso." });
+
+  } catch (err) {
+    if (client){
+      try { await client.query("ROLLBACK"); } catch {}
+    }
     return res.status(500).json({ error: err.message || "Erro interno" });
+  } finally {
+    if (client) client.release();
   }
 }
