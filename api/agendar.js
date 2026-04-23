@@ -7,24 +7,24 @@ const pool = new Pool({
 });
 
 const MAP = {
-  a:"1", b:"2", c:"3", d:"4", e:"5",
-  f:"6", g:"7", h:"8", i:"9", j:"0"
+  a: "1", b: "2", c: "3", d: "4", e: "5",
+  f: "6", g: "7", h: "8", i: "9", j: "0"
 };
 
-function decodificar(txt){
+function decodificar(txt) {
   return String(txt || "")
     .split("")
     .map(ch => MAP[ch] || "")
     .join("");
 }
 
-function calcularDV(pb, grupoNum, autorizado){
+function calcularDV(pb, grupoNum, autorizado) {
   const base = `${pb}${grupoNum}${autorizado}`;
   const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
   return String(soma).padStart(2, "0");
 }
 
-function decodeToken(token){
+function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
 
   const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
@@ -48,8 +48,8 @@ function decodeToken(token){
   };
 }
 
-export default async function handler(req, res){
-  if (req.method !== "POST"){
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
   }
 
@@ -58,18 +58,18 @@ export default async function handler(req, res){
   try {
     const { token, data, hora } = req.body || {};
 
-    if (!token || !data || !hora){
+    if (!token || !data || !hora) {
       return res.status(400).json({ error: "Dados incompletos" });
     }
 
     const acesso = decodeToken(token);
-    if (!acesso){
+    if (!acesso) {
       return res.status(400).json({ error: "Token inválido" });
     }
 
-    const pbNum = Number(acesso.pb);
+    const codEmbPB = Number(acesso.pb);
     const codAutorizadoNum = Number(acesso.codAutorizado);
-    const grupo = acesso.grupo;
+    const grupoCompLetra = acesso.grupo;
     const dataHora = `${data}T${hora}:00`;
 
     client = await pool.connect();
@@ -78,32 +78,37 @@ export default async function handler(req, res){
     const check = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
-        WHERE "PB" = $1
+        WHERE "Cod_Emb_PB" = $1
           AND "Dt_Agendamento" = $2
         LIMIT 1`,
-      [pbNum, dataHora]
+      [codEmbPB, dataHora]
     );
 
-    if (check.rowCount > 0){
+    if (check.rowCount > 0) {
       await client.query("ROLLBACK");
       return res.status(409).json({ error: "Horário já ocupado." });
     }
 
     await client.query(
       `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
-       ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
-       VALUES ($1,$2,$3,$4,$5)`,
-      [pbNum, 4255, codAutorizadoNum, grupo, dataHora]
+       ("Cod_Emb_PB", "Cod_Proprietário", "Cod_Autorizado", "Grupo_Comp_letra", "Dt_Solicitacao", "Dt_Agendamento")
+       VALUES ($1, $2, $3, $4, NOW(), $5)`,
+      [codEmbPB, 4255, codAutorizadoNum, grupoCompLetra, dataHora]
     );
 
     await client.query("COMMIT");
     return res.status(200).json({ msg: "Agendamento realizado com sucesso." });
 
   } catch (err) {
-    if (client){
-      try { await client.query("ROLLBACK"); } catch {}
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
     }
-    return res.status(500).json({ error: err.message || "Erro interno" });
+
+    return res.status(500).json({
+      error: err.message || "Erro interno"
+    });
   } finally {
     if (client) client.release();
   }
