@@ -4,17 +4,74 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+const VERSAO_API = "v. 2604231419";
+
 // ===== DECODER =====
 const MAP = { a:"1",b:"2",c:"3",d:"4",e:"5",f:"6",g:"7",h:"8",i:"9",j:"0" };
 
-function decode(token){
-  const m = token.match(/^([a-j]+)([a-z])([a-j])$/);
-  if(!m) return null;
+function decodificar(txt) {
+  return String(txt || "")
+    .split("")
+    .map(x => MAP[x] || "")
+    .join("");
+}
 
-  const pb = m[1].split("").map(x=>MAP[x]).join("");
-  const grupo = m[2].toUpperCase() + MAP[m[3]];
+function calcularDV(pb, grupoNum, autorizado) {
+  const soma =
+    String(pb)
+      .split("")
+      .reduce((acc, n) => acc + Number(n), 0) +
+    Number(grupoNum) +
+    String(autorizado)
+      .split("")
+      .reduce((acc, n) => acc + Number(n), 0);
 
-  return { pb, grupo };
+  return String(soma % 100).padStart(2, "0");
+}
+
+function decodeToken(token) {
+  const t = String(token || "").trim().toLowerCase();
+
+  // ===== NOVO PADRÃO (com DV)
+  let m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+
+  if (m) {
+    const pb = decodificar(m[1]);
+    const grupoLetra = m[2].toUpperCase();
+    const grupoNum = decodificar(m[3]);
+    const autorizado = decodificar(m[4]);
+    const dv = decodificar(m[5]);
+
+    if (!pb || !grupoNum || !autorizado || !dv) return null;
+
+    const dvCalc = calcularDV(pb, grupoNum, autorizado);
+    if (dv !== dvCalc) return null;
+
+    return {
+      pb,
+      grupo: `${grupoLetra}${grupoNum}`,
+      codAutorizado: autorizado
+    };
+  }
+
+  // ===== PADRÃO ANTIGO (fallback)
+  m = t.match(/^([a-j]+)([a-z])([a-j])$/);
+
+  if (m) {
+    const pb = decodificar(m[1]);
+    const grupoLetra = m[2].toUpperCase();
+    const grupoNum = decodificar(m[3]);
+
+    if (!pb || !grupoNum) return null;
+
+    return {
+      pb,
+      grupo: `${grupoLetra}${grupoNum}`,
+      codAutorizado: 4255
+    };
+  }
+
+  return null;
 }
 
 // ===== HANDLER =====
@@ -24,8 +81,11 @@ try{
 
   const { token, data, hora } = req.body;
 
-  const acesso = decode(token);
-  if(!acesso) return res.status(400).json({ error:"token inválido" });
+  const acesso = decodeToken(token);
+  if(!acesso) return res.status(400).json({
+    error:"token inválido",
+    versao: VERSAO_API
+  });
 
   const pb = acesso.pb;
   const grupo = acesso.grupo;
@@ -44,7 +104,8 @@ try{
 
   if(existe.rows.length){
     return res.status(400).json({
-      error:"data não está mais disponível"
+      error:"data não está mais disponível",
+      versao: VERSAO_API
     });
   }
 
@@ -68,11 +129,6 @@ try{
   const usados = parseInt(aberto.rows[0].count,10);
 
   // ===== CONTINGÊNCIA =====
-  // Regra:
-  // - terça, quarta ou quinta
-  // - pedido para o mesmo dia
-  // - ignora somente o limite do grupo
-  // - mantém o bloqueio da embarcação por dia
   const agora = new Date();
 
   const hojeLocal = new Date(
@@ -86,13 +142,14 @@ try{
     String(hojeLocal.getMonth() + 1).padStart(2,"0") + "-" +
     String(hojeLocal.getDate()).padStart(2,"0");
 
-  const diaSemana = hojeLocal.getDay(); // 0=dom ... 6=sab
+  const diaSemana = hojeLocal.getDay();
   const mesmaData = data === hojeStr;
   const contingencia = (diaSemana >= 2 && diaSemana <= 4 && mesmaData);
 
   if(usados >= capacidade && !contingencia){
     return res.status(400).json({
-      error:`capacidade esgotada (${usados}/${capacidade})`
+      error:`capacidade esgotada (${usados}/${capacidade})`,
+      versao: VERSAO_API
     });
   }
 
@@ -130,10 +187,16 @@ try{
     msg += " (regra de contingência)";
   }
 
-  return res.status(200).json({ msg });
+  return res.status(200).json({
+    msg,
+    versao: VERSAO_API
+  });
 
 }catch(err){
   console.error(err);
-  return res.status(500).json({ error: err.message });
+  return res.status(500).json({
+    error: err.message,
+    versao: VERSAO_API
+  });
 }
 }
