@@ -1,6 +1,8 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
+const VERSAO_API = "v. 2604231208";
+
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -62,16 +64,6 @@ function normalizarHora(hora) {
   return null;
 }
 
-function gerarVersaoAPI() {
-  const agora = new Date();
-  const yy = String(agora.getFullYear()).slice(-2);
-  const mm = String(agora.getMonth() + 1).padStart(2, "0");
-  const dd = String(agora.getDate()).padStart(2, "0");
-  const hh = String(agora.getHours()).padStart(2, "0");
-  const nn = String(agora.getMinutes()).padStart(2, "0");
-  return `v. ${yy}${mm}${dd}${hh}${nn}`;
-}
-
 function formatarDataPtBr(dataIso) {
   const [ano, mes, dia] = String(dataIso).split("-");
   return `${dia}/${mes}/${ano}`;
@@ -93,11 +85,24 @@ function obterDiaSemanaPtBr(dataIso) {
   return dias[dt.getDay()];
 }
 
+function montarMensagemLimite(limiteGrupo, rows) {
+  const linhas = [`Limite do grupo (${limiteGrupo}) atingido.`];
+
+  for (const row of rows || []) {
+    if (row?.data_agendada) {
+      linhas.push(formatarDataPtBr(row.data_agendada));
+    }
+  }
+
+  linhas.push(VERSAO_API);
+  return linhas.join("\n");
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Método não permitido",
-      versao: gerarVersaoAPI()
+      versao: VERSAO_API
     });
   }
 
@@ -109,7 +114,7 @@ export default async function handler(req, res) {
     if (!token || !data || !hora) {
       return res.status(400).json({
         error: "Dados incompletos",
-        versao: gerarVersaoAPI()
+        versao: VERSAO_API
       });
     }
 
@@ -117,7 +122,7 @@ export default async function handler(req, res) {
     if (!acesso) {
       return res.status(400).json({
         error: "Token inválido",
-        versao: gerarVersaoAPI()
+        versao: VERSAO_API
       });
     }
 
@@ -129,7 +134,7 @@ export default async function handler(req, res) {
     if (!codEmbPB || !codAutorizado || !grupo || !limiteGrupo) {
       return res.status(400).json({
         error: "Dados do token inválidos.",
-        versao: gerarVersaoAPI()
+        versao: VERSAO_API
       });
     }
 
@@ -137,7 +142,7 @@ export default async function handler(req, res) {
     if (!horaNormalizada) {
       return res.status(400).json({
         error: "Hora inválida. Use HH:MM ou HH:MM:SS.",
-        versao: gerarVersaoAPI()
+        versao: VERSAO_API
       });
     }
 
@@ -163,7 +168,7 @@ export default async function handler(req, res) {
       await client.query("ROLLBACK");
       return res.status(409).json({
         error: `A embarcação ${codEmbPB} já possui agendamento em aberto para o dia selecionado.`,
-        versao: gerarVersaoAPI()
+        versao: VERSAO_API
       });
     }
 
@@ -182,10 +187,23 @@ export default async function handler(req, res) {
     const totalEmAberto = emAberto.rows[0]?.total || 0;
 
     if (totalEmAberto >= limiteGrupo) {
+      const datasFuturas = await client.query(
+        `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
+           FROM public."P_BOAT_z_10_Saida_Emb"
+          WHERE "Cod_Emb_PB" = $1
+            AND "Cod_Autorizado" = $2
+            AND "Grupo_Comp_letra" = $3
+            AND "Dt_Agendamento"::date >= CURRENT_DATE
+            AND "Dt_Desistencia" IS NULL
+            AND "Dt_Cancela_saida" IS NULL
+          ORDER BY data_agendada`,
+        [codEmbPB, codAutorizado, grupo]
+      );
+
       await client.query("ROLLBACK");
       return res.status(409).json({
-        error: `Limite do grupo (${limiteGrupo}) atingido.`,
-        versao: gerarVersaoAPI()
+        error: montarMensagemLimite(limiteGrupo, datasFuturas.rows),
+        versao: VERSAO_API
       });
     }
 
@@ -237,7 +255,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       msg: `Agendamento com sucesso ${dataFormatada} ${diaSemana} às ${horaExibicao}`,
-      versao: gerarVersaoAPI()
+      versao: VERSAO_API
     });
 
   } catch (err) {
@@ -249,7 +267,7 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       error: err.message || "Erro interno",
-      versao: gerarVersaoAPI()
+      versao: VERSAO_API
     });
   } finally {
     if (client) client.release();
