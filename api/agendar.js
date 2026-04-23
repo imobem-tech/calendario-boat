@@ -26,8 +26,8 @@ function calcularDV(pb, grupoNum, autorizado) {
 
 function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
-
   const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+
   if (!m) return null;
 
   const pb = decodificar(m[1]);
@@ -56,20 +56,49 @@ function extrairLimiteDoGrupo(grupo) {
 function normalizarHora(hora) {
   const h = String(hora || "").trim();
 
-  if (/^\d{2}:\d{2}$/.test(h)) {
-    return `${h}:00`;
-  }
-
-  if (/^\d{2}:\d{2}:\d{2}$/.test(h)) {
-    return h;
-  }
+  if (/^\d{2}:\d{2}$/.test(h)) return `${h}:00`;
+  if (/^\d{2}:\d{2}:\d{2}$/.test(h)) return h;
 
   return null;
 }
 
+function gerarVersaoAPI() {
+  const agora = new Date();
+  const yy = String(agora.getFullYear()).slice(-2);
+  const mm = String(agora.getMonth() + 1).padStart(2, "0");
+  const dd = String(agora.getDate()).padStart(2, "0");
+  const hh = String(agora.getHours()).padStart(2, "0");
+  const nn = String(agora.getMinutes()).padStart(2, "0");
+  return `v. ${yy}${mm}${dd}${hh}${nn}`;
+}
+
+function formatarDataPtBr(dataIso) {
+  const [ano, mes, dia] = String(dataIso).split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
+function obterDiaSemanaPtBr(dataIso) {
+  const dias = [
+    "domingo",
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado"
+  ];
+
+  const [ano, mes, dia] = String(dataIso).split("-").map(Number);
+  const dt = new Date(ano, mes - 1, dia);
+  return dias[dt.getDay()];
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido" });
+    return res.status(405).json({
+      error: "Método não permitido",
+      versao: gerarVersaoAPI()
+    });
   }
 
   let client;
@@ -78,12 +107,18 @@ export default async function handler(req, res) {
     const { token, data, hora } = req.body || {};
 
     if (!token || !data || !hora) {
-      return res.status(400).json({ error: "Dados incompletos" });
+      return res.status(400).json({
+        error: "Dados incompletos",
+        versao: gerarVersaoAPI()
+      });
     }
 
     const acesso = decodeToken(token);
     if (!acesso) {
-      return res.status(400).json({ error: "Token inválido" });
+      return res.status(400).json({
+        error: "Token inválido",
+        versao: gerarVersaoAPI()
+      });
     }
 
     const codEmbPB = Number(acesso.pb);
@@ -92,24 +127,27 @@ export default async function handler(req, res) {
     const limiteGrupo = extrairLimiteDoGrupo(grupo);
 
     if (!codEmbPB || !codAutorizado || !grupo || !limiteGrupo) {
-      return res.status(400).json({ error: "Dados do token inválidos." });
+      return res.status(400).json({
+        error: "Dados do token inválidos.",
+        versao: gerarVersaoAPI()
+      });
     }
 
     const horaNormalizada = normalizarHora(hora);
     if (!horaNormalizada) {
-      return res.status(400).json({ error: "Hora inválida. Use HH:MM ou HH:MM:SS." });
+      return res.status(400).json({
+        error: "Hora inválida. Use HH:MM ou HH:MM:SS.",
+        versao: gerarVersaoAPI()
+      });
     }
 
-    // Ex.: 2026-04-23 09:41:28
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
     await client.query("BEGIN");
 
-    // trava a tabela para evitar dois usuários pegarem o mesmo MAX("Código")+1
     await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
 
-    // 1) Verifica se a embarcação já tem agendamento aberto no mesmo dia
     const conflitoDia = await client.query(
       `SELECT 1
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -124,11 +162,11 @@ export default async function handler(req, res) {
     if (conflitoDia.rowCount > 0) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        error: `A embarcação ${codEmbPB} já possui agendamento em aberto para o dia selecionado.`
+        error: `A embarcação ${codEmbPB} já possui agendamento em aberto para o dia selecionado.`,
+        versao: gerarVersaoAPI()
       });
     }
 
-    // 2) Conta quantos agendamentos em aberto existem a partir de hoje
     const emAberto = await client.query(
       `SELECT COUNT(*)::int AS total
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -146,11 +184,11 @@ export default async function handler(req, res) {
     if (totalEmAberto >= limiteGrupo) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        error: `Limite do grupo (${limiteGrupo}) atingido.`
+        error: `Limite do grupo (${limiteGrupo}) atingido.`,
+        versao: gerarVersaoAPI()
       });
     }
 
-    // 3) Busca o próximo Código = MAX + 1
     const rsCodigo = await client.query(
       `SELECT COALESCE(MAX("Código"), 0) + 1 AS proximo_codigo
          FROM public."P_BOAT_z_10_Saida_Emb"`
@@ -158,7 +196,6 @@ export default async function handler(req, res) {
 
     const proximoCodigo = rsCodigo.rows[0].proximo_codigo;
 
-    // 4) Insere o agendamento com data + hora
     await client.query(
       `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
        (
@@ -194,9 +231,13 @@ export default async function handler(req, res) {
 
     await client.query("COMMIT");
 
+    const dataFormatada = formatarDataPtBr(data);
+    const diaSemana = obterDiaSemanaPtBr(data);
+    const horaExibicao = horaNormalizada.slice(0, 5);
+
     return res.status(200).json({
-      msg: `Agendamento realizado com sucesso para ${data} às ${horaNormalizada}.`,
-      codigo: proximoCodigo
+      msg: `Agendamento com sucesso ${dataFormatada} ${diaSemana} às ${horaExibicao}`,
+      versao: gerarVersaoAPI()
     });
 
   } catch (err) {
@@ -207,7 +248,8 @@ export default async function handler(req, res) {
     }
 
     return res.status(500).json({
-      error: err.message || "Erro interno"
+      error: err.message || "Erro interno",
+      versao: gerarVersaoAPI()
     });
   } finally {
     if (client) client.release();
