@@ -77,7 +77,7 @@ export default async function handler(req, res){
 
     const check = await client.query(
       `SELECT 1
-         FROM public."P_BOAT_10_Agendamento"
+         FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "PB" = $1
           AND "Dt_Agendamento" = $2
         LIMIT 1`,
@@ -90,7 +90,7 @@ export default async function handler(req, res){
     }
 
     await client.query(
-      `INSERT INTO public."P_BOAT_10_Agendamento"
+      `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
        ("PB","Cod_Proprietário","Cod_Autorizado","Grupo","Dt_Agendamento")
        VALUES ($1,$2,$3,$4,$5)`,
       [pbNum, 4255, codAutorizadoNum, grupo, dataHora]
