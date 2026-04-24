@@ -12,7 +12,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 
 const { Pool } = pkg
-const VERSAO_WPP = "Allmax®2604232342";
+const VERSAO_WPP = "Allmax®2604240031";
 const app = express()
 const PORT = process.env.PORT || 8080
 
@@ -28,6 +28,39 @@ let qrAtual = null
 let conectado = false
 let iniciando = false
 let processandoFila = false
+
+function extrairGrupoAgenda(nome, grupoId) {
+  const nomeLimpo = String(nome || '').trim()
+
+  // ignora se os 3 primeiros caracteres não forem números
+  if (!/^\d{3}/.test(nomeLimpo)) {
+    return null
+  }
+
+  // 1ª opção: NNN-AN
+  // exemplos: 576-Y2, 573-X4, 586-R4
+  const comCota = nomeLimpo.match(/^(\d{3})-([A-Z]\d)\b/i)
+
+  if (comCota) {
+    return {
+      pb: Number(comCota[1]),
+      cota: comCota[2].toUpperCase(),
+      nomeGrupoWpp: nomeLimpo,
+      grupoWppId: grupoId
+    }
+  }
+
+  // 2ª opção: NNN qualquer coisa
+  // exemplos: 555 SUMMER, 672-SUMMER, 643 SUMMER
+  const semCota = nomeLimpo.match(/^(\d{3})/)
+
+  return {
+    pb: Number(semCota[1]),
+    cota: null,
+    nomeGrupoWpp: nomeLimpo,
+    grupoWppId: grupoId
+  }
+}
 
 async function limparSessao() {
   await rm('/data/auth_info', { recursive: true, force: true })
@@ -231,6 +264,88 @@ app.get('/grupos', async (req, res) => {
     res.json(lista)
   } catch (err) {
     res.status(500).json({ erro: err.message })
+  }
+})
+
+app.post('/sincronizar-grupos-agenda', async (req, res) => {
+  let client
+
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    }
+
+    const grupos = await sock.groupFetchAllParticipating()
+
+    client = await pool.connect()
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_wpp_grupos_agenda_pb_cota
+      ON "WPP_Grupos_Agenda" (PB, COALESCE(Cota, ''))
+    `)
+
+    let inseridos = 0
+    let atualizados = 0
+    let ignorados = 0
+
+    const processados = []
+
+    for (const g of Object.values(grupos)) {
+      const item = extrairGrupoAgenda(g.subject, g.id)
+
+      if (!item) {
+        ignorados++
+        continue
+      }
+
+      const rsExiste = await client.query(
+        `SELECT ID
+           FROM "WPP_Grupos_Agenda"
+          WHERE PB = $1
+            AND COALESCE(Cota, '') = COALESCE($2, '')
+          LIMIT 1`,
+        [item.pb, item.cota]
+      )
+
+      if (rsExiste.rowCount === 0) {
+        await client.query(
+          `INSERT INTO "WPP_Grupos_Agenda"
+           (PB, Cota, NomeGrupoWpp, GrupoWppId, DataAtualizacao)
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
+        )
+
+        inseridos++
+      } else {
+        await client.query(
+          `UPDATE "WPP_Grupos_Agenda"
+              SET NomeGrupoWpp = $3,
+                  GrupoWppId = $4,
+                  DataAtualizacao = NOW()
+            WHERE PB = $1
+              AND COALESCE(Cota, '') = COALESCE($2, '')`,
+          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
+        )
+
+        atualizados++
+      }
+
+      processados.push(item)
+    }
+
+    res.json({
+      sucesso: true,
+      inseridos,
+      atualizados,
+      ignorados,
+      totalProcessados: processados.length,
+      exemplos: processados.slice(0, 20)
+    })
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  } finally {
+    if (client) client.release()
   }
 })
 
