@@ -1,17 +1,49 @@
 const express = require('express');
-const path = require('path');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-const publicPath = path.join(__dirname);
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
 
-app.use(express.static(publicPath));
+let qrAtual = null;
 
+// 🚀 Iniciar servidor web
 app.get('/', (req, res) => {
-  res.redirect('/index.html');
+    res.send('<h1>WPP Bot rodando 🚀</h1><p><a href="/qr">Ver QR Code</a></p>');
+});
+
+// 📲 Rota do QR
+app.get('/qr', (req, res) => {
+    if (!qrAtual) return res.send('QR ainda não gerado...');
+    res.send(`<img src="${qrAtual}" />`);
 });
 
 app.listen(PORT, () => {
-  console.log('Servidor rodando na porta ' + PORT);
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
+
+// 🤖 Conexão WhatsApp
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth');
+
+    const sock = makeWASocket({
+        auth: state
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, qr } = update;
+
+        if (qr) {
+            console.log('QR recebido!');
+            qrAtual = await QRCode.toDataURL(qr);
+        }
+
+        if (connection === 'open') {
+            console.log('✅ WhatsApp conectado!');
+        }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+}
+
+startBot();
