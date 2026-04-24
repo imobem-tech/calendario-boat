@@ -1,5 +1,5 @@
 import express from 'express'
-import makeWASocket from '@whiskeysockets/baileys'
+import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 
 const app = express()
@@ -10,8 +10,11 @@ let qrAtual = null
 async function startBot() {
     console.log('🚀 Iniciando bot...')
 
+    // 🔑 CORREÇÃO PRINCIPAL
+    const { state, saveCreds } = await useMultiFileAuthState('auth')
+
     const sock = makeWASocket({
-        printQRInTerminal: true
+        auth: state
     })
 
     sock.ev.on('connection.update', async (update) => {
@@ -30,6 +33,9 @@ async function startBot() {
             console.log('❌ Conexão fechada.')
         }
     })
+
+    // 🔑 SALVA SESSÃO (IMPORTANTE)
+    sock.ev.on('creds.update', saveCreds)
 }
 
 startBot()
