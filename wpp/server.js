@@ -1,6 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
+import pkg from 'pg'
 import { rm } from 'fs/promises'
 
 import makeWASocket, {
@@ -10,15 +11,23 @@ import makeWASocket, {
   Browsers
 } from '@whiskeysockets/baileys'
 
+const { Pool } = pkg
+
 const app = express()
 const PORT = process.env.PORT || 8080
 
 app.use(express.json())
 
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+})
+
 let sock = null
 let qrAtual = null
 let conectado = false
 let iniciando = false
+let processandoFila = false
 
 async function limparSessao() {
   await rm('./auth_info', { recursive: true, force: true })
@@ -34,8 +43,6 @@ async function iniciarBot() {
   try {
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
     const { version } = await fetchLatestBaileysVersion()
-
-    console.log('📦 Baileys version:', version)
 
     sock = makeWASocket({
       version,
@@ -91,6 +98,64 @@ async function iniciarBot() {
   }
 }
 
+async function processarFila() {
+  if (processandoFila) return
+  if (!conectado || !sock) return
+
+  processandoFila = true
+  let client
+
+  try {
+    client = await pool.connect()
+
+    const rs = await client.query(
+      `SELECT id, grupo_id, mensagem
+         FROM public.wpp_fila_agenda
+        WHERE status = 'pendente'
+          AND tentativas < 5
+        ORDER BY id
+        LIMIT 5`
+    )
+
+    for (const row of rs.rows) {
+      try {
+        console.log(`📤 Enviando mensagem fila ID ${row.id} para ${row.grupo_id}`)
+
+        await sock.sendMessage(row.grupo_id, {
+          text: row.mensagem
+        })
+
+        await client.query(
+          `UPDATE public.wpp_fila_agenda
+              SET status = 'enviado',
+                  enviado_em = NOW(),
+                  erro = NULL
+            WHERE id = $1`,
+          [row.id]
+        )
+
+        console.log(`✅ Mensagem ID ${row.id} enviada.`)
+
+      } catch (err) {
+        console.error(`❌ Erro ao enviar ID ${row.id}:`, err.message)
+
+        await client.query(
+          `UPDATE public.wpp_fila_agenda
+              SET tentativas = tentativas + 1,
+                  erro = $2
+            WHERE id = $1`,
+          [row.id, err.message]
+        )
+      }
+    }
+  } catch (err) {
+    console.error('💥 Erro geral ao processar fila:', err.message)
+  } finally {
+    if (client) client.release()
+    processandoFila = false
+  }
+}
+
 app.get('/', (req, res) => {
   res.send(`
     <h1>WPP Bot rodando 🚀</h1>
@@ -101,11 +166,23 @@ app.get('/', (req, res) => {
   `)
 })
 
-app.get('/status', (req, res) => {
+app.get('/status', async (req, res) => {
+  let pendentes = null
+
+  try {
+    const rs = await pool.query(
+      `SELECT COUNT(*)::int AS total
+         FROM public.wpp_fila_agenda
+        WHERE status = 'pendente'`
+    )
+    pendentes = rs.rows[0].total
+  } catch {}
+
   res.json({
     online: true,
     whatsappConectado: conectado,
-    qrDisponivel: !!qrAtual
+    qrDisponivel: !!qrAtual,
+    filaPendentes: pendentes
   })
 })
 
@@ -137,32 +214,6 @@ app.get('/reset', async (req, res) => {
   res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
 })
 
-// Enviar para número individual
-app.post('/enviar-numero', async (req, res) => {
-  try {
-    if (!conectado || !sock) {
-      return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    }
-
-    const { numero, mensagem } = req.body
-
-    if (!numero || !mensagem) {
-      return res.status(400).json({ erro: 'numero e mensagem são obrigatórios' })
-    }
-
-    const numeroLimpo = String(numero).replace(/\D/g, '')
-    const jid = `${numeroLimpo}@s.whatsapp.net`
-
-    await sock.sendMessage(jid, { text: mensagem })
-
-    res.json({ sucesso: true, destino: jid })
-  } catch (err) {
-    console.error('Erro ao enviar número:', err)
-    res.status(500).json({ erro: err.message })
-  }
-})
-
-// Listar grupos
 app.get('/grupos', async (req, res) => {
   try {
     if (!conectado || !sock) {
@@ -179,12 +230,10 @@ app.get('/grupos', async (req, res) => {
 
     res.json(lista)
   } catch (err) {
-    console.error('Erro ao listar grupos:', err)
     res.status(500).json({ erro: err.message })
   }
 })
 
-// Enviar para grupo
 app.post('/enviar-grupo', async (req, res) => {
   try {
     if (!conectado || !sock) {
@@ -201,7 +250,6 @@ app.post('/enviar-grupo', async (req, res) => {
 
     res.json({ sucesso: true, destino: grupoId })
   } catch (err) {
-    console.error('Erro ao enviar grupo:', err)
     res.status(500).json({ erro: err.message })
   }
 })
@@ -209,4 +257,8 @@ app.post('/enviar-grupo', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
   iniciarBot()
+
+  setInterval(() => {
+    processarFila()
+  }, 10000)
 })
