@@ -4,6 +4,6 @@
     "express": "^4.18.2"
   },
   "scripts": {
-    "start": "node wwp/server.js"
+    "start": "node wpp/server.js"
   }
 }
