@@ -1,6 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
+import { rm } from 'fs/promises'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -19,10 +20,19 @@ let qrAtual = null
 let conectado = false
 let iniciando = false
 
+async function limparSessao() {
+  try {
+    await rm('./auth_info', { recursive: true, force: true })
+    console.log('🧹 Sessão apagada.')
+  } catch (e) {
+    console.log('Sessão já limpa.')
+  }
+}
+
 async function iniciarBot() {
   if (iniciando) return
-
   iniciando = true
+
   console.log('🚀 Iniciando bot WhatsApp...')
 
   try {
@@ -37,19 +47,19 @@ async function iniciarBot() {
       browser: Browsers.macOS('Desktop'),
       logger: P({ level: 'silent' }),
       syncFullHistory: false,
-      markOnlineOnConnect: false,
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000
+      markOnlineOnConnect: false
     })
 
     sock.ev.on('creds.update', saveCreds)
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, qr, lastDisconnect } = update
+      const statusCode = lastDisconnect?.error?.output?.statusCode
 
       console.log('🔥 UPDATE:', {
         connection,
         qr: qr ? 'QR_GERADO' : undefined,
+        statusCode,
         error: lastDisconnect?.error?.message
       })
 
@@ -67,21 +77,26 @@ async function iniciarBot() {
 
       if (connection === 'close') {
         conectado = false
+        iniciando = false
 
-        const statusCode = lastDisconnect?.error?.output?.statusCode
         console.log('❌ Conexão fechada. Código:', statusCode)
 
-        if (statusCode !== DisconnectReason.loggedOut) {
-          console.log('🔄 Tentando reconectar em 10 segundos...')
-          setTimeout(() => {
-            iniciando = false
-            iniciarBot()
-          }, 10000)
-        } else {
-          console.log('🚪 Sessão encerrada. Precisa escanear novo QR.')
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+          console.log('🚪 Sessão inválida. Limpando e gerando novo QR...')
+          await limparSessao()
           qrAtual = null
-          iniciando = false
+
+          setTimeout(() => {
+            iniciarBot()
+          }, 3000)
+
+          return
         }
+
+        console.log('🔄 Reconectando em 8 segundos...')
+        setTimeout(() => {
+          iniciarBot()
+        }, 8000)
       }
     })
   } catch (err) {
@@ -90,7 +105,7 @@ async function iniciarBot() {
 
     setTimeout(() => {
       iniciarBot()
-    }, 10000)
+    }, 8000)
   }
 }
 
@@ -100,6 +115,7 @@ app.get('/', (req, res) => {
     <p>Status: ${conectado ? 'Conectado ✅' : 'Aguardando QR/conexão ⏳'}</p>
     <p><a href="/qr">Ver QR Code</a></p>
     <p><a href="/status">Status JSON</a></p>
+    <p><a href="/reset">Resetar sessão</a></p>
   `)
 })
 
@@ -119,8 +135,7 @@ app.get('/qr', async (req, res) => {
   if (!qrAtual) {
     return res.send(`
       <h2>QR ainda não gerado... ⏳</h2>
-      <p>Aguarde alguns segundos e atualize a página.</p>
-      <p><a href="/status">Ver status</a></p>
+      <p>Aguarde alguns segundos e atualize.</p>
     `)
   }
 
@@ -131,6 +146,20 @@ app.get('/qr', async (req, res) => {
     <img src="${qrImage}" style="width:320px;height:320px;" />
     <p>WhatsApp → Aparelhos conectados → Conectar aparelho.</p>
   `)
+})
+
+app.get('/reset', async (req, res) => {
+  conectado = false
+  qrAtual = null
+  iniciando = false
+
+  await limparSessao()
+
+  setTimeout(() => {
+    iniciarBot()
+  }, 1000)
+
+  res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
 })
 
 app.listen(PORT, () => {
