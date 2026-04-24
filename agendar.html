@@ -280,7 +280,7 @@
     }
 
    
-    const VERSAO_HTML = "V.2604231522";
+    const VERSAO_HTML = "V.2604240219";
 
 function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
@@ -390,25 +390,77 @@ function aplicarAssinatura(){
       atualizarBotao();
     }
 
-    function criarBotoesHorario(){
-      slotsEl.innerHTML = "";
-      for(let h = 10; h <= 17; h++){
-        for(let m = 0; m < 60; m += 15){
-          if(h === 17 && m > 0) break;
-          const hh = String(h).padStart(2, "0");
-          const mm = String(m).padStart(2, "0");
-          const hora = `${hh}:${mm}`;
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "slot-btn";
-          btn.textContent = hora;
-          btn.dataset.hora = hora;
-          btn.addEventListener("click", () => selecionarHora(hora));
-          slotsEl.appendChild(btn);
-        }
-      }
-    }
+function agoraSaoPaulo() {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
 
+  const get = tipo => partes.find(p => p.type === tipo)?.value;
+
+  return {
+    iso: `${get("year")}-${get("month")}-${get("day")}`,
+    hora: Number(get("hour")),
+    minuto: Number(get("minute"))
+  };
+}
+
+function arredondarParaProximo15(hora, minuto) {
+  let total = hora * 60 + minuto;
+  const resto = total % 15;
+
+  if (resto !== 0) {
+    total += 15 - resto;
+  }
+
+  return total;
+}
+
+function criarBotoesHorario() {
+  slotsEl.innerHTML = "";
+
+  const inicioPadrao = 11 * 60; // 11:00
+  const fimDia = 17 * 60;       // 17:00
+
+  let inicioMinutos = inicioPadrao;
+  const agora = agoraSaoPaulo();
+
+  if (data === agora.iso) {
+    const limiteComPrazo = arredondarParaProximo15(
+      agora.hora + 2,
+      agora.minuto
+    );
+
+    inicioMinutos = Math.max(inicioPadrao, limiteComPrazo);
+  }
+
+  for (let total = inicioMinutos; total <= fimDia; total += 15) {
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+
+    const hh = String(h).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    const hora = `${hh}:${mm}`;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "slot-btn";
+    btn.textContent = hora;
+    btn.dataset.hora = hora;
+    btn.addEventListener("click", () => selecionarHora(hora));
+
+    slotsEl.appendChild(btn);
+  }
+
+  if (!slotsEl.children.length) {
+    setWarning("Não há mais horários disponíveis para hoje respeitando o prazo mínimo de 2 horas.", true);
+  }
+}
     function avaliarContingencia(){
       const hoje = hojeIsoLocal();
       const dow = diaSemanaLocal(hoje);
