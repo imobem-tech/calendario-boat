@@ -87,18 +87,18 @@ function obterDiaSemanaPtBr(dataIso) {
   return dias[dt.getDay()];
 }
 
-async function buscarGrupoWppAgenda(client, pb, cota) {
+async function buscarGruposWppAgenda(client, pb, cota) {
   const rsCota = await client.query(
     `SELECT grupowppid, nomegrupowpp
        FROM public.wpp_grupos_agenda
       WHERE pb = $1
         AND UPPER(COALESCE(cota, '')) = UPPER($2)
-      LIMIT 1`,
+      ORDER BY nomegrupowpp`,
     [pb, cota || ""]
   );
 
   if (rsCota.rowCount > 0) {
-    return rsCota.rows[0];
+    return rsCota.rows;
   }
 
   const rsGeral = await client.query(
@@ -106,17 +106,12 @@ async function buscarGrupoWppAgenda(client, pb, cota) {
        FROM public.wpp_grupos_agenda
       WHERE pb = $1
         AND cota IS NULL
-      LIMIT 1`,
+      ORDER BY nomegrupowpp`,
     [pb]
   );
 
-  if (rsGeral.rowCount > 0) {
-    return rsGeral.rows[0];
-  }
-
-  return null;
+  return rsGeral.rows;
 }
-
 function montarMensagemLimite(limiteGrupo, rows) {
   const linhas = [`Limite do grupo (${limiteGrupo}) atingido.`];
 
@@ -325,24 +320,26 @@ Código: ${proximoCodigo}
 
 ${VERSAO_WPP}`;
 
-    try {
-      const grupoWpp = await buscarGrupoWppAgenda(client, codEmbPB, grupo);
+   try {
+  const gruposWpp = await buscarGruposWppAgenda(client, codEmbPB, grupo);
 
-      if (!grupoWpp?.grupowppid) {
-        console.error(`Grupo WhatsApp não encontrado para PB ${codEmbPB} / Cota ${grupo}`);
-      } else {
-        await client.query(
-          `INSERT INTO public.wpp_fila_agenda
-           (grupo_id, mensagem, status)
-           VALUES ($1, $2, 'pendente')`,
-          [grupoWpp.grupowppid, mensagemWpp]
-        );
+  if (!gruposWpp.length) {
+    console.error(`Nenhum grupo WhatsApp encontrado para PB ${codEmbPB} / Cota ${grupo}`);
+  } else {
+    for (const grupoWpp of gruposWpp) {
+      await client.query(
+        `INSERT INTO public.wpp_fila_agenda
+         (grupo_id, mensagem, status)
+         VALUES ($1, $2, 'pendente')`,
+        [grupoWpp.grupowppid, mensagemWpp]
+      );
 
-        console.log(`Mensagem de agenda enfileirada para ${grupoWpp.nomegrupowpp}`);
-      }
-    } catch (filaErr) {
-      console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
+      console.log(`Mensagem enfileirada para ${grupoWpp.nomegrupowpp}`);
     }
+  }
+} catch (filaErr) {
+  console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
+}
 
     return res.status(200).json({
       msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
