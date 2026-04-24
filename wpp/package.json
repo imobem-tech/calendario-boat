@@ -1,16 +1,16 @@
 {
-  "name": "wpp",
+  "name": "wpp-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
- "scripts": {
-  "start": "node wpp/server.js"
-}
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.0",
-    "express": "^4.18.2",
-    "qrcode": "^1.5.4",
-    "pino": "^9.6.0",
-    "pg": "^8.11.5"
+    "@whiskeysockets/baileys": "latest",
+    "express": "latest",
+    "pg": "latest",
+    "pino": "latest",
+    "qrcode": "latest"
   }
 }
