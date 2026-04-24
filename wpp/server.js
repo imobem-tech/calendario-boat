@@ -6,7 +6,7 @@ import { rm } from 'fs/promises'
 
 import makeWASocket, {
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
+  fetchLatestBaileysVersion, 
   DisconnectReason,
   Browsers
 } from '@whiskeysockets/baileys'
