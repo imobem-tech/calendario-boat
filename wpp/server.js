@@ -195,6 +195,18 @@ async function sincronizarGruposAgenda() {
     let inseridos = 0
     let atualizados = 0
     let ignorados = 0
+    let removidos = 0
+
+    const idsAtuais = []
+
+    await client.query(`
+      DROP INDEX IF EXISTS ux_wpp_grupos_agenda_pb_cota
+    `)
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_wpp_grupos_agenda_grupowppid
+      ON public.wpp_grupos_agenda (grupowppid)
+    `)
 
     for (const g of Object.values(grupos)) {
       const item = extrairGrupoAgenda(g.subject, g.id)
@@ -204,13 +216,14 @@ async function sincronizarGruposAgenda() {
         continue
       }
 
+      idsAtuais.push(item.grupoWppId)
+
       const rsExiste = await client.query(
         `SELECT id
            FROM public.wpp_grupos_agenda
-          WHERE pb = $1
-            AND COALESCE(cota, '') = COALESCE($2, '')
+          WHERE grupowppid = $1
           LIMIT 1`,
-        [item.pb, item.cota]
+        [item.grupoWppId]
       )
 
       if (rsExiste.rowCount === 0) {
@@ -220,24 +233,32 @@ async function sincronizarGruposAgenda() {
            VALUES ($1, $2, $3, $4, NOW())`,
           [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
         )
-
         inseridos++
       } else {
         await client.query(
           `UPDATE public.wpp_grupos_agenda
-              SET nomegrupowpp = $3,
-                  grupowppid = $4,
+              SET pb = $1,
+                  cota = $2,
+                  nomegrupowpp = $3,
                   dataatualizacao = NOW()
-            WHERE pb = $1
-              AND COALESCE(cota, '') = COALESCE($2, '')`,
+            WHERE grupowppid = $4`,
           [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
         )
-
         atualizados++
       }
     }
 
-    return { inseridos, atualizados, ignorados }
+    if (idsAtuais.length > 0) {
+      const rsDelete = await client.query(
+        `DELETE FROM public.wpp_grupos_agenda
+          WHERE NOT (grupowppid = ANY($1::text[]))`,
+        [idsAtuais]
+      )
+
+      removidos = rsDelete.rowCount
+    }
+
+    return { inseridos, atualizados, ignorados, removidos }
 
   } finally {
     client.release()
