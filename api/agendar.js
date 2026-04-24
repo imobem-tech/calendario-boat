@@ -2,7 +2,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 
 const VERSAO_API = "Allmax®2604231515";
-const VERSAO_WPP = process.env.VERSAO_WPP || "";
+const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 // Grupo fixo por enquanto
 const WPP_GRUPO_ID = "556384030406-1557238631@g.us";
