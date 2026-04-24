@@ -470,6 +470,47 @@ app.post('/enviar-grupo', async (req, res) => {
   }
 })
 
+app.get('/botao_agenda_todos', async (req, res) => {
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    }
+
+    const grupoId = '120363330197701730@g.us'
+
+    const linkAgenda =
+      req.query.link ||
+      'https://allmaxcalendar.vercel.app/egfxddachch'
+
+    const mensagem =
+      req.query.mensagem ||
+      '📅 Agenda disponível\n\nClique no botão abaixo para acessar a agenda.'
+
+    await sock.sendMessage(grupoId, {
+      text: mensagem,
+      footer: 'Allmax Náutica',
+      templateButtons: [
+        {
+          index: 1,
+          urlButton: {
+            displayText: '📅 Ver Agenda',
+            url: linkAgenda
+          }
+        }
+      ]
+    })
+
+    res.json({
+      sucesso: true,
+      destino: grupoId,
+      link: linkAgenda
+    })
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
   iniciarBot()
