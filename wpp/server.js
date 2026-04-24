@@ -6,7 +6,7 @@ import { rm } from 'fs/promises'
 
 import makeWASocket, {
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
+  fetchLatestBaileysVersioawait client.query(n,
   DisconnectReason,
   Browsers
 } from '@whiskeysockets/baileys'
@@ -130,6 +130,13 @@ async function iniciarBot() {
     setTimeout(iniciarBot, 8000)
   }
 }
+
+app.get('/sincronizar-grupos-agenda', async (req, res) => {
+  req.method = 'POST'
+  res.status(405).json({
+    erro: 'Use POST em /sincronizar-grupos-agenda. Se quiser, eu adapto para GET temporário.'
+  })
+})
 
 async function processarFila() {
   if (processandoFila) return
@@ -279,10 +286,10 @@ app.post('/sincronizar-grupos-agenda', async (req, res) => {
 
     client = await pool.connect()
 
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_wpp_grupos_agenda_pb_cota
-      ON "WPP_Grupos_Agenda" (PB, COALESCE(Cota, ''))
-    `)
+   await client.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_wpp_grupos_agenda_pb_cota
+  ON public.wpp_grupos_agenda (PB, COALESCE(Cota, ''))
+`)
 
     let inseridos = 0
     let atualizados = 0
@@ -299,33 +306,33 @@ app.post('/sincronizar-grupos-agenda', async (req, res) => {
       }
 
       const rsExiste = await client.query(
-        `SELECT ID
-           FROM "WPP_Grupos_Agenda"
-          WHERE PB = $1
-            AND COALESCE(Cota, '') = COALESCE($2, '')
-          LIMIT 1`,
-        [item.pb, item.cota]
-      )
+  `SELECT ID
+     FROM public.wpp_grupos_agenda
+    WHERE PB = $1
+      AND COALESCE(Cota, '') = COALESCE($2, '')
+    LIMIT 1`,
+  [item.pb, item.cota]
+)
 
       if (rsExiste.rowCount === 0) {
-        await client.query(
-          `INSERT INTO "WPP_Grupos_Agenda"
-           (PB, Cota, NomeGrupoWpp, GrupoWppId, DataAtualizacao)
-           VALUES ($1, $2, $3, $4, NOW())`,
-          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
-        )
+       await client.query(
+  `INSERT INTO public.wpp_grupos_agenda
+   (PB, Cota, NomeGrupoWpp, GrupoWppId, DataAtualizacao)
+   VALUES ($1, $2, $3, $4, NOW())`,
+  [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
+)
 
         inseridos++
       } else {
-        await client.query(
-          `UPDATE "WPP_Grupos_Agenda"
-              SET NomeGrupoWpp = $3,
-                  GrupoWppId = $4,
-                  DataAtualizacao = NOW()
-            WHERE PB = $1
-              AND COALESCE(Cota, '') = COALESCE($2, '')`,
-          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
-        )
+       await client.query(
+  `UPDATE public.wpp_grupos_agenda
+      SET NomeGrupoWpp = $3,
+          GrupoWppId = $4,
+          DataAtualizacao = NOW()
+    WHERE PB = $1
+      AND COALESCE(Cota, '') = COALESCE($2, '')`,
+  [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
+)
 
         atualizados++
       }
