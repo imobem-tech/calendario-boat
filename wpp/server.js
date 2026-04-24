@@ -21,12 +21,8 @@ let conectado = false
 let iniciando = false
 
 async function limparSessao() {
-  try {
-    await rm('./auth_info', { recursive: true, force: true })
-    console.log('🧹 Sessão apagada.')
-  } catch (e) {
-    console.log('Sessão já limpa.')
-  }
+  await rm('./auth_info', { recursive: true, force: true })
+  console.log('🧹 Sessão apagada.')
 }
 
 async function iniciarBot() {
@@ -64,7 +60,6 @@ async function iniciarBot() {
       })
 
       if (qr) {
-        console.log('📲 QR RECEBIDO!')
         qrAtual = qr
         conectado = false
       }
@@ -79,43 +74,30 @@ async function iniciarBot() {
         conectado = false
         iniciando = false
 
-        console.log('❌ Conexão fechada. Código:', statusCode)
-
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-          console.log('🚪 Sessão inválida. Limpando e gerando novo QR...')
           await limparSessao()
           qrAtual = null
-
-          setTimeout(() => {
-            iniciarBot()
-          }, 3000)
-
+          setTimeout(iniciarBot, 3000)
           return
         }
 
-        console.log('🔄 Reconectando em 8 segundos...')
-        setTimeout(() => {
-          iniciarBot()
-        }, 8000)
+        setTimeout(iniciarBot, 8000)
       }
     })
   } catch (err) {
     console.error('💥 Erro ao iniciar bot:', err)
     iniciando = false
-
-    setTimeout(() => {
-      iniciarBot()
-    }, 8000)
+    setTimeout(iniciarBot, 8000)
   }
 }
 
 app.get('/', (req, res) => {
   res.send(`
     <h1>WPP Bot rodando 🚀</h1>
-    <p>Status: ${conectado ? 'Conectado ✅' : 'Aguardando QR/conexão ⏳'}</p>
-    <p><a href="/qr">Ver QR Code</a></p>
-    <p><a href="/status">Status JSON</a></p>
-    <p><a href="/reset">Resetar sessão</a></p>
+    <p>Status: ${conectado ? 'Conectado ✅' : 'Aguardando conexão ⏳'}</p>
+    <p><a href="/status">Status</a></p>
+    <p><a href="/qr">QR Code</a></p>
+    <p><a href="/grupos">Listar grupos</a></p>
   `)
 })
 
@@ -133,10 +115,7 @@ app.get('/qr', async (req, res) => {
   }
 
   if (!qrAtual) {
-    return res.send(`
-      <h2>QR ainda não gerado... ⏳</h2>
-      <p>Aguarde alguns segundos e atualize.</p>
-    `)
+    return res.send('<h2>QR ainda não gerado... ⏳</h2>')
   }
 
   const qrImage = await QRCode.toDataURL(qrAtual)
@@ -144,7 +123,6 @@ app.get('/qr', async (req, res) => {
   res.send(`
     <h2>Escaneie o QR Code</h2>
     <img src="${qrImage}" style="width:320px;height:320px;" />
-    <p>WhatsApp → Aparelhos conectados → Conectar aparelho.</p>
   `)
 })
 
@@ -154,12 +132,78 @@ app.get('/reset', async (req, res) => {
   iniciando = false
 
   await limparSessao()
-
-  setTimeout(() => {
-    iniciarBot()
-  }, 1000)
+  setTimeout(iniciarBot, 1000)
 
   res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
+})
+
+// Enviar para número individual
+app.post('/enviar-numero', async (req, res) => {
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    }
+
+    const { numero, mensagem } = req.body
+
+    if (!numero || !mensagem) {
+      return res.status(400).json({ erro: 'numero e mensagem são obrigatórios' })
+    }
+
+    const numeroLimpo = String(numero).replace(/\D/g, '')
+    const jid = `${numeroLimpo}@s.whatsapp.net`
+
+    await sock.sendMessage(jid, { text: mensagem })
+
+    res.json({ sucesso: true, destino: jid })
+  } catch (err) {
+    console.error('Erro ao enviar número:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// Listar grupos
+app.get('/grupos', async (req, res) => {
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    }
+
+    const grupos = await sock.groupFetchAllParticipating()
+
+    const lista = Object.values(grupos).map(g => ({
+      nome: g.subject,
+      id: g.id,
+      participantes: g.participants?.length || 0
+    }))
+
+    res.json(lista)
+  } catch (err) {
+    console.error('Erro ao listar grupos:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// Enviar para grupo
+app.post('/enviar-grupo', async (req, res) => {
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    }
+
+    const { grupoId, mensagem } = req.body
+
+    if (!grupoId || !mensagem) {
+      return res.status(400).json({ erro: 'grupoId e mensagem são obrigatórios' })
+    }
+
+    await sock.sendMessage(grupoId, { text: mensagem })
+
+    res.json({ sucesso: true, destino: grupoId })
+  } catch (err) {
+    console.error('Erro ao enviar grupo:', err)
+    res.status(500).json({ erro: err.message })
+  }
 })
 
 app.listen(PORT, () => {
