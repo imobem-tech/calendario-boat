@@ -27,23 +27,31 @@ async function startBot() {
     console.log("🚀 Iniciando bot...");
     const { state, saveCreds } = await useMultiFileAuthState('auth');
 
-    const sock = makeWASocket({
-        auth: state
-    });
+   const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: true,ock.ev.on('c
+    browser: ['WPP Bot', 'Chrome', '1.0.0']
+})
 
-    sock.ev.on('connection.update', async (update) => {
-    console.log("UPDATE:", update);
-        const { connection, qr } = update;
+sock.ev.on('connection.update', (update) => {
+    const { connection, qr } = update
 
-        if (qr) {
-            console.log('QR recebido!');
-            qrAtual = await QRCode.toDataURL(qr);
-        }
+    console.log('UPDATE:', update)
 
-        if (connection === 'open') {
-            console.log('✅ WhatsApp conectado!');
-        }
-    });
+    if (qr) {
+        console.log('📱 QR GERADO!')
+        latestQR = qr
+    }
+
+    if (connection === 'open') {
+        console.log('✅ WhatsApp conectado!')
+    }
+
+    if (connection === 'close') {
+        console.log('❌ Conexão fechada, reiniciando...')
+        startSock()
+    }
+})
 
     sock.ev.on('creds.update', saveCreds);
 }
