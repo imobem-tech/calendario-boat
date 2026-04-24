@@ -11,28 +11,24 @@ async function startBot() {
     console.log('🚀 Iniciando bot...')
 
     // 🔑 CORREÇÃO PRINCIPAL
-    const { state, saveCreds } = await useMultiFileAuthState('auth')
+    const { state, sock.ev.on('connection.update', async (update) => {
+    const { connection, qr } = update
 
-    const sock = makeWASocket({
-        auth: state
-    })
+    console.log('🔥 UPDATE COMPLETO:', update)
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, qr } = update
+    if (qr) {
+        console.log('📲 QR RECEBIDO!')
+        qrAtual = qr
+    }
 
-        if (qr) {
-            console.log('📲 QR RECEBIDO!')
-            qrAtual = qr
-        }
+    if (connection === 'open') {
+        console.log('✅ WhatsApp conectado!')
+    }
 
-        if (connection === 'open') {
-            console.log('✅ WhatsApp conectado!')
-        }
-
-        if (connection === 'close') {
-            console.log('❌ Conexão fechada.')
-        }
-    })
+    if (connection === 'close') {
+        console.log('❌ Conexão fechada.')
+    }
+})
 
     // 🔑 SALVA SESSÃO (IMPORTANTE)
     sock.ev.on('creds.update', saveCreds)
