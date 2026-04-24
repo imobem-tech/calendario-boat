@@ -1,10 +1,10 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604232229";
+const VERSAO_API = "Allmax®2604231515";
 
-const WPP_API_URL = process.env.WPP_API_URL || "https://calendario-boat-production.up.railway.app";
-const WPP_GRUPO_ID = process.env.WPP_GRUPO_ID || "556384030406-1557238631@g.us";
+// Grupo fixo por enquanto
+const WPP_GRUPO_ID = "556384030406-1557238631@g.us";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -85,6 +85,7 @@ function obterDiaSemanaPtBr(dataIso) {
 
   const [ano, mes, dia] = String(dataIso).split("-").map(Number);
   const dt = new Date(ano, mes - 1, dia);
+
   return dias[dt.getDay()];
 }
 
@@ -118,31 +119,6 @@ function ehDiaContingenciaHoje(dataIso) {
   return diaSemana >= 2 && diaSemana <= 4;
 }
 
-async function enviarAvisoGrupoWhatsApp(mensagem) {
-  if (!WPP_API_URL || !WPP_GRUPO_ID) {
-    console.log("WhatsApp não configurado: WPP_API_URL ou WPP_GRUPO_ID ausente.");
-    return;
-  }
-
-  try {
-    const resp = await fetch(`${WPP_API_URL}/enviar-grupo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grupoId: WPP_GRUPO_ID,
-        mensagem
-      })
-    });
-
-    if (!resp.ok) {
-      const texto = await resp.text();
-      console.error("Falha ao enviar WhatsApp:", resp.status, texto);
-    }
-  } catch (err) {
-    console.error("Erro ao chamar API WhatsApp:", err.message);
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -164,6 +140,7 @@ export default async function handler(req, res) {
     }
 
     const acesso = decodeToken(token);
+
     if (!acesso) {
       return res.status(400).json({
         error: "Token inválido",
@@ -184,6 +161,7 @@ export default async function handler(req, res) {
     }
 
     const horaNormalizada = normalizarHora(hora);
+
     if (!horaNormalizada) {
       return res.status(400).json({
         error: "Hora inválida. Use HH:MM ou HH:MM:SS.",
@@ -195,6 +173,7 @@ export default async function handler(req, res) {
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
+
     await client.query("BEGIN");
 
     await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
@@ -212,6 +191,7 @@ export default async function handler(req, res) {
 
     if (conflitoDia.rowCount > 0) {
       await client.query("ROLLBACK");
+
       return res.status(409).json({
         error: `Embarcação ${codEmbPB} já possui agenda para o dia!`,
         versao: VERSAO_API
@@ -248,6 +228,7 @@ export default async function handler(req, res) {
         );
 
         await client.query("ROLLBACK");
+
         return res.status(409).json({
           error: montarMensagemLimite(limiteGrupo, datasFuturas.rows),
           versao: VERSAO_API
@@ -295,15 +276,18 @@ export default async function handler(req, res) {
       ]
     );
 
-   await client.query("COMMIT");
+    await client.query("COMMIT");
 
-// 🔹 primeiro monta a mensagem
-const dataFormatada = formatarDataPtBr(data);
-const diaSemana = obterDiaSemanaPtBr(data);
-const horaExibicao = horaNormalizada.slice(0, 5);
+    const dataFormatada = formatarDataPtBr(data);
+    const diaSemana = obterDiaSemanaPtBr(data);
+    const horaExibicao = horaNormalizada.slice(0, 5);
 
-const mensagemWpp = `
-🚤 NOVO AGENDAMENTO
+    const prefixo = contingenciaHoje
+      ? "Agendamento de contingência"
+      : "Agendamento com sucesso";
+
+    const mensagemWpp =
+`🚤 NOVO AGENDAMENTO
 PB: ${codEmbPB}
 Grupo: ${grupo}
 Autorizado: ${codAutorizado}
@@ -313,13 +297,21 @@ Código: ${proximoCodigo}
 
 ${VERSAO_API}`;
 
-// 🔹 depois grava na fila
-await client.query(
-  `INSERT INTO public.wpp_fila_agenda
-   (grupo_id, mensagem, status)
-   VALUES ($1, $2, 'pendente')`,
-  [WPP_GRUPO_ID, mensagemWpp]
-);
+    try {
+      await client.query(
+        `INSERT INTO public.wpp_fila_agenda
+         (grupo_id, mensagem, status)
+         VALUES ($1, $2, 'pendente')`,
+        [WPP_GRUPO_ID, mensagemWpp]
+      );
+    } catch (filaErr) {
+      console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
+    }
+
+    return res.status(200).json({
+      msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
+      versao: VERSAO_API
+    });
 
   } catch (err) {
     if (client) {
@@ -332,6 +324,7 @@ await client.query(
       error: err.message || "Erro interno",
       versao: VERSAO_API
     });
+
   } finally {
     if (client) client.release();
   }
