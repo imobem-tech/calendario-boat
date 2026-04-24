@@ -477,31 +477,20 @@ app.get('/botao_agenda_todos', async (req, res) => {
     }
 
     const grupoId = '120363330197701730@g.us'
-
-    const linkAgenda =
-      req.query.link ||
-      'https://allmaxcalendar.vercel.app/egfxddachch'
-
-    const mensagem =
-      req.query.mensagem ||
-      '📅 Agenda disponível\n\nClique no botão abaixo para acessar a agenda.'
+    const linkAgenda = 'https://allmaxcalendar.vercel.app/egfxddachch'
 
     await sock.sendMessage(grupoId, {
-      text: mensagem,
-      footer: 'Allmax Náutica',
-      templateButtons: [
-        {
-          index: 1,
-          urlButton: {
-            displayText: '📅 Ver Agenda',
-            url: linkAgenda
-          }
-        }
-      ]
+      text:
+`📅 *Agenda disponível*
+
+Clique abaixo para acessar:
+
+${linkAgenda}`
     })
 
     res.json({
       sucesso: true,
+      tipo: 'link_clicavel',
       destino: grupoId,
       link: linkAgenda
     })
