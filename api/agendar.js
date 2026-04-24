@@ -1,7 +1,10 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604231515";
+const VERSAO_API = "Allmax®2604232229";
+
+const WPP_API_URL = process.env.WPP_API_URL || "https://calendario-boat-production.up.railway.app";
+const WPP_GRUPO_ID = process.env.WPP_GRUPO_ID || "556384030406-1557238631@g.us";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -111,8 +114,33 @@ function ehDiaContingenciaHoje(dataIso) {
 
   if (!mesmaData) return false;
 
-  const diaSemana = hoje.getDay(); // 0=domingo ... 6=sábado
-  return diaSemana >= 2 && diaSemana <= 4; // terça a quinta
+  const diaSemana = hoje.getDay();
+  return diaSemana >= 2 && diaSemana <= 4;
+}
+
+async function enviarAvisoGrupoWhatsApp(mensagem) {
+  if (!WPP_API_URL || !WPP_GRUPO_ID) {
+    console.log("WhatsApp não configurado: WPP_API_URL ou WPP_GRUPO_ID ausente.");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${WPP_API_URL}/enviar-grupo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grupoId: WPP_GRUPO_ID,
+        mensagem
+      })
+    });
+
+    if (!resp.ok) {
+      const texto = await resp.text();
+      console.error("Falha ao enviar WhatsApp:", resp.status, texto);
+    }
+  } catch (err) {
+    console.error("Erro ao chamar API WhatsApp:", err.message);
+  }
 }
 
 export default async function handler(req, res) {
@@ -253,9 +281,9 @@ export default async function handler(req, res) {
          $3,
          $4,
          (NOW() AT TIME ZONE 'America/Sao_Paulo'),
-  $5::timestamp,
-  $6,
-  (NOW() AT TIME ZONE 'America/Sao_Paulo')
+         $5::timestamp,
+         $6,
+         (NOW() AT TIME ZONE 'America/Sao_Paulo')
        )`,
       [
         proximoCodigo,
@@ -274,13 +302,26 @@ export default async function handler(req, res) {
     const horaExibicao = horaNormalizada.slice(0, 5);
 
     const prefixo = contingenciaHoje
-  ? "Agendamento de contingência"
-  : "Agendamento com sucesso";
+      ? "Agendamento de contingência"
+      : "Agendamento com sucesso";
 
-return res.status(200).json({
-  msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
-  versao: VERSAO_API
-});
+    const mensagemWpp =
+`🚤 NOVO AGENDAMENTO
+PB: ${codEmbPB}
+Grupo: ${grupo}
+Autorizado: ${codAutorizado}
+Data: ${dataFormatada} - ${diaSemana}
+Hora: ${horaExibicao}
+Código: ${proximoCodigo}
+
+${VERSAO_API}`;
+
+    await enviarAvisoGrupoWhatsApp(mensagemWpp);
+
+    return res.status(200).json({
+      msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
+      versao: VERSAO_API
+    });
 
   } catch (err) {
     if (client) {
