@@ -12,7 +12,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 
 const { Pool } = pkg
-
+const VERSAO_WPP = "Allmax®2604232342";
 const app = express()
 const PORT = process.env.PORT || 8080
 
@@ -30,7 +30,7 @@ let iniciando = false
 let processandoFila = false
 
 async function limparSessao() {
-  await rm('./auth_info', { recursive: true, force: true })
+  await rm('/data/auth_info', { recursive: true, force: true })
   console.log('🧹 Sessão apagada.')
 }
 
@@ -41,7 +41,7 @@ async function iniciarBot() {
   console.log('🚀 Iniciando bot WhatsApp...')
 
   try {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
+    const { state, saveCreds } = await useMultiFileAuthState('/data/auth_info')
     const { version } = await fetchLatestBaileysVersion()
 
     sock = makeWASocket({
