@@ -3,7 +3,7 @@ import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 
 const app = express()
-const PORT = process.env.PORT || 8080
+const PORT = process.env.PORT || 8080 
 
 let qrAtual = null
 let conectado = false
