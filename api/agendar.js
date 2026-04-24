@@ -1,11 +1,11 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604231515";
+const VERSAO_API = "Allmax®2604240040";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 // Grupo fixo por enquanto
-const WPP_GRUPO_ID = "556384030406-1557238631@g.us";
+
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -88,6 +88,36 @@ function obterDiaSemanaPtBr(dataIso) {
   const dt = new Date(ano, mes - 1, dia);
 
   return dias[dt.getDay()];
+}
+
+async function buscarGrupoWppAgenda(client, pb, cota) {
+  const rsCota = await client.query(
+    `SELECT GrupoWppId, NomeGrupoWpp
+       FROM "WPP_Grupos_Agenda"
+      WHERE PB = $1
+        AND UPPER(COALESCE(Cota, '')) = UPPER($2)
+      LIMIT 1`,
+    [pb, cota || ""]
+  );
+
+  if (rsCota.rowCount > 0) {
+    return rsCota.rows[0];
+  }
+
+  const rsGeral = await client.query(
+    `SELECT GrupoWppId, NomeGrupoWpp
+       FROM "WPP_Grupos_Agenda"
+      WHERE PB = $1
+        AND Cota IS NULL
+      LIMIT 1`,
+    [pb]
+  );
+
+  if (rsGeral.rowCount > 0) {
+    return rsGeral.rows[0];
+  }
+
+  return null;
 }
 
 function montarMensagemLimite(limiteGrupo, rows) {
@@ -298,17 +328,28 @@ Código: ${proximoCodigo}
 
 ${VERSAO_WPP}`;
 
-    try {
-      await client.query(
-        `INSERT INTO public.wpp_fila_agenda
-         (grupo_id, mensagem, status)
-         VALUES ($1, $2, 'pendente')`,
-        [WPP_GRUPO_ID, mensagemWpp]
-      );
-    } catch (filaErr) {
-      console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
-    }
+   try {
+  const grupoWpp = await buscarGrupoWppAgenda(client, codEmbPB, grupo);
 
+  if (!grupoWpp?.grupowppid) {
+    console.error(
+      `Grupo WhatsApp não encontrado para PB ${codEmbPB} / Cota ${grupo}`
+    );
+  } else {
+    await client.query(
+      `INSERT INTO public.wpp_fila_agenda
+       (grupo_id, mensagem, status)
+       VALUES ($1, $2, 'pendente')`,
+      [grupoWpp.grupowppid, mensagemWpp]
+    );
+
+    console.log(
+      `Mensagem de agenda enfileirada para ${grupoWpp.nomegrupowpp} (${grupoWpp.grupowppid})`
+    );
+  }
+} catch (filaErr) {
+  console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
+}
     return res.status(200).json({
       msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
       versao: VERSAO_API
