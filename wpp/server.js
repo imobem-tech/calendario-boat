@@ -155,7 +155,7 @@ async function processarFila() {
         await client.query(
           `UPDATE public.wpp_fila_agenda
               SET status = 'enviado',
-                  enviado_em = NOW(),
+                  enviado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
                   erro = NULL
             WHERE id = $1`,
           [row.id]
@@ -230,7 +230,7 @@ async function sincronizarGruposAgenda() {
         await client.query(
           `INSERT INTO public.wpp_grupos_agenda
            (pb, cota, nomegrupowpp, grupowppid, dataatualizacao)
-           VALUES ($1, $2, $3, $4, NOW())`,
+           VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'America/Sao_Paulo')`,
           [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
         )
         inseridos++
@@ -240,7 +240,7 @@ async function sincronizarGruposAgenda() {
               SET pb = $1,
                   cota = $2,
                   nomegrupowpp = $3,
-                  dataatualizacao = NOW()
+                  dataatualizacao = NOW() AT TIME ZONE 'America/Sao_Paulo'
             WHERE grupowppid = $4`,
           [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
         )
