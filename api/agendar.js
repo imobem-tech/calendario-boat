@@ -295,18 +295,15 @@ export default async function handler(req, res) {
       ]
     );
 
-    await client.query("COMMIT");
+   await client.query("COMMIT");
 
-    const dataFormatada = formatarDataPtBr(data);
-    const diaSemana = obterDiaSemanaPtBr(data);
-    const horaExibicao = horaNormalizada.slice(0, 5);
+// 🔹 primeiro monta a mensagem
+const dataFormatada = formatarDataPtBr(data);
+const diaSemana = obterDiaSemanaPtBr(data);
+const horaExibicao = horaNormalizada.slice(0, 5);
 
-    const prefixo = contingenciaHoje
-      ? "Agendamento de contingência"
-      : "Agendamento com sucesso";
-
-    const mensagemWpp =
-`🚤 NOVO AGENDAMENTO
+const mensagemWpp = `
+🚤 NOVO AGENDAMENTO
 PB: ${codEmbPB}
 Grupo: ${grupo}
 Autorizado: ${codAutorizado}
@@ -316,12 +313,13 @@ Código: ${proximoCodigo}
 
 ${VERSAO_API}`;
 
-    await enviarAvisoGrupoWhatsApp(mensagemWpp);
-
-    return res.status(200).json({
-      msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
-      versao: VERSAO_API
-    });
+// 🔹 depois grava na fila
+await client.query(
+  `INSERT INTO public.wpp_fila_agenda
+   (grupo_id, mensagem, status)
+   VALUES ($1, $2, 'pendente')`,
+  [WPP_GRUPO_ID, mensagemWpp]
+);
 
   } catch (err) {
     if (client) {
