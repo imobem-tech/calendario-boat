@@ -349,6 +349,67 @@ app.post('/sincronizar-grupos-agenda', async (req, res) => {
   }
 })
 
+app.get('/testar-rota-grupo', async (req, res) => {
+  try {
+    const pb = Number(req.query.pb)
+    const cota = String(req.query.cota || '').trim().toUpperCase()
+
+    if (!pb) {
+      return res.status(400).json({
+        erro: 'Informe o PB. Exemplo: /testar-rota-grupo?pb=576&cota=X4'
+      })
+    }
+
+    const rsCota = await pool.query(
+      `SELECT PB, Cota, NomeGrupoWpp, GrupoWppId
+         FROM public.wpp_grupos_agenda
+        WHERE PB = $1
+          AND UPPER(COALESCE(Cota, '')) = UPPER($2)
+        LIMIT 1`,
+      [pb, cota]
+    )
+
+    if (rsCota.rowCount > 0) {
+      return res.json({
+        encontrado: true,
+        tipo: 'cota',
+        pb,
+        cota,
+        grupo: rsCota.rows[0]
+      })
+    }
+
+    const rsGeral = await pool.query(
+      `SELECT PB, Cota, NomeGrupoWpp, GrupoWppId
+         FROM public.wpp_grupos_agenda
+        WHERE PB = $1
+          AND Cota IS NULL
+        LIMIT 1`,
+      [pb]
+    )
+
+    if (rsGeral.rowCount > 0) {
+      return res.json({
+        encontrado: true,
+        tipo: 'fallback_pb',
+        pb,
+        cota,
+        grupo: rsGeral.rows[0]
+      })
+    }
+
+    return res.status(404).json({
+      encontrado: false,
+      pb,
+      cota,
+      erro: 'Nenhum grupo encontrado para este PB/Cota'
+    })
+
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
 app.post('/enviar-grupo', async (req, res) => {
   try {
     if (!conectado || !sock) {
