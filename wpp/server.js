@@ -24,6 +24,7 @@ app.listen(PORT, () => {
 
 // 🤖 Conexão WhatsApp
 async function startBot() {
+    console.log("🚀 Iniciando bot...");
     const { state, saveCreds } = await useMultiFileAuthState('auth');
 
     const sock = makeWASocket({
@@ -31,6 +32,7 @@ async function startBot() {
     });
 
     sock.ev.on('connection.update', async (update) => {
+    console.log("UPDATE:", update);
         const { connection, qr } = update;
 
         if (qr) {
