@@ -72,8 +72,13 @@ function formatarDataPtBr(dataIso) {
 
 function obterDiaSemanaPtBr(dataIso) {
   const dias = [
-    "domingo","segunda-feira","terça-feira",
-    "quarta-feira","quinta-feira","sexta-feira","sábado"
+    "domingo",
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado"
   ];
 
   const [ano, mes, dia] = String(dataIso).split("-").map(Number);
@@ -82,13 +87,12 @@ function obterDiaSemanaPtBr(dataIso) {
   return dias[dt.getDay()];
 }
 
-// ✅ CORRIGIDO AQUI
 async function buscarGrupoWppAgenda(client, pb, cota) {
   const rsCota = await client.query(
-    `SELECT GrupoWppId, NomeGrupoWpp
+    `SELECT grupowppid, nomegrupowpp
        FROM public.wpp_grupos_agenda
-      WHERE PB = $1
-        AND UPPER(COALESCE(Cota, '')) = UPPER($2)
+      WHERE pb = $1
+        AND UPPER(COALESCE(cota, '')) = UPPER($2)
       LIMIT 1`,
     [pb, cota || ""]
   );
@@ -98,10 +102,10 @@ async function buscarGrupoWppAgenda(client, pb, cota) {
   }
 
   const rsGeral = await client.query(
-    `SELECT GrupoWppId, NomeGrupoWpp
+    `SELECT grupowppid, nomegrupowpp
        FROM public.wpp_grupos_agenda
-      WHERE PB = $1
-        AND Cota IS NULL
+      WHERE pb = $1
+        AND cota IS NULL
       LIMIT 1`,
     [pb]
   );
@@ -145,7 +149,10 @@ function ehDiaContingenciaHoje(dataIso) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido", versao: VERSAO_API });
+    return res.status(405).json({
+      error: "Método não permitido",
+      versao: VERSAO_API
+    });
   }
 
   let client;
@@ -154,12 +161,19 @@ export default async function handler(req, res) {
     const { token, data, hora } = req.body || {};
 
     if (!token || !data || !hora) {
-      return res.status(400).json({ error: "Dados incompletos", versao: VERSAO_API });
+      return res.status(400).json({
+        error: "Dados incompletos",
+        versao: VERSAO_API
+      });
     }
 
     const acesso = decodeToken(token);
+
     if (!acesso) {
-      return res.status(400).json({ error: "Token inválido", versao: VERSAO_API });
+      return res.status(400).json({
+        error: "Token inválido",
+        versao: VERSAO_API
+      });
     }
 
     const codEmbPB = Number(acesso.pb);
@@ -168,32 +182,145 @@ export default async function handler(req, res) {
     const limiteGrupo = extrairLimiteDoGrupo(grupo);
 
     if (!codEmbPB || !codAutorizado || !grupo || !limiteGrupo) {
-      return res.status(400).json({ error: "Dados do token inválidos.", versao: VERSAO_API });
+      return res.status(400).json({
+        error: "Dados do token inválidos.",
+        versao: VERSAO_API
+      });
     }
 
     const horaNormalizada = normalizarHora(hora);
+
     if (!horaNormalizada) {
-      return res.status(400).json({ error: "Hora inválida.", versao: VERSAO_API });
+      return res.status(400).json({
+        error: "Hora inválida. Use HH:MM ou HH:MM:SS.",
+        versao: VERSAO_API
+      });
     }
 
     const contingenciaHoje = ehDiaContingenciaHoje(data);
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
+
     await client.query("BEGIN");
 
     await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
 
-    // (resto igual...)
+    const conflitoDia = await client.query(
+      `SELECT 1
+         FROM public."P_BOAT_z_10_Saida_Emb"
+        WHERE "Cod_Emb_PB" = $1
+          AND "Dt_Agendamento"::date = $2::date
+          AND "Dt_Desistencia" IS NULL
+          AND "Dt_Cancela_saida" IS NULL
+        LIMIT 1`,
+      [codEmbPB, data]
+    );
+
+    if (conflitoDia.rowCount > 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(409).json({
+        error: `Embarcação ${codEmbPB} já possui agenda para o dia!`,
+        versao: VERSAO_API
+      });
+    }
+
+    if (!contingenciaHoje) {
+      const emAberto = await client.query(
+        `SELECT COUNT(*)::int AS total
+           FROM public."P_BOAT_z_10_Saida_Emb"
+          WHERE "Cod_Emb_PB" = $1
+            AND "Cod_Autorizado" = $2
+            AND "Grupo_Comp_letra" = $3
+            AND "Dt_Agendamento"::date >= CURRENT_DATE
+            AND "Dt_Desistencia" IS NULL
+            AND "Dt_Cancela_saida" IS NULL`,
+        [codEmbPB, codAutorizado, grupo]
+      );
+
+      const totalEmAberto = emAberto.rows[0]?.total || 0;
+
+      if (totalEmAberto >= limiteGrupo) {
+        const datasFuturas = await client.query(
+          `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
+             FROM public."P_BOAT_z_10_Saida_Emb"
+            WHERE "Cod_Emb_PB" = $1
+              AND "Cod_Autorizado" = $2
+              AND "Grupo_Comp_letra" = $3
+              AND "Dt_Agendamento"::date >= CURRENT_DATE
+              AND "Dt_Desistencia" IS NULL
+              AND "Dt_Cancela_saida" IS NULL
+            ORDER BY data_agendada`,
+          [codEmbPB, codAutorizado, grupo]
+        );
+
+        await client.query("ROLLBACK");
+
+        return res.status(409).json({
+          error: montarMensagemLimite(limiteGrupo, datasFuturas.rows),
+          versao: VERSAO_API
+        });
+      }
+    }
+
+    const rsCodigo = await client.query(
+      `SELECT COALESCE(MAX("Código"), 0) + 1 AS proximo_codigo
+         FROM public."P_BOAT_z_10_Saida_Emb"`
+    );
+
+    const proximoCodigo = rsCodigo.rows[0].proximo_codigo;
+
+    await client.query(
+      `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
+       (
+         "Código",
+         "Cod_Emb_PB",
+         "Cod_Proprietário",
+         "Cod_Autorizado",
+         "Dt_Solicitacao",
+         "Dt_Agendamento",
+         "Grupo_Comp_letra",
+         "updated_at"
+       )
+       VALUES
+       (
+         $1,
+         $2,
+         $3,
+         $4,
+         (NOW() AT TIME ZONE 'America/Sao_Paulo'),
+         $5::timestamp,
+         $6,
+         (NOW() AT TIME ZONE 'America/Sao_Paulo')
+       )`,
+      [
+        proximoCodigo,
+        codEmbPB,
+        4255,
+        codAutorizado,
+        dataHoraAgendamento,
+        grupo
+      ]
+    );
 
     await client.query("COMMIT");
 
-    const mensagemWpp = `🚤 NOVO AGENDAMENTO
+    const dataFormatada = formatarDataPtBr(data);
+    const diaSemana = obterDiaSemanaPtBr(data);
+    const horaExibicao = horaNormalizada.slice(0, 5);
+
+    const prefixo = contingenciaHoje
+      ? "Agendamento de contingência"
+      : "Agendamento com sucesso";
+
+    const mensagemWpp =
+`🚤 NOVO AGENDAMENTO
 PB: ${codEmbPB}
 Grupo: ${grupo}
 Autorizado: ${codAutorizado}
-Data: ${formatarDataPtBr(data)} - ${obterDiaSemanaPtBr(data)}
-Hora: ${horaNormalizada.slice(0,5)}
+Data: ${dataFormatada} - ${diaSemana}
+Hora: ${horaExibicao}
 Código: ${proximoCodigo}
 
 ${VERSAO_WPP}`;
@@ -202,26 +329,38 @@ ${VERSAO_WPP}`;
       const grupoWpp = await buscarGrupoWppAgenda(client, codEmbPB, grupo);
 
       if (!grupoWpp?.grupowppid) {
-        console.error(`Grupo não encontrado PB ${codEmbPB} / ${grupo}`);
+        console.error(`Grupo WhatsApp não encontrado para PB ${codEmbPB} / Cota ${grupo}`);
       } else {
         await client.query(
-          `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status)
+          `INSERT INTO public.wpp_fila_agenda
+           (grupo_id, mensagem, status)
            VALUES ($1, $2, 'pendente')`,
           [grupoWpp.grupowppid, mensagemWpp]
         );
+
+        console.log(`Mensagem de agenda enfileirada para ${grupoWpp.nomegrupowpp}`);
       }
-    } catch (e) {
-      console.error("Erro fila:", e.message);
+    } catch (filaErr) {
+      console.error("Erro ao gravar fila WhatsApp:", filaErr.message);
     }
 
     return res.status(200).json({
-      msg: `Agendado com sucesso`,
+      msg: `${prefixo} ${dataFormatada} ${diaSemana} às ${horaExibicao}\n${VERSAO_API}`,
       versao: VERSAO_API
     });
 
   } catch (err) {
-    if (client) await client.query("ROLLBACK");
-    return res.status(500).json({ error: err.message, versao: VERSAO_API });
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+    }
+
+    return res.status(500).json({
+      error: err.message || "Erro interno",
+      versao: VERSAO_API
+    });
+
   } finally {
     if (client) client.release();
   }
