@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises' 
+import retornoRoutes from "./api/msg_externa.js";
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -16,7 +17,7 @@ const VERSAO_WPP = "Allmax®2604240031"
 
 const app = express()
 const PORT = process.env.PORT || 8080
-import retornoRoutes from "./api/msg_externa.js";
+
 
 app.use(express.json())
 app.use("/", retornoRoutes);
