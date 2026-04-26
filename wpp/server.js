@@ -2,7 +2,7 @@ import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
-import { rm } from 'fs/promises'
+import { rm } from 'fs/promises' 
 
 import makeWASocket, {
   useMultiFileAuthState,
