@@ -17,7 +17,7 @@ function parsePbCota(input) {
       cota: match[2]
     };
   }
-
+ 
   if (input.endsWith("00")) {
     return {
       pb: parseInt(input.slice(0, -2), 10),
