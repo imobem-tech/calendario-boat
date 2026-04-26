@@ -77,11 +77,11 @@ export default async function handler(req, res) {
     const grupoId = result.rows[0].grupowppid;
 
     await pool.query(
-      `INSERT INTO public.wpp_fila_agenda
-       (grupo_id, mensagem, status, data_criacao)
-       VALUES ($1, $2, 'pendente', NOW())`,
-      [grupoId, mensagem]
-    );
+  `INSERT INTO public.wpp_fila_agenda
+   (grupo_id, mensagem, status)
+   VALUES ($1, $2, 'pendente')`,
+  [grupoId, mensagem]
+);
 
     return res.status(200).json({
       sucesso: true,
