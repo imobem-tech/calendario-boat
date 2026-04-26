@@ -23,7 +23,7 @@ function parsePbCota(input) {
   throw new Error("Formato inválido. Use 576X1 ou 57600");
 }
 
-router.post("/retorno", async (req, res) => {
+router.post("/msg_externa", async (req, res) => {
   try {
     const { pb_cota, mensagem } = req.body;
 
