@@ -1,4 +1,11 @@
-const pool = require("./db"); // se db.js estiver dentro de /api
+import pkg from "pg";
+
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 function parsePbCota(input) {
   input = String(input || "").toUpperCase().trim();
@@ -21,9 +28,9 @@ function parsePbCota(input) {
   throw new Error("Formato inválido. Use 576X1 ou 57600");
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ erro: "Método não permitido. Use POST." });
+    return res.status(405).json({ erro: "Use POST" });
   }
 
   try {
@@ -42,45 +49,50 @@ module.exports = async function handler(req, res) {
     if (cota) {
       result = await pool.query(
         `SELECT grupowppid
-         FROM wpp_grupos_agenda
-         WHERE pb = $1 AND cota = $2
+         FROM public.wpp_grupos_agenda
+         WHERE pb = $1
+           AND UPPER(COALESCE(cota, '')) = UPPER($2)
          LIMIT 1`,
         [pb, cota]
       );
     } else {
       result = await pool.query(
         `SELECT grupowppid
-         FROM wpp_grupos_agenda
-         WHERE pb = $1 AND cota IS NULL
+         FROM public.wpp_grupos_agenda
+         WHERE pb = $1
+           AND cota IS NULL
          LIMIT 1`,
         [pb]
       );
     }
 
-    const grupo = result.rows[0];
-
-    if (!grupo) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
-        erro: "Grupo não encontrado para esse PB/Cota",
+        erro: "Grupo não encontrado",
         pb,
         cota
       });
     }
 
+    const grupoId = result.rows[0].grupowppid;
+
     await pool.query(
-      `INSERT INTO wpp_fila_agenda (grupo_id, mensagem, status, data_criacao)
+      `INSERT INTO public.wpp_fila_agenda
+       (grupo_id, mensagem, status, data_criacao)
        VALUES ($1, $2, 'pendente', NOW())`,
-      [grupo.grupowppid, mensagem]
+      [grupoId, mensagem]
     );
 
     return res.status(200).json({
       sucesso: true,
-      grupo: grupo.grupowppid
+      grupo_id: grupoId
     });
 
   } catch (err) {
+    console.error("ERRO /api/msg_externa:", err);
+
     return res.status(500).json({
       erro: err.message
     });
   }
-};
+}
