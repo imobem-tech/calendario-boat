@@ -4,7 +4,8 @@ import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
-import retornoRoutes from "./msg_externa.js"; 
+
+import retornoRoutes from "../api/msg_externa.js";
 
 import makeWASocket, {
   useMultiFileAuthState,
