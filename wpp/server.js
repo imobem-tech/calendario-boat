@@ -16,9 +16,9 @@ const VERSAO_WPP = "Allmax®2604240031"
 
 const app = express()
 const PORT = process.env.PORT || 8080
-
+const retornoRoutes = require("./msg_externa");
 app.use(express.json())
-
+app.use("/", retornoRoutes);
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
