@@ -10,7 +10,7 @@ import makeWASocket, {
   DisconnectReason,
   Browsers
 } from '@whiskeysockets/baileys'
-
+ 
 const { Pool } = pkg
 const VERSAO_WPP = "Allmax®2604240031"
 
