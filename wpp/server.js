@@ -320,9 +320,12 @@ app.get('/status', async (req, res) => {
 let numero = null
 let nome = null
 
-if (client && client.info) {
-  numero = client.info.wid.user
-  nome = client.info.pushname || ""
+try {
+  numero = sock?.user?.id || null
+  nome = sock?.user?.name || sock?.user?.verifiedName || ""
+} catch (e) {
+  numero = null
+  nome = ""
 }
 
 res.json({
