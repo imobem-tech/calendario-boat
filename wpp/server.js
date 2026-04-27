@@ -196,18 +196,8 @@ return
           erroMsg.includes('Session error')
 
        
-        if (erroSessao) {
-  console.log("⚠️ Erro de sessão WhatsApp. Pausando mensagem:", erroMsg)
-
-  try {
-    if (sock) {
-      sock.end?.()
-      sock.ws?.close?.()
-    }
-  } catch (e) {}
-
-  sock = null
-  conectado = false
+if (erroSessao) {
+  console.log("⚠️ Erro de sessão WhatsApp. Marcando como erro_sessao:", erroMsg)
 
   await client.query(
     `UPDATE public.wpp_fila_agenda
@@ -217,7 +207,7 @@ return
     [erroMsg, row.id]
   )
 
-  return
+  continue
 }
         await client.query(
           `UPDATE public.wpp_fila_agenda
