@@ -44,12 +44,13 @@ let ultimaMensagemEnviadaEm = null
 const iniciadoEm = new Date()
 
 async function processarFila() {
-  if (processandoFila) return
-  if (!conectado || !sock) return
-
-  processandoFila = true
-
   try {
+    if (processandoFila) return
+    if (!conectado) return
+    if (!sock) return
+
+    processandoFila = true
+
     const rs = await pool.query(`
       SELECT id, grupo_id, mensagem
       FROM public.wpp_fila_agenda
@@ -70,25 +71,18 @@ async function processarFila() {
           WHERE id = $1
         `, [row.id])
 
-        ultimaMensagemEnviadaEm = new Date().toISOString()
-
       } catch (err) {
-        const erroMsg = err?.message || String(err)
-
         await pool.query(`
           UPDATE public.wpp_fila_agenda
           SET status = 'erro',
               erro = $2
           WHERE id = $1
-        `, [row.id, erroMsg])
-
-        ultimaFalhaEnvioEm = new Date().toISOString()
-        erroUltimoEnvio = erroMsg
+        `, [row.id, err.message])
       }
     }
 
   } catch (err) {
-    console.error('Erro geral ao processar fila:', err)
+    console.error('ERRO NA FILA:', err)
   } finally {
     processandoFila = false
   }
@@ -655,6 +649,9 @@ ${linkAgenda}`
     res.status(500).json({ erro: err.message })
   }
 })
+
+// roda fila automaticamente a cada 10 segundos
+setInterval(processarFila, 10000)
 
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
