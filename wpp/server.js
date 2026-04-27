@@ -152,11 +152,65 @@ async function processarFila() {
       try {
         console.log(`📤 Enviando mensagem fila ID ${row.id} para ${row.grupo_id}`)
 
-        await sock.sendMessage(row.grupo_id, {
-          text: row.mensagem
-        })
 
-        await client.query(
+       
+       try {
+  await sock.sendMessage(grupo_id, { text: mensagem })
+
+  await pool.query(
+    `UPDATE wpp_fila_agenda
+     SET status = 'enviado',
+         erro = NULL,
+         enviado_em = NOW()
+     WHERE id = $1`,
+    [id]
+  )
+
+} catch (err) {
+  const erroMsg = err?.message || String(err)
+
+  const erroSessao =
+    erroMsg.includes("Incorrect private key length") ||
+    erroMsg.includes("bad mac") ||
+    erroMsg.includes("No session") ||
+    erroMsg.includes("Session error")
+
+  if (erroSessao) {
+    console.log("Erro de sessão WhatsApp. Reiniciando socket:", erroMsg)
+
+    try {
+      if (sock) {
+        sock.end?.()
+        sock.ws?.close?.()
+      }
+    } catch (e) {}
+
+    sock = null
+    conectado = false
+
+    await pool.query(
+      `UPDATE wpp_fila_agenda
+       SET status = 'pendente',
+           erro = $1
+       WHERE id = $2`,
+      [erroMsg, id]
+    )
+
+    return
+  }
+
+  await pool.query(
+    `UPDATE wpp_fila_agenda
+     SET tentativas = tentativas + 1,
+         erro = $1
+     WHERE id = $2`,
+    [erroMsg, id]
+  )
+}
+
+    
+       
+       await client.query(
           `UPDATE public.wpp_fila_agenda
               SET status = 'enviado',
                   enviado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
