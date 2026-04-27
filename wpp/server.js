@@ -154,13 +154,35 @@ async function processarFila() {
         await sock.sendMessage(row.grupo_id, { text: row.mensagem })
 
         await client.query(
-          `UPDATE public.wpp_fila_agenda
-              SET status = 'enviado',
-                  enviado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
-                  erro = NULL
-            WHERE id = $1`,
-          [row.id]
-        )
+  `UPDATE public.wpp_fila_agenda
+      SET status = 'aguardando_sessao',
+          erro = $1
+    WHERE id = $2`,
+  [erroMsg, row.id]
+)
+
+setTimeout(async () => {
+  try {
+    const client2 = await pool.connect()
+
+    await client2.query(
+      `UPDATE public.wpp_fila_agenda
+          SET status = 'pendente'
+        WHERE id = $1
+          AND status = 'aguardando_sessao'`,
+      [row.id]
+    )
+
+    client2.release()
+  } catch (e) {
+    console.log("Erro ao reativar mensagem:", e.message)
+  }
+}, 30000)
+
+return
+
+
+        
 
         console.log(`✅ Mensagem ID ${row.id} enviada.`)
 
