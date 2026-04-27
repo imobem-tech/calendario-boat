@@ -195,30 +195,30 @@ return
           erroMsg.includes('No session') ||
           erroMsg.includes('Session error')
 
+       
         if (erroSessao) {
-          console.log('⚠️ Erro de sessão WhatsApp. Reiniciando socket:', erroMsg)
+  console.log("⚠️ Erro de sessão WhatsApp. Pausando mensagem:", erroMsg)
 
-          try {
-            if (sock) {
-              sock.end?.()
-              sock.ws?.close?.()
-            }
-          } catch (e) {}
+  try {
+    if (sock) {
+      sock.end?.()
+      sock.ws?.close?.()
+    }
+  } catch (e) {}
 
-          sock = null
-          conectado = false
+  sock = null
+  conectado = false
 
-          await client.query(
-            `UPDATE public.wpp_fila_agenda
-                SET status = 'pendente',
-                    erro = $1
-              WHERE id = $2`,
-            [erroMsg, row.id]
-          )
+  await client.query(
+    `UPDATE public.wpp_fila_agenda
+        SET status = 'erro_sessao',
+            erro = $1
+      WHERE id = $2`,
+    [erroMsg, row.id]
+  )
 
-          return
-        }
-
+  return
+}
         await client.query(
           `UPDATE public.wpp_fila_agenda
               SET tentativas = tentativas + 1,
