@@ -176,7 +176,7 @@ async function iniciarBot() {
       if (connection === 'close') {
         conectado = false
         iniciando = false
-          ultimoEvento = 'DESCONECTADait sock.sendMessage(O'
+          ultimoEvento = 'DESCONECTADO'
   ultimaDesconexaoEm = new Date().toISOString()
   motivoDesconexao = lastDisconnect?.error?.message || null
 
@@ -197,53 +197,6 @@ async function iniciarBot() {
   }
 }
 
-
-
-console.log(`✅ Mensagem ID ${row.id} enviada.`)
-
-
-        
-
-        console.log(`✅ Mensagem ID ${row.id} enviada.`)
-
-      } catch (err) {
-        const erroMsg = err?.message || String(err)
-
-        ultimaFalhaEnvioEm = new Date().toISOString()
-erroUltimoEnvio = erroMsg
-
-        const erroSessao =
-          erroMsg.includes('Incorrect private key length') ||
-          erroMsg.includes('bad mac') ||
-          erroMsg.includes('No session') ||
-          erroMsg.includes('Session error')
-
-       
-if (erroSessao) {
-  console.log("⚠️ Erro de sessão WhatsApp. Marcando como erro_sessao:", erroMsg)
-
-  await client.query(
-    `UPDATE public.wpp_fila_agenda
-        SET status = 'erro_sessao',
-            erro = $1
-      WHERE id = $2`,
-    [erroMsg, row.id]
-  )
-
-  continue
-}
-        await client.query(
-          `UPDATE public.wpp_fila_agenda
-              SET tentativas = tentativas + 1,
-                  erro = $1
-            WHERE id = $2`,
-          [erroMsg, row.id]
-        )
-
-        console.log(`❌ Falha ao enviar ID ${row.id}:`, erroMsg)
-      }
-    }
- 
 async function sincronizarGruposAgenda() {
   if (!conectado || !sock) {
     throw new Error('WhatsApp não conectado')
@@ -355,7 +308,7 @@ app.get('/status', async (req, res) => {
   }
 
   try {
-    numero = sock?.user?.id || null
+    numero = sock?.user?.id?.split(':')[0] || null
     nome = sock?.user?.name || sock?.user?.verifiedName || ''
   } catch (err) {
     numero = null
@@ -615,14 +568,11 @@ ${linkAgenda}`
   }
 })
 
-// roda fila automaticamente a cada 10 segundos
-setInterval(processarFila, 10000)
-
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
   iniciarBot()
 
   setInterval(() => {
-    processarFila()
+    processarFila().catch(console.error)
   }, 10000)
 })
