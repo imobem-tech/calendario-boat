@@ -317,13 +317,27 @@ app.get('/status', async (req, res) => {
     pendentes = rs.rows[0].total
   } catch {}
 
-  res.json({
-    online: true,
-    whatsappConectado: conectado,
-    qrDisponivel: !!qrAtual,
-    filaPendentes: pendentes,
-    versao: VERSAO_WPP
-  })
+let numero = null
+let nome = null
+
+if (client && client.info) {
+  numero = client.info.wid.user
+  nome = client.info.pushname || ""
+}
+
+res.json({
+  online: true,
+  whatsappConectado: conectado,
+  qrDisponivel: !!qrAtual,
+  filaPendentes: pendentes,
+  versao: VERSAO_WPP,
+
+  // 🔥 NOVOS CAMPOS
+  numeroConectado: numero,
+  nomePerfil: nome
+})
+
+  
 })
 
 app.get('/qr', async (req, res) => {
