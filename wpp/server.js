@@ -33,6 +33,16 @@ let conectado = false
 let iniciando = false
 let processandoFila = false
 
+let ultimoEvento = null
+let ultimaConexaoEm = null
+let ultimaDesconexaoEm = null
+let motivoDesconexao = null
+let ultimoQrEm = null
+let ultimaFalhaEnvioEm = null
+let erroUltimoEnvio = null
+let ultimaMensagemEnviadaEm = null
+const iniciadoEm = new Date()
+
 function extrairGrupoAgenda(nome, grupoId) {
   const nomeLimpo = String(nome || '').trim()
 
@@ -97,19 +107,27 @@ async function iniciarBot() {
       })
 
       if (qr) {
-        qrAtual = qr
-        conectado = false
-      }
+  qrAtual = qr
+  conectado = false
+  ultimoQrEm = new Date().toISOString()
+  ultimoEvento = 'QR_GERADO'
+}
 
       if (connection === 'open') {
-        console.log('✅ WhatsApp conectado!')
-        conectado = true
-        qrAtual = null
-      }
+  console.log('✅ WhatsApp conectado!')
+  conectado = true
+  qrAtual = null
+  ultimoEvento = 'CONECTADO'
+  ultimaConexaoEm = new Date().toISOString()
+  motivoDesconexao = null
+}
 
       if (connection === 'close') {
         conectado = false
         iniciando = false
+          ultimoEvento = 'DESCONECTADait sock.sendMessage(O'
+  ultimaDesconexaoEm = new Date().toISOString()
+  motivoDesconexao = lastDisconnect?.error?.message || null
 
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
           await limparSessao()
@@ -153,6 +171,8 @@ async function processarFila() {
 
         await sock.sendMessage(row.grupo_id, { text: row.mensagem })
 
+        ultimaMensagemEnviadaEm = new Date().toISOString()
+
        
         await client.query(
   `UPDATE public.wpp_fila_agenda
@@ -171,6 +191,9 @@ console.log(`✅ Mensagem ID ${row.id} enviada.`)
 
       } catch (err) {
         const erroMsg = err?.message || String(err)
+
+        ultimaFalhaEnvioEm = new Date().toISOString()
+erroUltimoEnvio = erroMsg
 
         const erroSessao =
           erroMsg.includes('Incorrect private key length') ||
@@ -307,6 +330,8 @@ app.get('/', (req, res) => {
 
 app.get('/status', async (req, res) => {
   let pendentes = null
+  let numero = null
+  let nome = null
 
   try {
     const rs = await pool.query(
@@ -315,32 +340,67 @@ app.get('/status', async (req, res) => {
         WHERE status = 'pendente'`
     )
     pendentes = rs.rows[0].total
-  } catch {}
+  } catch (err) {
+    console.error('Erro ao consultar fila pendente:', err.message)
+  }
 
-let numero = null
-let nome = null
+  try {
+    numero = sock?.user?.id || null
+    nome = sock?.user?.name || sock?.user?.verifiedName || ''
+  } catch (err) {
+    numero = null
+    nome = ''
+  }
 
-try {
-  numero = sock?.user?.id || null
-  nome = sock?.user?.name || sock?.user?.verifiedName || ""
-} catch (e) {
-  numero = null
-  nome = ""
-}
+  const mem = process.memoryUsage()
 
-res.json({
-  online: true,
-  whatsappConectado: conectado,
-  qrDisponivel: !!qrAtual,
-  filaPendentes: pendentes,
-  versao: VERSAO_WPP,
+  let statusConexao = 'desconectado'
 
-  // 🔥 NOVOS CAMPOS
-  numeroConectado: numero,
-  nomePerfil: nome
-})
+  if (conectado) {
+    statusConexao = 'conectado'
+  } else if (qrAtual) {
+    statusConexao = 'aguardando_qr'
+  } else if (iniciando) {
+    statusConexao = 'iniciando'
+  }
 
-  
+  res.json({
+    online: true,
+    whatsappConectado: conectado,
+    statusConexao,
+    qrDisponivel: !!qrAtual,
+    filaPendentes: pendentes,
+    filaProcessando: processandoFila,
+
+    numeroConectado: numero,
+    nomePerfil: nome,
+
+    ultimoEvento,
+    ultimaConexaoEm,
+    ultimaDesconexaoEm,
+    motivoDesconexao,
+    ultimoQrEm,
+
+    ultimaMensagemEnviadaEm,
+    ultimaFalhaEnvioEm,
+    erroUltimoEnvio,
+
+    versao: VERSAO_WPP,
+    horaServidor: new Date().toISOString(),
+    uptimeSegundos: Math.floor(process.uptime()),
+    iniciadoEm: iniciadoEm.toISOString(),
+
+    nodeEnv: process.env.NODE_ENV || null,
+    ambiente: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
+    railwayInstance: process.env.RAILWAY_REPLICA_ID || process.env.HOSTNAME || null,
+    pid: process.pid,
+
+    memoriaUsoMB: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024)
+    }
+  })
 })
 
 app.get('/qr', async (req, res) => {
