@@ -191,41 +191,7 @@ async function iniciarBot() {
   }
 }
 
-async function processarFila() {
-  if (processandoFila) return
-  if (!conectado || !sock) return
 
-  processandoFila = true
-  let client
-
-  try {
-    client = await pool.connect()
-
-    const rs = await client.query(
-      `SELECT id, grupo_id, mensagem
-         FROM public.wpp_fila_agenda
-        WHERE status = 'pendente'
-          AND tentativas < 5
-        ORDER BY id
-        LIMIT 5`
-    )
-
-    for (const row of rs.rows) {
-      try {
-        console.log(`📤 Enviando mensagem fila ID ${row.id} para ${row.grupo_id}`)
-
-        await sock.sendMessage(row.grupo_id, { text: row.mensagem })
-
-        ultimaMensagemEnviadaEm = new Date().toISOString()
-
-       
-        await client.query(
-  `UPDATE public.wpp_fila_agenda
-      SET status = 'enviado',
-          erro = NULL
-    WHERE id = $1`,
-  [row.id]
-)
 
 console.log(`✅ Mensagem ID ${row.id} enviada.`)
 
