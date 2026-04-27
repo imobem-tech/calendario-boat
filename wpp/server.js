@@ -4,7 +4,6 @@ import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
- 
 import retornoRoutes from "./msg_externa.js";
 
 import makeWASocket, {
@@ -188,36 +187,25 @@ async function processarFila() {
     sock = null
     conectado = false
 
-    await pool.query(
-      `UPDATE wpp_fila_agenda
-       SET status = 'pendente',
-           erro = $1
-       WHERE id = $2`,
-      [erroMsg, id]
+    await client.query(
+      `UPDATE public.wpp_fila_agenda
+          SET status = 'pendente',
+              erro = $1
+        WHERE id = $2`,
+      [erroMsg, row.id]
     )
 
     return
   }
 
-  await pool.query(
-    `UPDATE wpp_fila_agenda
-     SET tentativas = tentativas + 1,
-         erro = $1
-     WHERE id = $2`,
-    [erroMsg, id]
+  await client.query(
+    `UPDATE public.wpp_fila_agenda
+        SET tentativas = tentativas + 1,
+            erro = $1
+      WHERE id = $2`,
+    [erroMsg, row.id]
   )
 }
-
-    
-       
-       await client.query(
-          `UPDATE public.wpp_fila_agenda
-              SET status = 'enviado',
-                  enviado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
-                  erro = NULL
-            WHERE id = $1`,
-          [row.id]
-        )
 
         console.log(`✅ Mensagem ID ${row.id} enviada.`)
 
