@@ -94,7 +94,6 @@ async function processarFila() {
   }
 }
 
-
 function extrairGrupoAgenda(nome, grupoId) {
   const nomeLimpo = String(nome || '').trim()
 
@@ -244,14 +243,7 @@ if (erroSessao) {
         console.log(`❌ Falha ao enviar ID ${row.id}:`, erroMsg)
       }
     }
-  } catch (err) {
-    console.error('💥 Erro geral ao processar fila:', err.message)
-  } finally {
-    if (client) client.release()
-    processandoFila = false
-  }
-}
-
+ 
 async function sincronizarGruposAgenda() {
   if (!conectado || !sock) {
     throw new Error('WhatsApp não conectado')
