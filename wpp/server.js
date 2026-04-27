@@ -327,6 +327,8 @@ app.get('/status', async (req, res) => {
     statusConexao = 'iniciando'
   }
 
+
+  
   res.json({
     online: true,
     whatsappConectado: conectado,
@@ -364,6 +366,42 @@ app.get('/status', async (req, res) => {
       heapUsed: Math.round(mem.heapUsed / 1024 / 1024)
     }
   })
+})
+
+app.get('/reset-sessao', async (req, res) => {
+  try {
+    conectado = false
+    qrAtual = null
+    ultimoEvento = 'RESET_SESSAO_FORCADO'
+    motivoDesconexao = 'Reset manual de sessão para troca de celular'
+
+    try {
+      if (sock) {
+        await sock.logout()
+      }
+    } catch (e) {
+      console.log('Logout ignorado:', e.message)
+    }
+
+    sock = null
+
+    await rm('./auth_info_baileys', { recursive: true, force: true })
+
+    setTimeout(() => {
+      iniciarBot()
+    }, 2000)
+
+    res.json({
+      sucesso: true,
+      mensagem: 'Sessão apagada. Aguarde alguns segundos e gere um novo QR.'
+    })
+
+  } catch (err) {
+    res.status(500).json({
+      sucesso: false,
+      erro: err.message
+    })
+  }
 })
 
 app.get('/qr', async (req, res) => {
