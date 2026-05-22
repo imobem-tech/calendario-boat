@@ -272,17 +272,31 @@ async function iniciarBot() {
           const pb = rsGrupo.rows[0].pb
           const cota = rsGrupo.rows[0].cota
 
-          const rsAut = await pool.query(
-            `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
-               FROM public."P_BOAT_4_Autorizados"
-              WHERE "Cod_Embarcacao" = $1
-                AND UPPER("Gropo_letra") = UPPER($2)
-                AND "Dt_Desautorizacao" IS NULL
-                AND "Dt_Cancelamento" IS NULL
-              LIMIT 1`,
-            [pb, cota]
-          )
-
+    let rsAut
+if (cota === '01') {
+  // cota era NULL — busca qualquer autorizado ativo do PB
+  rsAut = await pool.query(
+    `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+       FROM public."P_BOAT_4_Autorizados"
+      WHERE "Cod_Embarcacao" = $1
+        AND "Dt_Desautorizacao" IS NULL
+        AND "Dt_Cancelamento" IS NULL
+      ORDER BY "Código" DESC
+      LIMIT 1`,
+    [pb]
+  )
+} else {
+  rsAut = await pool.query(
+    `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+       FROM public."P_BOAT_4_Autorizados"
+      WHERE "Cod_Embarcacao" = $1
+        AND UPPER("Gropo_letra") = UPPER($2)
+        AND "Dt_Desautorizacao" IS NULL
+        AND "Dt_Cancelamento" IS NULL
+      LIMIT 1`,
+    [pb, cota]
+  )
+}
           if (rsAut.rowCount === 0) {
             console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
             await sock.sendMessage(grupoId, {
