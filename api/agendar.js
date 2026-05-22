@@ -22,14 +22,21 @@ function decodificar(txt) {
 }
 
 function calcularDV(pb, grupoNum, autorizado) {
-  const base = `${pb}${grupoNum}${autorizado}`;
+  // Inclui MMDD do dia atual na soma para validação
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const mm = String(agora.getMonth() + 1).padStart(2, "0");
+  const dd = String(agora.getDate()).padStart(2, "0");
+  const mmdd = `${mm}${dd}`;
+  const base = `${pb}${grupoNum}${autorizado}${mmdd}`;
   const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
   return String(soma).padStart(2, "0");
 }
 
 function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
-  const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+
+  // Novo formato com MMDD: [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
+  const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
   if (!m) return null;
 
@@ -37,9 +44,18 @@ function decodeToken(token) {
   const grupoLetra = m[2].toUpperCase();
   const grupoNum = decodificar(m[3]);
   const autorizado = decodificar(m[4]);
-  const dv = decodificar(m[5]);
+  const mmdd = decodificar(m[5]).padStart(4, "0");
+  const dv = decodificar(m[6]);
 
   if (!pb || !grupoNum || !autorizado || !dv) return null;
+
+  // Valida MMDD: token deve ser do dia atual (horário Brasil)
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
+  const ddHoje = String(agora.getDate()).padStart(2, "0");
+  const mmddHoje = `${mmHoje}${ddHoje}`;
+
+  if (mmdd !== mmddHoje) return null; // token expirado
 
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
