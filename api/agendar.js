@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604240040";
+const VERSAO_API = "Allmax®2605221942";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const pool = new Pool({
