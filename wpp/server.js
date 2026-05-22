@@ -125,6 +125,52 @@ async function limparSessao() {
   console.log('🧹 Sessão apagada.')
 }
 
+// ============================================================
+// GERAÇÃO DE TOKEN DO DIA (válido apenas no dia atual)
+// Formato: [PB] [LetraGrupo] [NumGrupo] [CodAutorizado] [MMDD] [DV]
+// Codificação: a=1,b=2,c=3,d=4,e=5,f=6,g=7,h=8,i=9,j=0
+// ============================================================
+const MAP_ENC = { '1':'a','2':'b','3':'c','4':'d','5':'e','6':'f','7':'g','8':'h','9':'i','0':'j' }
+
+function encodificar(num) {
+  return String(num).split('').map(d => MAP_ENC[d] || '').join('')
+}
+
+function calcularDVToken(pb, grupoNum, autorizado, mmdd) {
+  const base = `${pb}${grupoNum}${autorizado}${mmdd}`
+  const soma = base.split('').reduce((acc, n) => acc + Number(n), 0)
+  return String(soma).padStart(2, '0')
+}
+
+function gerarToken(pb, grupoLetra, codAutorizado) {
+  const matchGrupo = String(grupoLetra).match(/^([A-Za-z])(\d+)$/)
+  if (!matchGrupo) throw new Error(`Formato de grupo inválido: ${grupoLetra}`)
+
+  const letra = matchGrupo[1].toLowerCase()
+  const grupoNum = matchGrupo[2]
+
+  // MMDD do dia atual no horário Brasil
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const mm = String(agora.getMonth() + 1).padStart(2, '0')
+  const dd = String(agora.getDate()).padStart(2, '0')
+  const mmdd = `${mm}${dd}`
+
+  const pbLimpo = String(Math.round(pb))
+  const autLimpo = String(Math.round(codAutorizado)).padStart(4, '0')
+  const numLimpo = String(grupoNum)
+
+  const dv = calcularDVToken(pbLimpo, numLimpo, autLimpo, mmdd)
+
+  return (
+    encodificar(pbLimpo) +
+    letra +
+    encodificar(numLimpo) +
+    encodificar(autLimpo) +
+    encodificar(mmdd) +
+    encodificar(dv)
+  )
+}
+
 async function iniciarBot() {
   if (iniciando) return
   iniciando = true
@@ -190,6 +236,92 @@ async function iniciarBot() {
         setTimeout(iniciarBot, 8000)
       }
     })
+
+    // ============================================================
+    // LISTENER DE MENSAGENS — comando CCC gera link com token
+    // ============================================================
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return
+
+      for (const msg of messages) {
+        try {
+          // Só processa mensagens de grupos
+          if (!msg.key.remoteJid?.endsWith('@g.us')) continue
+
+          // Ignora mensagens próprias do bot
+          if (msg.key.fromMe) continue
+
+          // Extrai o texto da mensagem
+          const texto = (
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            ''
+          ).trim()
+
+          // Detecta padrão: 3 ou mais C seguidos (maiúsculo ou minúsculo), sem outros caracteres
+          if (!/^c{3,}$/i.test(texto)) continue
+
+          const grupoId = msg.key.remoteJid
+
+          console.log(`📅 Comando CCC recebido no grupo ${grupoId}`)
+
+          // Busca pb e cota pelo grupowppid
+          const rsGrupo = await pool.query(
+            `SELECT pb, COALESCE(cota, '01') AS cota
+               FROM public.wpp_grupos_agenda
+              WHERE grupowppid = $1
+              LIMIT 1`,
+            [grupoId]
+          )
+
+          if (rsGrupo.rowCount === 0) {
+            console.log(`⚠️ Grupo ${grupoId} não encontrado em wpp_grupos_agenda`)
+            continue
+          }
+
+          const pb = rsGrupo.rows[0].pb
+          const cota = rsGrupo.rows[0].cota
+
+          // Busca o autorizado ativo para pb + grupo
+          const rsAut = await pool.query(
+            `SELECT "Cod_Pessoa", "Gropo_letra"
+               FROM public."P_BOAT_4_Autorizados"
+              WHERE "Cod_Embarcacao" = $1
+                AND UPPER("Gropo_letra") = UPPER($2)
+                AND "Dt_Desautorizacao" IS NULL
+                AND "Dt_Cancelamento" IS NULL
+              LIMIT 1`,
+            [pb, cota]
+          )
+
+          if (rsAut.rowCount === 0) {
+            console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
+            await sock.sendMessage(grupoId, {
+              text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.`
+            })
+            continue
+          }
+
+          const codAutorizado = rsAut.rows[0].Cod_Pessoa
+          const grupoLetra = rsAut.rows[0].Gropo_letra
+
+          // Gera token do dia com MMDD embutido
+          const token = gerarToken(pb, grupoLetra, codAutorizado)
+          const BASE_URL = process.env.BASE_URL_AGENDA || 'https://allmaxcalendar.vercel.app'
+          const link = `${BASE_URL}/agendar?t=${token}`
+
+          await sock.sendMessage(grupoId, {
+            text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_`
+          })
+
+          console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra} — enviado para ${grupoId}`)
+
+        } catch (err) {
+          console.error('Erro ao processar mensagem CCC:', err.message)
+        }
+      }
+    })
+
   } catch (err) {
     console.error('💥 Erro ao iniciar bot:', err)
     iniciando = false
