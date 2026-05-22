@@ -302,8 +302,19 @@ async function iniciarBot() {
             continue
           }
 
-          const codAutorizado = rsAut.rows[0].Cod_Pessoa
-          const grupoLetra = rsAut.rows[0].Gropo_letra
+          const rsAut = await pool.query(
+  `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+     FROM public."P_BOAT_4_Autorizados"
+    WHERE "Cod_Embarcacao" = $1
+      AND UPPER("Gropo_letra") = UPPER($2)
+      AND "Dt_Desautorizacao" IS NULL
+      AND "Dt_Cancelamento" IS NULL
+    LIMIT 1`,
+  [pb, cota]
+)
+
+          const codAutorizado = rsAut.rows[0].cod_pessoa
+const grupoLetra = rsAut.rows[0].gropo_letra
 
           // Gera token do dia com MMDD embutido
           const token = gerarToken(pb, grupoLetra, codAutorizado)
