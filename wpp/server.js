@@ -283,26 +283,10 @@ async function iniciarBot() {
           const cota = rsGrupo.rows[0].cota
 
           // Busca o autorizado ativo para pb + grupo
-          const rsAut = await pool.query(
-            `SELECT "Cod_Pessoa", "Gropo_letra"
-               FROM public."P_BOAT_4_Autorizados"
-              WHERE "Cod_Embarcacao" = $1
-                AND UPPER("Gropo_letra") = UPPER($2)
-                AND "Dt_Desautorizacao" IS NULL
-                AND "Dt_Cancelamento" IS NULL
-              LIMIT 1`,
-            [pb, cota]
-          )
 
-          if (rsAut.rowCount === 0) {
-            console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
-            await sock.sendMessage(grupoId, {
-              text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.`
-            })
-            continue
-          }
 
-          const rsAut = await pool.query(
+
+                    const rsAut = await pool.query(
   `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
      FROM public."P_BOAT_4_Autorizados"
     WHERE "Cod_Embarcacao" = $1
@@ -315,6 +299,15 @@ async function iniciarBot() {
 
           const codAutorizado = rsAut.rows[0].cod_pessoa
 const grupoLetra = rsAut.rows[0].gropo_letra
+
+          if (rsAut.rowCount === 0) {
+            console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
+            await sock.sendMessage(grupoId, {
+              text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.`
+            })
+            continue
+          }
+
 
           // Gera token do dia com MMDD embutido
           const token = gerarToken(pb, grupoLetra, codAutorizado)
