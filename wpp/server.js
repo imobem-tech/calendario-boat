@@ -256,8 +256,9 @@ async function iniciarBot() {
           const grupoId = msg.key.remoteJid
           console.log(`📅 Comando CCC recebido no grupo ${grupoId}`)
 
+          // Busca pb e cota pelo grupowppid (sem COALESCE — mantém NULL)
           const rsGrupo = await pool.query(
-            `SELECT pb, COALESCE(cota, '01') AS cota
+            `SELECT pb, cota
                FROM public.wpp_grupos_agenda
               WHERE grupowppid = $1
               LIMIT 1`,
@@ -270,33 +271,37 @@ async function iniciarBot() {
           }
 
           const pb = rsGrupo.rows[0].pb
-          const cota = rsGrupo.rows[0].cota
+          const cota = rsGrupo.rows[0].cota  // pode ser NULL
 
-    let rsAut
-if (cota === '01') {
-  // cota era NULL — busca qualquer autorizado ativo do PB
-  rsAut = await pool.query(
-    `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
-       FROM public."P_BOAT_4_Autorizados"
-      WHERE "Cod_Embarcacao" = $1
-        AND "Dt_Desautorizacao" IS NULL
-        AND "Dt_Cancelamento" IS NULL
-      ORDER BY "Código" DESC
-      LIMIT 1`,
-    [pb]
-  )
-} else {
-  rsAut = await pool.query(
-    `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
-       FROM public."P_BOAT_4_Autorizados"
-      WHERE "Cod_Embarcacao" = $1
-        AND UPPER("Gropo_letra") = UPPER($2)
-        AND "Dt_Desautorizacao" IS NULL
-        AND "Dt_Cancelamento" IS NULL
-      LIMIT 1`,
-    [pb, cota]
-  )
-}
+          // Busca autorizado: se cota é NULL, pega qualquer ativo do PB
+          // se cota tem valor, filtra pelo grupo específico
+          let rsAut
+          if (!cota) {
+            console.log(`🔍 Cota NULL para PB ${pb} — buscando qualquer autorizado ativo`)
+            rsAut = await pool.query(
+              `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+                 FROM public."P_BOAT_4_Autorizados"
+                WHERE "Cod_Embarcacao" = $1
+                  AND "Dt_Desautorizacao" IS NULL
+                  AND "Dt_Cancelamento" IS NULL
+                ORDER BY "Código" DESC
+                LIMIT 1`,
+              [pb]
+            )
+          } else {
+            console.log(`🔍 Buscando autorizado para PB ${pb} / Cota ${cota}`)
+            rsAut = await pool.query(
+              `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+                 FROM public."P_BOAT_4_Autorizados"
+                WHERE "Cod_Embarcacao" = $1
+                  AND UPPER("Gropo_letra") = UPPER($2)
+                  AND "Dt_Desautorizacao" IS NULL
+                  AND "Dt_Cancelamento" IS NULL
+                LIMIT 1`,
+              [pb, cota]
+            )
+          }
+
           if (rsAut.rowCount === 0) {
             console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
             await sock.sendMessage(grupoId, {
@@ -310,7 +315,7 @@ if (cota === '01') {
 
           const token = gerarToken(pb, grupoLetra, codAutorizado)
           const BASE_URL = process.env.BASE_URL_AGENDA || 'https://allmaxcalendar.vercel.app'
-          const link = `${BASE_URL}/agendar?t=${token}`
+          const link = `${BASE_URL}/?t=${token}`
 
           await sock.sendMessage(grupoId, {
             text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_`
