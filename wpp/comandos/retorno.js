@@ -1,6 +1,5 @@
 // ============================================================
-// COMANDO RETORNO (RRR)
-// Allmax®2605222230
+// COMANDO RETORNO (RRR) — Allmax®2605222315
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
@@ -63,18 +62,35 @@ export async function handleRetorno(sock, pool, grupoId) {
 
   const { pb, cota } = grupoInfo
 
-  const rsAg = await pool.query(
-    `SELECT "ID", "Dt_Saída"
-       FROM public."P_BOAT_z_10_Saida_Emb"
-      WHERE "Cod_Emb_PB" = $1
-        AND "Grupo_Comp_letra" = COALESCE($2, "Grupo_Comp_letra")
-        AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
-        AND "Dt_Desistencia" IS NULL
-        AND "Dt_Cancela_saida" IS NULL
-      LIMIT 1`,
-    [pb, cota]
-  )
+  // Caso 1: cota preenchida → filtra por grupo
+  // Caso 2: cota NULL → busca qualquer agendamento do PB hoje
+  let rsAg
+  if (cota) {
+    rsAg = await pool.query(
+      `SELECT "ID", "Dt_Saída", "Dt_Retorno"
+         FROM public."P_BOAT_z_10_Saida_Emb"
+        WHERE "Cod_Emb_PB" = $1
+          AND "Grupo_Comp_letra" = $2
+          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
+          AND "Dt_Desistencia" IS NULL
+          AND "Dt_Cancela_saida" IS NULL
+        LIMIT 1`,
+      [pb, cota]
+    )
+  } else {
+    rsAg = await pool.query(
+      `SELECT "ID", "Dt_Saída", "Dt_Retorno"
+         FROM public."P_BOAT_z_10_Saida_Emb"
+        WHERE "Cod_Emb_PB" = $1
+          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
+          AND "Dt_Desistencia" IS NULL
+          AND "Dt_Cancela_saida" IS NULL
+        LIMIT 1`,
+      [pb]
+    )
+  }
 
+  // Caso A — sem agendamento hoje
   if (rsAg.rowCount === 0) {
     await sock.sendMessage(grupoId, {
       text: `ℹ️ Não encontrei agendamento para hoje.${MENU}`
@@ -82,15 +98,25 @@ export async function handleRetorno(sock, pool, grupoId) {
     return
   }
 
-  const agendamento = rsAg.rows[0]
+  const ag = rsAg.rows[0]
 
-  if (!agendamento['Dt_Saída']) {
+  // Caso B — agendamento existe mas saída não registrada
+  if (!ag['Dt_Saída']) {
     await sock.sendMessage(grupoId, {
-      text: `⚠️ Não consta registro da saída.${MENU}`
+      text: `⚠️ Saída da embarcação não registrada no sistema.${MENU}`
     })
     return
   }
 
+  // Caso C — retorno já registrado
+  if (ag['Dt_Retorno']) {
+    await sock.sendMessage(grupoId, {
+      text: `ℹ️ Retorno já registrado para hoje.${MENU}`
+    })
+    return
+  }
+
+  // Caso D — saída registrada, retorno pendente → confirma
   await sock.sendMessage(grupoId, {
     text: `❓ Confirma retorno S/N`
   })
@@ -105,7 +131,7 @@ export async function handleRetorno(sock, pool, grupoId) {
   }, 60 * 1000)
 
   aguardandoRetorno.set(grupoId, {
-    agendamentoId: agendamento['ID'],
+    agendamentoId: ag['ID'],
     timeoutHandle
   })
 }
