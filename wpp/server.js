@@ -13,7 +13,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
  
 const { Pool } = pkg
-const VERSAO_WPP = "Allmax®2604240031"
+const VERSAO_WPP = "Allmax®2605222110"
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -235,7 +235,54 @@ async function iniciarBot() {
     })
 
     // ============================================================
-    // LISTENER DE MENSAGENS — comando CCC gera link com token
+    // ============================================================
+    // MENU PADRÃO — anexado ao final de toda resposta do bot
+    // ============================================================
+    const MENU = `\n\n─────────────\n*Para Calendário*: digite 3x a letra "c" juntas\n*Para Solicitar Retorno*: digite 3x a letra "r" juntas`
+
+    // ============================================================
+    // ESTADO DE CONFIRMAÇÃO DE RETORNO (por grupo, em memória)
+    // ============================================================
+    const aguardandoRetorno = new Map()
+    // Map: grupoId → { agendamentoId, timeoutHandle }
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    async function buscarGrupoInfo(grupoId) {
+      const rs = await pool.query(
+        `SELECT pb, cota FROM public.wpp_grupos_agenda WHERE grupowppid = $1 LIMIT 1`,
+        [grupoId]
+      )
+      return rs.rowCount > 0 ? rs.rows[0] : null
+    }
+
+    async function buscarAutorizado(pb, cota) {
+      if (!cota) {
+        const rs = await pool.query(
+          `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+             FROM public."P_BOAT_4_Autorizados"
+            WHERE "Cod_Embarcacao" = $1
+              AND "Dt_Desautorizacao" IS NULL AND "Dt_Cancelamento" IS NULL
+            ORDER BY "Código" DESC LIMIT 1`,
+          [pb]
+        )
+        return rs.rowCount > 0 ? rs.rows[0] : null
+      }
+      const rs = await pool.query(
+        `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
+           FROM public."P_BOAT_4_Autorizados"
+          WHERE "Cod_Embarcacao" = $1
+            AND UPPER("Gropo_letra") = UPPER($2)
+            AND "Dt_Desautorizacao" IS NULL AND "Dt_Cancelamento" IS NULL
+          LIMIT 1`,
+        [pb, cota]
+      )
+      return rs.rowCount > 0 ? rs.rows[0] : null
+    }
+
+    // ============================================================
+    // LISTENER DE MENSAGENS
     // ============================================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return
@@ -245,87 +292,164 @@ async function iniciarBot() {
           if (!msg.key.remoteJid?.endsWith('@g.us')) continue
           if (msg.key.fromMe) continue
 
+          const grupoId = msg.key.remoteJid
           const texto = (
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
             ''
           ).trim()
 
-          if (!/^c{3,}$/i.test(texto)) continue
+          if (!texto) continue
 
-          const grupoId = msg.key.remoteJid
-          console.log(`📅 Comando CCC recebido no grupo ${grupoId}`)
+          // ──────────────────────────────────────────────────────
+          // AGUARDANDO CONFIRMAÇÃO DE RETORNO
+          // ──────────────────────────────────────────────────────
+          if (aguardandoRetorno.has(grupoId)) {
+            const estado = aguardandoRetorno.get(grupoId)
 
-          // Busca pb e cota pelo grupowppid (sem COALESCE — mantém NULL)
-          const rsGrupo = await pool.query(
-            `SELECT pb, cota
-               FROM public.wpp_grupos_agenda
-              WHERE grupowppid = $1
-              LIMIT 1`,
-            [grupoId]
-          )
+            if (/^s$/i.test(texto)) {
+              clearTimeout(estado.timeoutHandle)
+              aguardandoRetorno.delete(grupoId)
 
-          if (rsGrupo.rowCount === 0) {
-            console.log(`⚠️ Grupo ${grupoId} não encontrado em wpp_grupos_agenda`)
+              // Grava Dt_Retorno
+              const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+              await pool.query(
+                `UPDATE public."P_BOAT_z_10_Saida_Emb"
+                    SET "Dt_Retorno" = $1
+                  WHERE "ID" = $2`,
+                [agora, estado.agendamentoId]
+              )
+
+              await sock.sendMessage(grupoId, {
+                text: `✅ RETORNO registrado.${MENU}`
+              })
+              console.log(`✅ Retorno registrado — agendamento ${estado.agendamentoId}`)
+
+            } else if (/^n$/i.test(texto)) {
+              clearTimeout(estado.timeoutHandle)
+              aguardandoRetorno.delete(grupoId)
+
+              await sock.sendMessage(grupoId, {
+                text: `❌ Retorno Abortado.${MENU}`
+              })
+
+            } else {
+              // Resposta inválida — repete a pergunta
+              await sock.sendMessage(grupoId, {
+                text: `❓ Confirma retorno S/N`
+              })
+            }
+
             continue
           }
 
-          const pb = rsGrupo.rows[0].pb
-          const cota = rsGrupo.rows[0].cota  // pode ser NULL
+          // ──────────────────────────────────────────────────────
+          // COMANDO CCC / CALENDARIO / CALENDAR
+          // ──────────────────────────────────────────────────────
+          const ehCalendario =
+            /^c{3,}$/i.test(texto) ||
+            /^calend[aá]rio$/i.test(texto) ||
+            /^calendar$/i.test(texto)
 
-          // Busca autorizado: se cota é NULL, pega qualquer ativo do PB
-          // se cota tem valor, filtra pelo grupo específico
-          let rsAut
-          if (!cota) {
-            console.log(`🔍 Cota NULL para PB ${pb} — buscando qualquer autorizado ativo`)
-            rsAut = await pool.query(
-              `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
-                 FROM public."P_BOAT_4_Autorizados"
-                WHERE "Cod_Embarcacao" = $1
-                  AND "Dt_Desautorizacao" IS NULL
-                  AND "Dt_Cancelamento" IS NULL
-                ORDER BY "Código" DESC
-                LIMIT 1`,
-              [pb]
-            )
-          } else {
-            console.log(`🔍 Buscando autorizado para PB ${pb} / Cota ${cota}`)
-            rsAut = await pool.query(
-              `SELECT "Cod_Pessoa" AS cod_pessoa, "Gropo_letra" AS gropo_letra
-                 FROM public."P_BOAT_4_Autorizados"
-                WHERE "Cod_Embarcacao" = $1
-                  AND UPPER("Gropo_letra") = UPPER($2)
-                  AND "Dt_Desautorizacao" IS NULL
-                  AND "Dt_Cancelamento" IS NULL
+          if (ehCalendario) {
+            console.log(`📅 Comando Calendário recebido no grupo ${grupoId}`)
+
+            const grupoInfo = await buscarGrupoInfo(grupoId)
+            if (!grupoInfo) {
+              console.log(`⚠️ Grupo ${grupoId} não encontrado`)
+              continue
+            }
+
+            const { pb, cota } = grupoInfo
+            const aut = await buscarAutorizado(pb, cota)
+
+            if (!aut) {
+              await sock.sendMessage(grupoId, {
+                text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.${MENU}`
+              })
+              continue
+            }
+
+            const token = gerarToken(pb, aut.gropo_letra, aut.cod_pessoa)
+            const BASE_URL = process.env.BASE_URL_AGENDA || 'https://allmaxcalendar.vercel.app'
+            const link = `${BASE_URL}/?t=${token}`
+
+            await sock.sendMessage(grupoId, {
+              image: { url: 'https://allmaxcalendar.vercel.app/agenda-preview.png' },
+              caption: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
+            })
+
+            console.log(`✅ Token gerado para PB ${pb} / ${aut.gropo_letra}`)
+            continue
+          }
+
+          // ──────────────────────────────────────────────────────
+          // COMANDO RRR — SOLICITAR RETORNO
+          // ──────────────────────────────────────────────────────
+          if (/^r{3,}$/i.test(texto)) {
+            console.log(`🔄 Comando Retorno recebido no grupo ${grupoId}`)
+
+            const grupoInfo = await buscarGrupoInfo(grupoId)
+            if (!grupoInfo) {
+              console.log(`⚠️ Grupo ${grupoId} não encontrado`)
+              continue
+            }
+
+            const { pb, cota } = grupoInfo
+
+            // Busca agendamento de hoje
+            const rsAg = await pool.query(
+              `SELECT "ID", "Dt_Saída"
+                 FROM public."P_BOAT_z_10_Saida_Emb"
+                WHERE "Cod_Emb_PB" = $1
+                  AND "Grupo_Comp_letra" = COALESCE($2, "Grupo_Comp_letra")
+                  AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
+                  AND "Dt_Desistencia" IS NULL
+                  AND "Dt_Cancela_saida" IS NULL
                 LIMIT 1`,
               [pb, cota]
             )
-          }
 
-          if (rsAut.rowCount === 0) {
-            console.log(`⚠️ Nenhum autorizado ativo para PB ${pb} / Cota ${cota}`)
+            if (rsAg.rowCount === 0) {
+              await sock.sendMessage(grupoId, {
+                text: `ℹ️ Não encontrei agendamento para hoje.${MENU}`
+              })
+              continue
+            }
+
+            const agendamento = rsAg.rows[0]
+
+            if (!agendamento['Dt_Saída']) {
+              await sock.sendMessage(grupoId, {
+                text: `⚠️ Não consta registro da saída.${MENU}`
+              })
+              continue
+            }
+
+            // Aguarda confirmação
             await sock.sendMessage(grupoId, {
-              text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.`
+              text: `❓ Confirma retorno S/N`
             })
+
+            const timeoutHandle = setTimeout(async () => {
+              if (aguardandoRetorno.has(grupoId)) {
+                aguardandoRetorno.delete(grupoId)
+                await sock.sendMessage(grupoId, {
+                  text: `⏱️ Tempo expirado, retorno Não Confirmado.${MENU}`
+                })
+              }
+            }, 60 * 1000)
+
+            aguardandoRetorno.set(grupoId, {
+              agendamentoId: agendamento['ID'],
+              timeoutHandle
+            })
+
             continue
           }
 
-          const codAutorizado = rsAut.rows[0].cod_pessoa
-          const grupoLetra = rsAut.rows[0].gropo_letra
-
-          const token = gerarToken(pb, grupoLetra, codAutorizado)
-          const BASE_URL = process.env.BASE_URL_AGENDA || 'https://allmaxcalendar.vercel.app'
-          const link = `${BASE_URL}/?t=${token}`
-
-          await sock.sendMessage(grupoId, {
-            image: { url: 'https://allmaxcalendar.vercel.app/agenda-preview.png' },
-            caption: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_`
-          })
-
-          console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra} — enviado para ${grupoId}`)
-
         } catch (err) {
-          console.error('Erro ao processar mensagem CCC:', err.message)
+          console.error('Erro ao processar mensagem:', err.message)
         }
       }
     })
