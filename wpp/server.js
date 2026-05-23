@@ -13,7 +13,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
  
 const { Pool } = pkg
-const VERSAO_WPP = "Allmax®2604240031"
+const VERSAO_WPP = "Allmax®260222103"
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -318,7 +318,8 @@ async function iniciarBot() {
           const link = `${BASE_URL}/?t=${token}`
 
           await sock.sendMessage(grupoId, {
-            text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_`
+            text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_`,
+            linkPreview: true
           })
 
           console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra} — enviado para ${grupoId}`)
