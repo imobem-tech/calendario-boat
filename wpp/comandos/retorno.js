@@ -1,5 +1,5 @@
 // ============================================================
-// COMANDO RETORNO (RRR) — Allmax®2605222315
+// COMANDO RETORNO (RRR) — Allmax®2605222345
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
@@ -71,7 +71,7 @@ export async function handleRetorno(sock, pool, grupoId) {
          FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "Cod_Emb_PB" = $1
           AND "Grupo_Comp_letra" = $2
-          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
+          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
           AND "Dt_Desistencia" IS NULL
           AND "Dt_Cancela_saida" IS NULL
         LIMIT 1`,
@@ -82,7 +82,7 @@ export async function handleRetorno(sock, pool, grupoId) {
       `SELECT "ID", "Dt_Saída", "Dt_Retorno"
          FROM public."P_BOAT_z_10_Saida_Emb"
         WHERE "Cod_Emb_PB" = $1
-          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = CURRENT_DATE
+          AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
           AND "Dt_Desistencia" IS NULL
           AND "Dt_Cancela_saida" IS NULL
         LIMIT 1`,
