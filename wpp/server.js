@@ -23,7 +23,7 @@ import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605222230'
+const VERSAO_WPP = 'Allmax®2605242125'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -134,6 +134,8 @@ async function iniciarBot() {
           if (msg.key.fromMe) continue
 
           const grupoId = msg.key.remoteJid
+          // Remetente: em grupos vem em msg.key.participant
+          const remetente = msg.key.participant || msg.key.remoteJid
           const texto = (
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
@@ -156,7 +158,7 @@ async function iniciarBot() {
 
           // Comando Retorno
           if (ehComandoRetorno(texto)) {
-            await handleRetorno(sock, pool, grupoId)
+            await handleRetorno(sock, pool, grupoId, remetente)
             continue
           }
 
