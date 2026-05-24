@@ -79,13 +79,31 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     const gruposDoBarco = grupos.filter(g => g.subject.startsWith(prefixo))
     addLog(`Grupos da embarcação ${Cod_Embarcacao}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
 
-    // 5. Matching por JID
-    const grupoMatch = gruposDoBarco.find(g => g.participants.includes(jidDono))
-    if (grupoMatch) {
-      addLog(`Grupo encontrado: ${grupoMatch.subject} (${grupoMatch.id})`)
-    } else {
-      addLog(`Nenhum grupo encontrado com o JID ${jidDono}`)
-      addLog(`Participantes dos grupos do barco: ${gruposDoBarco.map(g => g.subject + ':' + g.participants.join(',')).join(' | ')}`)
+    let grupoMatch = null
+
+    if (gruposDoBarco.length === 1) {
+      // Apenas 1 grupo → usa direto sem checar participantes
+      grupoMatch = gruposDoBarco[0]
+      addLog(`Apenas 1 grupo encontrado, usando direto: ${grupoMatch.subject}`)
+
+    } else if (gruposDoBarco.length > 1) {
+      // Múltiplos grupos → tenta matching por JID (s.whatsapp.net)
+      grupoMatch = gruposDoBarco.find(g => g.participants.includes(jidDono))
+
+      // Se não achou por JID, tenta pelo número (ignora sufixo @...)
+      if (!grupoMatch) {
+        const numero = jidDono.replace('@s.whatsapp.net', '')
+        grupoMatch = gruposDoBarco.find(g =>
+          g.participants.some(p => p.startsWith(numero))
+        )
+        if (grupoMatch) addLog(`Match por número encontrado: ${grupoMatch.subject}`)
+      } else {
+        addLog(`Match por JID encontrado: ${grupoMatch.subject}`)
+      }
+
+      if (!grupoMatch) {
+        addLog(`Nenhum grupo encontrado com o JID/número ${jidDono} entre ${gruposDoBarco.length} grupos`)
+      }
     }
 
     if (grupoMatch) {
@@ -100,7 +118,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       return res.json({ acao: 'RENOMEADO', grupoId: grupoMatch.id, de: grupoMatch.subject, para: nomeCorreto, log })
     }
 
-    // 6. Cria novo grupo
+    // 5. Nenhum grupo encontrado → cria novo
     addLog(`Criando novo grupo: ${nomeCorreto}`)
     const membros = [jidDono, ADM2_JID].filter(Boolean)
     addLog(`Membros: ${membros.join(', ')}`)
