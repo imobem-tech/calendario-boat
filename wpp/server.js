@@ -5,6 +5,7 @@ import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
 import retornoRoutes from "./msg_externa.js";
+import { handleRenomearGrupos } from './renomear-grupos.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -604,6 +605,10 @@ ${linkAgenda}`
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
+})
+
+app.post('/renomear-grupos', (req, res) => {
+  handleRenomearGrupos(req, res, sock, conectado)
 })
 
 app.listen(PORT, () => {
