@@ -102,42 +102,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     }))
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
-    // 4. Filtra grupos da embarcação
-    const gruposDoBarco = grupos.filter(g => 
-  g.subject.startsWith(`${Cod_Embarcacao}-`) || 
-  g.subject.startsWith(`${Cod_Embarcacao} `)
-)
-    addLog(`Grupos da embarcação ${Cod_Embarcacao}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
-
-    let grupoMatch = null
-
-    if (gruposDoBarco.length === 1) {
-      // Apenas 1 grupo → usa direto
-      grupoMatch = gruposDoBarco[0]
-      addLog(`Apenas 1 grupo, usando direto: ${grupoMatch.subject}`)
-
-    } else if (gruposDoBarco.length > 1) {
-      // Múltiplos grupos → matching por número com variações
-      const resultado = encontrarGrupoPorJid(gruposDoBarco, jidDono)
-      if (resultado) {
-        grupoMatch = resultado.grupo
-        addLog(`Match encontrado via número ${resultado.variacaoUsada}: ${grupoMatch.subject}`)
-      } else {
-        addLog(`Nenhum match entre ${gruposDoBarco.length} grupos — será criado novo grupo`)
-      }
-    }
-
-    if (grupoMatch) {
-      if (grupoMatch.subject === nomeCorreto) {
-        addLog('Grupo já está com o nome correto')
-        return res.json({ acao: 'JA_OK', grupoId: grupoMatch.id, nome: grupoMatch.subject, log })
-      }
-
-      addLog(`Renomeando de "${grupoMatch.subject}" para "${nomeCorreto}"`)
-      await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
-      addLog('Renomeado com sucesso!')
-      return res.json({ acao: 'RENOMEADO', grupoId: grupoMatch.id, de: grupoMatch.subject, para: nomeCorreto, log })
-    }
+  // 4. Filtra grupos da embarcação
 
     // 5. Nenhum grupo encontrado → cria novo
     addLog(`Criando novo grupo: ${nomeCorreto}`)
