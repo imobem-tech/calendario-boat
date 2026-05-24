@@ -133,21 +133,73 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
 
     // 6. Cria novo grupo — sem retry para evitar timeout
     addLog(`Criando novo grupo: ${nomeCorreto}`)
-    const membros = [jidDono, ADM2_JID]
-    addLog(`Membros: ${membros.join(', ')}`)
+    
+    
+const membrosBrutos = [jidDono, ADM2_JID]
+addLog(`Membros brutos: ${membrosBrutos.join(', ')}`)
 
-    try {
-      const result = await sock.groupCreate(nomeCorreto, membros)
-      const novoId = result.id
-      addLog(`Grupo criado: ${novoId}`)
-      await sock.groupParticipantsUpdate(novoId, membros, 'promote')
-      addLog('Membros promovidos a admin')
-      return res.json({ acao: 'CRIADO', grupoId: novoId, nomeGrupo: nomeCorreto, jidDono, log })
-    } catch (errCreate) {
-      addLog(`ERRO ao criar grupo: ${errCreate.message}`)
-      return res.status(500).json({ erro: `Falha ao criar grupo: ${errCreate.message}`, log })
+const membrosValidos = []
+
+for (const jid of membrosBrutos) {
+  try {
+    const numero = jid.replace('@s.whatsapp.net', '')
+    const check = await sock.onWhatsApp(numero)
+
+    if (check && check.length > 0 && check[0].exists) {
+      membrosValidos.push(check[0].jid)
+      addLog(`JID válido no WhatsApp: ${check[0].jid}`)
+    } else {
+      addLog(`JID NÃO encontrado no WhatsApp: ${jid}`)
     }
+  } catch (e) {
+    addLog(`Erro ao validar JID ${jid}: ${e.message}`)
+  }
+}
 
+if (membrosValidos.length === 0) {
+  return res.status(400).json({
+    erro: 'Nenhum membro válido para criar o grupo',
+    membrosBrutos,
+    log
+  })
+}
+
+addLog(`Membros válidos para criação: ${membrosValidos.join(', ')}`)
+
+try {
+  const result = await sock.groupCreate(nomeCorreto, membrosValidos)
+  const novoId = result.id
+  addLog(`Grupo criado: ${novoId}`)
+
+  try {
+    await sock.groupParticipantsUpdate(novoId, membrosValidos, 'promote')
+    addLog('Membros promovidos a admin')
+  } catch (errPromote) {
+    addLog(`Grupo criado, mas falhou ao promover admins: ${errPromote.message}`)
+  }
+
+  return res.json({
+    acao: 'CRIADO',
+    grupoId: novoId,
+    nomeGrupo: nomeCorreto,
+    jidDono,
+    membrosValidos,
+    log
+  })
+
+} catch (errCreate) {
+  addLog(`ERRO ao criar grupo: ${errCreate.message}`)
+  addLog(`Detalhe erro: ${JSON.stringify(errCreate, Object.getOwnPropertyNames(errCreate))}`)
+
+  return res.status(500).json({
+    erro: `Falha ao criar grupo: ${errCreate.message}`,
+    detalhe: JSON.stringify(errCreate, Object.getOwnPropertyNames(errCreate)),
+    membrosValidos,
+    log
+  })
+}
+
+    
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
     console.error('[criar-ou-atualizar-grupo] ERRO:', err)
