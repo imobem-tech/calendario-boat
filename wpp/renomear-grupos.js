@@ -100,9 +100,10 @@ async function criarGrupo(codEmbarcacao, gropoLetra, jidDono) {
 // -------------------------------------------------------
 // Handler principal do endpoint
 // -------------------------------------------------------
-async function handleRenomearGrupos(req, res) {
-  const log = [];
-
+export async function handleRenomearGrupos(req, res, getSock, getConectado) {
+  const sock = getSock()
+  const conectado = getConectado()
+  const log = []
   try {
     const registros = await buscarRegistros();
     const grupos    = await buscarGruposWhatsApp();
