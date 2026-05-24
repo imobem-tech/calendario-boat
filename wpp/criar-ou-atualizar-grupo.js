@@ -96,7 +96,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     }))
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
-    // 4. Filtra grupos da embarcação
+    // 4. Filtra grupos da embarcação (qualquer separador após o código)
     const codStr = String(Cod_Embarcacao)
     const gruposDoBarco = grupos.filter(g => {
       const subject = g.subject.trim()
@@ -119,6 +119,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       }
     }
 
+    // 5. Renomeia se encontrou
     if (grupoMatch) {
       if (grupoMatch.subject === nomeCorreto) {
         addLog('Grupo já está com o nome correto')
@@ -130,40 +131,22 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       return res.json({ acao: 'RENOMEADO', grupoId: grupoMatch.id, de: grupoMatch.subject, para: nomeCorreto, log })
     }
 
-    // 5. Nenhum grupo encontrado → cria novo
+    // 6. Cria novo grupo — sem retry para evitar timeout
     addLog(`Criando novo grupo: ${nomeCorreto}`)
     const membros = [jidDono, ADM2_JID]
+    addLog(`Membros: ${membros.join(', ')}`)
 
-    let result = null
-    let tentativa = 0
-    const maxTentativas = 3
-
-    while (tentativa < maxTentativas) {
-      try {
-        tentativa++
-        addLog(`Tentativa ${tentativa} de criar grupo...`)
-        result = await sock.groupCreate(nomeCorreto, membros)
-        addLog(`Grupo criado com sucesso na tentativa ${tentativa}: ${result.id}`)
-        break
-      } catch (errCreate) {
-        addLog(`Tentativa ${tentativa} falhou: ${errCreate.message}`)
-        if (tentativa < maxTentativas) {
-          addLog('Aguardando 3 segundos antes de tentar novamente...')
-          await new Promise(r => setTimeout(r, 3000))
-        }
-      }
+    try {
+      const result = await sock.groupCreate(nomeCorreto, membros)
+      const novoId = result.id
+      addLog(`Grupo criado: ${novoId}`)
+      await sock.groupParticipantsUpdate(novoId, membros, 'promote')
+      addLog('Membros promovidos a admin')
+      return res.json({ acao: 'CRIADO', grupoId: novoId, nomeGrupo: nomeCorreto, jidDono, log })
+    } catch (errCreate) {
+      addLog(`ERRO ao criar grupo: ${errCreate.message}`)
+      return res.status(500).json({ erro: `Falha ao criar grupo: ${errCreate.message}`, log })
     }
-
-    if (!result) {
-      addLog('Todas as tentativas de criar grupo falharam')
-      return res.status(500).json({ erro: 'Não foi possível criar o grupo após 3 tentativas', log })
-    }
-
-    const novoId = result.id
-    await sock.groupParticipantsUpdate(novoId, membros, 'promote')
-    addLog('Membros promovidos a admin')
-
-    return res.json({ acao: 'CRIADO', grupoId: novoId, nomeGrupo: nomeCorreto, jidDono, log })
 
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
