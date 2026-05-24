@@ -1,5 +1,5 @@
 // ============================================================
-// COMANDO RETORNO (RRR) — Allmax®2605222350
+// COMANDO RETORNO (RRR) — Allmax®2605242125
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
@@ -14,6 +14,27 @@ export function ehComandoRetorno(texto) {
 
 export function estaAguardandoRetorno(grupoId) {
   return aguardandoRetorno.has(grupoId)
+}
+
+// ============================================================
+// BUSCA NOME DO CLIENTE PELO TELEFONE
+// ============================================================
+async function buscarNomeCliente(pool, numeroWpp) {
+  try {
+    // numeroWpp vem como "5563933002220@s.whatsapp.net" ou "5563933002220"
+    const numero = String(numeroWpp).replace(/\D/g, '').replace(/^55/, '55')
+    const rs = await pool.query(
+      `SELECT "Cliente_Nome"
+         FROM public."Cliente"
+        WHERE REPLACE("Cliente_Telefone_Celular", '+', '') = $1
+        LIMIT 1`,
+      [numero]
+    )
+    return rs.rowCount > 0 ? (rs.rows[0].Cliente_Nome || null) : null
+  } catch (err) {
+    console.error('Erro ao buscar nome cliente:', err.message)
+    return null
+  }
 }
 
 // ============================================================
@@ -48,10 +69,11 @@ function montarMensagemRetorno(dadosRetorno) {
 
   const sufixo = `${dd}${hh}${min}`
   const dataHora = `${dd}/${mm} ${hh}:${min}`
+  const nomeExibido = dadosRetorno.nomeCliente || `Autorizado: ${dadosRetorno.codAutorizado}`
 
   let msg = `RETORNO_${sufixo}\n`
   msg += `${dataHora}\n`
-  msg += `Autorizado: ${dadosRetorno.codAutorizado}\n`
+  msg += `${nomeExibido}\n`
   msg += `Emb ${dadosRetorno.pb}-${dadosRetorno.grupoLetra}`
 
   if (dadosRetorno.comanda) {
@@ -110,7 +132,7 @@ export async function handleConfirmacaoRetorno(sock, pool, grupoId, texto) {
 // ============================================================
 // HANDLER PRINCIPAL RRR
 // ============================================================
-export async function handleRetorno(sock, pool, grupoId) {
+export async function handleRetorno(sock, pool, grupoId, remetente) {
   console.log(`🔄 Comando Retorno — grupo ${grupoId}`)
 
   const grupoInfo = await buscarGrupoInfo(pool, grupoId)
@@ -121,8 +143,6 @@ export async function handleRetorno(sock, pool, grupoId) {
 
   const { pb, cota } = grupoInfo
 
-  // Caso 1: cota preenchida → filtra por grupo
-  // Caso 2: cota NULL → busca qualquer agendamento do PB hoje
   let rsAg
   if (cota) {
     rsAg = await pool.query(
@@ -175,15 +195,23 @@ export async function handleRetorno(sock, pool, grupoId) {
     return
   }
 
-  // Caso D — tudo ok, busca comanda e confirma
+  // Caso D — busca nome e comanda, confirma
   const codAutorizado = ag['Cod_Autorizado']
   const grupoLetra = ag['Grupo_Comp_letra']
-  const comanda = await buscarComandaAberta(pool, codAutorizado)
 
-  // Monta preview da mensagem para mostrar na confirmação
-  const dadosRetorno = { pb, grupoLetra, codAutorizado, comanda }
+  // Extrai número limpo do remetente: "5563933002220@s.whatsapp.net" → "5563933002220"
+  const numeroRemetente = String(remetente || '').replace('@s.whatsapp.net', '').replace(/\D/g, '')
 
-  let textoConfirmacao = `❓ Confirma retorno S/N\n\nEmb ${pb}-${grupoLetra} | Autorizado: ${codAutorizado}`
+  const [nomeCliente, comanda] = await Promise.all([
+    buscarNomeCliente(pool, numeroRemetente),
+    buscarComandaAberta(pool, codAutorizado)
+  ])
+
+  const dadosRetorno = { pb, grupoLetra, codAutorizado, nomeCliente, comanda }
+
+  const nomeExibido = nomeCliente || `Autorizado: ${codAutorizado}`
+  let textoConfirmacao = `❓ Confirma retorno S/N\n\n${nomeExibido}\nEmb ${pb}-${grupoLetra}`
+
   if (comanda) {
     const valorFmt = comanda.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
