@@ -7,6 +7,9 @@ import { rm } from 'fs/promises'
 import retornoRoutes from "./msg_externa.js";
 import { handleRenomearGrupos } from './renomear-grupos.js'
 
+import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
+
+
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -609,6 +612,10 @@ ${linkAgenda}`
 
 app.post('/renomear-grupos', (req, res) => {
   handleRenomearGrupos(req, res, () => sock, () => conectado)
+})
+
+app.post('/criar-ou-atualizar-grupo', (req, res) => {
+  handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
 })
 
 app.listen(PORT, () => {
