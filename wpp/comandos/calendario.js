@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO CALENDÁRIO (CCC / calendario / calendar)
-// Allmax®2605222230
+// Allmax®2605242135
 // ============================================================
 
 import { buscarGrupoInfo, buscarAutorizado } from '../db.js'
@@ -16,6 +16,11 @@ export function ehComandoCalendario(texto) {
     /^calend[aá]rio$/i.test(texto) ||
     /^calendar$/i.test(texto)
   )
+}
+
+// Valida formato de grupo: letra + número, ex: X1, S2, A10
+function grupoLetraValido(grupoLetra) {
+  return /^[A-Za-z]\d+$/.test(String(grupoLetra || ''))
 }
 
 export async function handleCalendario(sock, pool, grupoId) {
@@ -37,7 +42,25 @@ export async function handleCalendario(sock, pool, grupoId) {
     return
   }
 
-  const token = gerarToken(pb, aut.gropo_letra, aut.cod_pessoa)
+  // Determina o grupoLetra para o token:
+  // 1. Se cota do grupo é válida (ex: X1), usa ela
+  // 2. Se gropo_letra do autorizado é válido, usa ele
+  // 3. Caso contrário, erro
+  let grupoLetra = null
+
+  if (cota && grupoLetraValido(cota)) {
+    grupoLetra = cota
+  } else if (grupoLetraValido(aut.gropo_letra)) {
+    grupoLetra = aut.gropo_letra
+  } else {
+    console.log(`⚠️ Grupo inválido — cota: ${cota}, gropo_letra: ${aut.gropo_letra}`)
+    await sock.sendMessage(grupoId, {
+      text: `⚠️ Configuração de grupo inválida para esta embarcação.\nContate o administrador.${MENU}`
+    })
+    return
+  }
+
+  const token = gerarToken(pb, grupoLetra, aut.cod_pessoa)
   const link = `${BASE_URL}/?t=${token}`
 
   await sock.sendMessage(grupoId, {
@@ -45,5 +68,5 @@ export async function handleCalendario(sock, pool, grupoId) {
     caption: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
   })
 
-  console.log(`✅ Token gerado para PB ${pb} / ${aut.gropo_letra}`)
+  console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra}`)
 }
