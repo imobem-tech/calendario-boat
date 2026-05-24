@@ -30,23 +30,127 @@ async function buscarJidDono(codPessoa) {
   return rows[0].jid_dono
 }
 
-function variacoesNumero(jid) {
-  const numero = String(jid || '').replace('@s.whatsapp.net', '')
-  const variacoes = new Set()
+function limparNumero(jidOuNumero) {
+  return String(jidOuNumero || '')
+    .replace('@s.whatsapp.net', '')
+    .replace('@lid', '')
+    .replace(/\D/g, '')
+}
 
-  variacoes.add(numero)
+function gerarVariacoesNumero(jidOuNumero) {
+  const numero = limparNumero(jidOuNumero)
+  const set = new Set()
 
+  if (!numero) return []
+
+  set.add(numero)
+
+  // Brasil: 55 + DDD + 9 + número com 8 dígitos
+  // Ex.: 5563984380383 -> 556384380383
   const sem9 = numero.replace(/^(\d{4})9(\d{8})$/, '$1$2')
-  variacoes.add(sem9)
+  set.add(sem9)
 
+  // Brasil: 55 + DDD + número com 8 dígitos
+  // Ex.: 556384380383 -> 5563984380383
   const com9 = numero.replace(/^(\d{4})(\d{8})$/, '$19$2')
-  variacoes.add(com9)
+  set.add(com9)
 
-  return [...variacoes].filter(Boolean)
+  return [...set].filter(Boolean)
+}
+
+function gerarChavesMatching(...jids) {
+  const set = new Set()
+
+  for (const jid of jids) {
+    if (!jid) continue
+
+    const jidStr = String(jid)
+
+    // Mantém JID completo para match exato, inclusive @lid
+    set.add(jidStr)
+
+    // Adiciona número puro e variações com/sem 9
+    for (const variacao of gerarVariacoesNumero(jidStr)) {
+      set.add(variacao)
+      set.add(`${variacao}@s.whatsapp.net`)
+    }
+  }
+
+  return [...set].filter(Boolean)
+}
+
+function extrairIdsParticipante(p) {
+  const ids = []
+
+  if (!p) return ids
+
+  if (typeof p === 'string') {
+    ids.push(p)
+    return ids
+  }
+
+  if (p.id) ids.push(p.id)
+  if (p.jid) ids.push(p.jid)
+  if (p.phoneNumber) ids.push(p.phoneNumber)
+  if (p.lid) ids.push(p.lid)
+
+  return ids.filter(Boolean)
+}
+
+function participanteBateComChaves(participanteIds, chaves) {
+  for (const id of participanteIds) {
+    const idStr = String(id)
+    const idNumero = limparNumero(idStr)
+
+    for (const chave of chaves) {
+      const chaveStr = String(chave)
+      const chaveNumero = limparNumero(chaveStr)
+
+      // Match exato, útil para @lid
+      if (idStr === chaveStr) return true
+
+      // Match por número/variação
+      if (chaveNumero && idNumero && idNumero.startsWith(chaveNumero)) return true
+      if (chaveNumero && idNumero && chaveNumero.startsWith(idNumero)) return true
+    }
+  }
+
+  return false
+}
+
+function encontrarGrupoPorJids(gruposDoBarco, jidDonoBruto, jidDonoFinal, addLog) {
+  const chaves = gerarChavesMatching(jidDonoBruto, jidDonoFinal)
+
+  addLog(`Chaves de matching do cliente: ${chaves.join(', ')}`)
+
+  for (const grupo of gruposDoBarco) {
+    for (const participante of grupo.participantsRaw || []) {
+      const idsParticipante = extrairIdsParticipante(participante)
+
+      if (participanteBateComChaves(idsParticipante, chaves)) {
+        return {
+          grupo,
+          participanteEncontrado: idsParticipante.join(' | ')
+        }
+      }
+    }
+
+    // fallback para estrutura já normalizada
+    for (const participanteId of grupo.participants || []) {
+      if (participanteBateComChaves([participanteId], chaves)) {
+        return {
+          grupo,
+          participanteEncontrado: participanteId
+        }
+      }
+    }
+  }
+
+  return null
 }
 
 async function confirmarJidWhatsApp(sock, jid, addLog) {
-  const numero = String(jid || '').replace('@s.whatsapp.net', '')
+  const numero = limparNumero(jid)
 
   try {
     const check = await sock.onWhatsApp(numero)
@@ -64,20 +168,6 @@ async function confirmarJidWhatsApp(sock, jid, addLog) {
   }
 }
 
-function encontrarGrupoPorJid(gruposDoBarco, jidDono) {
-  const variacoes = variacoesNumero(jidDono)
-
-  for (const grupo of gruposDoBarco) {
-    for (const variacao of variacoes) {
-      if (grupo.participants.some(p => p.startsWith(variacao))) {
-        return { grupo, variacaoUsada: variacao }
-      }
-    }
-  }
-
-  return null
-}
-
 async function validarMembrosWhatsApp(sock, membrosBrutos, addLog) {
   const membrosValidos = []
 
@@ -85,7 +175,7 @@ async function validarMembrosWhatsApp(sock, membrosBrutos, addLog) {
 
   for (const jid of membrosBrutos) {
     try {
-      const numero = String(jid || '').replace('@s.whatsapp.net', '')
+      const numero = limparNumero(jid)
       const check = await sock.onWhatsApp(numero)
 
       if (check && check.length > 0 && check[0].exists) {
@@ -139,10 +229,13 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       })
     }
 
-    addLog(`JID bruto encontrado: ${jidDonoBruto} | variações: ${variacoesNumero(jidDonoBruto).join(', ')}`)
+    addLog(`JID bruto encontrado: ${jidDonoBruto}`)
+    addLog(`Variações do JID bruto: ${gerarVariacoesNumero(jidDonoBruto).join(', ')}`)
 
     const jidDonoFinal = await confirmarJidWhatsApp(sock, jidDonoBruto, addLog)
-    addLog(`JID final usado no processo: ${jidDonoFinal} | variações: ${variacoesNumero(jidDonoFinal).join(', ')}`)
+
+    addLog(`JID final usado no processo: ${jidDonoFinal}`)
+    addLog(`Variações do JID final: ${gerarVariacoesNumero(jidDonoFinal).join(', ')}`)
 
     const nomeCorreto = montarNomeGrupo(Cod_Embarcacao, Gropo_letra, Cod_Cliente, Plano)
     addLog(`Nome correto do grupo: ${nomeCorreto}`)
@@ -154,39 +247,51 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     const grupos = Object.entries(gruposWpp).map(([id, data]) => ({
       id,
       subject: data.subject,
-      participants: data.participants.map(p => p.id)
+      participantsRaw: data.participants || [],
+      participants: (data.participants || []).flatMap(p => extrairIdsParticipante(p))
     }))
 
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
-    const codStr = String(Cod_Embarcacao)
+    // REGRA PRINCIPAL:
+    // Seleciona todos os grupos que começam com os 3 primeiros dígitos da embarcação.
+    // Ex.: PB=555 => pega 555 SUMMER..., 555-SUMMER..., 555_..., etc.
+    const prefixoBarco = String(Cod_Embarcacao).trim().substring(0, 3)
 
     const gruposDoBarco = grupos.filter(g => {
       const subject = String(g.subject || '').trim()
-      return new RegExp(`^${codStr}\\D`).test(subject)
+      return subject.startsWith(prefixoBarco)
     })
 
-    addLog(`Grupos da embarcação ${Cod_Embarcacao}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
+    addLog(`Prefixo usado para grupos da embarcação: ${prefixoBarco}`)
+    addLog(`Grupos da embarcação ${prefixoBarco}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
 
     let grupoMatch = null
 
     if (gruposDoBarco.length === 1) {
       grupoMatch = gruposDoBarco[0]
-      addLog(`Apenas 1 grupo, usando direto: ${grupoMatch.subject}`)
+      addLog(`Apenas 1 grupo com prefixo ${prefixoBarco}, usando direto: ${grupoMatch.subject}`)
     } else if (gruposDoBarco.length > 1) {
-      const resultado = encontrarGrupoPorJid(gruposDoBarco, jidDonoFinal)
+      const resultado = encontrarGrupoPorJids(
+        gruposDoBarco,
+        jidDonoBruto,
+        jidDonoFinal,
+        addLog
+      )
 
       if (resultado) {
         grupoMatch = resultado.grupo
-        addLog(`Match encontrado via número ${resultado.variacaoUsada}: ${grupoMatch.subject}`)
+        addLog(`Match encontrado pelo cliente no grupo: ${grupoMatch.subject}`)
+        addLog(`Participante encontrado: ${resultado.participanteEncontrado}`)
       } else {
-        addLog(`Nenhum match entre ${gruposDoBarco.length} grupos — será criado novo grupo`)
+        addLog(`Nenhum grupo com prefixo ${prefixoBarco} contém o número/JID do cliente`)
       }
     }
 
     if (grupoMatch) {
       if (grupoMatch.subject === nomeCorreto) {
         addLog('Grupo já está com o nome correto')
+
         return res.json({
           acao: 'JA_OK',
           grupoId: grupoMatch.id,
@@ -198,7 +303,9 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       }
 
       addLog(`Renomeando de "${grupoMatch.subject}" para "${nomeCorreto}"`)
+
       await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
+
       addLog('Renomeado com sucesso!')
 
       return res.json({
@@ -212,7 +319,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       })
     }
 
-    addLog(`Criando novo grupo: ${nomeCorreto}`)
+    addLog(`Nenhum grupo existente corresponde ao cliente — criando novo grupo: ${nomeCorreto}`)
 
     const membrosBrutos = [jidDonoFinal, ADM2_JID]
     const membrosValidos = await validarMembrosWhatsApp(sock, membrosBrutos, addLog)
