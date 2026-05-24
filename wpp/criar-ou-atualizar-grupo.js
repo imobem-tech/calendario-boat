@@ -29,19 +29,13 @@ async function buscarJidDono(codPessoa) {
   return rows[0].jid_dono
 }
 
-// Gera variações do número para matching (com e sem o 9º dígito)
 function variacoesNumero(jid) {
   const numero = jid.replace('@s.whatsapp.net', '')
   const variacoes = [numero]
-
-  // Remove o 9 extra: 5563984380383 → 556384880383
   const sem9 = numero.replace(/^(\d{4})9(\d{8})$/, '$1$2')
   if (sem9 !== numero) variacoes.push(sem9)
-
-  // Adiciona o 9: 556384880383 → 5563984880383
   const com9 = numero.replace(/^(\d{4})(\d{8})$/, '$19$2')
   if (com9 !== numero) variacoes.push(com9)
-
   return variacoes
 }
 
@@ -102,13 +96,44 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     }))
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
-  // 4. Filtra grupos da embarcação
+    // 4. Filtra grupos da embarcação
+    const codStr = String(Cod_Embarcacao)
+    const gruposDoBarco = grupos.filter(g => {
+      const subject = g.subject.trim()
+      return new RegExp(`^${codStr}\\D`).test(subject)
+    })
+    addLog(`Grupos da embarcação ${Cod_Embarcacao}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
+
+    let grupoMatch = null
+
+    if (gruposDoBarco.length === 1) {
+      grupoMatch = gruposDoBarco[0]
+      addLog(`Apenas 1 grupo, usando direto: ${grupoMatch.subject}`)
+    } else if (gruposDoBarco.length > 1) {
+      const resultado = encontrarGrupoPorJid(gruposDoBarco, jidDono)
+      if (resultado) {
+        grupoMatch = resultado.grupo
+        addLog(`Match encontrado via número ${resultado.variacaoUsada}: ${grupoMatch.subject}`)
+      } else {
+        addLog(`Nenhum match entre ${gruposDoBarco.length} grupos — será criado novo grupo`)
+      }
+    }
+
+    if (grupoMatch) {
+      if (grupoMatch.subject === nomeCorreto) {
+        addLog('Grupo já está com o nome correto')
+        return res.json({ acao: 'JA_OK', grupoId: grupoMatch.id, nome: grupoMatch.subject, log })
+      }
+      addLog(`Renomeando de "${grupoMatch.subject}" para "${nomeCorreto}"`)
+      await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
+      addLog('Renomeado com sucesso!')
+      return res.json({ acao: 'RENOMEADO', grupoId: grupoMatch.id, de: grupoMatch.subject, para: nomeCorreto, log })
+    }
 
     // 5. Nenhum grupo encontrado → cria novo
     addLog(`Criando novo grupo: ${nomeCorreto}`)
     const membros = [jidDono, ADM2_JID]
 
-    // Tenta criar com retry em caso de bad-request
     let result = null
     let tentativa = 0
     const maxTentativas = 3
