@@ -1,8 +1,7 @@
 // ============================================================
 // wpp/criar-ou-atualizar-grupo.js
 // Endpoint POST /criar-ou-atualizar-grupo
-// Recebe: { Cod_Embarcacao, Gropo_letra, Cod_Pessoa }
-// Verifica se grupo já existe → renomeia ou cria
+// Recebe: { Cod_Embarcacao, Gropo_letra, Cod_Pessoa, Cod_Cliente, Plano }
 // ============================================================
 
 import pkg from 'pg'
@@ -13,6 +12,16 @@ const pool = new Pool({
 })
 
 const ADM2_JID = '556332258473@s.whatsapp.net'
+
+// -------------------------------------------------------
+// Monta o nome do grupo com base nas regras de negócio
+// {Cod_Embarcacao}-{Gropo_letra} _{Unidade} {Descricao}
+// -------------------------------------------------------
+function montarNomeGrupo(codEmbarcacao, gropoLetra, codCliente, plano) {
+  const unidade = String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
+  const descricao = Number(codCliente) === 4255 ? 'ALLMAX COTAS' : 'SUMMER NÁUTICA'
+  return `${codEmbarcacao}-${gropoLetra} _${unidade} ${descricao}`
+}
 
 // -------------------------------------------------------
 // Busca o JID do dono a partir do Cod_Pessoa
@@ -31,38 +40,6 @@ async function buscarJidDono(codPessoa) {
 }
 
 // -------------------------------------------------------
-// Busca nome da embarcação para compor o nome do grupo
-// -------------------------------------------------------
-async function buscarNomeEmbarcacao(codEmbarcacao) {
-  const { rows } = await pool.query(`
-    SELECT "Nome_Embarcacao"
-    FROM public."Embarcacao"
-    WHERE "Codigo" = $1
-    LIMIT 1
-  `, [codEmbarcacao])
-
-  if (rows.length === 0) return null
-  return rows[0].Nome_Embarcacao
-}
-
-// -------------------------------------------------------
-// Monta o novo nome: {cod}-{letra}-{descricao}
-// -------------------------------------------------------
-function montarNovoNome(nomeAtual, codEmbarcacao, gropoLetra) {
-  const prefixoAtual = `${codEmbarcacao}-`
-  const prefixoNovo  = `${codEmbarcacao}-${gropoLetra}-`
-
-  if (!nomeAtual.startsWith(prefixoAtual)) return null
-
-  const resto = nomeAtual.slice(prefixoAtual.length)
-
-  // Já está no formato correto?
-  if (resto.startsWith(`${gropoLetra}-`)) return nomeAtual
-
-  return prefixoNovo + resto
-}
-
-// -------------------------------------------------------
 // Handler principal
 // -------------------------------------------------------
 export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectado) {
@@ -73,10 +50,10 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     return res.status(503).json({ erro: 'WhatsApp não conectado' })
   }
 
-  const { Cod_Embarcacao, Gropo_letra, Cod_Pessoa } = req.body
+  const { Cod_Embarcacao, Gropo_letra, Cod_Pessoa, Cod_Cliente, Plano } = req.body
 
-  if (!Cod_Embarcacao || !Gropo_letra || !Cod_Pessoa) {
-    return res.status(400).json({ erro: 'Cod_Embarcacao, Gropo_letra e Cod_Pessoa são obrigatórios' })
+  if (!Cod_Embarcacao || !Gropo_letra || !Cod_Pessoa || !Cod_Cliente || !Plano) {
+    return res.status(400).json({ erro: 'Cod_Embarcacao, Gropo_letra, Cod_Pessoa, Cod_Cliente e Plano são obrigatórios' })
   }
 
   try {
@@ -86,7 +63,10 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       return res.status(404).json({ erro: `Celular não encontrado para Cod_Pessoa ${Cod_Pessoa}` })
     }
 
-    // 2. Busca todos os grupos do WhatsApp
+    // 2. Monta o nome correto do grupo
+    const nomeCorreto = montarNomeGrupo(Cod_Embarcacao, Gropo_letra, Cod_Cliente, Plano)
+
+    // 3. Busca todos os grupos do WhatsApp
     const gruposWpp = await sock.groupFetchAllParticipating()
     const grupos = Object.entries(gruposWpp).map(([id, data]) => ({
       id,
@@ -94,18 +74,14 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       participants: data.participants.map(p => p.id),
     }))
 
-    // 3. Filtra grupos da embarcação
+    // 4. Tenta encontrar grupo pelo JID do dono em grupos da embarcação
     const prefixo = `${Cod_Embarcacao}-`
     const gruposDoBarco = grupos.filter(g => g.subject.startsWith(prefixo))
-
-    // 4. Tenta encontrar grupo pelo JID do dono
     const grupoMatch = gruposDoBarco.find(g => g.participants.includes(jidDono))
 
     if (grupoMatch) {
       // Grupo já existe → verifica se nome precisa atualizar
-      const novoNome = montarNovoNome(grupoMatch.subject, Cod_Embarcacao, Gropo_letra)
-
-      if (!novoNome || novoNome === grupoMatch.subject) {
+      if (grupoMatch.subject === nomeCorreto) {
         return res.json({
           acao: 'JA_OK',
           grupoId: grupoMatch.id,
@@ -113,33 +89,28 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
         })
       }
 
-      await sock.groupUpdateSubject(grupoMatch.id, novoNome)
+      await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
       return res.json({
         acao: 'RENOMEADO',
         grupoId: grupoMatch.id,
         de: grupoMatch.subject,
-        para: novoNome
+        para: nomeCorreto
       })
     }
 
     // 5. Grupo não existe → cria novo
-    // Tenta buscar nome da embarcação para compor o nome do grupo
-    const nomeEmb = await buscarNomeEmbarcacao(Cod_Embarcacao)
-    const descricao = nomeEmb ? nomeEmb.toUpperCase() : 'NOVO'
-    const nomeGrupo = `${Cod_Embarcacao}-${Gropo_letra}-${descricao}`
-
     const membros = [jidDono, ADM2_JID].filter(Boolean)
-    const result = await sock.groupCreate(nomeGrupo, membros)
+    const result = await sock.groupCreate(nomeCorreto, membros)
     const novoId = result.id
 
     await sock.groupParticipantsUpdate(novoId, membros, 'promote')
 
-    console.log(`[CRIADO] ${nomeGrupo} → ${novoId}`)
+    console.log(`[CRIADO] ${nomeCorreto} → ${novoId}`)
 
     return res.json({
       acao: 'CRIADO',
       grupoId: novoId,
-      nomeGrupo,
+      nomeGrupo: nomeCorreto,
       jidDono
     })
 
