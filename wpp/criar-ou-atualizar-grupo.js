@@ -29,6 +29,34 @@ async function buscarJidDono(codPessoa) {
   return rows[0].jid_dono
 }
 
+// Gera variações do número para matching (com e sem o 9º dígito)
+function variacoesNumero(jid) {
+  const numero = jid.replace('@s.whatsapp.net', '')
+  const variacoes = [numero]
+
+  // Remove o 9 extra: 5563984380383 → 556384880383
+  const sem9 = numero.replace(/^(\d{4})9(\d{8})$/, '$1$2')
+  if (sem9 !== numero) variacoes.push(sem9)
+
+  // Adiciona o 9: 556384880383 → 5563984880383
+  const com9 = numero.replace(/^(\d{4})(\d{8})$/, '$19$2')
+  if (com9 !== numero) variacoes.push(com9)
+
+  return variacoes
+}
+
+function encontrarGrupoPorJid(gruposDoBarco, jidDono) {
+  const variacoes = variacoesNumero(jidDono)
+  for (const grupo of gruposDoBarco) {
+    for (const variacao of variacoes) {
+      if (grupo.participants.some(p => p.startsWith(variacao))) {
+        return { grupo, variacaoUsada: variacao }
+      }
+    }
+  }
+  return null
+}
+
 export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectado) {
   const sock = getSock()
   const conectado = getConectado()
@@ -58,7 +86,7 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
       addLog(`JID não encontrado para Cod_Pessoa=${Cod_Pessoa}`)
       return res.status(404).json({ erro: `Celular não encontrado para Cod_Pessoa ${Cod_Pessoa}`, log })
     }
-    addLog(`JID encontrado: ${jidDono}`)
+    addLog(`JID encontrado: ${jidDono} | variações: ${variacoesNumero(jidDono).join(', ')}`)
 
     // 2. Monta nome correto
     const nomeCorreto = montarNomeGrupo(Cod_Embarcacao, Gropo_letra, Cod_Cliente, Plano)
@@ -82,27 +110,18 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     let grupoMatch = null
 
     if (gruposDoBarco.length === 1) {
-      // Apenas 1 grupo → usa direto sem checar participantes
+      // Apenas 1 grupo → usa direto
       grupoMatch = gruposDoBarco[0]
-      addLog(`Apenas 1 grupo encontrado, usando direto: ${grupoMatch.subject}`)
+      addLog(`Apenas 1 grupo, usando direto: ${grupoMatch.subject}`)
 
     } else if (gruposDoBarco.length > 1) {
-      // Múltiplos grupos → tenta matching por JID (s.whatsapp.net)
-      grupoMatch = gruposDoBarco.find(g => g.participants.includes(jidDono))
-
-      // Se não achou por JID, tenta pelo número (ignora sufixo @...)
-      if (!grupoMatch) {
-        const numero = jidDono.replace('@s.whatsapp.net', '')
-        grupoMatch = gruposDoBarco.find(g =>
-          g.participants.some(p => p.startsWith(numero))
-        )
-        if (grupoMatch) addLog(`Match por número encontrado: ${grupoMatch.subject}`)
+      // Múltiplos grupos → matching por número com variações
+      const resultado = encontrarGrupoPorJid(gruposDoBarco, jidDono)
+      if (resultado) {
+        grupoMatch = resultado.grupo
+        addLog(`Match encontrado via número ${resultado.variacaoUsada}: ${grupoMatch.subject}`)
       } else {
-        addLog(`Match por JID encontrado: ${grupoMatch.subject}`)
-      }
-
-      if (!grupoMatch) {
-        addLog(`Nenhum grupo encontrado com o JID/número ${jidDono} entre ${gruposDoBarco.length} grupos`)
+        addLog(`Nenhum match entre ${gruposDoBarco.length} grupos — será criado novo grupo`)
       }
     }
 
@@ -120,12 +139,35 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
 
     // 5. Nenhum grupo encontrado → cria novo
     addLog(`Criando novo grupo: ${nomeCorreto}`)
-    const membros = [jidDono, ADM2_JID].filter(Boolean)
-    addLog(`Membros: ${membros.join(', ')}`)
-    const result = await sock.groupCreate(nomeCorreto, membros)
-    const novoId = result.id
-    addLog(`Grupo criado: ${novoId}`)
+    const membros = [jidDono, ADM2_JID]
 
+    // Tenta criar com retry em caso de bad-request
+    let result = null
+    let tentativa = 0
+    const maxTentativas = 3
+
+    while (tentativa < maxTentativas) {
+      try {
+        tentativa++
+        addLog(`Tentativa ${tentativa} de criar grupo...`)
+        result = await sock.groupCreate(nomeCorreto, membros)
+        addLog(`Grupo criado com sucesso na tentativa ${tentativa}: ${result.id}`)
+        break
+      } catch (errCreate) {
+        addLog(`Tentativa ${tentativa} falhou: ${errCreate.message}`)
+        if (tentativa < maxTentativas) {
+          addLog('Aguardando 3 segundos antes de tentar novamente...')
+          await new Promise(r => setTimeout(r, 3000))
+        }
+      }
+    }
+
+    if (!result) {
+      addLog('Todas as tentativas de criar grupo falharam')
+      return res.status(500).json({ erro: 'Não foi possível criar o grupo após 3 tentativas', log })
+    }
+
+    const novoId = result.id
     await sock.groupParticipantsUpdate(novoId, membros, 'promote')
     addLog('Membros promovidos a admin')
 
