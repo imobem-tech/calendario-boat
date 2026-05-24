@@ -103,8 +103,10 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
     // 4. Filtra grupos da embarcação
-    const prefixo = `${Cod_Embarcacao}-`
-    const gruposDoBarco = grupos.filter(g => g.subject.startsWith(prefixo))
+    const gruposDoBarco = grupos.filter(g => 
+  g.subject.startsWith(`${Cod_Embarcacao}-`) || 
+  g.subject.startsWith(`${Cod_Embarcacao} `)
+)
     addLog(`Grupos da embarcação ${Cod_Embarcacao}: ${gruposDoBarco.map(g => g.subject).join(', ') || 'nenhum'}`)
 
     let grupoMatch = null
