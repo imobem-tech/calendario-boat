@@ -62,11 +62,15 @@ function decodeToken(token) {
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
-  return {
-    pb,
-    grupo: `${grupoLetra}${grupoNum}`,
-    codAutorizado: autorizado
-  };
+ const primeiroGrupo = decodificar(m[2]);
+const grupoFinal = primeiroGrupo ? `${primeiroGrupo}${grupoNum}` : `${grupoLetra}${grupoNum}`;
+
+return {
+  pb,
+  grupo: grupoFinal,
+  codAutorizado: autorizado,
+  token: t
+};
 }
 
 function extrairLimiteDoGrupo(grupo) {
