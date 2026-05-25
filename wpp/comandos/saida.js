@@ -5,7 +5,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-
+ 
 // ============================================================
 // HELPERS
 // ============================================================
@@ -118,6 +118,11 @@ function variantesTelefoneBR(numeroOriginal) {
 async function buscarColaborador(pool, remetente) {
   const variantesRemetente = variantesTelefoneBR(remetente)
 
+  console.log('DEBUG_COLAB_REMETENTE', {
+  remetente,
+  variantesRemetente
+})
+
   const rs = await pool.query(`
     SELECT "ID", "Nome", "Telefone", "Administrador"
       FROM public.wpp_colaboradores
@@ -127,6 +132,14 @@ async function buscarColaborador(pool, remetente) {
     const variantesColab = variantesTelefoneBR(colab.Telefone)
     const encontrou = variantesColab.some(v => variantesRemetente.includes(v))
 
+
+    console.log('DEBUG_COLAB_COMPARE', {
+  nome: colab.Nome,
+  telefone: colab.Telefone,
+  variantesColab,
+  encontrou
+})
+    
     if (encontrou) {
       return colab
     }
