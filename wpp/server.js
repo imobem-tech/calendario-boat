@@ -151,7 +151,7 @@ async function iniciarBot() {
           if (!texto) continue
 
           // ============================================================
-          // Comando Saída — SSS
+          // Comando Saída — SSS / colaborador
           // ============================================================
           const saidaTratada = await tratarComandoSaida(sock, pool, grupoId, remetente, texto)
           if (saidaTratada) {
