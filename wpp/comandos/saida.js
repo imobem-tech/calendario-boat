@@ -2,10 +2,16 @@
 // COMANDO SSS — REGISTRO DE SAÍDA
 // Allmax Gestão de Cotas
 // Compatível com pg Pool
+//
+// Comandos:
+//   sss / ssss / SSS  => inicia registro de saída
+//   colaborador63984030406
+//   colaborador 63984030406
+//      => vincula o LID do remetente ao colaborador cadastrado
 // ============================================================
 
 const estadosSaida = new Map()
- 
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -45,7 +51,7 @@ function formatarDataHoraBR(dt = agoraSaoPauloDate()) {
 }
 
 function chaveEstado(grupoId, remetente) {
-  return `${grupoId || ''}::${somenteDigitos(remetente)}`
+  return `${grupoId || ''}::${String(remetente || '').trim().toLowerCase()}`
 }
 
 function horaMotorValida(txt) {
@@ -54,6 +60,15 @@ function horaMotorValida(txt) {
 
 function comandoSaida(txt) {
   return /^s{3,}$/i.test(String(txt || '').trim())
+}
+
+function extrairComandoColaborador(txt) {
+  const m = String(txt || '').trim().match(/^colaborador\s*(\d{10,13})$/i)
+  return m ? m[1] : ''
+}
+
+function isLid(remetente) {
+  return String(remetente || '').trim().toLowerCase().endsWith('@lid')
 }
 
 async function enviar(sock, grupoId, texto) {
@@ -115,37 +130,139 @@ function variantesTelefoneBR(numeroOriginal) {
 // COLABORADOR
 // ============================================================
 
-async function buscarColaborador(pool, remetente) {
-  const variantesRemetente = variantesTelefoneBR(remetente)
-
-  console.log('DEBUG_COLAB_REMETENTE', {
-  remetente,
-  variantesRemetente
-})
-
+async function listarColaboradores(pool) {
   const rs = await pool.query(`
-    SELECT "ID", "Nome", "Telefone", "Administrador"
+    SELECT "ID", "Nome", "Telefone", "Administrador", "Lid"
       FROM public.wpp_colaboradores
   `)
 
-  for (const colab of rs.rows || []) {
-    const variantesColab = variantesTelefoneBR(colab.Telefone)
-    const encontrou = variantesColab.some(v => variantesRemetente.includes(v))
+  return rs.rows || []
+}
 
+function colaboradorBateComTelefone(colab, numero) {
+  const variantesNumero = variantesTelefoneBR(numero)
+  const variantesColab = variantesTelefoneBR(colab.Telefone)
 
-    console.log('DEBUG_COLAB_COMPARE', {
-  nome: colab.Nome,
-  telefone: colab.Telefone,
-  variantesColab,
-  encontrou
-})
-    
-    if (encontrou) {
+  return variantesColab.some(v => variantesNumero.includes(v))
+}
+
+async function buscarColaboradorPorTelefone(pool, numero) {
+  const colaboradores = await listarColaboradores(pool)
+
+  for (const colab of colaboradores) {
+    if (colaboradorBateComTelefone(colab, numero)) {
       return colab
     }
   }
 
   return null
+}
+
+async function buscarColaborador(pool, remetente) {
+  const remetenteNormalizado = String(remetente || '').trim().toLowerCase()
+  const variantesRemetente = variantesTelefoneBR(remetente)
+
+  console.log('DEBUG_COLAB_REMETENTE', {
+    remetente,
+    variantesRemetente
+  })
+
+  const colaboradores = await listarColaboradores(pool)
+
+  for (const colab of colaboradores) {
+    const lidColab = String(colab.Lid || '').trim().toLowerCase()
+
+    if (lidColab && lidColab === remetenteNormalizado) {
+      console.log('DEBUG_COLAB_LID_MATCH', {
+        nome: colab.Nome,
+        lid: colab.Lid
+      })
+      return colab
+    }
+
+    const variantesColab = variantesTelefoneBR(colab.Telefone)
+    const encontrou = variantesColab.some(v => variantesRemetente.includes(v))
+
+    console.log('DEBUG_COLAB_COMPARE', {
+      nome: colab.Nome,
+      telefone: colab.Telefone,
+      lid: colab.Lid || null,
+      variantesColab,
+      encontrou
+    })
+
+    if (encontrou) {
+      // Se achou pelo telefone e o remetente veio como LID, aprende automaticamente.
+      if (isLid(remetente) && !lidColab) {
+        await pool.query(`
+          UPDATE public.wpp_colaboradores
+             SET "Lid" = $1
+           WHERE "ID" = $2
+        `, [remetenteNormalizado, colab.ID])
+
+        colab.Lid = remetenteNormalizado
+
+        console.log('DEBUG_COLAB_LID_AUTO_GRAVADO', {
+          nome: colab.Nome,
+          lid: remetenteNormalizado
+        })
+      }
+
+      return colab
+    }
+  }
+
+  return null
+}
+
+// ============================================================
+// COMANDO DE VINCULAÇÃO DO LID
+// ============================================================
+
+async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
+  const numeroInformado = extrairComandoColaborador(texto)
+
+  if (!numeroInformado) {
+    return false
+  }
+
+  const colaborador = await buscarColaboradorPorTelefone(pool, numeroInformado)
+
+  if (!colaborador) {
+    await enviar(
+      sock,
+      grupoId,
+      'Não encontrei colaborador com este telefone. Verifique o número cadastrado.'
+    )
+    return true
+  }
+
+  const lid = String(remetente || '').trim().toLowerCase()
+
+  if (!lid) {
+    await enviar(sock, grupoId, 'Não consegui identificar o remetente para vincular.')
+    return true
+  }
+
+  await pool.query(`
+    UPDATE public.wpp_colaboradores
+       SET "Lid" = $1
+     WHERE "ID" = $2
+  `, [lid, colaborador.ID])
+
+  await enviar(
+    sock,
+    grupoId,
+    `Colaborador vinculado com sucesso: ${colaborador.Nome}`
+  )
+
+  console.log('DEBUG_COLAB_LID_VINCULADO_MANUAL', {
+    nome: colaborador.Nome,
+    telefone: colaborador.Telefone,
+    lid
+  })
+
+  return true
 }
 
 // ============================================================
@@ -231,7 +348,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const colaborador = await buscarColaborador(pool, remetente)
 
   if (!colaborador) {
-    await enviar(sock, grupoId, 'Comando não aceito.')
+    await enviar(sock, grupoId, 'Comando não aceito. Use: colaborador + telefone cadastrado.')
     return true
   }
 
@@ -418,12 +535,21 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 // ============================================================
 
 export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) {
+  // Primeiro trata estado já aberto.
   const estadoTratado = await tratarEstadoSaida(sock, pool, grupoId, remetente, texto)
 
   if (estadoTratado) {
     return true
   }
 
+  // Depois trata vinculação colaborador + telefone.
+  const vinculou = await vincularLidColaborador(sock, pool, grupoId, remetente, texto)
+
+  if (vinculou) {
+    return true
+  }
+
+  // Por fim trata comando de saída.
   if (!comandoSaida(texto)) {
     return false
   }
