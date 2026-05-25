@@ -1,424 +1,419 @@
 // ============================================================
-// SERVER.JS — Allmax®2605222230
-// Inicialização, conexão WhatsApp e rotas HTTP
+// COMANDO SSS — REGISTRO DE SAÍDA
+// Allmax Gestão de Cotas
+// Compatível com pg Pool
 // ============================================================
 
-import express from 'express'
-import QRCode from 'qrcode'
-import P from 'pino'
-import pkg from 'pg'
-import { rm } from 'fs/promises'
+const estadosSaida = new Map()
 
-import { handleRenomearGrupos } from './renomear-grupos.js'
+// ============================================================
+// HELPERS
+// ============================================================
 
-import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
-
-import retornoRoutes from './msg_externa.js'
-
-import makeWASocket, {
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason,
-  Browsers
-} from '@whiskeysockets/baileys'
-
-import { processarFila } from './fila.js'
-import { sincronizarGruposAgenda } from './grupos.js'
-import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
-import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
-import { tratarComandoSaida } from './comandos/saida.js'
-
-const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605242125'
-
-const app = express()
-const PORT = process.env.PORT || 8080
-
-app.use(express.json())
-app.use('/msg_externa', retornoRoutes)
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
-})
-
-let sock = null
-let qrAtual = null
-let conectado = false
-let iniciando = false
-
-let ultimoEvento = null
-let ultimaConexaoEm = null
-let ultimaDesconexaoEm = null
-let motivoDesconexao = null
-let ultimoQrEm = null
-let ultimaFalhaEnvioEm = null
-let erroUltimoEnvio = null
-let ultimaMensagemEnviadaEm = null
-let processandoFila = false
-const iniciadoEm = new Date()
-
-async function limparSessao() {
-  await rm('/data/auth_info', { recursive: true, force: true })
-  console.log('🧹 Sessão apagada.')
+function somenteDigitos(txt) {
+  return String(txt || '').replace(/\D+/g, '')
 }
 
-async function iniciarBot() {
-  if (iniciando) return
-  iniciando = true
+function normalizarTexto(txt) {
+  return String(txt || '').trim().toLowerCase()
+}
 
-  console.log('🚀 Iniciando bot WhatsApp...')
-
-  try {
-    const { state, saveCreds } = await useMultiFileAuthState('/data/auth_info')
-    const { version } = await fetchLatestBaileysVersion()
-
-    sock = makeWASocket({
-      version,
-      auth: state,
-      browser: Browsers.macOS('Desktop'),
-      logger: P({ level: 'silent' }),
-      syncFullHistory: false,
-      markOnlineOnConnect: false
+function agoraSaoPauloDate() {
+  return new Date(
+    new Date().toLocaleString('en-US', {
+      timeZone: 'America/Sao_Paulo'
     })
+  )
+}
 
-    sock.ev.on('creds.update', saveCreds)
+function hojeIsoSaoPaulo() {
+  const d = agoraSaoPauloDate()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, qr, lastDisconnect } = update
-      const statusCode = lastDisconnect?.error?.output?.statusCode
+function formatarDataHoraBR(dt = agoraSaoPauloDate()) {
+  const dd = String(dt.getDate()).padStart(2, '0')
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const yyyy = dt.getFullYear()
+  const hh = String(dt.getHours()).padStart(2, '0')
+  const mi = String(dt.getMinutes()).padStart(2, '0')
+  const ss = String(dt.getSeconds()).padStart(2, '0')
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`
+}
 
-      console.log('🔥 UPDATE:', {
-        connection,
-        qr: qr ? 'QR_GERADO' : undefined,
-        statusCode,
-        error: lastDisconnect?.error?.message
-      })
+function chaveEstado(grupoId, remetente) {
+  return `${grupoId || ''}::${somenteDigitos(remetente)}`
+}
 
-      if (qr) {
-        qrAtual = qr
-        conectado = false
-        ultimoQrEm = new Date().toISOString()
-        ultimoEvento = 'QR_GERADO'
-      }
+function horaMotorValida(txt) {
+  return /^\d{3},\d$/.test(String(txt || '').trim())
+}
 
-      if (connection === 'open') {
-        console.log('✅ WhatsApp conectado!')
-        conectado = true
-        qrAtual = null
-        ultimoEvento = 'CONECTADO'
-        ultimaConexaoEm = new Date().toISOString()
-        motivoDesconexao = null
-      }
+function comandoSaida(txt) {
+  return /^s{3,}$/i.test(String(txt || '').trim())
+}
 
-      if (connection === 'close') {
-        conectado = false
-        iniciando = false
-        ultimoEvento = 'DESCONECTADO'
-        ultimaDesconexaoEm = new Date().toISOString()
-        motivoDesconexao = lastDisconnect?.error?.message || null
-
-        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-          await limparSessao()
-          qrAtual = null
-          setTimeout(iniciarBot, 3000)
-          return
-        }
-
-        setTimeout(iniciarBot, 8000)
-      }
-    })
-
-    // ============================================================
-    // LISTENER DE MENSAGENS
-    // ============================================================
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return
-
-      for (const msg of messages) {
-        try {
-          if (!msg.key.remoteJid?.endsWith('@g.us')) continue
-          if (msg.key.fromMe) continue
-
-          const grupoId = msg.key.remoteJid
-          // Remetente: em grupos vem em msg.key.participant
-          const remetente = msg.key.participant || msg.key.remoteJid
-          const texto = (
-            msg.message?.conversation ||
-            msg.message?.extendedTextMessage?.text ||
-            ''
-          ).trim()
-
-          if (!texto) continue
-
-          // ============================================================
-          // Comando Saída — SSS
-          // ============================================================
-          const saidaTratada = await tratarComandoSaida(sock, pool, grupoId, remetente, texto)
-          if (saidaTratada) {
-            continue
-          }
-
-          // Aguardando confirmação de retorno
-          if (estaAguardandoRetorno(grupoId)) {
-            await handleConfirmacaoRetorno(sock, pool, grupoId, texto)
-            continue
-          }
-
-          // Comando Calendário
-          if (ehComandoCalendario(texto)) {
-            await handleCalendario(sock, pool, grupoId)
-            continue
-          }
-
-          // Comando Retorno
-          if (ehComandoRetorno(texto)) {
-            await handleRetorno(sock, pool, grupoId, remetente)
-            continue
-          }
-
-         } catch (err) {
-          console.error('Erro ao processar mensagem:', err.message)
-          try {
-            await sock.sendMessage(grupoId, { text: `🔴 ERRO: ${err.message}` })
-          } catch {}
-        }
-      }
-    })
-
-  } catch (err) {
-    console.error('💥 Erro ao iniciar bot:', err)
-    iniciando = false
-    setTimeout(iniciarBot, 8000)
-  }
+async function enviar(sock, grupoId, texto) {
+  await sock.sendMessage(grupoId, { text: texto })
 }
 
 // ============================================================
-// ROTAS HTTP
+// TELEFONE — aceita com/sem DDI 55 e com/sem nono dígito
 // ============================================================
 
-app.get('/', (req, res) => {
-  res.send(`
-    <h1>WPP Bot rodando 🚀</h1>
-    <p>Status: ${conectado ? 'Conectado ✅' : 'Aguardando conexão ⏳'}</p>
-    <p>Versão: ${VERSAO_WPP}</p>
-    <p><a href="/status">Status</a></p>
-    <p><a href="/qr">QR Code</a></p>
-    <p><a href="/grupos">Listar grupos</a></p>
-    <p><a href="/sincronizar-grupos-agenda">Sincronizar grupos agenda</a></p>
-  `)
-})
+function variantesTelefoneBR(numeroOriginal) {
+  const bruto = somenteDigitos(numeroOriginal)
+  const variantes = new Set()
 
-app.get('/status', async (req, res) => {
-  let pendentes = null
-  let numero = null
-  let nome = null
-
-  try {
-    const rs = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM public.wpp_fila_agenda WHERE status = 'pendente'`
-    )
-    pendentes = rs.rows[0].total
-  } catch (err) {
-    console.error('Erro ao consultar fila pendente:', err.message)
+  function add(n) {
+    if (n) variantes.add(String(n))
   }
 
-  try {
-    numero = sock?.user?.id?.split(':')[0] || null
-    nome = sock?.user?.name || sock?.user?.verifiedName || ''
-  } catch (err) {
-    numero = null
-    nome = ''
+  add(bruto)
+
+  let sem55 = bruto
+  if (sem55.startsWith('55') && sem55.length >= 12) {
+    sem55 = sem55.slice(2)
+    add(sem55)
   }
 
-  const mem = process.memoryUsage()
-  let statusConexao = 'desconectado'
-  if (conectado) statusConexao = 'conectado'
-  else if (qrAtual) statusConexao = 'aguardando_qr'
-  else if (iniciando) statusConexao = 'iniciando'
+  // Ex.: 63984030406
+  if (sem55.length === 11) {
+    const ddd = sem55.slice(0, 2)
+    const numero = sem55.slice(2)
 
-  res.json({
-    online: true,
-    whatsappConectado: conectado,
-    statusConexao,
-    qrDisponivel: !!qrAtual,
-    filaPendentes: pendentes,
-    filaProcessando: processandoFila,
-    numeroConectado: numero,
-    nomePerfil: nome,
-    ultimoEvento,
-    ultimaConexaoEm,
-    ultimaDesconexaoEm,
-    motivoDesconexao,
-    ultimoQrEm,
-    ultimaMensagemEnviadaEm,
-    ultimaFalhaEnvioEm,
-    erroUltimoEnvio,
-    versao: VERSAO_WPP,
-    horaServidor: new Date().toISOString(),
-    uptimeSegundos: Math.floor(process.uptime()),
-    iniciadoEm: iniciadoEm.toISOString(),
-    nodeEnv: process.env.NODE_ENV || null,
-    ambiente: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
-    railwayInstance: process.env.RAILWAY_REPLICA_ID || process.env.HOSTNAME || null,
-    pid: process.pid,
-    memoriaUsoMB: {
-      rss: Math.round(mem.rss / 1024 / 1024),
-      heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
-      heapUsed: Math.round(mem.heapUsed / 1024 / 1024)
+    add(sem55)
+    add('55' + sem55)
+
+    if (numero.startsWith('9')) {
+      const semNove = ddd + numero.slice(1)
+      add(semNove)
+      add('55' + semNove)
     }
+  }
+
+  // Ex.: 6384030406
+  if (sem55.length === 10) {
+    const ddd = sem55.slice(0, 2)
+    const numero = sem55.slice(2)
+
+    add(sem55)
+    add('55' + sem55)
+
+    const comNove = ddd + '9' + numero
+    add(comNove)
+    add('55' + comNove)
+  }
+
+  return Array.from(variantes)
+}
+
+// ============================================================
+// COLABORADOR
+// ============================================================
+
+async function buscarColaborador(pool, remetente) {
+  const variantesRemetente = variantesTelefoneBR(remetente)
+
+  const rs = await pool.query(`
+    SELECT "ID", "Nome", "Telefone", "Administrador"
+      FROM public.wpp_colaboradores
+  `)
+
+  for (const colab of rs.rows || []) {
+    const variantesColab = variantesTelefoneBR(colab.Telefone)
+    const encontrou = variantesColab.some(v => variantesRemetente.includes(v))
+
+    if (encontrou) {
+      return colab
+    }
+  }
+
+  return null
+}
+
+// ============================================================
+// IDENTIFICA EMBARCAÇÃO / GRUPO PELO GRUPO WPP
+// ============================================================
+
+async function buscarGrupoAgenda(pool, grupoId) {
+  const rs = await pool.query(`
+    SELECT pb, cota, nomegrupowpp, grupowppid
+      FROM public.wpp_grupos_agenda
+     WHERE grupowppid = $1
+     LIMIT 1
+  `, [grupoId])
+
+  return rs.rows[0] || null
+}
+
+function normalizarGrupoCompLetra(cota) {
+  return String(cota || '').trim().toUpperCase()
+}
+
+// ============================================================
+// BUSCA SAÍDA DO DIA
+// ============================================================
+
+async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
+  const hoje = hojeIsoSaoPaulo()
+
+  const rs = await pool.query(`
+    SELECT *
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
+       AND "Dt_Agendamento" >= ($3::date)
+       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+  `, [codEmbPb, grupoCompLetra, hoje])
+
+  return rs.rows || []
+}
+
+// ============================================================
+// REGISTROS
+// ============================================================
+
+async function registrarHoraMotor(pool, idSaida, horaMotor) {
+  const valor = Number(String(horaMotor).replace(',', '.'))
+
+  await pool.query(`
+    UPDATE public."P_BOAT_z_10_Saida_Emb"
+       SET "Hora_Motor_Saida" = $1
+     WHERE "ID" = $2
+  `, [valor, idSaida])
+}
+
+async function registrarSaida(pool, saida, colaborador) {
+  const agora = agoraSaoPauloDate()
+  const agoraBR = formatarDataHoraBR(agora)
+
+  await pool.query(`
+    UPDATE public."P_BOAT_z_10_Saida_Emb"
+       SET "Dt_Saída" = $1,
+           "Dt_Desistencia" = NULL,
+           "Colab_Responsavel" = $2
+     WHERE "ID" = $3
+  `, [agora, colaborador.Nome, saida.ID])
+
+  await pool.query(`
+    UPDATE public."P_BOAT_9_OS"
+       SET "OS_obs_Fechamento" = $1
+     WHERE "OS_Dt_Fechamento" IS NULL
+       AND "Num_Emb_PB" = $2
+       AND "Tipo" = 'SAÍDA'
+  `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
+
+  return agoraBR
+}
+
+// ============================================================
+// FLUXO
+// ============================================================
+
+async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
+  const colaborador = await buscarColaborador(pool, remetente)
+
+  if (!colaborador) {
+    await enviar(sock, grupoId, 'Comando não aceito.')
+    return true
+  }
+
+  const grupoAgenda = await buscarGrupoAgenda(pool, grupoId)
+
+  if (!grupoAgenda) {
+    await enviar(sock, grupoId, 'Não encontrei este grupo na base de grupos da agenda.')
+    return true
+  }
+
+  const codEmbPb = Number(grupoAgenda.pb)
+  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
+
+  console.log('DEBUG_SAIDA_ENTRADA', {
+    grupoId,
+    remetente,
+    codEmbPb,
+    grupoCompLetra,
+    colaborador: colaborador.Nome
   })
-})
 
-app.get('/reset-sessao', async (req, res) => {
-  try {
-    conectado = false
-    qrAtual = null
-    ultimoEvento = 'RESET_SESSAO_FORCADO'
-    motivoDesconexao = 'Reset manual de sessão para troca de celular'
-    try { if (sock) await sock.logout() } catch (e) { console.log('Logout ignorado:', e.message) }
-    sock = null
-    await rm('./auth_info_baileys', { recursive: true, force: true })
-    setTimeout(() => { iniciarBot() }, 2000)
-    res.json({ sucesso: true, mensagem: 'Sessão apagada. Aguarde alguns segundos e gere um novo QR.' })
-  } catch (err) {
-    res.status(500).json({ sucesso: false, erro: err.message })
+  if (!codEmbPb || !grupoCompLetra) {
+    await enviar(sock, grupoId, 'Não consegui identificar a embarcação/grupo desta conversa.')
+    return true
   }
-})
 
-app.get('/qr', async (req, res) => {
-  if (conectado) return res.send('<h2>WhatsApp já conectado ✅</h2>')
-  if (!qrAtual) return res.send('<h2>QR ainda não gerado... ⏳</h2>')
-  const qrImage = await QRCode.toDataURL(qrAtual)
-  res.send(`<h2>Escaneie o QR Code</h2><img src="${qrImage}" style="width:320px;height:320px;" />`)
-})
+  const saidas = await buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra)
 
-app.get('/reset', async (req, res) => {
-  conectado = false
-  qrAtual = null
-  iniciando = false
-  await limparSessao()
-  setTimeout(iniciarBot, 1000)
-  res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
-})
-
-app.get('/grupos', async (req, res) => {
-  try {
-    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    const grupos = await sock.groupFetchAllParticipating()
-    const lista = Object.values(grupos).map(g => ({
-      nome: g.subject, id: g.id, participantes: g.participants?.length || 0
-    }))
-    res.json(lista)
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
+  if (!saidas.length) {
+    await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
+    return true
   }
-})
 
-app.get('/sincronizar-grupos-agenda', async (req, res) => {
-  try {
-    const resultado = await sincronizarGruposAgenda(pool, sock, conectado)
-    res.json({ sucesso: true, metodo: 'GET', ...resultado })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
+  if (saidas.length > 1) {
+    await enviar(sock, grupoId, 'Encontrei mais de uma saída para hoje. Não consegui registrar automaticamente.')
+    return true
   }
-})
 
-app.post('/sincronizar-grupos-agenda', async (req, res) => {
-  try {
-    const resultado = await sincronizarGruposAgenda(pool, sock, conectado)
-    res.json({ sucesso: true, metodo: 'POST', ...resultado })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
+  const saida = saidas[0]
+
+  if (saida.Dt_Desistencia) {
+    await enviar(sock, grupoId, 'Esta saída consta como desistência. Não é possível registrar a saída.')
+    return true
   }
-})
 
-app.get('/testar-rota-grupo', async (req, res) => {
-  try {
-    const pb = Number(req.query.pb)
-    const cota = String(req.query.cota || '').trim().toUpperCase()
-    if (!pb) return res.status(400).json({ erro: 'Informe o PB. Exemplo: /testar-rota-grupo?pb=576&cota=X4' })
+  if (saida.Dt_Cancela_saida) {
+    await enviar(sock, grupoId, 'Esta saída consta como cancelada. Não é possível registrar a saída.')
+    return true
+  }
 
-    const rsCota = await pool.query(
-      `SELECT pb, cota, nomegrupowpp, grupowppid FROM public.wpp_grupos_agenda
-        WHERE pb = $1 AND UPPER(COALESCE(cota, '')) = UPPER($2) LIMIT 1`,
-      [pb, cota]
+  if (saida['Dt_Saída']) {
+    await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
+    return true
+  }
+
+  const key = chaveEstado(grupoId, remetente)
+
+  const precisaHoraMotor =
+    Number(saida['Cod_Proprietário']) === 4255 &&
+    (
+      saida.Hora_Motor_Saida === null ||
+      saida.Hora_Motor_Saida === undefined ||
+      saida.Hora_Motor_Saida === ''
     )
-    if (rsCota.rowCount > 0) return res.json({ encontrado: true, tipo: 'cota', pb, cota, grupo: rsCota.rows[0] })
 
-    const rsGeral = await pool.query(
-      `SELECT pb, cota, nomegrupowpp, grupowppid FROM public.wpp_grupos_agenda
-        WHERE pb = $1 AND cota IS NULL LIMIT 1`,
-      [pb]
-    )
-    if (rsGeral.rowCount > 0) return res.json({ encontrado: true, tipo: 'fallback_pb', pb, cota, grupo: rsGeral.rows[0] })
-
-    return res.status(404).json({ encontrado: false, pb, cota, erro: 'Nenhum grupo encontrado para este PB/Cota' })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
-  }
-})
-
-app.post('/fila', async (req, res) => {
-  try {
-    const { grupo_id, mensagem } = req.body
-    if (!grupo_id || !mensagem) return res.status(400).json({ erro: 'grupo_id e mensagem são obrigatórios' })
-    await pool.query(
-      `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status) VALUES ($1, $2, 'pendente')`,
-      [grupo_id, mensagem]
-    )
-    res.json({ sucesso: true })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
-  }
-})
-
-app.post('/enviar-grupo', async (req, res) => {
-  try {
-    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    const { grupoId, mensagem } = req.body
-    if (!grupoId || !mensagem) return res.status(400).json({ erro: 'grupoId e mensagem são obrigatórios' })
-    await sock.sendMessage(grupoId, { text: mensagem })
-    res.json({ sucesso: true, destino: grupoId })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
-  }
-})
-
-app.get('/botao_agenda_todos', async (req, res) => {
-  try {
-    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    const grupoId = '120363330197701730@g.us'
-    const linkAgenda = 'https://allmaxcalendar.vercel.app/egfxddachch'
-    await sock.sendMessage(grupoId, {
-      text: `📅 *Agenda disponível*\n\nClique abaixo para acessar:\n\n${linkAgenda}`
+  if (precisaHoraMotor) {
+    estadosSaida.set(key, {
+      etapa: 'aguardando_hora_motor_saida',
+      saida,
+      colaborador
     })
-    res.json({ sucesso: true, tipo: 'link_clicavel', destino: grupoId, link: linkAgenda })
-  } catch (err) {
-    res.status(500).json({ erro: err.message })
+
+    await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+    return true
   }
-})
 
-app.post('/renomear-grupos', (req, res) => {
-  handleRenomearGrupos(req, res, () => sock, () => conectado)
-})
+  estadosSaida.set(key, {
+    etapa: 'aguardando_confirmacao_saida',
+    saida,
+    colaborador
+  })
 
-app.post('/criar-ou-atualizar-grupo', (req, res) => {
-  handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
-})
+  await enviar(sock, grupoId, 'Confirma saída? S/N')
+  return true
+}
+
+async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
+  const key = chaveEstado(grupoId, remetente)
+  const estado = estadosSaida.get(key)
+
+  if (!estado) {
+    return false
+  }
+
+  const msg = normalizarTexto(texto)
+
+  if (msg === 'd') {
+    estadosSaida.delete(key)
+    await enviar(sock, grupoId, 'Desistência registrada.')
+    return true
+  }
+
+  if (estado.etapa === 'aguardando_hora_motor_saida') {
+    if (!horaMotorValida(texto)) {
+      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      return true
+    }
+
+    estado.horaMotorInformada = String(texto).trim()
+    estado.etapa = 'aguardando_confirmacao_hora_motor'
+    estadosSaida.set(key, estado)
+
+    await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+    return true
+  }
+
+  if (estado.etapa === 'aguardando_confirmacao_hora_motor') {
+    if (msg === 'n') {
+      estado.etapa = 'aguardando_hora_motor_saida'
+      estado.horaMotorInformada = ''
+      estadosSaida.set(key, estado)
+
+      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      return true
+    }
+
+    if (msg !== 's') {
+      await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+      return true
+    }
+
+    await registrarHoraMotor(pool, estado.saida.ID, estado.horaMotorInformada)
+
+    estado.saida.Hora_Motor_Saida = Number(
+      estado.horaMotorInformada.replace(',', '.')
+    )
+
+    estado.etapa = 'aguardando_confirmacao_saida'
+    estadosSaida.set(key, estado)
+
+    await enviar(sock, grupoId, 'Confirma saída? S/N')
+    return true
+  }
+
+  if (estado.etapa === 'aguardando_confirmacao_saida') {
+    if (msg === 'n') {
+      estadosSaida.delete(key)
+      await enviar(sock, grupoId, 'Saída não confirmada.')
+      return true
+    }
+
+    if (msg !== 's') {
+      await enviar(sock, grupoId, 'Confirma saída? S/N')
+      return true
+    }
+
+    const dataHoraBR = await registrarSaida(pool, estado.saida, estado.colaborador)
+
+    estadosSaida.delete(key)
+
+    let resposta =
+      `Saída registrada com sucesso.\n\n` +
+      `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
+      `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
+      `Colaborador: ${estado.colaborador.Nome}\n` +
+      `Data/Hora: ${dataHoraBR}`
+
+    if (
+      estado.saida.Hora_Motor_Saida !== null &&
+      estado.saida.Hora_Motor_Saida !== undefined
+    ) {
+      resposta += `\nHora Motor Saída: ${String(estado.saida.Hora_Motor_Saida).replace('.', ',')}`
+    }
+
+    await enviar(sock, grupoId, resposta)
+    return true
+  }
+
+  return false
+}
+
 // ============================================================
-// INICIALIZAÇÃO
+// EXPORT PRINCIPAL
 // ============================================================
 
-app.listen(PORT, () => {
-  console.log(`🌐 Servidor rodando na porta ${PORT}`)
-  iniciarBot()
+export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) {
+  const estadoTratado = await tratarEstadoSaida(sock, pool, grupoId, remetente, texto)
 
-  setInterval(async () => {
-    processandoFila = true
-    await processarFila(pool, sock, conectado, {
-      onEnviado: () => { ultimaMensagemEnviadaEm = new Date().toISOString() },
-      onErro: (msg) => { ultimaFalhaEnvioEm = new Date().toISOString(); erroUltimoEnvio = msg }
-    }).catch(console.error)
-    processandoFila = false
-  }, 10000)
-})
+  if (estadoTratado) {
+    return true
+  }
+
+  if (!comandoSaida(texto)) {
+    return false
+  }
+
+  return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
+}
