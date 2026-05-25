@@ -1,4 +1,3 @@
-
 // ============================================================
 // wpp/criar-ou-atualizar-grupo.js
 // ============================================================
@@ -23,9 +22,7 @@ function montarNomeReduzidoCliente(nomeCliente) {
 
   const primeiroNome = partes[0].toUpperCase()
 
-  if (partes.length === 1) {
-    return primeiroNome
-  }
+  if (partes.length === 1) return primeiroNome
 
   const inicialSegundoNome = partes[1].substring(0, 1).toUpperCase()
 
@@ -232,11 +229,15 @@ async function confirmarJidWhatsApp(sock, jid, addLog) {
   const numero = limparNumero(jid)
 
   try {
-    const check = await sock.onWhatsApp(numero)
+    const variacoes = gerarVariacoesNumero(numero)
 
-    if (check && check.length > 0 && check[0].exists) {
-      addLog(`JID confirmado pelo WhatsApp: ${check[0].jid}`)
-      return check[0].jid
+    for (const variacao of variacoes) {
+      const check = await sock.onWhatsApp(variacao)
+
+      if (check && check.length > 0 && check[0].exists) {
+        addLog(`JID confirmado pelo WhatsApp: ${check[0].jid}`)
+        return check[0].jid
+      }
     }
 
     addLog(`JID bruto não encontrado no WhatsApp: ${jid}`)
@@ -270,6 +271,7 @@ async function validarMembrosWhatsApp(sock, membrosBrutos, addLog) {
         if (!membrosValidos.includes(jidConfirmado)) {
           membrosValidos.push(jidConfirmado)
         }
+
         addLog(`JID válido no WhatsApp: ${jidConfirmado}`)
       } else {
         addLog(`JID NÃO encontrado no WhatsApp: ${jid}`)
@@ -321,6 +323,7 @@ async function sincronizarColaboradoresNoGrupo(sock, grupo, colaboradores, addLo
   const adicionados = []
   const jaExistiam = []
   const promovidos = []
+  const rebaixados = []
   const falhas = []
 
   for (const colab of colaboradores) {
@@ -350,6 +353,15 @@ async function sincronizarColaboradoresNoGrupo(sock, grupo, colaboradores, addLo
         falhas.push({ nome: colab.nome, acao: 'promote', erro: e.message })
         addLog(`Aviso: não foi possível promover ${colab.nome} a admin: ${e.message}`)
       }
+    } else if (achou.encontrado && achou.isAdmin) {
+      try {
+        await sock.groupParticipantsUpdate(grupo.id, [colab.jidFinal], 'demote')
+        rebaixados.push(colab.jidFinal)
+        addLog(`Colaborador rebaixado para participante comum: ${colab.nome}`)
+      } catch (e) {
+        falhas.push({ nome: colab.nome, acao: 'demote', erro: e.message })
+        addLog(`Aviso: não foi possível rebaixar ${colab.nome}: ${e.message}`)
+      }
     }
   }
 
@@ -357,6 +369,7 @@ async function sincronizarColaboradoresNoGrupo(sock, grupo, colaboradores, addLo
     adicionados,
     jaExistiam,
     promovidos,
+    rebaixados,
     falhas
   }
 }
@@ -366,6 +379,7 @@ function montarResumoGrupo(syncColaboradores) {
     colaboradoresAdicionados: syncColaboradores?.adicionados || [],
     colaboradoresJaExistiam: syncColaboradores?.jaExistiam || [],
     colaboradoresPromovidos: syncColaboradores?.promovidos || [],
+    colaboradoresRebaixados: syncColaboradores?.rebaixados || [],
     falhasColaboradores: syncColaboradores?.falhas || []
   }
 }
@@ -584,7 +598,6 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
         log
       })
     }
-
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
     console.error('[criar-ou-atualizar-grupo] ERRO:', err)
