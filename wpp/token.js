@@ -20,18 +20,21 @@ function calcularDVToken(pb, grupoNum, autorizado, mmdd) {
 }
 
 export function gerarToken(pb, grupoLetra, codAutorizado) {
-  const s = String(grupoLetra)
-  const matchLetraNum = s.match(/^([A-Za-z])(\d+)$/)
-  const matchSoNum = s.match(/^(\d+)$/)
+  const grupoTxt = String(grupoLetra || '').trim()
 
-  let letra, grupoNum
+  const matchLetraNum = grupoTxt.match(/^([A-Za-z])(\d+)$/)
+  const matchSoNum = grupoTxt.match(/^(\d+)$/)
+
+  let letra = ''
+  let grupoNum = ''
+
   if (matchLetraNum) {
     letra = matchLetraNum[1].toLowerCase()
     grupoNum = matchLetraNum[2]
   } else if (matchSoNum) {
-  letra = matchSoNum[1][0]        // primeiro dígito como "letra"
-  grupoNum = matchSoNum[1].slice(1) || '0'  // resto como número
-} else {
+    letra = encodificar(matchSoNum[1][0])
+    grupoNum = matchSoNum[1].slice(1) || '0'
+  } else {
     throw new Error(`Formato de grupo inválido: ${grupoLetra}`)
   }
 
