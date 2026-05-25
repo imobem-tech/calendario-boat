@@ -424,7 +424,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.262426</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605222030</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -500,8 +500,8 @@
         .join("");
     }
 
-    function calcularDvEsperado(pb, grupoNum, codAutorizado){
-      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}`;
+    function calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd){
+      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}${mmdd}`;
       const soma = base
         .split("")
         .reduce((acc, n) => acc + Number(n), 0);
@@ -512,27 +512,35 @@
     function decodificarToken(token){
       const t = String(token || "").trim().toLowerCase();
 
-      // Formato novo:
-      // [emb codificado][letra grupo][numero grupo codificado][autorizado 4 digitos codificado][dv 2 digitos codificado]
-      // Ex: egfxdabcdcb = 576 + X4 + 1234 + 32
-      const match = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+      // Formato novo com MMDD (15 chars):
+      // [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
+      const match = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{4})([a-j]{2})$/);
       if(!match) return null;
 
       const embCod = match[1];
       const grupoLetra = match[2].toUpperCase();
       const grupoNumCod = match[3];
       const autorizadoCod = match[4];
-      const dvCod = match[5];
+      const mmddCod = match[5];
+      const dvCod = match[6];
 
       const pb = decodificarDigitosCodificados(embCod);
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
       const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
+      const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
       const dvInformado = decodificarDigitosCodificados(dvCod);
 
       if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
       if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
 
-      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado);
+      // Valida MMDD: token deve ser do dia atual (horário Brasil)
+      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
+      const ddHoje = String(agora.getDate()).padStart(2, "0");
+      const mmddHoje = `${mmHoje}${ddHoje}`;
+      if(mmdd !== mmddHoje) return null; // token expirado
+
+      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd);
       const dvOk = dvInformado === dvEsperado;
 
       return {
@@ -549,13 +557,16 @@
     }
 
     function obterTokenDaUrl(){
+      const qs = new URLSearchParams(window.location.search);
+      const tokenQs = qs.get("t") || qs.get("token") || "";
+      if(tokenQs) return tokenQs.toLowerCase();
+
       const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
       if(path && path.toLowerCase() !== "index.html"){
         return path.toLowerCase();
       }
 
-      const qs = new URLSearchParams(window.location.search);
-      return (qs.get("token") || "").toLowerCase();
+      return "";
     }
 
     const tokenUrl = obterTokenDaUrl();
@@ -633,7 +644,7 @@
       if(!acesso || !acesso.dvOk) return;
 
       const dataStr = isoDate(data);
-      window.location.href = `/agendar.html?token=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+      window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
     }
 
     function criarCelulaDia(data, info){
