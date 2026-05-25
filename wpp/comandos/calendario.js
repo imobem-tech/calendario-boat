@@ -1,8 +1,7 @@
 // ============================================================
 // COMANDO CALENDÁRIO (CCC / calendario / calendar)
-// Allmax®2605242135
+// Allmax®2605242125
 // ============================================================
-
 import { buscarGrupoInfo, buscarAutorizado } from '../db.js'
 import { gerarToken } from '../token.js'
 import { MENU } from './menu.js'
@@ -18,10 +17,10 @@ export function ehComandoCalendario(texto) {
   )
 }
 
-// Valida formato de grupo: letra + número, ex: X1, S2, A10
+// Valida formato de grupo: letra + número (ex: X1, S2) OU só números (ex: 11, 21)
 function grupoLetraValido(grupoLetra) {
   const s = String(grupoLetra || '')
-return /^[A-Za-z]\d+$/.test(s) || /^\d+$/.test(s)
+  return /^[A-Za-z]\d+$/.test(s) || /^\d+$/.test(s)
 }
 
 export async function handleCalendario(sock, pool, grupoId) {
@@ -34,8 +33,8 @@ export async function handleCalendario(sock, pool, grupoId) {
   }
 
   const { pb, cota } = grupoInfo
-  const aut = await buscarAutorizado(pool, pb, cota)
 
+  const aut = await buscarAutorizado(pool, pb, cota)
   if (!aut) {
     await sock.sendMessage(grupoId, {
       text: `⚠️ Nenhum autorizado ativo encontrado para esta embarcação.\nContate o administrador.${MENU}`
@@ -44,7 +43,7 @@ export async function handleCalendario(sock, pool, grupoId) {
   }
 
   // Determina o grupoLetra para o token:
-  // 1. Se cota do grupo é válida (ex: X1), usa ela
+  // 1. Se cota do grupo é válida (ex: X1, 11), usa ela
   // 2. Se gropo_letra do autorizado é válido, usa ele
   // 3. Caso contrário, erro
   let grupoLetra = null
