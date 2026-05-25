@@ -17,12 +17,30 @@ export function estaAguardandoRetorno(grupoId) {
 }
 
 // ============================================================
-// BUSCA NOME DO CLIENTE PELO TELEFONE
+// BUSCA NOME DO AUTORIZADO PELO Cod_Autorizado
 // ============================================================
-async function buscarNomeCliente(pool, numeroWpp) {
+async function buscarNomeAutorizado(pool, codAutorizado) {
   try {
-    // numeroWpp vem como "5563933002220@s.whatsapp.net" ou "5563933002220"
-    const numero = String(numeroWpp).replace(/\D/g, '').replace(/^55/, '55')
+    const rs = await pool.query(
+      `SELECT "Cliente_Nome"
+         FROM public."Cliente"
+        WHERE "Codigo" = $1
+        LIMIT 1`,
+      [codAutorizado]
+    )
+    return rs.rowCount > 0 ? (rs.rows[0].Cliente_Nome || null) : null
+  } catch (err) {
+    console.error('Erro ao buscar nome autorizado:', err.message)
+    return null
+  }
+}
+
+// ============================================================
+// BUSCA NOME DO REMETENTE PELO TELEFONE
+// ============================================================
+async function buscarNomeRemetente(pool, numeroWpp) {
+  try {
+    const numero = String(numeroWpp).replace(/\D/g, '')
     const rs = await pool.query(
       `SELECT "Cliente_Nome"
          FROM public."Cliente"
@@ -32,7 +50,7 @@ async function buscarNomeCliente(pool, numeroWpp) {
     )
     return rs.rowCount > 0 ? (rs.rows[0].Cliente_Nome || null) : null
   } catch (err) {
-    console.error('Erro ao buscar nome cliente:', err.message)
+    console.error('Erro ao buscar nome remetente:', err.message)
     return null
   }
 }
@@ -69,11 +87,14 @@ function montarMensagemRetorno(dadosRetorno) {
 
   const sufixo = `${dd}${hh}${min}`
   const dataHora = `${dd}/${mm} ${hh}:${min}`
-  const nomeExibido = dadosRetorno.nomeCliente || `Autorizado: ${dadosRetorno.codAutorizado}`
+
+  const nomeAutorizado = dadosRetorno.nomeAutorizado || `Autorizado: ${dadosRetorno.codAutorizado}`
+  const nomeRemetente = dadosRetorno.nomeRemetente || ''
 
   let msg = `RETORNO_${sufixo}\n`
   msg += `${dataHora}\n`
-  msg += `${nomeExibido}\n`
+  msg += `${nomeAutorizado}\n`
+  if (nomeRemetente) msg += `${nomeRemetente}\n`
   msg += `Emb ${dadosRetorno.pb}-${dadosRetorno.grupoLetra}`
 
   if (dadosRetorno.comanda) {
@@ -195,22 +216,23 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     return
   }
 
-  // Caso D — busca nome e comanda, confirma
+  // Caso D — busca nomes e comanda, confirma
   const codAutorizado = ag['Cod_Autorizado']
   const grupoLetra = ag['Grupo_Comp_letra']
-
-  // Extrai número limpo do remetente: "5563933002220@s.whatsapp.net" → "5563933002220"
   const numeroRemetente = String(remetente || '').replace('@s.whatsapp.net', '').replace(/\D/g, '')
 
-  const [nomeCliente, comanda] = await Promise.all([
-    buscarNomeCliente(pool, numeroRemetente),
+  const [nomeAutorizado, nomeRemetente, comanda] = await Promise.all([
+    buscarNomeAutorizado(pool, codAutorizado),
+    buscarNomeRemetente(pool, numeroRemetente),
     buscarComandaAberta(pool, codAutorizado)
   ])
 
-  const dadosRetorno = { pb, grupoLetra, codAutorizado, nomeCliente, comanda }
+  const dadosRetorno = { pb, grupoLetra, codAutorizado, nomeAutorizado, nomeRemetente, comanda }
 
-  const nomeExibido = nomeCliente || `Autorizado: ${codAutorizado}`
-  let textoConfirmacao = `❓ Confirma retorno S/N\n\n${nomeExibido}\nEmb ${pb}-${grupoLetra}`
+  const nomeAutExibido = nomeAutorizado || `Autorizado: ${codAutorizado}`
+  let textoConfirmacao = `❓ Confirma retorno S/N\n\n${nomeAutExibido}`
+  if (nomeRemetente) textoConfirmacao += `\n${nomeRemetente}`
+  textoConfirmacao += `\nEmb ${pb}-${grupoLetra}`
 
   if (comanda) {
     const valorFmt = comanda.toLocaleString('pt-BR', {
@@ -220,9 +242,7 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     textoConfirmacao += `\n⚠️ Comanda aberta R$ ${valorFmt}`
   }
 
-  await sock.sendMessage(grupoId, {
-    text: textoConfirmacao
-  })
+  await sock.sendMessage(grupoId, { text: textoConfirmacao })
 
   const timeoutHandle = setTimeout(async () => {
     if (aguardandoRetorno.has(grupoId)) {
