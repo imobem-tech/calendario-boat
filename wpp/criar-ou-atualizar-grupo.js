@@ -30,11 +30,39 @@ async function buscarJidDono(codPessoa) {
   return rows[0].jid_dono
 }
 
+async function buscarColaboradores() {
+  const { rows } = await pool.query(`
+    SELECT
+      "ID",
+      "Nome",
+      "Telefone",
+      COALESCE("Administrador", 'N') AS "Administrador"
+    FROM public."wpp_colaboradores"
+    WHERE "Telefone" IS NOT NULL
+      AND TRIM("Telefone") <> ''
+    ORDER BY "Nome"
+  `)
+
+  return rows
+}
+
 function limparNumero(jidOuNumero) {
-  return String(jidOuNumero || '')
+  let numero = String(jidOuNumero || '')
     .replace('@s.whatsapp.net', '')
     .replace('@lid', '')
     .replace(/\D/g, '')
+
+  if (numero.length === 10 || numero.length === 11) {
+    numero = `55${numero}`
+  }
+
+  return numero
+}
+
+function montarJid(numeroOuJid) {
+  const numero = limparNumero(numeroOuJid)
+  if (!numero) return null
+  return `${numero}@s.whatsapp.net`
 }
 
 function gerarVariacoesNumero(jidOuNumero) {
@@ -45,13 +73,9 @@ function gerarVariacoesNumero(jidOuNumero) {
 
   set.add(numero)
 
-  // Brasil: 55 + DDD + 9 + número com 8 dígitos
-  // Ex.: 5563984380383 -> 556384380383
   const sem9 = numero.replace(/^(\d{4})9(\d{8})$/, '$1$2')
   set.add(sem9)
 
-  // Brasil: 55 + DDD + número com 8 dígitos
-  // Ex.: 556384380383 -> 5563984380383
   const com9 = numero.replace(/^(\d{4})(\d{8})$/, '$19$2')
   set.add(com9)
 
@@ -65,11 +89,8 @@ function gerarChavesMatching(...jids) {
     if (!jid) continue
 
     const jidStr = String(jid)
-
-    // Mantém JID completo para match exato, inclusive @lid
     set.add(jidStr)
 
-    // Adiciona número puro e variações com/sem 9
     for (const variacao of gerarVariacoesNumero(jidStr)) {
       set.add(variacao)
       set.add(`${variacao}@s.whatsapp.net`)
@@ -106,10 +127,8 @@ function participanteBateComChaves(participanteIds, chaves) {
       const chaveStr = String(chave)
       const chaveNumero = limparNumero(chaveStr)
 
-      // Match exato, útil para @lid
       if (idStr === chaveStr) return true
 
-      // Match por número/variação
       if (chaveNumero && idNumero && idNumero.startsWith(chaveNumero)) return true
       if (chaveNumero && idNumero && chaveNumero.startsWith(idNumero)) return true
     }
@@ -118,30 +137,61 @@ function participanteBateComChaves(participanteIds, chaves) {
   return false
 }
 
+function participanteEhAdmin(participante) {
+  if (!participante || typeof participante === 'string') return false
+
+  const admin = String(participante.admin || '').toLowerCase()
+
+  return admin === 'admin' || admin === 'superadmin'
+}
+
+function encontrarParticipanteNoGrupo(grupo, ...jids) {
+  const chaves = gerarChavesMatching(...jids)
+
+  for (const participante of grupo.participantsRaw || []) {
+    const idsParticipante = extrairIdsParticipante(participante)
+
+    if (participanteBateComChaves(idsParticipante, chaves)) {
+      return {
+        encontrado: true,
+        ids: idsParticipante,
+        participante,
+        isAdmin: participanteEhAdmin(participante)
+      }
+    }
+  }
+
+  for (const participanteId of grupo.participants || []) {
+    if (participanteBateComChaves([participanteId], chaves)) {
+      return {
+        encontrado: true,
+        ids: [participanteId],
+        participante: participanteId,
+        isAdmin: false
+      }
+    }
+  }
+
+  return {
+    encontrado: false,
+    ids: [],
+    participante: null,
+    isAdmin: false
+  }
+}
+
 function encontrarGrupoPorJids(gruposDoBarco, jidDonoBruto, jidDonoFinal, addLog) {
   const chaves = gerarChavesMatching(jidDonoBruto, jidDonoFinal)
 
   addLog(`Chaves de matching do cliente: ${chaves.join(', ')}`)
 
   for (const grupo of gruposDoBarco) {
-    for (const participante of grupo.participantsRaw || []) {
-      const idsParticipante = extrairIdsParticipante(participante)
+    const achou = encontrarParticipanteNoGrupo(grupo, jidDonoBruto, jidDonoFinal)
 
-      if (participanteBateComChaves(idsParticipante, chaves)) {
-        return {
-          grupo,
-          participanteEncontrado: idsParticipante.join(' | ')
-        }
-      }
-    }
-
-    // fallback para estrutura já normalizada
-    for (const participanteId of grupo.participants || []) {
-      if (participanteBateComChaves([participanteId], chaves)) {
-        return {
-          grupo,
-          participanteEncontrado: participanteId
-        }
+    if (achou.encontrado) {
+      return {
+        grupo,
+        participanteEncontrado: achou.ids.join(' | ')
       }
     }
   }
@@ -194,6 +244,92 @@ async function validarMembrosWhatsApp(sock, membrosBrutos, addLog) {
   return membrosValidos
 }
 
+async function prepararColaboradores(sock, addLog) {
+  const colaboradores = await buscarColaboradores()
+
+  addLog(`Colaboradores cadastrados: ${colaboradores.length}`)
+
+  const preparados = []
+
+  for (const colab of colaboradores) {
+    const jidBruto = montarJid(colab.Telefone)
+
+    if (!jidBruto) {
+      addLog(`Colaborador sem telefone válido: ${colab.Nome}`)
+      continue
+    }
+
+    const jidFinal = await confirmarJidWhatsApp(sock, jidBruto, addLog)
+    const admin = String(colab.Administrador || 'N').toUpperCase() === 'S'
+
+    preparados.push({
+      id: colab.ID,
+      nome: colab.Nome,
+      telefone: colab.Telefone,
+      administrador: admin,
+      jidBruto,
+      jidFinal
+    })
+
+    addLog(`Colaborador preparado: ${colab.Nome} | ${jidFinal} | Admin=${admin ? 'S' : 'N'}`)
+  }
+
+  return preparados
+}
+
+async function sincronizarColaboradoresNoGrupo(sock, grupo, colaboradores, addLog) {
+  const adicionados = []
+  const jaExistiam = []
+  const promovidos = []
+  const falhas = []
+
+  for (const colab of colaboradores) {
+    const achou = encontrarParticipanteNoGrupo(grupo, colab.jidBruto, colab.jidFinal)
+
+    if (!achou.encontrado) {
+      try {
+        await sock.groupParticipantsUpdate(grupo.id, [colab.jidFinal], 'add')
+        adicionados.push(colab.jidFinal)
+        addLog(`Colaborador incluído no grupo: ${colab.nome} | ${colab.jidFinal}`)
+      } catch (e) {
+        falhas.push({ nome: colab.nome, acao: 'add', erro: e.message })
+        addLog(`Falha ao incluir colaborador ${colab.nome}: ${e.message}`)
+        continue
+      }
+    } else {
+      jaExistiam.push(colab.jidFinal)
+      addLog(`Colaborador já estava no grupo: ${colab.nome}`)
+    }
+
+    if (colab.administrador) {
+      try {
+        await sock.groupParticipantsUpdate(grupo.id, [colab.jidFinal], 'promote')
+        promovidos.push(colab.jidFinal)
+        addLog(`Colaborador promovido a admin: ${colab.nome}`)
+      } catch (e) {
+        falhas.push({ nome: colab.nome, acao: 'promote', erro: e.message })
+        addLog(`Aviso: não foi possível promover ${colab.nome} a admin: ${e.message}`)
+      }
+    }
+  }
+
+  return {
+    adicionados,
+    jaExistiam,
+    promovidos,
+    falhas
+  }
+}
+
+function montarResumoGrupo(grupoMatch, syncColaboradores) {
+  return {
+    colaboradoresAdicionados: syncColaboradores?.adicionados || [],
+    colaboradoresJaExistiam: syncColaboradores?.jaExistiam || [],
+    colaboradoresPromovidos: syncColaboradores?.promovidos || [],
+    falhasColaboradores: syncColaboradores?.falhas || []
+  }
+}
+
 export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectado) {
   const sock = getSock()
   const conectado = getConectado()
@@ -237,6 +373,8 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     addLog(`JID final usado no processo: ${jidDonoFinal}`)
     addLog(`Variações do JID final: ${gerarVariacoesNumero(jidDonoFinal).join(', ')}`)
 
+    const colaboradores = await prepararColaboradores(sock, addLog)
+
     const nomeCorreto = montarNomeGrupo(Cod_Embarcacao, Gropo_letra, Cod_Cliente, Plano)
     addLog(`Nome correto do grupo: ${nomeCorreto}`)
 
@@ -253,9 +391,6 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
 
     addLog(`Total de grupos encontrados: ${grupos.length}`)
 
-    // REGRA PRINCIPAL:
-    // Seleciona todos os grupos que começam com os 3 primeiros dígitos da embarcação.
-    // Ex.: PB=555 => pega 555 SUMMER..., 555-SUMMER..., 555_..., etc.
     const prefixoBarco = String(Cod_Embarcacao).trim().substring(0, 3)
 
     const gruposDoBarco = grupos.filter(g => {
@@ -289,39 +424,49 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
     }
 
     if (grupoMatch) {
-      if (grupoMatch.subject === nomeCorreto) {
-        addLog('Grupo já está com o nome correto')
+      let acao = 'JA_OK'
+      let de = grupoMatch.subject
+      let para = grupoMatch.subject
 
-        return res.json({
-          acao: 'JA_OK',
-          grupoId: grupoMatch.id,
-          nome: grupoMatch.subject,
-          jidDonoBruto,
-          jidDonoFinal,
-          log
-        })
+      if (grupoMatch.subject !== nomeCorreto) {
+        addLog(`Renomeando de "${grupoMatch.subject}" para "${nomeCorreto}"`)
+        await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
+        addLog('Renomeado com sucesso!')
+
+        acao = 'RENOMEADO'
+        para = nomeCorreto
+      } else {
+        addLog('Grupo já está com o nome correto')
       }
 
-      addLog(`Renomeando de "${grupoMatch.subject}" para "${nomeCorreto}"`)
-
-      await sock.groupUpdateSubject(grupoMatch.id, nomeCorreto)
-
-      addLog('Renomeado com sucesso!')
+      const syncColaboradores = await sincronizarColaboradoresNoGrupo(
+        sock,
+        grupoMatch,
+        colaboradores,
+        addLog
+      )
 
       return res.json({
-        acao: 'RENOMEADO',
+        acao,
         grupoId: grupoMatch.id,
-        de: grupoMatch.subject,
-        para: nomeCorreto,
+        nome: nomeCorreto,
+        de,
+        para,
         jidDonoBruto,
         jidDonoFinal,
+        ...montarResumoGrupo(grupoMatch, syncColaboradores),
         log
       })
     }
 
     addLog(`Nenhum grupo existente corresponde ao cliente — criando novo grupo: ${nomeCorreto}`)
 
-    const membrosBrutos = [jidDonoFinal, ADM2_JID]
+    const membrosBrutos = [
+      jidDonoFinal,
+      ADM2_JID,
+      ...colaboradores.map(c => c.jidFinal)
+    ]
+
     const membrosValidos = await validarMembrosWhatsApp(sock, membrosBrutos, addLog)
 
     if (membrosValidos.length === 0) {
@@ -340,11 +485,22 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
 
       addLog(`Grupo criado: ${novoId}`)
 
-      try {
-        await sock.groupParticipantsUpdate(novoId, membrosValidos, 'promote')
-        addLog('Membros promovidos a admin')
-      } catch (errPromote) {
-        addLog(`Aviso: grupo criado, mas não foi possível promover admins: ${errPromote.message}`)
+      const adminsParaPromover = [
+        ADM2_JID,
+        ...colaboradores
+          .filter(c => c.administrador)
+          .map(c => c.jidFinal)
+      ]
+
+      const adminsValidos = await validarMembrosWhatsApp(sock, adminsParaPromover, addLog)
+
+      if (adminsValidos.length > 0) {
+        try {
+          await sock.groupParticipantsUpdate(novoId, adminsValidos, 'promote')
+          addLog(`Admins promovidos: ${adminsValidos.join(', ')}`)
+        } catch (errPromote) {
+          addLog(`Aviso: grupo criado, mas não foi possível promover admins: ${errPromote.message}`)
+        }
       }
 
       return res.json({
@@ -354,6 +510,11 @@ export async function handleCriarOuAtualizarGrupo(req, res, getSock, getConectad
         jidDonoBruto,
         jidDonoFinal,
         membrosValidos,
+        colaboradoresIncluidosNaCriacao: colaboradores.map(c => ({
+          nome: c.nome,
+          jid: c.jidFinal,
+          administrador: c.administrador ? 'S' : 'N'
+        })),
         log
       })
     } catch (errCreate) {
