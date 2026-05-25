@@ -167,8 +167,11 @@ async function iniciarBot() {
             continue
           }
 
-        } catch (err) {
+         } catch (err) {
           console.error('Erro ao processar mensagem:', err.message)
+          try {
+            await sock.sendMessage(grupoId, { text: `🔴 ERRO: ${err.message}` })
+          } catch {}
         }
       }
     })
