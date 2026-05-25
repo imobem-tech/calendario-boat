@@ -1,4 +1,4 @@
-
+ 
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
