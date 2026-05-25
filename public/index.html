@@ -510,70 +510,53 @@
     }
 
     function decodificarToken(token){
-      const t = String(token || "").trim().toLowerCase();
+  const t = String(token || "").trim().toLowerCase();
 
-      // Formato novo com MMDD (15 chars):
-      // [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
-      const m = t.match(/^([a-j]+)([a-z])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
-      if(!match) return null;
+  const m = t.match(/^([a-j]+)([a-z])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
+  if(!m) return null;
 
-      const embCod = match[1];
-      const grupoLetra = match[2].toUpperCase();
-      const grupoNumCod = match[3];
-      const autorizadoCod = match[4];
-      const mmddCod = match[5];
-      const dvCod = match[6];
+  const embCod = m[1];
+  const grupoLetraCod = m[2];
+  const grupoNumCod = m[3];
+  const autorizadoCod = m[4];
+  const mmddCod = m[5];
+  const dvCod = m[6];
 
-      const pb = decodificarDigitosCodificados(embCod);
-      const grupoNum = decodificarDigitosCodificados(grupoNumCod);
-      const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
-      const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
-      const dvInformado = decodificarDigitosCodificados(dvCod);
+  const pb = decodificarDigitosCodificados(embCod);
+  const primeiroGrupo = decodificarDigitosCodificados(grupoLetraCod);
+  const grupoNum = decodificarDigitosCodificados(grupoNumCod);
+  const grupoFinal = primeiroGrupo
+    ? `${primeiroGrupo}${grupoNum}`
+    : `${grupoLetraCod.toUpperCase()}${grupoNum}`;
 
-      if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
-      if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
+  const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
+  const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
+  const dvInformado = decodificarDigitosCodificados(dvCod);
 
-      // Valida MMDD: token deve ser do dia atual (horário Brasil)
-      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-      const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
-      const ddHoje = String(agora.getDate()).padStart(2, "0");
-      const mmddHoje = `${mmHoje}${ddHoje}`;
-      if(mmdd !== mmddHoje) return null; // token expirado
+  if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
+  if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
 
-      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd);
-      const dvOk = dvInformado === dvEsperado;
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
+  const ddHoje = String(agora.getDate()).padStart(2, "0");
+  const mmddHoje = `${mmHoje}${ddHoje}`;
+  if(mmdd !== mmddHoje) return null;
 
-      return {
-        token: t,
-        pb,
-        
+  const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd);
+  const dvOk = dvInformado === dvEsperado;
 
-
-        const primeiroGrupo = decodificar(m[2]);
-
-const grupoFinal = primeiroGrupo
-  ? `${primeiroGrupo}${grupoNum}`
-  : `${grupoLetra}${grupoNum}`;
-
-return {
-  token: t,
-  pb,
-  grupo: grupoFinal,
-  grupoLetra,
-  grupoNum,
-  codAutorizado,
-  dvInformado,
-  dvEsperado,
-  dvOk
-};
-        grupoLetra,
-        grupoNum,
-        codAutorizado,
-        dvInformado,
-        dvEsperado,
-        dvOk
-      };
-    }
+  return {
+    token: t,
+    pb,
+    grupo: grupoFinal,
+    grupoLetra: grupoLetraCod.toUpperCase(),
+    grupoNum,
+    codAutorizado,
+    dvInformado,
+    dvEsperado,
+    dvOk
+  };
+}
 
     function obterTokenDaUrl(){
       const qs = new URLSearchParams(window.location.search);
