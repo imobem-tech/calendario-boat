@@ -20,7 +20,8 @@ export function ehComandoCalendario(texto) {
 
 // Valida formato de grupo: letra + número, ex: X1, S2, A10
 function grupoLetraValido(grupoLetra) {
-  return /^[A-Za-z]\d+$/.test(String(grupoLetra || ''))
+  const s = String(grupoLetra || '')
+return /^[A-Za-z]\d+$/.test(s) || /^\d+$/.test(s)
 }
 
 export async function handleCalendario(sock, pool, grupoId) {
