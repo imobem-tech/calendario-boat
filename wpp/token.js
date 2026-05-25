@@ -29,9 +29,9 @@ export function gerarToken(pb, grupoLetra, codAutorizado) {
     letra = matchLetraNum[1].toLowerCase()
     grupoNum = matchLetraNum[2]
   } else if (matchSoNum) {
-    letra = 'n'
-    grupoNum = matchSoNum[1]
-  } else {
+  letra = matchSoNum[1][0]        // primeiro dígito como "letra"
+  grupoNum = matchSoNum[1].slice(1) || '0'  // resto como número
+} else {
     throw new Error(`Formato de grupo inválido: ${grupoLetra}`)
   }
 
