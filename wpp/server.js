@@ -26,7 +26,6 @@ import { processarFila } from './fila.js'
 import { sincronizarGruposAgenda } from './grupos.js'
 import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
-import { ehComandoSaida, estaAguardandoSaida, handleSaida, handleEstadoSaida } from './comandos/saida.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605242125'
@@ -156,12 +155,6 @@ async function iniciarBot() {
             continue
           }
 
-          // Aguardando fluxo de saída
-          if (estaAguardandoSaida(grupoId, remetente)) {
-            await handleEstadoSaida(sock, pool, grupoId, remetente, texto)
-            continue
-          }
-
           // Comando Calendário
           if (ehComandoCalendario(texto)) {
             await handleCalendario(sock, pool, grupoId)
@@ -171,12 +164,6 @@ async function iniciarBot() {
           // Comando Retorno
           if (ehComandoRetorno(texto)) {
             await handleRetorno(sock, pool, grupoId, remetente)
-            continue
-          }
-
-          // Comando Saída
-          if (ehComandoSaida(texto)) {
-            await handleSaida(sock, pool, grupoId, remetente)
             continue
           }
 
