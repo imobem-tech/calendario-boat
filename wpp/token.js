@@ -20,11 +20,23 @@ function calcularDVToken(pb, grupoNum, autorizado, mmdd) {
 }
 
 export function gerarToken(pb, grupoLetra, codAutorizado) {
-  const matchGrupo = String(grupoLetra).match(/^([A-Za-z])(\d+)$/)
-  if (!matchGrupo) throw new Error(`Formato de grupo inválido: ${grupoLetra}`)
+  const grupoTxt = String(grupoLetra || '').trim()
 
-  const letra = matchGrupo[1].toLowerCase()
-  const grupoNum = matchGrupo[2]
+  const matchLetraNum = grupoTxt.match(/^([A-Za-z])(\d+)$/)
+  const matchSoNum = grupoTxt.match(/^(\d+)$/)
+
+  let letra = ''
+  let grupoNum = ''
+
+  if (matchLetraNum) {
+    letra = matchLetraNum[1].toLowerCase()
+    grupoNum = matchLetraNum[2]
+  } else if (matchSoNum) {
+    letra = encodificar(matchSoNum[1][0])
+    grupoNum = matchSoNum[1].slice(1) || '0'
+  } else {
+    throw new Error(`Formato de grupo inválido: ${grupoLetra}`)
+  }
 
   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
   const mm = String(agora.getMonth() + 1).padStart(2, '0')
