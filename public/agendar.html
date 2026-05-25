@@ -257,12 +257,17 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
       const dvCalc = calcularDV(pb, grupoNum, autorizado, mmdd);
       if(dv !== dvCalc) return null;
 
-      return {
-        pb,
-        grupo: `${grupoLetra}${grupoNum}`,
-        codAutorizado: autorizado,
-        token: t
-      };
+    const primeiroGrupo = decodificar(m[2]);
+const grupoFinal = primeiroGrupo
+  ? `${primeiroGrupo}${grupoNum}`
+  : `${grupoLetra}${grupoNum}`;
+
+return {
+  pb,
+  grupo: grupoFinal,
+  codAutorizado: autorizado,
+  token: t
+};
     }
 
     function formatarDataBR(iso){
