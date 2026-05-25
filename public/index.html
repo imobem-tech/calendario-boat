@@ -514,7 +514,7 @@
 
       // Formato novo com MMDD (15 chars):
       // [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
-      const match = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{4})([a-j]{2})$/);
+      const m = t.match(/^([a-j]+)([a-z])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
       if(!match) return null;
 
       const embCod = match[1];
@@ -546,7 +546,26 @@
       return {
         token: t,
         pb,
-        grupo: `${grupoLetra}${grupoNum}`,
+        
+
+
+        const primeiroGrupo = decodificar(m[2]);
+
+const grupoFinal = primeiroGrupo
+  ? `${primeiroGrupo}${grupoNum}`
+  : `${grupoLetra}${grupoNum}`;
+
+return {
+  token: t,
+  pb,
+  grupo: grupoFinal,
+  grupoLetra,
+  grupoNum,
+  codAutorizado,
+  dvInformado,
+  dvEsperado,
+  dvOk
+};
         grupoLetra,
         grupoNum,
         codAutorizado,
