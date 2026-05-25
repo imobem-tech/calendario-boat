@@ -8,6 +8,11 @@ import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
+
+import { handleRenomearGrupos } from './renomear-grupos.js'
+
+import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
+
 import retornoRoutes from './msg_externa.js'
 
 import makeWASocket, {
@@ -381,6 +386,13 @@ app.get('/botao_agenda_todos', async (req, res) => {
   }
 })
 
+app.post('/renomear-grupos', (req, res) => {
+  handleRenomearGrupos(req, res, () => sock, () => conectado)
+})
+
+app.post('/criar-ou-atualizar-grupo', (req, res) => {
+  handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
+})
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
