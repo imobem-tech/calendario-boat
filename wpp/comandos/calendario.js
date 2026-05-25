@@ -63,10 +63,9 @@ export async function handleCalendario(sock, pool, grupoId) {
   const token = gerarToken(pb, grupoLetra, aut.cod_pessoa)
   const link = `${BASE_URL}/?t=${token}`
 
-  await sock.sendMessage(grupoId, {
-    image: { url: PREVIEW_IMG },
-    caption: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
-  })
+ await sock.sendMessage(grupoId, {
+  text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
+})
 
   console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra}`)
 }
