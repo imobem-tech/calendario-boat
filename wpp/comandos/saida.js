@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605260035
+// Allmax Gestão de Cotas — V.2605260050
 // Compatível com pg Pool
 //
 // Comandos:
@@ -17,7 +17,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605260035'
+const VERSAO_SAIDA = 'V.2605260050'
 
 // ============================================================
 // HELPERS
@@ -526,8 +526,22 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const saida = aguardando[0].r
   const key   = chaveEstado(grupoId, remetente)
 
+  // Leitura robusta — pg pode normalizar o nome da coluna com acento
+  const codProprietario = Number(
+    saida['Cod_Proprietário'] ??
+    saida['Cod_Proprietario'] ??
+    saida['cod_proprietário'] ??
+    saida['cod_proprietario'] ??
+    0
+  )
+
+  console.log('DEBUG_PROPRIETARIO', {
+    codProprietario,
+    keys: Object.keys(saida).filter(k => k.toLowerCase().includes('propri'))
+  })
+
   const precisaHoraMotor =
-    Number(saida['Cod_Proprietário']) === 4255 &&
+    codProprietario === 4255 &&
     (saida.Hora_Motor_Saida === null ||
      saida.Hora_Motor_Saida === undefined ||
      saida.Hora_Motor_Saida === '')
