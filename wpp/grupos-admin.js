@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261520
+// wpp/grupos-admin.js — Allmax®2605261530
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -441,17 +441,22 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
       return res.json({ acao: 'JA_NO_GRUPO', nome, jid: jidTitular, log })
     }
 
-    // Adiciona como membro simples (sem promote)
     const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
     addLog(`Resultado groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
 
-    // Verifica se foi adicionado com sucesso
-    const status = resultado?.[0]?.status || resultado?.[0]
-    if (status === '200' || status === 200) {
+    const status = String(resultado?.[0]?.status || '')
+    if (status === '200') {
       addLog(`Titular adicionado: ${nome}`)
       return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
+    } else if (status === '408') {
+      // 408 = convite enviado (número precisa aceitar) ou já está no grupo
+      addLog(`Titular: convite enviado ou já no grupo (408): ${nome}`)
+      return res.json({ acao: 'CONVITE_ENVIADO', nome, jid: jidTitular, log })
+    } else if (status === '403') {
+      addLog(`Titular bloqueou adições: ${nome}`)
+      return res.json({ acao: 'BLOQUEADO', nome, jid: jidTitular, log })
     } else {
-      addLog(`AVISO: status inesperado: ${JSON.stringify(status)}`)
+      addLog(`AVISO: status inesperado: ${status}`)
       return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
     }
 
