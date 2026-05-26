@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER.JS — Allmax®2605261130
+// SERVER.JS — Allmax®2605261400
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
@@ -13,6 +13,7 @@ import { handleRenomearGrupos } from './renomear-grupos.js'
 
 import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
+import { handleRenomearGrupo, handleColaboradoresGrupo, handleColaboradoresTodos, handleAdicionarTitular } from './grupos-admin.js'
 import retornoRoutes from './msg_externa.js'
 
 import makeWASocket, {
@@ -30,7 +31,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605261130'
+const VERSAO_WPP = 'Allmax®2605261400'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -445,6 +446,25 @@ app.post('/renomear-grupos', (req, res) => {
 
 app.post('/criar-ou-atualizar-grupo', (req, res) => {
   handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
+})
+
+// ============================================================
+// GESTÃO DE GRUPOS — grupos-admin.js
+// ============================================================
+app.post('/grupos/renomear', (req, res) => {
+  handleRenomearGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/grupo', (req, res) => {
+  handleColaboradoresGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/todos', (req, res) => {
+  handleColaboradoresTodos(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/titular', (req, res) => {
+  handleAdicionarTitular(req, res, () => sock, () => conectado)
 })
 
 // ============================================================
