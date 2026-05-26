@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605260025
+// Allmax Gestão de Cotas — V.2605260030
 // Compatível com pg Pool
 //
 // Comandos:
@@ -17,7 +17,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605260025'
+const VERSAO_SAIDA = 'V.2605260030'
 
 // ============================================================
 // HELPERS
@@ -437,13 +437,18 @@ async function registrarSaida(pool, saida, colaborador) {
      WHERE "ID" = $3
   `, [agora, colaborador.Nome, saida.ID])
 
-  await pool.query(`
-    UPDATE public."P_BOAT_9_OS"
-       SET "OS_obs_Fechamento" = $1
-     WHERE "OS_Dt_Fechamento" IS NULL
-       AND "Num_Emb_PB" = $2
-       AND "Tipo" = 'SAÍDA'
-  `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
+  // P_BOAT_9_OS pode não estar disponível no Neon ainda
+  try {
+    await pool.query(`
+      UPDATE public."P_BOAT_9_OS"
+         SET "OS_obs_Fechamento" = $1
+       WHERE "OS_Dt_Fechamento" IS NULL
+         AND "Num_Emb_PB" = $2
+         AND "Tipo" = 'SAÍDA'
+    `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
+  } catch (osErr) {
+    console.warn('[registrarSaida] P_BOAT_9_OS indisponível:', osErr.message)
+  }
 
   return agoraBR
 }
