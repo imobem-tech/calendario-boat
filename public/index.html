@@ -762,21 +762,26 @@
     const inadimDialog  = document.getElementById("inadimDialog");
     const inadimSpinner = document.getElementById("inadimSpinner");
     const inadimFechar  = document.getElementById("inadimFechar");
+    const inadimWppLink = document.getElementById("inadimWppLink");
 
     inadimFechar.addEventListener("click", () => inadimDialog.close());
     inadimDialog.addEventListener("click", (e) => {
       if(e.target === inadimDialog) inadimDialog.close();
     });
 
+    // Flag anti-duplo: impede segunda chamada enquanto já está verificando
+    let verificandoInadimplencia = false;
+
     // ----------------------------------------------------------
     // Navegar para agendamento com verificação de inadimplência
     // ----------------------------------------------------------
     async function navegarParaAgendamento(data){
       if(!acesso || !acesso.dvOk) return;
+      if(verificandoInadimplencia) return;   // ← bloqueia duplo clique
 
+      verificandoInadimplencia = true;
       const dataStr = isoDate(data);
 
-      // Chama endpoint de inadimplência antes de redirecionar
       try{
         inadimSpinner.style.display = "block";
         inadimDialog.showModal();
@@ -788,7 +793,12 @@
         inadimSpinner.style.display = "none";
 
         if(!resp.ok || json.inadimplente){
-          // Deixa o modal aberto com a mensagem de bloqueio
+          // Atualiza link do botão para o grupo real do cotista
+          if(json.grupowppid){
+            const grupoId = String(json.grupowppid).split("@")[0];
+            inadimWppLink.href = `https://wa.me/g/${grupoId}`;
+          }
+          // Mantém modal aberto com a mensagem de bloqueio
           return;
         }
 
@@ -797,11 +807,13 @@
         window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){
-        // Se a consulta falhar por erro de rede etc., deixa passar (não bloqueia)
+        // Falha de rede: libera o acesso sem bloquear o cotista
         inadimSpinner.style.display = "none";
         inadimDialog.close();
-        console.warn("[inadimplencia] Falha na consulta, liberando acesso:", err.message);
+        console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
         window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+      } finally {
+        verificandoInadimplencia = false;
       }
     }
 
