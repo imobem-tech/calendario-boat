@@ -16,7 +16,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605261040";
+const VERSAO_API = "Allmax®2605261100";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-desenvolvimento.up.railway.app";
@@ -42,7 +42,13 @@ function somenteDigitos(txt) {
 }
 
 function montarMensagemCR(faturas) {
-  const linhas = ["⚠️ *Informações sobre Contas em Aberto*\n"];
+  const linhas = [
+    "*ALLMAX COTAS*",
+    "*SUMMER NÁUTICA*",
+    "",
+    "⚠️ *Informações sobre Contas em Aberto*",
+    ""
+  ];
 
   for (const f of faturas) {
     linhas.push(`*${f.descricao}*`);
@@ -184,9 +190,20 @@ export default async function handler(req, res) {
 
       // 2. Espelho gerencial
       const mensagemEspelho =
+        `*SAÍDA - ${pb}-${grupo}*\n` +
         `👤 *${nomeCliente}* (Cód. ${codAutorizado})\n` +
         `📱 ${telefoneBruto || "sem telefone"}\n\n` +
-        mensagemCR;
+        `⚠️ *Informações sobre Contas em Aberto*\n\n` +
+        faturas.map(f => {
+          const link = String(f.link || "").trim();
+          let linhas = [
+            `*${f.descricao}*`,
+            `  | Valor Original: R$ ${formatarValorBR(f.valor)}`,
+            `  | Vencimento: ${f.vencimento}`
+          ];
+          if (link) { linhas.push(`  | Link:`); linhas.push(`  | ${link}`); }
+          return linhas.join("\n");
+        }).join("\n\n");
 
       console.log(`[inadimplencia] DEBUG chamando enviarViaBot espelho jid=${ESPELHO_FINANCEIRO_ID}`);
       try {
