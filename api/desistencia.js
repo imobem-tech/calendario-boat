@@ -10,8 +10,8 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605252310";
-const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2605252310";
+const VERSAO_API = "Allmax®2605252320";
+const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2605252320";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -140,7 +140,7 @@ export default async function handler(req, res) {
 
     // Busca o agendamento — valida que pertence ao cotista e à embarcação correta
     const rsAg = await client.query(
-      `SELECT "ID", "Código", "Dt_Agendamento", "Grupo_Comp_letra",
+      `SELECT "ID", "Código", "Dt_Agendamento", "Dt_Solicitacao", "Grupo_Comp_letra",
               "Cod_Emb_PB", "Cod_Autorizado",
               "Dt_Desistencia", "Dt_Cancela_saida", "Dt_Saída"
          FROM public."P_BOAT_z_10_Saida_Emb"
@@ -185,18 +185,18 @@ export default async function handler(req, res) {
 
     await client.query("COMMIT");
 
-    const dtAgendadaBR  = formatarDataBR(ag.Dt_Agendamento);
-    const dtDesistBR    = formatarDataHoraBR(agora);
+    const dtSolicitacaoBR = formatarDataBR(ag.Dt_Solicitacao);
+    const dtAgendadaBR    = formatarDataBR(ag.Dt_Agendamento);
+    const dtDesistBR      = formatarDataHoraBR(agora);
 
     // Monta mensagem WPP
     const mensagemWpp =
 `🚫 DESISTÊNCIA DE AGENDAMENTO
-PB: ${codEmbPB}
-Grupo: ${ag.Grupo_Comp_letra}
+PB: ${codEmbPB} Grupo: ${ag.Grupo_Comp_letra}
 Autorizado: ${codAutorizado}
-Dt Agendada: ${dtAgendadaBR}
-Dt Desistência: ${dtDesistBR}
-Código: ${ag.Código}
+Dt. Agendamento: ${dtSolicitacaoBR}
+Dt. Agendada: ${dtAgendadaBR}
+Dt. Desistência: ${dtDesistBR}
 
 ${VERSAO_WPP}`;
 
