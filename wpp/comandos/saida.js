@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605252330
+// Allmax Gestão de Cotas — V.2605252345
 // Compatível com pg Pool
 //
 // Comandos:
@@ -9,10 +9,11 @@
 //   colaborador 63984030406
 //      => vincula o LID do remetente ao colaborador cadastrado
 //
-// CORREÇÃO V.2605252330:
-//   buscarSaidaDoDia agora filtra Dt_Desistencia IS NULL e
-//   Dt_Cancela_saida IS NULL, evitando falso "mais de uma saída"
-//   quando existem registros cancelados no mesmo dia.
+// V.2605252345:
+//   - buscarSaidaDoDia retorna TODOS os registros do dia
+//   - classifica cada registro em estado (#1 a #10)
+//   - exibe histórico completo antes de qualquer ação
+//   - permite nova saída mesmo havendo ciclos anteriores completos
 // ============================================================
 
 const estadosSaida = new Map()
@@ -311,6 +312,105 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
 }
 
 // ============================================================
+// BUSCA TODOS OS REGISTROS DO DIA
+// ============================================================
+
+async function buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra) {
+  const hoje = hojeIsoSaoPaulo()
+
+  const rs = await pool.query(`
+    SELECT *
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
+       AND "Dt_Agendamento" >= ($3::date)
+       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+     ORDER BY "Dt_Agendamento" ASC
+  `, [codEmbPb, grupoCompLetra, hoje])
+
+  return rs.rows || []
+}
+
+// ============================================================
+// CLASSIFICA ESTADO DE CADA REGISTRO
+// ============================================================
+
+function classificarEstado(r) {
+  const saida      = r['Dt_Saída']
+  const retorno    = r['Dt_Retorno']
+  const desist     = r['Dt_Desistencia']
+  const cancela    = r['Dt_Cancela_saida']
+
+  if (!saida && !desist && !cancela)           return 1  // aguardando saída
+  if (saida  && !retorno && !desist && !cancela) return 2  // em navegação
+  if (saida  &&  retorno && !desist && !cancela) return 3  // ciclo completo
+  if (!saida &&  desist  && !cancela)            return 4  // desistência cotista
+  if (!saida && !desist  &&  cancela)            return 5  // cancelado admin
+  if (!saida &&  desist  &&  cancela)            return 6  // desist + cancela
+  if (saida  && !retorno &&  desist)             return 7  // inconsistente
+  if (saida  && !retorno &&  cancela)            return 8  // inconsistente
+  if (!saida &&  retorno)                        return 9  // inconsistente
+  if (saida  &&  retorno &&  desist)             return 10 // inconsistente
+  return 99 // desconhecido
+}
+
+// ============================================================
+// FORMATA HORA A PARTIR DE TIMESTAMP
+// ============================================================
+
+function extrairHora(dt) {
+  if (!dt) return '—'
+  const d = dt instanceof Date ? dt : new Date(dt)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mi}`
+}
+
+// ============================================================
+// MONTA RESUMO HISTÓRICO
+// ============================================================
+
+function montarResumoHistorico(registros, pb, grupo) {
+  const hoje = hojeIsoSaoPaulo()
+  const [ano, mes, dia] = hoje.split('-')
+  const dataFormatada = `${dia}/${mes}/${ano}`
+
+  const linhas = [`📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}\n`]
+
+  for (const r of registros) {
+    const estado = classificarEstado(r)
+    const agHora = extrairHora(r['Dt_Agendamento'])
+    const saHora = extrairHora(r['Dt_Saída'])
+    const reHora = extrairHora(r['Dt_Retorno'])
+
+    switch (estado) {
+      case 1:
+        linhas.push(`⏳ Aguardando saída\n   Agendado: ${agHora}`)
+        break
+      case 2:
+        linhas.push(`🚢 Em navegação\n   Agendado: ${agHora} | Saída: ${saHora}`)
+        break
+      case 3:
+        linhas.push(`✅ Ciclo encerrado\n   Saída: ${saHora} | Retorno: ${reHora}`)
+        break
+      case 4:
+        linhas.push(`❌ Desistência\n   Agendado: ${agHora}`)
+        break
+      case 5:
+        linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
+        break
+      case 6:
+        linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
+        break
+      default:
+        linhas.push(`⚠️ Situação irregular\n   Agendado: ${agHora}`)
+    }
+  }
+
+  return linhas.join('\n')
+}
+
+// ============================================================
 // REGISTROS
 // ============================================================
 
@@ -366,14 +466,11 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     return true
   }
 
-  const codEmbPb = Number(grupoAgenda.pb)
+  const codEmbPb      = Number(grupoAgenda.pb)
   const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
 
   console.log('DEBUG_SAIDA_ENTRADA', {
-    grupoId,
-    remetente,
-    codEmbPb,
-    grupoCompLetra,
+    grupoId, remetente, codEmbPb, grupoCompLetra,
     colaborador: colaborador.Nome
   })
 
@@ -382,63 +479,72 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     return true
   }
 
-  const saidas = await buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra)
+  // Busca TODOS os registros do dia
+  const registros = await buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra)
 
-  if (!saidas.length) {
+  // Sem nenhum registro
+  if (!registros.length) {
     await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
     return true
   }
 
-  if (saidas.length > 1) {
-    await enviar(sock, grupoId, 'Encontrei mais de uma saída para hoje. Não consegui registrar automaticamente.')
+  // Monta e exibe histórico
+  const resumo = montarResumoHistorico(registros, codEmbPb, grupoCompLetra)
+
+  // Classifica todos
+  const estados = registros.map(r => ({ r, estado: classificarEstado(r) }))
+
+  // Verifica navegação ativa (#2)
+  const emNavegacao = estados.filter(e => e.estado === 2)
+  if (emNavegacao.length > 0) {
+    await enviar(sock, grupoId, `${resumo}\n\nEsta embarcação já está em navegação.`)
     return true
   }
 
-  const saida = saidas[0]
+  // Filtra aguardando saída (#1)
+  const aguardando = estados.filter(e => e.estado === 1)
 
-  if (saida.Dt_Desistencia) {
-    await enviar(sock, grupoId, 'Esta saída consta como desistência. Não é possível registrar a saída.')
+  if (aguardando.length === 0) {
+    await enviar(sock, grupoId, `${resumo}\n\nNão há agendamento ativo para hoje.`)
     return true
   }
 
-  if (saida.Dt_Cancela_saida) {
-    await enviar(sock, grupoId, 'Esta saída consta como cancelada. Não é possível registrar a saída.')
+  if (aguardando.length > 1) {
+    await enviar(sock, grupoId, `${resumo}\n\n⚠️ Situação irregular: mais de um agendamento ativo. Contate o administrador.`)
     return true
   }
 
-  if (saida['Dt_Saída']) {
-    await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
-    return true
-  }
-
-  const key = chaveEstado(grupoId, remetente)
+  // Exatamente um #1 — prossegue para registrar saída
+  const saida = aguardando[0].r
+  const key   = chaveEstado(grupoId, remetente)
 
   const precisaHoraMotor =
     Number(saida['Cod_Proprietário']) === 4255 &&
-    (
-      saida.Hora_Motor_Saida === null ||
-      saida.Hora_Motor_Saida === undefined ||
-      saida.Hora_Motor_Saida === ''
-    )
+    (saida.Hora_Motor_Saida === null ||
+     saida.Hora_Motor_Saida === undefined ||
+     saida.Hora_Motor_Saida === '')
 
   if (precisaHoraMotor) {
     estadosSaida.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       saida,
-      colaborador
+      colaborador,
+      resumo
     })
 
-    await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato 000,0, ou D para desistir`)
     return true
   }
 
   estadosSaida.set(key, {
     etapa: 'aguardando_confirmacao_saida',
     saida,
-    colaborador
+    colaborador,
+    resumo
   })
 
-  await enviar(sock, grupoId, 'Confirma saída? S/N')
+  const horaAgendada = extrairHora(saida['Dt_Agendamento'])
+  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para ${horaAgendada}? S/N`)
   return true
 }
 
