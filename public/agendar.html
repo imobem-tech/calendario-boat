@@ -130,6 +130,11 @@
       cursor: pointer;
     }
 
+    .section-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; }
+    .section-header .section-title{ margin:0; }
+    .btn-voltar{ display:inline-flex; align-items:center; gap:6px; background: var(--primary-soft); color: var(--primary); font-size: 15px; font-weight: 800; border: none; border-radius: 12px; padding: 8px 16px; cursor:pointer; text-decoration:none; }
+    .btn-voltar:active{ opacity:.8; }
+
     @media (min-width: 640px){ .slots{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (min-width: 900px){ .slots{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
@@ -177,7 +182,10 @@
     </section>
 
     <section class="section-card">
-      <h2 class="section-title">Horário</h2>
+      <div class="section-header">
+        <h2 class="section-title">Horário</h2>
+        <button class="btn-voltar" id="btnVoltar" type="button">← Voltar</button>
+      </div>
       <p class="section-desc">Qual sua previsão de saída? Escolha o horário abaixo:</p>
 
       <div class="slots" id="slots"></div>
@@ -297,7 +305,7 @@ return {
     }
 
    
-    const VERSAO_HTML = "V.2605222011";
+    const VERSAO_HTML = "V.2605252320";
 
 function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
@@ -542,6 +550,15 @@ if(!resp.ok){
       atualizarBotao();
       btnConfirmar.addEventListener("click", agendar);
     }
+
+    // Botão Voltar — retorna ao calendário preservando o mês
+    document.getElementById("btnVoltar").addEventListener("click", () => {
+      const ym = data ? data.slice(0, 7) : "";
+      const url = token
+        ? `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`
+        : "/";
+      window.location.href = url;
+    });
 
     aplicarAssinatura();
   </script>
