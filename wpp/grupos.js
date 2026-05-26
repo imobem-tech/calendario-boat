@@ -1,5 +1,5 @@
 // ============================================================
-// SINCRONIZAÇÃO DE GRUPOS AGENDA — Allmax®2605222230
+// SINCRONIZAÇÃO DE GRUPOS AGENDA — Allmax®2605261110
 // ============================================================
 
 export function extrairGrupoAgenda(nome, grupoId) {
@@ -7,17 +7,30 @@ export function extrairGrupoAgenda(nome, grupoId) {
 
   if (!/^\d{3}/.test(nomeLimpo)) return null
 
-  const comCota = nomeLimpo.match(/^(\d{3})-([A-Z]\d)\b/i)
-  if (comCota) {
+  // Formato com cota letra+número: 576-X4-... ou 151-S1-...
+  const comCotaLetra = nomeLimpo.match(/^(\d+)-([A-Z]\d+)\b/i)
+  if (comCotaLetra) {
     return {
-      pb: Number(comCota[1]),
-      cota: comCota[2].toUpperCase(),
+      pb: Number(comCotaLetra[1]),
+      cota: comCotaLetra[2].toUpperCase(),
       nomeGrupoWpp: nomeLimpo,
       grupoWppId: grupoId
     }
   }
 
-  const semCota = nomeLimpo.match(/^(\d{3})/)
+  // Formato com cota numérica: 151-11-... ou 576-21-...
+  const comCotaNum = nomeLimpo.match(/^(\d+)-(\d+)-/i)
+  if (comCotaNum) {
+    return {
+      pb: Number(comCotaNum[1]),
+      cota: comCotaNum[2],
+      nomeGrupoWpp: nomeLimpo,
+      grupoWppId: grupoId
+    }
+  }
+
+  // Sem cota identificável
+  const semCota = nomeLimpo.match(/^(\d+)/)
   return {
     pb: Number(semCota[1]),
     cota: null,
