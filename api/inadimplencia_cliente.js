@@ -18,6 +18,8 @@ const { Pool } = pkg;
 
 const VERSAO_API = "Allmax®2605261010";
 
+
+
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-desenvolvimento.up.railway.app";
 
