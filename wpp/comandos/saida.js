@@ -353,16 +353,7 @@ async function verificarInadimplenciaENotificar(sock, pool, codAutorizado) {
   const faturas = rsFaturas.rows
   if (!faturas.length) return false
 
-  // Busca telefone do cliente
-  const rsCliente = await pool.query(
-    `SELECT "Cliente_Telefone_Celular" AS telefone
-       FROM public."Cliente"
-      WHERE "Codigo" = $1
-      LIMIT 1`,
-    [codAutorizado]
-  )
-
-  // Busca nome do cliente para o espelho
+  // Busca telefone e nome do cliente
   const rsCliente = await pool.query(
     `SELECT "Cliente_Telefone_Celular" AS telefone,
             "Nome_Cliente"             AS nome
