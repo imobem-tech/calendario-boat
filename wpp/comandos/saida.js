@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605260030
+// Allmax Gestão de Cotas — V.2605260035
 // Compatível com pg Pool
 //
 // Comandos:
@@ -17,7 +17,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605260030'
+const VERSAO_SAIDA = 'V.2605260035'
 
 // ============================================================
 // HELPERS
@@ -378,7 +378,11 @@ function montarResumoHistorico(registros, pb, grupo) {
 
   const linhas = [`📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}\n`]
 
-  for (const r of registros) {
+  // Separa #1 dos demais — #1 sempre aparece por último
+  const historico = registros.filter(r => classificarEstado(r) !== 1)
+  const aguardando = registros.filter(r => classificarEstado(r) === 1)
+
+  for (const r of [...historico, ...aguardando]) {
     const estado = classificarEstado(r)
     const agHora = extrairHora(r['Dt_Agendamento'])
     const saHora = extrairHora(r['Dt_Saída'])
@@ -386,7 +390,7 @@ function montarResumoHistorico(registros, pb, grupo) {
 
     switch (estado) {
       case 1:
-        linhas.push(`⏳ Aguardando saída\n   Agendado: ${agHora}`)
+        linhas.push(`⏳ Aguardando saída`)
         break
       case 2:
         linhas.push(`🚢 Em navegação\n   Agendado: ${agHora} | Saída: ${saHora}`)
@@ -398,8 +402,6 @@ function montarResumoHistorico(registros, pb, grupo) {
         linhas.push(`❌ Desistência\n   Agendado: ${agHora}`)
         break
       case 5:
-        linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
-        break
       case 6:
         linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
         break
@@ -549,8 +551,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     resumo
   })
 
-  const horaAgendada = extrairHora(saida['Dt_Agendamento'])
-  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para *${horaAgendada}*? S/N\n${VERSAO_SAIDA}`)
+  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída? S/N\n${VERSAO_SAIDA}`)
   return true
 }
 
