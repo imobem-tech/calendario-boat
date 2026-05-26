@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261600
+// wpp/grupos-admin.js — Allmax®2605261630
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -54,7 +54,8 @@ async function atualizarGruposAgenda(pool, codEmbarcacao, gropoLetra, nomeGrupo,
 async function buscarColaboradoresAtivos(pool) {
   const { rows } = await pool.query(`
     SELECT "ID", "Nome", "Telefone", "Lid",
-           COALESCE("Administrador", 'N') AS "Administrador"
+           COALESCE("Administrador", 'N') AS "Administrador",
+           COALESCE("Ativo", 'S') AS "Ativo"
       FROM public.wpp_colaboradores
      WHERE "Telefone" IS NOT NULL AND TRIM("Telefone") <> ''
      ORDER BY "Nome"
@@ -142,9 +143,13 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
     }
   }
 
-  // Set de norms dos colaboradores ativos (telefone + Lid se disponível)
+  // Separa ativos e inativos
+  const ativos   = colaboradoresResolvidos.filter(c => c.Ativo === 'S')
+  const inativos = colaboradoresResolvidos.filter(c => c.Ativo !== 'S')
+
+  // Set de norms dos colaboradores ATIVOS (telefone + Lid)
   const normsColaboradores = new Set()
-  for (const c of colaboradoresResolvidos) {
+  for (const c of ativos) {
     normsColaboradores.add(c.normFinal)
     if (c.Lid) normsColaboradores.add(normJid(c.Lid))
   }
@@ -168,8 +173,8 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
     return linkConvite
   }
 
-  // ADICIONAR / PROMOVER colaboradores
-  for (const colab of colaboradoresResolvidos) {
+  // ADICIONAR / PROMOVER colaboradores ATIVOS
+  for (const colab of ativos) {
     const jaEsta = colab.participanteAtual
     const deveSerAdmin = colab.Administrador === 'S'
 
@@ -179,9 +184,18 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
         const status = String(resultado?.[0]?.status || '')
         const lidRetornado = resultado?.[0]?.jid
 
-        // Grava Lid se retornado
-        if (lidRetornado && String(lidRetornado).includes('@lid')) {
-          await gravarLidColaborador(pool, colab.ID, lidRetornado, addLog)
+        // Grava Lid apenas se phone_number retornado bate com o colaborador
+        const lidRetornado = resultado?.[0]?.jid
+        const phoneRetornado = normJid(
+          resultado?.[0]?.content?.attrs?.phone_number || ''
+        )
+        if (lidRetornado?.includes('@lid') && phoneRetornado) {
+          const telColab = normJid(colab.jidFinal)
+          if (phoneRetornado.slice(-8) === telColab.slice(-8)) {
+            await gravarLidColaborador(pool, colab.ID, lidRetornado, addLog)
+          } else {
+            addLog(`AVISO: Lid não gravado — phone não bate (${phoneRetornado} ≠ ${telColab})`)
+          }
         }
 
         if (status === '200') {
@@ -247,8 +261,30 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
     }
   }
 
-  // REMOVER participantes que são colaboradores inativos
-  // Identifica pelo telefone normalizado (não pelo Lid que pode estar errado)
+  // REMOVER colaboradores INATIVOS pelo Lid gravado
+  for (const colab of inativos) {
+    if (!colab.Lid) {
+      addLog(`SKIP remoção ${colab.Nome}: sem Lid gravado`)
+      continue
+    }
+    const normLid = normJid(colab.Lid)
+    const noGrupo = jidsAtuais.find(p => p.norm === normLid)
+    if (noGrupo) {
+      try {
+        await sock.groupParticipantsUpdate(grupoId, [noGrupo.jid], 'remove')
+        addLog(`REMOVIDO (inativo): ${colab.Nome}`)
+        removidos++
+      } catch (err) {
+        addLog(`FALHA ao remover inativo ${colab.Nome}: ${err.message}`)
+        falhas.push({ nome: colab.Nome, erro: err.message })
+      }
+    } else {
+      addLog(`OK: ${colab.Nome} (inativo) já não está no grupo`)
+    }
+  }
+
+  // REMOVER participantes que eram colaboradores ativos mas foram desativados
+  // (fallback: identifica pelo telefone normalizado caso Lid não gravado)
   for (const p of jidsAtuais) {
     if (protegidos.has(p.norm)) continue
     if (normsColaboradores.has(p.norm)) continue
