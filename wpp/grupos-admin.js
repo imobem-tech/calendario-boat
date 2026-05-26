@@ -185,7 +185,7 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
         const lidRetornado = resultado?.[0]?.jid
 
         // Grava Lid apenas se phone_number retornado bate com o colaborador
-        const lidRetornado = resultado?.[0]?.jid
+     
         const phoneRetornado = normJid(
           resultado?.[0]?.content?.attrs?.phone_number || ''
         )
