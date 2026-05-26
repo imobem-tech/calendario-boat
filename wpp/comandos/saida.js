@@ -17,109 +17,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605261000'
-const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || '120363424805097946@g.us'
-
-// ============================================================
-// INADIMPLÊNCIA — verifica CR, envia privado + espelho
-// ============================================================
-
-function formatarValorBR(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
-
-function montarMensagemCR(faturas) {
-  const linhas = ['⚠️ *Informações sobre Contas em Aberto*\n']
-  for (const f of faturas) {
-    linhas.push(`*${f.descricao}*`)
-    linhas.push(`  | Valor Original: R$ ${formatarValorBR(f.valor)}`)
-    linhas.push(`  | Vencimento: ${f.vencimento}`)
-    const link = String(f.link || '').trim()
-    if (link) {
-      linhas.push(`  | Link:`)
-      linhas.push(`  | ${link}`)
-    }
-    linhas.push('')
-  }
-  linhas.push('_Caso não reconheça a conta, favor comunicar, para que se proceda o ajuste/baixa._')
-  linhas.push('_Desconsidere caso já tenha quitado, a baixa bancária pode demorar até 2 dias._')
-  return linhas.join('\n')
-}
-
-async function verificarInadimplenciaENotificar(sock, pool, codAutorizado) {
-  // Portão rápido: existe fatura vencida há mais de 3 dias?
-  const rsExiste = await pool.query(
-    `SELECT EXISTS (
-       SELECT 1 FROM public."Contas_Receber"
-        WHERE "Código_Cliente" = $1
-          AND "Data_Pagamento" IS NULL
-          AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
-     ) AS inadimplente`,
-    [codAutorizado]
-  )
-  if (!rsExiste.rows[0]?.inadimplente) return false
-
-  // Lista todas as faturas vencidas
-  const rsFaturas = await pool.query(
-    `SELECT "Descrição"                               AS descricao,
-            "Valor"                                   AS valor,
-            TO_CHAR("Data_Vencimento", 'DD/MM/YYYY')  AS vencimento,
-            COALESCE(NULLIF(TRIM("agendamento_obs"), ''), '') AS link
-       FROM public."Contas_Receber"
-      WHERE "Código_Cliente" = $1
-        AND "Data_Pagamento" IS NULL
-        AND "Data_Vencimento" < CURRENT_DATE
-      ORDER BY "Data_Vencimento"`,
-    [codAutorizado]
-  )
-  if (!rsFaturas.rows.length) return false
-
-  // Busca nome e telefone do cliente
-  const rsCliente = await pool.query(
-    `SELECT "Nome_Cliente" AS nome, "Cliente_Telefone_Celular" AS telefone
-       FROM public."Cliente"
-      WHERE "Codigo" = $1 LIMIT 1`,
-    [codAutorizado]
-  )
-  const nomeCliente   = rsCliente.rows[0]?.nome     || `Cód. ${codAutorizado}`
-  const telefoneBruto = rsCliente.rows[0]?.telefone || null
-
-  const mensagemCR = montarMensagemCR(rsFaturas.rows)
-
-  // 1. Envia relatório CR no privado do cliente
-  if (telefoneBruto) {
-    const tel = somenteDigitos(telefoneBruto)
-    let jid = tel.startsWith('55') ? tel : '55' + tel
-    if (jid.length === 12) jid = jid.slice(0, 4) + '9' + jid.slice(4)
-    jid = jid + '@s.whatsapp.net'
-    try {
-      await sock.sendMessage(jid, { text: mensagemCR })
-      console.log(`[inadimplencia] Privado enviado: ${jid}`)
-    } catch (err) {
-      console.warn(`[inadimplencia] Falha privado ${jid}:`, err.message)
-    }
-  } else {
-    console.warn(`[inadimplencia] Sem telefone para Cód. ${codAutorizado}`)
-  }
-
-  // 2. Espelha no ESPELHO_FINANCEIRO com cabeçalho do cliente
-  const mensagemEspelho =
-    `👤 *${nomeCliente}* (Cód. ${codAutorizado})\n` +
-    `📱 ${telefoneBruto || 'sem telefone'}\n\n` +
-    mensagemCR
-  try {
-    await sock.sendMessage(ESPELHO_FINANCEIRO_ID, { text: mensagemEspelho })
-    console.log(`[inadimplencia] Espelho enviado`)
-  } catch (err) {
-    console.warn(`[inadimplencia] Falha espelho:`, err.message)
-  }
-
-  return true // inadimplente — bloqueia saída
-}
-
+const VERSAO_SAIDA = 'V.2605260050'
 
 // ============================================================
 // HELPERS
@@ -624,18 +522,9 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     return true
   }
 
-  // Exatamente um #1 — verifica inadimplência antes de prosseguir
+  // Exatamente um #1 — prossegue para registrar saída
   const saida = aguardando[0].r
   const key   = chaveEstado(grupoId, remetente)
-
-  const codAutorizado = Number(saida['Cod_Autorizado'])
-  if (codAutorizado) {
-    const inadimplente = await verificarInadimplenciaENotificar(sock, pool, codAutorizado)
-    if (inadimplente) {
-      await enviar(sock, grupoId, `⚠️ Agendamento suspenso.\n${VERSAO_SAIDA}`)
-      return true
-    }
-  }
 
   // Leitura robusta — pg pode normalizar o nome da coluna com acento
   const codProprietario = Number(
