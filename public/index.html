@@ -321,6 +321,90 @@
       line-height: 1.4;
     }
 
+    /* ---- Modal inadimplência ---- */
+    .inadim-dialog{
+      border: none;
+      border-radius: 22px;
+      padding: 0;
+      width: min(92vw, 440px);
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(0,0,0,.22);
+    }
+
+    .inadim-dialog::backdrop{
+      background: rgba(0,0,0,.38);
+    }
+
+    .inadim-box{
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .inadim-icon{
+      font-size: 52px;
+      line-height: 1;
+    }
+
+    .inadim-title{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      color: #dc2626;
+      line-height: 1.2;
+    }
+
+    .inadim-msg{
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+
+    .inadim-wpp{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #25d366;
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 12px 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .inadim-fechar{
+      background: #f1f5f9;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .inadim-spinner{
+      display: none;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #e5e7eb;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 4px auto;
+    }
+
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    /* ---- */
     .brand-footer{
       text-align:center;
       margin-top: 18px;
@@ -424,7 +508,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605222030</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252130</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -459,6 +543,30 @@
       <div class="footer-note">
         Apenas dias livres e feriados ficam clicáveis.
       </div>
+    </div>
+  </dialog>
+
+  <!-- Modal de inadimplência -->
+  <dialog class="inadim-dialog" id="inadimDialog">
+    <div class="inadim-box">
+      <div class="inadim-icon">⚠️</div>
+      <h2 class="inadim-title">Agendamento indisponível</h2>
+      <div class="inadim-spinner" id="inadimSpinner"></div>
+      <p class="inadim-msg">
+        Não foi possível realizar o agendamento on-line.<br>
+        Faça contato com a Marina através do WhatsApp.
+      </p>
+      <a class="inadim-wpp"
+         href="https://wa.me/556199999999"
+         id="inadimWppLink"
+         target="_blank"
+         rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor">
+          <path d="M16 0C7.163 0 0 7.163 0 16c0 2.822.736 5.47 2.027 7.774L0 32l8.469-2.003A15.93 15.93 0 0 0 16 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.28 13.28 0 0 1-6.77-1.848l-.485-.287-5.024 1.188 1.24-4.877-.316-.5A13.293 13.293 0 0 1 2.667 16C2.667 8.636 8.636 2.667 16 2.667c7.364 0 13.333 5.969 13.333 13.333 0 7.364-5.969 13.333-13.333 13.333zm7.3-9.984c-.4-.2-2.368-1.168-2.735-1.302-.367-.133-.635-.2-.902.2-.267.4-1.035 1.302-1.268 1.568-.233.267-.467.3-.867.1-.4-.2-1.689-.623-3.217-1.983-1.189-1.06-1.992-2.37-2.225-2.77-.233-.4-.025-.616.175-.815.18-.18.4-.467.6-.7.2-.233.267-.4.4-.667.133-.267.067-.5-.033-.7-.1-.2-.902-2.168-1.235-2.968-.325-.78-.657-.674-.902-.686l-.768-.013c-.267 0-.7.1-1.067.5-.367.4-1.4 1.368-1.4 3.335s1.434 3.868 1.634 4.135c.2.267 2.82 4.303 6.832 6.035.955.413 1.7.659 2.282.844.958.305 1.832.262 2.52.159.769-.115 2.368-.968 2.702-1.902.333-.934.333-1.735.233-1.902-.1-.167-.367-.267-.767-.467z"/>
+        </svg>
+        Falar com a Marina
+      </a>
+      <button class="inadim-fechar" id="inadimFechar" type="button">Fechar</button>
     </div>
   </dialog>
 
@@ -648,11 +756,53 @@
       return div;
     }
 
-    function navegarParaAgendamento(data){
+    // ----------------------------------------------------------
+    // Modal de inadimplência
+    // ----------------------------------------------------------
+    const inadimDialog  = document.getElementById("inadimDialog");
+    const inadimSpinner = document.getElementById("inadimSpinner");
+    const inadimFechar  = document.getElementById("inadimFechar");
+
+    inadimFechar.addEventListener("click", () => inadimDialog.close());
+    inadimDialog.addEventListener("click", (e) => {
+      if(e.target === inadimDialog) inadimDialog.close();
+    });
+
+    // ----------------------------------------------------------
+    // Navegar para agendamento com verificação de inadimplência
+    // ----------------------------------------------------------
+    async function navegarParaAgendamento(data){
       if(!acesso || !acesso.dvOk) return;
 
       const dataStr = isoDate(data);
-      window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+
+      // Chama endpoint de inadimplência antes de redirecionar
+      try{
+        inadimSpinner.style.display = "block";
+        inadimDialog.showModal();
+
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}`;
+        const resp = await fetch(url, { cache: "no-store" });
+        const json = await resp.json();
+
+        inadimSpinner.style.display = "none";
+
+        if(!resp.ok || json.inadimplente){
+          // Deixa o modal aberto com a mensagem de bloqueio
+          return;
+        }
+
+        // Adimplente — fecha modal e navega
+        inadimDialog.close();
+        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+
+      }catch(err){
+        // Se a consulta falhar por erro de rede etc., deixa passar (não bloqueia)
+        inadimSpinner.style.display = "none";
+        inadimDialog.close();
+        console.warn("[inadimplencia] Falha na consulta, liberando acesso:", err.message);
+        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+      }
     }
 
     function criarCelulaDia(data, info){
