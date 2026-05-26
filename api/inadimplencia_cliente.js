@@ -14,7 +14,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605252200";
+const VERSAO_API = "Allmax®2605252145";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -101,6 +101,7 @@ export default async function handler(req, res) {
   const codAutorizado = Number(req.query.codAutorizado);
   const pb            = Number(req.query.pb);
   const grupo         = String(req.query.grupo || "").trim().toUpperCase();
+  const dispararWpp   = req.query.dispararWpp !== "false"; // default true
 
   if (!codAutorizado || !pb || !grupo) {
     return res.status(400).json({
@@ -156,41 +157,42 @@ export default async function handler(req, res) {
     const faturas = rsFaturas.rows;
 
     // ----------------------------------------------------------
-    // Enfileira mensagem WPP — apenas UMA vez por chamada,
-    // usando o primeiro grupo encontrado como referência de link.
+    // Enfileira mensagem WPP — apenas se solicitado pelo frontend.
+    // O frontend controla via sessionStorage para disparar só uma
+    // vez por sessão (enquanto a aba estiver aberta).
     // ----------------------------------------------------------
     let wppEnfileirado = false;
     let wppGrupos      = [];
     let grupowppid     = null;
 
-    try {
-      const grupos = await buscarGruposWpp(client, pb, grupo);
+    if(dispararWpp){
+      try {
+        const grupos = await buscarGruposWpp(client, pb, grupo);
 
-      if (grupos.length) {
-        grupowppid = grupos[0].grupowppid;
+        if (grupos.length) {
+          grupowppid = grupos[0].grupowppid;
 
-        const mensagem = montarMensagemWpp(faturas);
+          const mensagem = montarMensagemWpp(faturas);
 
-        // Insere todos os grupos em uma única transação para evitar duplicatas
-        await client.query("BEGIN");
-        for (const g of grupos) {
-          await client.query(
-            `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status)
-             VALUES ($1, $2, 'pendente')`,
-            [g.grupowppid, mensagem]
-          );
-          wppGrupos.push(g.nomegrupowpp);
+          await client.query("BEGIN");
+          for (const g of grupos) {
+            await client.query(
+              `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status)
+               VALUES ($1, $2, 'pendente')`,
+              [g.grupowppid, mensagem]
+            );
+            wppGrupos.push(g.nomegrupowpp);
+          }
+          await client.query("COMMIT");
+
+          wppEnfileirado = true;
+        } else {
+          console.warn(`[inadimplencia_cliente] Nenhum grupo WPP encontrado para PB ${pb} / Grupo ${grupo}`);
         }
-        await client.query("COMMIT");
-
-        wppEnfileirado = true;
-      } else {
-        console.warn(`[inadimplencia_cliente] Nenhum grupo WPP encontrado para PB ${pb} / Grupo ${grupo}`);
+      } catch (wppErr) {
+        try { await client.query("ROLLBACK"); } catch {}
+        console.error("[inadimplencia_cliente] Erro ao enfileirar WPP:", wppErr.message);
       }
-    } catch (wppErr) {
-      try { await client.query("ROLLBACK"); } catch {}
-      // Falha no WPP não bloqueia a resposta de inadimplência
-      console.error("[inadimplencia_cliente] Erro ao enfileirar WPP:", wppErr.message);
     }
 
     return res.status(200).json({
