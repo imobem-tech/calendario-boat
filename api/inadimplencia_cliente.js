@@ -1,20 +1,20 @@
 // ============================================================
-// /api/inadimplencia
+// /api/inadimplencia_cliente
 // Allmax Gestão de Cotas
 // Verifica inadimplência do cotista e enfileira WPP se houver
 // contas vencidas a mais de 3 dias.
 //
-// GET /api/inadimplencia?codAutorizado=4307&pb=576&grupo=X4
+// GET /api/inadimplencia_cliente?codAutorizado=4307&pb=576&grupo=X4
 //
 // Retorna:
 //   { inadimplente: false }
-//   { inadimplente: true, wppEnfileirado: true }
+//   { inadimplente: true, wppEnfileirado: true, grupowppid: "..." }
 // ============================================================
 
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605222011";
+const VERSAO_API = "Allmax®2605252200";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -40,23 +40,27 @@ function montarMensagemWpp(faturas) {
     linhas.push(`  | Valor Original: R$ ${formatarValorBR(f.valor)}`);
     linhas.push(`  | Vencimento: ${f.vencimento}`);
 
-    if (f.link && f.link.trim()) {
+    const link = String(f.link || "").trim();
+    if (link) {
       linhas.push(`  | Link:`);
-      linhas.push(`  | ${f.link.trim()}`);
+      linhas.push(`  | ${link}`);
     }
 
     linhas.push("");
   }
 
   linhas.push(
-    "_Caso tenha havido o pagamento, favor comunicar, para que se verifique sobre a baixa._"
+    "_Caso não reconheça a conta, favor comunicar, para que se proceda o ajuste/baixa._"
+  );
+  linhas.push(
+    "_Desconsidere caso já tenha quitado, a baixa bancária pode demorar até 2 dias._"
   );
 
   return linhas.join("\n");
 }
 
 // ------------------------------------------------------------
-// Busca grupos WPP do cotista (reutiliza lógica do agendar)
+// Busca grupos WPP do cotista
 // ------------------------------------------------------------
 
 async function buscarGruposWpp(client, pb, grupo) {
@@ -112,7 +116,7 @@ export default async function handler(req, res) {
 
     // ----------------------------------------------------------
     // Q1 — Portão: existe conta vencida há mais de 3 dias?
-    // Custo mínimo: EXISTS para na primeira linha encontrada.
+    // EXISTS para na primeira linha encontrada — custo mínimo.
     // ----------------------------------------------------------
     const rsExiste = await client.query(
       `SELECT EXISTS (
@@ -132,14 +136,15 @@ export default async function handler(req, res) {
     }
 
     // ----------------------------------------------------------
-    // Q2 — Listagem: todas as faturas vencidas até hoje
+    // Q2 — Listagem: todas as faturas vencidas até hoje.
+    // Link em agendamento_obs (campo correto do Asaas).
     // Só roda se Q1 confirmou inadimplência.
     // ----------------------------------------------------------
     const rsFaturas = await client.query(
       `SELECT "Descrição"                              AS descricao,
               "Valor"                                  AS valor,
               TO_CHAR("Data_Vencimento", 'DD/MM/YYYY') AS vencimento,
-              "Centro_Custo"                           AS link
+              COALESCE(NULLIF(TRIM("agendamento_obs"), ''), '') AS link
          FROM public."Contas_Receber"
         WHERE "Código_Cliente" = $1
           AND "Data_Pagamento" IS NULL
@@ -151,17 +156,23 @@ export default async function handler(req, res) {
     const faturas = rsFaturas.rows;
 
     // ----------------------------------------------------------
-    // Enfileira mensagem WPP para o grupo do cotista
+    // Enfileira mensagem WPP — apenas UMA vez por chamada,
+    // usando o primeiro grupo encontrado como referência de link.
     // ----------------------------------------------------------
     let wppEnfileirado = false;
     let wppGrupos      = [];
+    let grupowppid     = null;
 
     try {
       const grupos = await buscarGruposWpp(client, pb, grupo);
 
       if (grupos.length) {
+        grupowppid = grupos[0].grupowppid;
+
         const mensagem = montarMensagemWpp(faturas);
 
+        // Insere todos os grupos em uma única transação para evitar duplicatas
+        await client.query("BEGIN");
         for (const g of grupos) {
           await client.query(
             `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status)
@@ -170,14 +181,16 @@ export default async function handler(req, res) {
           );
           wppGrupos.push(g.nomegrupowpp);
         }
+        await client.query("COMMIT");
 
         wppEnfileirado = true;
       } else {
-        console.warn(`[inadimplencia] Nenhum grupo WPP encontrado para PB ${pb} / Grupo ${grupo}`);
+        console.warn(`[inadimplencia_cliente] Nenhum grupo WPP encontrado para PB ${pb} / Grupo ${grupo}`);
       }
     } catch (wppErr) {
+      try { await client.query("ROLLBACK"); } catch {}
       // Falha no WPP não bloqueia a resposta de inadimplência
-      console.error("[inadimplencia] Erro ao enfileirar WPP:", wppErr.message);
+      console.error("[inadimplencia_cliente] Erro ao enfileirar WPP:", wppErr.message);
     }
 
     return res.status(200).json({
@@ -185,11 +198,12 @@ export default async function handler(req, res) {
       totalFaturas: faturas.length,
       wppEnfileirado,
       wppGrupos,
+      grupowppid,
       versao: VERSAO_API
     });
 
   } catch (err) {
-    console.error("[inadimplencia] Erro:", err.message);
+    console.error("[inadimplencia_cliente] Erro:", err.message);
     return res.status(500).json({
       error: err.message || "Erro interno",
       versao: VERSAO_API
