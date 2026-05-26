@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER.JS — Allmax®2605222230
+// SERVER.JS — Allmax®2605261015
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
@@ -30,7 +30,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605242125'
+const VERSAO_WPP = 'Allmax®2605261015'
 
 const app = express()
 const PORT = process.env.PORT || 8080
