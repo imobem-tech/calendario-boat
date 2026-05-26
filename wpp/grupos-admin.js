@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261500
+// wpp/grupos-admin.js — Allmax®2605261510
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -63,15 +63,26 @@ async function buscarColaboradoresAtivos(pool) {
 }
 
 // Resolve JID para adicionar ao grupo: sempre usa telefone via onWhatsApp
+// Tenta com e sem nono dígito
 async function resolverJidColaborador(sock, colab) {
   const tel = String(colab.Telefone || '').replace(/\D/g, '')
   if (!tel) return null
-  try {
-    const [res] = await sock.onWhatsApp(tel)
-    return res?.exists ? res.jid : null
-  } catch {
-    return null
+
+  const telComDDI = tel.startsWith('55') ? tel : '55' + tel
+  const variantes = [telComDDI]
+  if (telComDDI.length === 12) {
+    variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
+  } else if (telComDDI.length === 13) {
+    variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
   }
+
+  for (const variante of variantes) {
+    try {
+      const [res] = await sock.onWhatsApp(variante)
+      if (res?.exists) return res.jid
+    } catch {}
+  }
+  return null
 }
 
 // Sincroniza colaboradores num único grupo
@@ -390,17 +401,36 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
 
     const { nome, telefone } = rsCliente.rows[0]
     const tel = String(telefone).replace(/\D/g, '')
+    // Garante DDI 55
+    const telComDDI = tel.startsWith('55') ? tel : '55' + tel
 
-    addLog(`Titular: ${nome} | Tel: ${telefone}`)
+    addLog(`Titular: ${nome} | Tel: ${telefone} | Normalizado: ${telComDDI}`)
 
-    // Resolve JID via onWhatsApp
-    const [resultado] = await sock.onWhatsApp(tel)
-    if (!resultado?.exists) {
-      return res.status(404).json({ erro: `Número ${telefone} não encontrado no WhatsApp`, log })
+    // Tenta com nono dígito e sem nono dígito
+    const variantes = [telComDDI]
+    if (telComDDI.length === 12) {
+      // sem nono → adiciona nono: 556384030406 → 5563984030406
+      variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
+    } else if (telComDDI.length === 13) {
+      // com nono → remove nono: 5563984030406 → 556384030406
+      variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
     }
 
-    const jidTitular = resultado.jid
-    addLog(`JID resolvido: ${jidTitular}`)
+    let jidTitular = null
+    for (const variante of variantes) {
+      try {
+        const [resultado] = await sock.onWhatsApp(variante)
+        if (resultado?.exists) {
+          jidTitular = resultado.jid
+          addLog(`JID resolvido via ${variante}: ${jidTitular}`)
+          break
+        }
+      } catch {}
+    }
+
+    if (!jidTitular) {
+      return res.status(404).json({ erro: `Número ${telefone} não encontrado no WhatsApp`, log })
+    }
 
     // Verifica se já está no grupo
     const meta = await sock.groupMetadata(grupowppid)
