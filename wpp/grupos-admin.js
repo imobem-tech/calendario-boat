@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261510
+// wpp/grupos-admin.js — Allmax®2605261520
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -442,10 +442,18 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
     }
 
     // Adiciona como membro simples (sem promote)
-    await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
-    addLog(`Titular adicionado: ${nome}`)
+    const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
+    addLog(`Resultado groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
 
-    return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
+    // Verifica se foi adicionado com sucesso
+    const status = resultado?.[0]?.status || resultado?.[0]
+    if (status === '200' || status === 200) {
+      addLog(`Titular adicionado: ${nome}`)
+      return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
+    } else {
+      addLog(`AVISO: status inesperado: ${JSON.stringify(status)}`)
+      return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
+    }
 
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
