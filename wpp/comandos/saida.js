@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas
+// Allmax Gestão de Cotas — V.2605260050
 // Compatível com pg Pool
 //
 // Comandos:
@@ -8,11 +8,118 @@
 //   colaborador63984030406
 //   colaborador 63984030406
 //      => vincula o LID do remetente ao colaborador cadastrado
+//
+// V.2605252345:
+//   - buscarSaidaDoDia retorna TODOS os registros do dia
+//   - classifica cada registro em estado (#1 a #10)
+//   - exibe histórico completo antes de qualquer ação
+//   - permite nova saída mesmo havendo ciclos anteriores completos
 // ============================================================
 
 const estadosSaida = new Map()
-
+const VERSAO_SAIDA = 'V.2605261000'
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || '120363424805097946@g.us'
+
+// ============================================================
+// INADIMPLÊNCIA — verifica CR, envia privado + espelho
+// ============================================================
+
+function formatarValorBR(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function montarMensagemCR(faturas) {
+  const linhas = ['⚠️ *Informações sobre Contas em Aberto*\n']
+  for (const f of faturas) {
+    linhas.push(`*${f.descricao}*`)
+    linhas.push(`  | Valor Original: R$ ${formatarValorBR(f.valor)}`)
+    linhas.push(`  | Vencimento: ${f.vencimento}`)
+    const link = String(f.link || '').trim()
+    if (link) {
+      linhas.push(`  | Link:`)
+      linhas.push(`  | ${link}`)
+    }
+    linhas.push('')
+  }
+  linhas.push('_Caso não reconheça a conta, favor comunicar, para que se proceda o ajuste/baixa._')
+  linhas.push('_Desconsidere caso já tenha quitado, a baixa bancária pode demorar até 2 dias._')
+  return linhas.join('\n')
+}
+
+async function verificarInadimplenciaENotificar(sock, pool, codAutorizado) {
+  // Portão rápido: existe fatura vencida há mais de 3 dias?
+  const rsExiste = await pool.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM public."Contas_Receber"
+        WHERE "Código_Cliente" = $1
+          AND "Data_Pagamento" IS NULL
+          AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
+     ) AS inadimplente`,
+    [codAutorizado]
+  )
+  if (!rsExiste.rows[0]?.inadimplente) return false
+
+  // Lista todas as faturas vencidas
+  const rsFaturas = await pool.query(
+    `SELECT "Descrição"                               AS descricao,
+            "Valor"                                   AS valor,
+            TO_CHAR("Data_Vencimento", 'DD/MM/YYYY')  AS vencimento,
+            COALESCE(NULLIF(TRIM("agendamento_obs"), ''), '') AS link
+       FROM public."Contas_Receber"
+      WHERE "Código_Cliente" = $1
+        AND "Data_Pagamento" IS NULL
+        AND "Data_Vencimento" < CURRENT_DATE
+      ORDER BY "Data_Vencimento"`,
+    [codAutorizado]
+  )
+  if (!rsFaturas.rows.length) return false
+
+  // Busca nome e telefone do cliente
+  const rsCliente = await pool.query(
+    `SELECT "Nome_Cliente" AS nome, "Cliente_Telefone_Celular" AS telefone
+       FROM public."Cliente"
+      WHERE "Codigo" = $1 LIMIT 1`,
+    [codAutorizado]
+  )
+  const nomeCliente   = rsCliente.rows[0]?.nome     || `Cód. ${codAutorizado}`
+  const telefoneBruto = rsCliente.rows[0]?.telefone || null
+
+  const mensagemCR = montarMensagemCR(rsFaturas.rows)
+
+  // 1. Envia relatório CR no privado do cliente
+  if (telefoneBruto) {
+    const tel = somenteDigitos(telefoneBruto)
+    let jid = tel.startsWith('55') ? tel : '55' + tel
+    if (jid.length === 12) jid = jid.slice(0, 4) + '9' + jid.slice(4)
+    jid = jid + '@s.whatsapp.net'
+    try {
+      await sock.sendMessage(jid, { text: mensagemCR })
+      console.log(`[inadimplencia] Privado enviado: ${jid}`)
+    } catch (err) {
+      console.warn(`[inadimplencia] Falha privado ${jid}:`, err.message)
+    }
+  } else {
+    console.warn(`[inadimplencia] Sem telefone para Cód. ${codAutorizado}`)
+  }
+
+  // 2. Espelha no ESPELHO_FINANCEIRO com cabeçalho do cliente
+  const mensagemEspelho =
+    `👤 *${nomeCliente}* (Cód. ${codAutorizado})\n` +
+    `📱 ${telefoneBruto || 'sem telefone'}\n\n` +
+    mensagemCR
+  try {
+    await sock.sendMessage(ESPELHO_FINANCEIRO_ID, { text: mensagemEspelho })
+    console.log(`[inadimplencia] Espelho enviado`)
+  } catch (err) {
+    console.warn(`[inadimplencia] Falha espelho:`, err.message)
+  }
+
+  return true // inadimplente — bloqueia saída
+}
+
 
 // ============================================================
 // HELPERS
@@ -234,7 +341,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
     await enviar(
       sock,
       grupoId,
-      'Não encontrei colaborador com este telefone. Verifique o número cadastrado.'
+      `Não encontrei colaborador com este telefone. Verifique o número cadastrado.\n${VERSAO_SAIDA}`
     )
     return true
   }
@@ -242,7 +349,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   const lid = String(remetente || '').trim().toLowerCase()
 
   if (!lid) {
-    await enviar(sock, grupoId, 'Não consegui identificar o remetente para vincular.')
+    await enviar(sock, grupoId, `Não consegui identificar o remetente para vincular.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -255,7 +362,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   await enviar(
     sock,
     grupoId,
-    `Colaborador vinculado com sucesso: ${colaborador.Nome}`
+    `Colaborador vinculado com sucesso: ${colaborador.Nome}\n${VERSAO_SAIDA}`
   )
 
   console.log('DEBUG_COLAB_LID_VINCULADO_MANUAL', {
@@ -287,121 +394,6 @@ function normalizarGrupoCompLetra(cota) {
 }
 
 // ============================================================
-// INADIMPLÊNCIA — verifica CR e envia no privado do cliente
-// ============================================================
-
-function formatarValorBR(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
-
-function montarMensagemInadimplencia(faturas) {
-  const linhas = ['⚠️ *Informações sobre Contas em Aberto*\n']
-
-  for (const f of faturas) {
-    linhas.push(`*${f.descricao}*`)
-    linhas.push(`  | Valor Original: R$ ${formatarValorBR(f.valor)}`)
-    linhas.push(`  | Vencimento: ${f.vencimento}`)
-
-    const link = String(f.link || '').trim()
-    if (link) {
-      linhas.push(`  | Link:`)
-      linhas.push(`  | ${link}`)
-    }
-
-    linhas.push('')
-  }
-
-  linhas.push('_Caso não reconheça a conta, favor comunicar, para que se proceda o ajuste/baixa._')
-  linhas.push('_Desconsidere caso já tenha quitado, a baixa bancária pode demorar até 2 dias._')
-
-  return linhas.join('\n')
-}
-
-async function verificarInadimplenciaENotificar(sock, pool, codAutorizado) {
-  // Portão rápido: existe fatura vencida há mais de 3 dias?
-  const rsExiste = await pool.query(
-    `SELECT EXISTS (
-       SELECT 1
-         FROM public."Contas_Receber"
-        WHERE "Código_Cliente" = $1
-          AND "Data_Pagamento" IS NULL
-          AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
-     ) AS inadimplente`,
-    [codAutorizado]
-  )
-
-  const inadimplente = rsExiste.rows[0]?.inadimplente === true
-  if (!inadimplente) return false
-
-  // Busca todas as faturas vencidas
-  const rsFaturas = await pool.query(
-    `SELECT "Descrição"                               AS descricao,
-            "Valor"                                   AS valor,
-            TO_CHAR("Data_Vencimento", 'DD/MM/YYYY')  AS vencimento,
-            COALESCE(NULLIF(TRIM("agendamento_obs"), ''), '') AS link
-       FROM public."Contas_Receber"
-      WHERE "Código_Cliente" = $1
-        AND "Data_Pagamento" IS NULL
-        AND "Data_Vencimento" < CURRENT_DATE
-      ORDER BY "Data_Vencimento"`,
-    [codAutorizado]
-  )
-
-  const faturas = rsFaturas.rows
-  if (!faturas.length) return false
-
-  // Busca telefone e nome do cliente
-  const rsCliente = await pool.query(
-    `SELECT "Cliente_Telefone_Celular" AS telefone,
-            "Nome_Cliente"             AS nome
-       FROM public."Cliente"
-      WHERE "Codigo" = $1
-      LIMIT 1`,
-    [codAutorizado]
-  )
-
-  const telefoneBruto = rsCliente.rows[0]?.telefone
-  const nomeCliente   = rsCliente.rows[0]?.nome || `Cód. ${codAutorizado}`
-  const mensagem      = montarMensagemInadimplencia(faturas)
-
-  // 1. Envia no privado do cliente
-  if (telefoneBruto) {
-    const tel = somenteDigitos(telefoneBruto)
-    let jid = tel
-    if (!jid.startsWith('55')) jid = '55' + jid
-    if (jid.length === 12) jid = jid.slice(0, 4) + '9' + jid.slice(4)
-    jid = jid + '@s.whatsapp.net'
-
-    try {
-      await sock.sendMessage(jid, { text: mensagem })
-      console.log(`[inadimplencia] Privado enviado: ${jid}`)
-    } catch (err) {
-      console.warn(`[inadimplencia] Falha ao enviar privado ${jid}:`, err.message)
-    }
-  } else {
-    console.warn(`[inadimplencia] Telefone não encontrado para Cod_Autorizado=${codAutorizado}`)
-  }
-
-  // 2. Espelha no ESPELHO_FINANCEIRO com cabeçalho identificando o cliente
-  const mensagemEspelho =
-    `👤 *${nomeCliente}* (Cód. ${codAutorizado})\n` +
-    `📱 ${telefoneBruto || 'sem telefone'}\n\n` +
-    mensagem
-
-  try {
-    await sock.sendMessage(ESPELHO_FINANCEIRO_ID, { text: mensagemEspelho })
-    console.log(`[inadimplencia] Espelho enviado: ${ESPELHO_FINANCEIRO_ID}`)
-  } catch (err) {
-    console.warn(`[inadimplencia] Falha ao enviar espelho:`, err.message)
-  }
-
-  return true // inadimplente — bloqueia saída
-}
-
-// ============================================================
 // BUSCA SAÍDA DO DIA
 // ============================================================
 
@@ -415,9 +407,112 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
        AND "Dt_Agendamento" >= ($3::date)
        AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+       AND "Dt_Desistencia"   IS NULL
+       AND "Dt_Cancela_saida" IS NULL
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
+}
+
+// ============================================================
+// BUSCA TODOS OS REGISTROS DO DIA
+// ============================================================
+
+async function buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra) {
+  const hoje = hojeIsoSaoPaulo()
+
+  const rs = await pool.query(`
+    SELECT *
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
+       AND "Dt_Agendamento" >= ($3::date)
+       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+     ORDER BY "Dt_Agendamento" ASC
+  `, [codEmbPb, grupoCompLetra, hoje])
+
+  return rs.rows || []
+}
+
+// ============================================================
+// CLASSIFICA ESTADO DE CADA REGISTRO
+// ============================================================
+
+function classificarEstado(r) {
+  const saida      = r['Dt_Saída']
+  const retorno    = r['Dt_Retorno']
+  const desist     = r['Dt_Desistencia']
+  const cancela    = r['Dt_Cancela_saida']
+
+  if (!saida && !desist && !cancela)           return 1  // aguardando saída
+  if (saida  && !retorno && !desist && !cancela) return 2  // em navegação
+  if (saida  &&  retorno && !desist && !cancela) return 3  // ciclo completo
+  if (!saida &&  desist  && !cancela)            return 4  // desistência cotista
+  if (!saida && !desist  &&  cancela)            return 5  // cancelado admin
+  if (!saida &&  desist  &&  cancela)            return 6  // desist + cancela
+  if (saida  && !retorno &&  desist)             return 7  // inconsistente
+  if (saida  && !retorno &&  cancela)            return 8  // inconsistente
+  if (!saida &&  retorno)                        return 9  // inconsistente
+  if (saida  &&  retorno &&  desist)             return 10 // inconsistente
+  return 99 // desconhecido
+}
+
+// ============================================================
+// FORMATA HORA A PARTIR DE TIMESTAMP
+// ============================================================
+
+function extrairHora(dt) {
+  if (!dt) return '—'
+  const d = dt instanceof Date ? dt : new Date(dt)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mi}`
+}
+
+// ============================================================
+// MONTA RESUMO HISTÓRICO
+// ============================================================
+
+function montarResumoHistorico(registros, pb, grupo) {
+  const hoje = hojeIsoSaoPaulo()
+  const [ano, mes, dia] = hoje.split('-')
+  const dataFormatada = `${dia}/${mes}/${ano}`
+
+  const linhas = [`📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}\n`]
+
+  // Separa #1 dos demais — #1 sempre aparece por último
+  const historico = registros.filter(r => classificarEstado(r) !== 1)
+  const aguardando = registros.filter(r => classificarEstado(r) === 1)
+
+  for (const r of [...historico, ...aguardando]) {
+    const estado = classificarEstado(r)
+    const agHora = extrairHora(r['Dt_Agendamento'])
+    const saHora = extrairHora(r['Dt_Saída'])
+    const reHora = extrairHora(r['Dt_Retorno'])
+
+    switch (estado) {
+      case 1:
+        linhas.push(`⏳ Aguardando saída`)
+        break
+      case 2:
+        linhas.push(`🚢 Em navegação\n   Agendado: ${agHora} | Saída: ${saHora}`)
+        break
+      case 3:
+        linhas.push(`✅ Ciclo encerrado\n   Saída: ${saHora} | Retorno: ${reHora}`)
+        break
+      case 4:
+        linhas.push(`❌ Desistência\n   Agendado: ${agHora}`)
+        break
+      case 5:
+      case 6:
+        linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
+        break
+      default:
+        linhas.push(`⚠️ Situação irregular\n   Agendado: ${agHora}`)
+    }
+  }
+
+  return linhas.join('\n')
 }
 
 // ============================================================
@@ -446,13 +541,18 @@ async function registrarSaida(pool, saida, colaborador) {
      WHERE "ID" = $3
   `, [agora, colaborador.Nome, saida.ID])
 
-  await pool.query(`
-    UPDATE public."P_BOAT_9_OS"
-       SET "OS_obs_Fechamento" = $1
-     WHERE "OS_Dt_Fechamento" IS NULL
-       AND "Num_Emb_PB" = $2
-       AND "Tipo" = 'SAÍDA'
-  `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
+  // P_BOAT_9_OS pode não estar disponível no Neon ainda
+  try {
+    await pool.query(`
+      UPDATE public."P_BOAT_9_OS"
+         SET "OS_obs_Fechamento" = $1
+       WHERE "OS_Dt_Fechamento" IS NULL
+         AND "Num_Emb_PB" = $2
+         AND "Tipo" = 'SAÍDA'
+    `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
+  } catch (osErr) {
+    console.warn('[registrarSaida] P_BOAT_9_OS indisponível:', osErr.message)
+  }
 
   return agoraBR
 }
@@ -465,103 +565,118 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const colaborador = await buscarColaborador(pool, remetente)
 
   if (!colaborador) {
-    await enviar(sock, grupoId, 'Comando não aceito. Use: colaborador + telefone cadastrado.')
+    await enviar(sock, grupoId, `Comando não aceito. Use: colaborador + telefone cadastrado.\n${VERSAO_SAIDA}`)
     return true
   }
 
   const grupoAgenda = await buscarGrupoAgenda(pool, grupoId)
 
   if (!grupoAgenda) {
-    await enviar(sock, grupoId, 'Não encontrei este grupo na base de grupos da agenda.')
+    await enviar(sock, grupoId, `Não encontrei este grupo na base de grupos da agenda.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  const codEmbPb = Number(grupoAgenda.pb)
+  const codEmbPb      = Number(grupoAgenda.pb)
   const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
 
   console.log('DEBUG_SAIDA_ENTRADA', {
-    grupoId,
-    remetente,
-    codEmbPb,
-    grupoCompLetra,
+    grupoId, remetente, codEmbPb, grupoCompLetra,
     colaborador: colaborador.Nome
   })
 
   if (!codEmbPb || !grupoCompLetra) {
-    await enviar(sock, grupoId, 'Não consegui identificar a embarcação/grupo desta conversa.')
+    await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  const saidas = await buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra)
+  // Busca TODOS os registros do dia
+  const registros = await buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra)
 
-  if (!saidas.length) {
-    await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
+  // Sem nenhum registro
+  if (!registros.length) {
+    await enviar(sock, grupoId, `Não encontrei agendamento de saída para esta embarcação/grupo hoje.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  if (saidas.length > 1) {
-    await enviar(sock, grupoId, 'Encontrei mais de uma saída para hoje. Não consegui registrar automaticamente.')
+  // Monta e exibe histórico
+  const resumo = montarResumoHistorico(registros, codEmbPb, grupoCompLetra)
+
+  // Classifica todos
+  const estados = registros.map(r => ({ r, estado: classificarEstado(r) }))
+
+  // Verifica navegação ativa (#2)
+  const emNavegacao = estados.filter(e => e.estado === 2)
+  if (emNavegacao.length > 0) {
+    await enviar(sock, grupoId, `${resumo}\n\nEsta embarcação já está em navegação.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  const saida = saidas[0]
+  // Filtra aguardando saída (#1)
+  const aguardando = estados.filter(e => e.estado === 1)
 
-  if (saida.Dt_Desistencia) {
-    await enviar(sock, grupoId, 'Esta saída consta como desistência. Não é possível registrar a saída.')
+  if (aguardando.length === 0) {
+    await enviar(sock, grupoId, `${resumo}\n\nNão há agendamento ativo para hoje.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  if (saida.Dt_Cancela_saida) {
-    await enviar(sock, grupoId, 'Esta saída consta como cancelada. Não é possível registrar a saída.')
+  if (aguardando.length > 1) {
+    await enviar(sock, grupoId, `${resumo}\n\n⚠️ Situação irregular: mais de um agendamento ativo. Contate o administrador.\n${VERSAO_SAIDA}`)
     return true
   }
 
-  if (saida['Dt_Saída']) {
-    await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
-    return true
-  }
+  // Exatamente um #1 — verifica inadimplência antes de prosseguir
+  const saida = aguardando[0].r
+  const key   = chaveEstado(grupoId, remetente)
 
-  // ============================================================
-  // VERIFICAÇÃO DE INADIMPLÊNCIA — bloqueia saída se houver CR
-  // O relatório é enviado no privado do cliente (tabela Cliente)
-  // ============================================================
   const codAutorizado = Number(saida['Cod_Autorizado'])
   if (codAutorizado) {
     const inadimplente = await verificarInadimplenciaENotificar(sock, pool, codAutorizado)
     if (inadimplente) {
-      await enviar(sock, grupoId, `⚠️ Agendamento suspenso.`)
+      await enviar(sock, grupoId, `⚠️ Agendamento suspenso.\n${VERSAO_SAIDA}`)
       return true
     }
   }
 
-  const key = chaveEstado(grupoId, remetente)
+  // Leitura robusta — pg pode normalizar o nome da coluna com acento
+  const codProprietario = Number(
+    saida['Cod_Proprietário'] ??
+    saida['Cod_Proprietario'] ??
+    saida['cod_proprietário'] ??
+    saida['cod_proprietario'] ??
+    0
+  )
+
+  console.log('DEBUG_PROPRIETARIO', {
+    codProprietario,
+    keys: Object.keys(saida).filter(k => k.toLowerCase().includes('propri'))
+  })
 
   const precisaHoraMotor =
-    Number(saida['Cod_Proprietário']) === 4255 &&
-    (
-      saida.Hora_Motor_Saida === null ||
-      saida.Hora_Motor_Saida === undefined ||
-      saida.Hora_Motor_Saida === ''
-    )
+    codProprietario === 4255 &&
+    (saida.Hora_Motor_Saida === null ||
+     saida.Hora_Motor_Saida === undefined ||
+     saida.Hora_Motor_Saida === '')
 
   if (precisaHoraMotor) {
     estadosSaida.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       saida,
-      colaborador
+      colaborador,
+      resumo
     })
 
-    await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
     return true
   }
 
   estadosSaida.set(key, {
     etapa: 'aguardando_confirmacao_saida',
     saida,
-    colaborador
+    colaborador,
+    resumo
   })
 
-  await enviar(sock, grupoId, 'Confirma saída? S/N')
+  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída? S/N\n${VERSAO_SAIDA}`)
   return true
 }
 
@@ -577,13 +692,13 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
   if (msg === 'd') {
     estadosSaida.delete(key)
-    await enviar(sock, grupoId, 'Desistência registrada.')
+    await enviar(sock, grupoId, `Desistência registrada.\n${VERSAO_SAIDA}`)
     return true
   }
 
   if (estado.etapa === 'aguardando_hora_motor_saida') {
     if (!horaMotorValida(texto)) {
-      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -591,7 +706,7 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_hora_motor'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+    await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -601,12 +716,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
       estado.horaMotorInformada = ''
       estadosSaida.set(key, estado)
 
-      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+      await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -619,19 +734,19 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_saida'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, 'Confirma saída? S/N')
+    await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
     return true
   }
 
   if (estado.etapa === 'aguardando_confirmacao_saida') {
     if (msg === 'n') {
       estadosSaida.delete(key)
-      await enviar(sock, grupoId, 'Saída não confirmada.')
+      await enviar(sock, grupoId, `Saída não confirmada.\n${VERSAO_SAIDA}`)
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, 'Confirma saída? S/N')
+      await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -639,12 +754,10 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
     estadosSaida.delete(key)
 
-    let resposta =
-      `Saída registrada com sucesso.\n\n` +
+    let resposta = `*Saída confirmada* — ${dataHoraBR}\n\n` +
       `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
       `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
-      `Colaborador: ${estado.colaborador.Nome}\n` +
-      `Data/Hora: ${dataHoraBR}`
+      `Colaborador: ${estado.colaborador.Nome}`
 
     if (
       estado.saida.Hora_Motor_Saida !== null &&
@@ -652,6 +765,8 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     ) {
       resposta += `\nHora Motor Saída: ${String(estado.saida.Hora_Motor_Saida).replace('.', ',')}`
     }
+
+    resposta += `\n${VERSAO_SAIDA}`
 
     await enviar(sock, grupoId, resposta)
     return true
