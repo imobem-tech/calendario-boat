@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER.JS — Allmax®2605261015
+// SERVER.JS — Allmax®2605261050
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
@@ -30,7 +30,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605261045'
+const VERSAO_WPP = 'Allmax®2605261050'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -396,12 +396,31 @@ app.post('/enviar-jid', async (req, res) => {
     if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const { jid, mensagem } = req.body
     if (!jid || !mensagem) return res.status(400).json({ erro: 'jid e mensagem são obrigatórios' })
-    console.log(`[enviar-jid] Enviando para ${jid} (${mensagem.length} chars)`)
-    await sock.sendMessage(jid, { text: mensagem })
-    console.log(`[enviar-jid] Enviado com sucesso para ${jid}`)
-    res.json({ sucesso: true, destino: jid })
+
+    console.log(`[enviar-jid] Iniciando envio para ${jid}`)
+
+    let jidFinal = jid
+
+    // Para privados (@s.whatsapp.net), verifica se o número existe no WhatsApp
+    if (jid.endsWith('@s.whatsapp.net')) {
+      try {
+        const [resultado] = await sock.onWhatsApp(jid.replace('@s.whatsapp.net', ''))
+        if (!resultado?.exists) {
+          console.warn(`[enviar-jid] Número não encontrado no WhatsApp: ${jid}`)
+          return res.status(404).json({ erro: 'Número não encontrado no WhatsApp', jid })
+        }
+        jidFinal = resultado.jid
+        console.log(`[enviar-jid] Número verificado: ${jidFinal}`)
+      } catch (checkErr) {
+        console.warn(`[enviar-jid] Falha ao verificar número, tentando enviar direto:`, checkErr.message)
+      }
+    }
+
+    await sock.sendMessage(jidFinal, { text: mensagem })
+    console.log(`[enviar-jid] Enviado com sucesso para ${jidFinal}`)
+    res.json({ sucesso: true, destino: jidFinal })
   } catch (err) {
-    console.error(`[enviar-jid] ERRO ao enviar para ${req.body?.jid}:`, err.message)
+    console.error(`[enviar-jid] ERRO:`, err.message)
     res.status(500).json({ erro: err.message })
   }
 })
