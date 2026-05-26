@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261550
+// wpp/grupos-admin.js — Allmax®2605261600
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -85,6 +85,20 @@ async function resolverJidColaborador(sock, colab) {
   return null
 }
 
+// Grava Lid do colaborador na tabela quando descoberto
+async function gravarLidColaborador(pool, colabId, lid, addLog) {
+  if (!lid || !String(lid).includes('@lid')) return
+  try {
+    await pool.query(
+      `UPDATE public.wpp_colaboradores SET "Lid" = $1 WHERE "ID" = $2`,
+      [lid, colabId]
+    )
+    addLog(`Lid gravado para colaborador ID=${colabId}: ${lid}`)
+  } catch (err) {
+    addLog(`AVISO: falha ao gravar Lid: ${err.message}`)
+  }
+}
+
 // Sincroniza colaboradores num único grupo
 async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
   const colaboradores = await buscarColaboradoresAtivos(pool)
@@ -96,29 +110,46 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
     participantesAtuais = meta.participants || []
   } catch (err) {
     addLog(`ERRO ao buscar participantes do grupo ${grupoId}: ${err.message}`)
-    return { adicionados: 0, removidos: 0, promovidos: 0, rebaixados: 0, falhas: [] }
+    return { adicionados: 0, removidos: 0, promovidos: 0, rebaixados: 0, convites: 0, falhas: [] }
   }
 
   const jidsAtuais = participantesAtuais.map(p => ({
     jid: p.id,
     norm: normJid(p.id),
+    isLid: String(p.id).includes('@lid'),
     admin: p.admin === 'admin' || p.admin === 'superadmin'
   }))
 
-  // Resolve JIDs dos colaboradores
+  // Resolve JIDs dos colaboradores via onWhatsApp (telefone)
   const colaboradoresResolvidos = []
   for (const colab of colaboradores) {
     const jid = await resolverJidColaborador(sock, colab)
     if (jid) {
-      colaboradoresResolvidos.push({ ...colab, jidFinal: jid, normFinal: normJid(jid) })
+      const normTel = normJid(jid)
+      // Verifica se já está no grupo pelo Lid gravado ou pelo telefone normalizado
+      const jaEstaNoGrupo = jidsAtuais.find(p =>
+        (colab.Lid && p.norm === normJid(colab.Lid)) ||
+        p.norm === normTel
+      )
+      colaboradoresResolvidos.push({
+        ...colab,
+        jidFinal: jid,
+        normFinal: normTel,
+        participanteAtual: jaEstaNoGrupo || null
+      })
     } else {
       addLog(`AVISO: não resolveu JID para colaborador ${colab.Nome}`)
     }
   }
 
-  const normsColaboradores = new Set(colaboradoresResolvidos.map(c => c.normFinal))
+  // Set de norms dos colaboradores ativos (telefone + Lid se disponível)
+  const normsColaboradores = new Set()
+  for (const c of colaboradoresResolvidos) {
+    normsColaboradores.add(c.normFinal)
+    if (c.Lid) normsColaboradores.add(normJid(c.Lid))
+  }
 
-  // JIDs protegidos: ADM2 e o próprio bot (não remover nunca)
+  // JIDs protegidos: ADM2
   const protegidos = new Set([normJid(ADM2_JID)])
 
   let adicionados = 0, removidos = 0, promovidos = 0, rebaixados = 0, convites = 0
@@ -139,13 +170,19 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
 
   // ADICIONAR / PROMOVER colaboradores
   for (const colab of colaboradoresResolvidos) {
-    const jaEsta = jidsAtuais.find(p => p.norm === colab.normFinal)
+    const jaEsta = colab.participanteAtual
     const deveSerAdmin = colab.Administrador === 'S'
 
     if (!jaEsta) {
       try {
         const resultado = await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'add')
         const status = String(resultado?.[0]?.status || '')
+        const lidRetornado = resultado?.[0]?.jid
+
+        // Grava Lid se retornado
+        if (lidRetornado && String(lidRetornado).includes('@lid')) {
+          await gravarLidColaborador(pool, colab.ID, lidRetornado, addLog)
+        }
 
         if (status === '200') {
           addLog(`ADICIONADO: ${colab.Nome}`)
@@ -161,7 +198,6 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
             }
           }
         } else if (status === '408') {
-          // Privacidade bloqueou — envia link de convite no privado
           const link = await obterLinkConvite()
           if (link) {
             const primeiroNome = String(colab.Nome || '').split(' ')[0]
@@ -193,7 +229,7 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
       // Já está — verifica se precisa promover/rebaixar
       if (deveSerAdmin && !jaEsta.admin) {
         try {
-          await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'promote')
+          await sock.groupParticipantsUpdate(grupoId, [jaEsta.jid], 'promote')
           addLog(`PROMOVIDO: ${colab.Nome}`)
           promovidos++
         } catch (err) {
@@ -201,7 +237,7 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
         }
       } else if (!deveSerAdmin && jaEsta.admin) {
         try {
-          await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'demote')
+          await sock.groupParticipantsUpdate(grupoId, [jaEsta.jid], 'demote')
           addLog(`REBAIXADO: ${colab.Nome}`)
           rebaixados++
         } catch (err) {
