@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261630
+// wpp/grupos-admin.js — Allmax®2605261640
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -182,10 +182,9 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
       try {
         const resultado = await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'add')
         const status = String(resultado?.[0]?.status || '')
-        const lidRetornado = resultado?.[0]?.jid
 
         // Grava Lid apenas se phone_number retornado bate com o colaborador
-     
+        const lidRetornado = resultado?.[0]?.jid
         const phoneRetornado = normJid(
           resultado?.[0]?.content?.attrs?.phone_number || ''
         )
@@ -199,8 +198,20 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
         }
 
         if (status === '200') {
-          addLog(`ADICIONADO: ${colab.Nome}`)
-          adicionados++
+          try {
+            const metaAtualizado = await sock.groupMetadata(grupoId)
+            const telColab = normJid(colab.jidFinal)
+            const participanteNovo = metaAtualizado.participants.find(p => {
+              // Tenta match pelo phone_number se disponível, ou pelo JID s.whatsapp.net
+              const pNorm = normJid(p.id)
+              return pNorm === telColab || pNorm.slice(-8) === telColab.slice(-8)
+            })
+            if (participanteNovo?.id?.includes('@lid')) {
+              await gravarLidColaborador(pool, colab.ID, participanteNovo.id, addLog)
+            }
+          } catch (errMeta) {
+            addLog(`AVISO: não buscou Lid após add: ${errMeta.message}`)
+          }
 
           if (deveSerAdmin) {
             try {
