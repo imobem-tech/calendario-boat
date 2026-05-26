@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261400
+// wpp/grupos-admin.js — Allmax®2605261500
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -62,12 +62,8 @@ async function buscarColaboradoresAtivos(pool) {
   return rows
 }
 
-// Resolve JID para adicionar ao grupo:
-// prefere Lid se disponível, senão usa telefone via onWhatsApp
+// Resolve JID para adicionar ao grupo: sempre usa telefone via onWhatsApp
 async function resolverJidColaborador(sock, colab) {
-  if (colab.Lid && String(colab.Lid).includes('@lid')) {
-    return colab.Lid
-  }
   const tel = String(colab.Telefone || '').replace(/\D/g, '')
   if (!tel) return null
   try {
