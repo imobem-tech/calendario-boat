@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas
+// Allmax Gestão de Cotas — V.2605252330
 // Compatível com pg Pool
 //
 // Comandos:
@@ -8,6 +8,11 @@
 //   colaborador63984030406
 //   colaborador 63984030406
 //      => vincula o LID do remetente ao colaborador cadastrado
+//
+// CORREÇÃO V.2605252330:
+//   buscarSaidaDoDia agora filtra Dt_Desistencia IS NULL e
+//   Dt_Cancela_saida IS NULL, evitando falso "mais de uma saída"
+//   quando existem registros cancelados no mesmo dia.
 // ============================================================
 
 const estadosSaida = new Map()
@@ -298,6 +303,8 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
        AND "Dt_Agendamento" >= ($3::date)
        AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+       AND "Dt_Desistencia"   IS NULL
+       AND "Dt_Cancela_saida" IS NULL
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
