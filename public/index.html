@@ -508,7 +508,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252124</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252145</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -556,17 +556,20 @@
         Não foi possível realizar o agendamento on-line.<br>
         Faça contato com a Marina através do WhatsApp.
       </p>
-      <a class="inadim-wpp"
-         href="https://wa.me/556199999999"
-         id="inadimWppLink"
-         target="_blank"
-         rel="noopener">
-        <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor">
-          <path d="M16 0C7.163 0 0 7.163 0 16c0 2.822.736 5.47 2.027 7.774L0 32l8.469-2.003A15.93 15.93 0 0 0 16 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.28 13.28 0 0 1-6.77-1.848l-.485-.287-5.024 1.188 1.24-4.877-.316-.5A13.293 13.293 0 0 1 2.667 16C2.667 8.636 8.636 2.667 16 2.667c7.364 0 13.333 5.969 13.333 13.333 0 7.364-5.969 13.333-13.333 13.333zm7.3-9.984c-.4-.2-2.368-1.168-2.735-1.302-.367-.133-.635-.2-.902.2-.267.4-1.035 1.302-1.268 1.568-.233.267-.467.3-.867.1-.4-.2-1.689-.623-3.217-1.983-1.189-1.06-1.992-2.37-2.225-2.77-.233-.4-.025-.616.175-.815.18-.18.4-.467.6-.7.2-.233.267-.4.4-.667.133-.267.067-.5-.033-.7-.1-.2-.902-2.168-1.235-2.968-.325-.78-.657-.674-.902-.686l-.768-.013c-.267 0-.7.1-1.067.5-.367.4-1.4 1.368-1.4 3.335s1.434 3.868 1.634 4.135c.2.267 2.82 4.303 6.832 6.035.955.413 1.7.659 2.282.844.958.305 1.832.262 2.52.159.769-.115 2.368-.968 2.702-1.902.333-.934.333-1.735.233-1.902-.1-.167-.367-.267-.767-.467z"/>
-        </svg>
-        Falar com a Marina
-      </a>
       <button class="inadim-fechar" id="inadimFechar" type="button">Fechar</button>
+    </div>
+  </dialog>
+
+  <!-- Modal de folga -->
+  <dialog class="inadim-dialog" id="folgaDialog">
+    <div class="inadim-box">
+      <div class="inadim-icon">🏖️</div>
+      <h2 class="inadim-title" style="color:#b45309;">Folga da Marina</h2>
+      <p class="inadim-msg">
+        Essa data é folga da Marina.<br>
+        Escolha outro dia disponível para agendar.
+      </p>
+      <button class="inadim-fechar" id="folgaFechar" type="button">Fechar</button>
     </div>
   </dialog>
 
@@ -762,12 +765,37 @@
     const inadimDialog  = document.getElementById("inadimDialog");
     const inadimSpinner = document.getElementById("inadimSpinner");
     const inadimFechar  = document.getElementById("inadimFechar");
-    const inadimWppLink = document.getElementById("inadimWppLink");
 
     inadimFechar.addEventListener("click", () => inadimDialog.close());
     inadimDialog.addEventListener("click", (e) => {
       if(e.target === inadimDialog) inadimDialog.close();
     });
+
+    // ----------------------------------------------------------
+    // Modal de folga
+    // ----------------------------------------------------------
+    const folgaDialog = document.getElementById("folgaDialog");
+    const folgaFechar = document.getElementById("folgaFechar");
+
+    folgaFechar.addEventListener("click", () => folgaDialog.close());
+    folgaDialog.addEventListener("click", (e) => {
+      if(e.target === folgaDialog) folgaDialog.close();
+    });
+
+    // ----------------------------------------------------------
+    // Controle de sessão — WPP disparado apenas uma vez por sessão
+    // ----------------------------------------------------------
+    const chaveWppSessao = `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
+
+    function wppJaDisparadoNaSessao(){
+      try{ return !!sessionStorage.getItem(chaveWppSessao); }
+      catch(e){ return false; }
+    }
+
+    function marcarWppDisparado(){
+      try{ sessionStorage.setItem(chaveWppSessao, "1"); }
+      catch(e){}
+    }
 
     // Flag anti-duplo: impede segunda chamada enquanto já está verificando
     let verificandoInadimplencia = false;
@@ -777,7 +805,7 @@
     // ----------------------------------------------------------
     async function navegarParaAgendamento(data){
       if(!acesso || !acesso.dvOk) return;
-      if(verificandoInadimplencia) return;   // ← bloqueia duplo clique
+      if(verificandoInadimplencia) return;
 
       verificandoInadimplencia = true;
       const dataStr = isoDate(data);
@@ -786,17 +814,17 @@
         inadimSpinner.style.display = "block";
         inadimDialog.showModal();
 
-        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}`;
+        // Só pede ao endpoint para disparar WPP se ainda não disparou nessa sessão
+        const dispararWpp = !wppJaDisparadoNaSessao();
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
         const resp = await fetch(url, { cache: "no-store" });
         const json = await resp.json();
 
         inadimSpinner.style.display = "none";
 
         if(!resp.ok || json.inadimplente){
-          // Atualiza link do botão para o grupo real do cotista
-          if(json.grupowppid){
-            const grupoId = String(json.grupowppid).split("@")[0];
-            inadimWppLink.href = `https://wa.me/g/${grupoId}`;
+          if(json.wppEnfileirado){
+            marcarWppDisparado(); // marca sessão para não disparar novamente
           }
           // Mantém modal aberto com a mensagem de bloqueio
           return;
@@ -807,7 +835,6 @@
         window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){
-        // Falha de rede: libera o acesso sem bloquear o cotista
         inadimSpinner.style.display = "none";
         inadimDialog.close();
         console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
@@ -821,13 +848,11 @@
       const status = info?.status || "free";
       const label = normalizarLabel(status, info?.label);
       const ehFeriado = !!info?.holiday;
+      const ehFolga = status === "folga";
 
-      const clicavel = status === "free" || status === "holiday";
-      const el = document.createElement(clicavel ? "button" : "div");
-
-      if(clicavel){
-        el.type = "button";
-      }
+      const clicavel = status === "free" || status === "holiday" || ehFolga;
+      const el = document.createElement("button");
+      el.type = "button";
 
       el.className = `day ${status}`;
 
@@ -839,11 +864,18 @@
       center.className = "day-center";
       center.textContent = label;
 
-      if(clicavel){
+      if(status === "free" || status === "holiday"){
         el.classList.add("empty-current");
         el.addEventListener("click", () => {
           navegarParaAgendamento(data);
         });
+      } else if(ehFolga){
+        el.addEventListener("click", () => {
+          folgaDialog.showModal();
+        });
+      } else {
+        el.disabled = true;
+        el.style.cursor = "default";
       }
 
       el.appendChild(num);
