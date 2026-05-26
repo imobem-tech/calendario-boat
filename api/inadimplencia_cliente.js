@@ -16,7 +16,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605261035";
+const VERSAO_API = "Allmax®2605261040";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-desenvolvimento.up.railway.app";
@@ -140,6 +140,7 @@ export default async function handler(req, res) {
     );
 
     const faturas = rsFaturas.rows;
+    console.log(`[inadimplencia] DEBUG totalFaturas=${faturas.length} codAutorizado=${codAutorizado}`);
 
     // Q3 — Nome e telefone do cliente
     const rsCliente = await client.query(
@@ -152,9 +153,12 @@ export default async function handler(req, res) {
 
     const nomeCliente   = rsCliente.rows[0]?.nome     || `Cód. ${codAutorizado}`;
     const telefoneBruto = rsCliente.rows[0]?.telefone || null;
+    console.log(`[inadimplencia] DEBUG nomeCliente="${nomeCliente}" telefone="${telefoneBruto}"`);
 
     let privadoEnviado = false;
     let espelhoEnviado = false;
+
+    console.log(`[inadimplencia] DEBUG dispararWpp=${dispararWpp}`);
 
     if (dispararWpp) {
       const mensagemCR = montarMensagemCR(faturas);
@@ -165,6 +169,7 @@ export default async function handler(req, res) {
         let jid = tel.startsWith("55") ? tel : "55" + tel;
         if (jid.length === 12) jid = jid.slice(0, 4) + "9" + jid.slice(4);
         jid = jid + "@s.whatsapp.net";
+        console.log(`[inadimplencia] DEBUG chamando enviarViaBot privado jid=${jid} BOT_URL=${BOT_URL}`);
 
         try {
           await enviarViaBot(jid, mensagemCR);
@@ -183,6 +188,7 @@ export default async function handler(req, res) {
         `📱 ${telefoneBruto || "sem telefone"}\n\n` +
         mensagemCR;
 
+      console.log(`[inadimplencia] DEBUG chamando enviarViaBot espelho jid=${ESPELHO_FINANCEIRO_ID}`);
       try {
         await enviarViaBot(ESPELHO_FINANCEIRO_ID, mensagemEspelho);
         espelhoEnviado = true;
