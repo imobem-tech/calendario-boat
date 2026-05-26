@@ -16,9 +16,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605261010";
-
-
+const VERSAO_API = "Allmax®2605261035";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-desenvolvimento.up.railway.app";
@@ -145,7 +143,7 @@ export default async function handler(req, res) {
 
     // Q3 — Nome e telefone do cliente
     const rsCliente = await client.query(
-      `SELECT "Nome_Cliente" AS nome, "Cliente_Telefone_Celular" AS telefone
+      `SELECT "Cliente_Nome" AS nome, "Cliente_Telefone_Celular" AS telefone
          FROM public."Cliente"
         WHERE "Codigo" = $1
         LIMIT 1`,
