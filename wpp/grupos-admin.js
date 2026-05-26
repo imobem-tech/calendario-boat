@@ -34,11 +34,20 @@ function montarNomeReduzidoCliente(nomeCliente) {
   return `${primeiroNome} ${inicialSegundoNome}`
 }
 
+function montarPrefixoGrupo(codEmbarcacao) {
+  // Usa somente os 4 primeiros caracteres do identificador do grupo.
+  // Ex.: PB 151 => "151-".
+  const prefixo = `${String(codEmbarcacao || '').trim()}-`
+  return prefixo.substring(0, 4)
+}
+
 function montarNomeGrupo(codEmbarcacao, gropoLetra, codCliente, plano, nomeCliente) {
   const unidade = String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
   const empresa  = Number(codCliente) === 4255 ? 'ALLMAX' : 'SUMMER'
   const nomeReduzido = montarNomeReduzidoCliente(nomeCliente)
-  return `${codEmbarcacao}-${gropoLetra} _${unidade} ${empresa} (${nomeReduzido})`
+  const prefixo = montarPrefixoGrupo(codEmbarcacao)
+  const item = String(gropoLetra || '').trim()
+  return `${prefixo}${item} _${unidade} ${empresa} (${nomeReduzido})`
 }
 
 async function atualizarGruposAgenda(pool, codEmbarcacao, gropoLetra, nomeGrupo, grupoId) {
@@ -327,7 +336,7 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
 // ============================================================
 // ENDPOINT 1 — POST /grupos/renomear
 // Body: { pb, letra }
-// Busca grupo pelo nome (contém "{pb}-{letra}"), renomeia para padrão
+// Busca grupo pelo prefixo do nome (primeiros 4 caracteres, ex.: "151-"), renomeia para padrão
 // ============================================================
 export async function handleRenomearGrupo(req, res, getSock, getConectado) {
   const sock = getSock()
@@ -350,17 +359,18 @@ export async function handleRenomearGrupo(req, res, getSock, getConectado) {
     const nomeCorreto = montarNomeGrupo(pb, letra, codCliente, plano, nomeCliente)
     addLog(`Nome correto calculado: "${nomeCorreto}"`)
 
-    // Busca grupos WPP que contêm "{pb}-{letra}" no nome
+    // Busca grupos WPP considerando somente os primeiros 4 caracteres do nome atual.
+    // Ex.: PB 151 => procura grupos cujo nome começa com "151-".
     const gruposWpp = await sock.groupFetchAllParticipating()
-    const trecho = `${pb}-${letra}`
+    const prefixoBusca = montarPrefixoGrupo(pb)
     const candidatos = Object.entries(gruposWpp)
-      .map(([id, data]) => ({ id, subject: data.subject }))
-      .filter(g => g.subject.includes(trecho))
+      .map(([id, data]) => ({ id, subject: String(data.subject || '') }))
+      .filter(g => g.subject.substring(0, 4) === prefixoBusca)
 
-    addLog(`Candidatos encontrados: ${candidatos.length} (buscando "${trecho}")`)
+    addLog(`Candidatos encontrados: ${candidatos.length} (buscando prefixo "${prefixoBusca}")`)
 
     if (candidatos.length === 0) {
-      return res.status(404).json({ erro: `Nenhum grupo encontrado contendo "${trecho}"`, log })
+      return res.status(404).json({ erro: `Nenhum grupo encontrado começando com "${prefixoBusca}"`, log })
     }
 
     if (candidatos.length > 1) {
