@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261530
+// wpp/grupos-admin.js — Allmax®2605261540
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -445,20 +445,37 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
     addLog(`Resultado groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
 
     const status = String(resultado?.[0]?.status || '')
+
     if (status === '200') {
-      addLog(`Titular adicionado: ${nome}`)
+      addLog(`Titular adicionado diretamente: ${nome}`)
       return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
-    } else if (status === '408') {
-      // 408 = convite enviado (número precisa aceitar) ou já está no grupo
-      addLog(`Titular: convite enviado ou já no grupo (408): ${nome}`)
-      return res.json({ acao: 'CONVITE_ENVIADO', nome, jid: jidTitular, log })
-    } else if (status === '403') {
+    }
+
+    if (status === '408') {
+      // Privacidade bloqueou adição direta — envia link de convite no privado
+      try {
+        const linkCode = await sock.groupInviteCode(grupowppid)
+        const msgConvite =
+          `Olá, *${nome.split(' ')[0]}*! 👋\n\n` +
+          `Você foi convidado para participar do grupo da sua embarcação.\n\n` +
+          `Clique no link abaixo para entrar:\n` +
+          `https://chat.whatsapp.com/${linkCode}`
+        await sock.sendMessage(jidTitular, { text: msgConvite })
+        addLog(`Link de convite enviado no privado de ${nome}: ${jidTitular}`)
+        return res.json({ acao: 'CONVITE_LINK_ENVIADO', nome, jid: jidTitular, log })
+      } catch (errLink) {
+        addLog(`Falha ao gerar/enviar link de convite: ${errLink.message}`)
+        return res.json({ acao: 'CONVITE_FALHOU', nome, jid: jidTitular, erro: errLink.message, log })
+      }
+    }
+
+    if (status === '403') {
       addLog(`Titular bloqueou adições: ${nome}`)
       return res.json({ acao: 'BLOQUEADO', nome, jid: jidTitular, log })
-    } else {
-      addLog(`AVISO: status inesperado: ${status}`)
-      return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
     }
+
+    addLog(`Status inesperado: ${status}`)
+    return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
 
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
