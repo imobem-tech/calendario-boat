@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605252345
+// Allmax Gestão de Cotas — V.2605260010
 // Compatível com pg Pool
 //
 // Comandos:
@@ -532,7 +532,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
       resumo
     })
 
-    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato 000,0, ou D para desistir`)
+    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato *000,0*, ou D para desistir`)
     return true
   }
 
@@ -544,7 +544,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   })
 
   const horaAgendada = extrairHora(saida['Dt_Agendamento'])
-  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para ${horaAgendada}? S/N`)
+  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para *${horaAgendada}*? S/N`)
   return true
 }
 
@@ -574,7 +574,7 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_hora_motor'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+    await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir`)
     return true
   }
 
@@ -584,12 +584,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
       estado.horaMotorInformada = ''
       estadosSaida.set(key, estado)
 
-      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato *000,0*, ou D para desistir')
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
+      await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir`)
       return true
     }
 
@@ -622,12 +622,10 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
     estadosSaida.delete(key)
 
-    let resposta =
-      `Saída registrada com sucesso.\n\n` +
+    let resposta = `*Saída confirmada* — ${dataHoraBR}\n\n` +
       `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
       `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
-      `Colaborador: ${estado.colaborador.Nome}\n` +
-      `Data/Hora: ${dataHoraBR}`
+      `Colaborador: ${estado.colaborador.Nome}`
 
     if (
       estado.saida.Hora_Motor_Saida !== null &&
