@@ -69,12 +69,15 @@ function montarMensagemCR(faturas) {
 // ------------------------------------------------------------
 
 async function enviarViaBot(jid, mensagem) {
-  const resp = await fetch(`${BOT_URL}/msg_externa`, {
+  const resp = await fetch(`${BOT_URL}/enviar-jid`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jid, mensagem })
   });
-  if (!resp.ok) throw new Error(`Bot retornou ${resp.status}`);
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`Bot retornou ${resp.status}: ${txt}`);
+  }
   return true;
 }
 
