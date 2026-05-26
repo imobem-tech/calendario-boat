@@ -695,3 +695,4 @@ export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) 
 
   return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
 }
+export { buscarColaborador }
