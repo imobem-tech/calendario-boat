@@ -508,7 +508,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252145</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252200</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -811,32 +811,27 @@
       const dataStr = isoDate(data);
 
       try{
-        inadimSpinner.style.display = "block";
-        inadimDialog.showModal();
-
-        // Só pede ao endpoint para disparar WPP se ainda não disparou nessa sessão
+        // Consulta silenciosa — sem abrir modal ainda
         const dispararWpp = !wppJaDisparadoNaSessao();
         const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
         const resp = await fetch(url, { cache: "no-store" });
         const json = await resp.json();
 
-        inadimSpinner.style.display = "none";
-
         if(!resp.ok || json.inadimplente){
+          // Só agora abre o modal — confirmada inadimplência
           if(json.wppEnfileirado){
-            marcarWppDisparado(); // marca sessão para não disparar novamente
+            marcarWppDisparado();
           }
-          // Mantém modal aberto com a mensagem de bloqueio
+          inadimSpinner.style.display = "none";
+          inadimDialog.showModal();
           return;
         }
 
-        // Adimplente — fecha modal e navega
-        inadimDialog.close();
+        // Adimplente — navega direto, sem abrir nada
         window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){
-        inadimSpinner.style.display = "none";
-        inadimDialog.close();
+        // Falha de rede: libera o acesso sem bloquear o cotista
         console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
         window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
       } finally {
