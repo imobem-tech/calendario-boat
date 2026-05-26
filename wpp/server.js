@@ -28,6 +28,7 @@ import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
 import { tratarComandoSaida } from './comandos/saida.js'
 import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
+import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605242125'
