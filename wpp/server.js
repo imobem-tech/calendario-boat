@@ -27,6 +27,7 @@ import { sincronizarGruposAgenda } from './grupos.js'
 import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
 import { tratarComandoSaida } from './comandos/saida.js'
+import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605242125'
@@ -149,6 +150,11 @@ async function iniciarBot() {
           ).trim()
 
           if (!texto) continue
+
+          const horaMotorTratado = await tratarComandoHoraMotor(
+  sock, pool, grupoId, remetente, texto, buscarColaborador
+)
+if (horaMotorTratado) continue
 
           // ============================================================
           // Comando Saída — SSS / colaborador
