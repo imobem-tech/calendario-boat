@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605260010
+// Allmax Gestão de Cotas — V.2605260025
 // Compatível com pg Pool
 //
 // Comandos:
@@ -17,6 +17,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
+const VERSAO_SAIDA = 'V.2605260025'
 
 // ============================================================
 // HELPERS
@@ -238,7 +239,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
     await enviar(
       sock,
       grupoId,
-      'Não encontrei colaborador com este telefone. Verifique o número cadastrado.'
+      `Não encontrei colaborador com este telefone. Verifique o número cadastrado.\n${VERSAO_SAIDA}`
     )
     return true
   }
@@ -246,7 +247,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   const lid = String(remetente || '').trim().toLowerCase()
 
   if (!lid) {
-    await enviar(sock, grupoId, 'Não consegui identificar o remetente para vincular.')
+    await enviar(sock, grupoId, `Não consegui identificar o remetente para vincular.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -259,7 +260,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   await enviar(
     sock,
     grupoId,
-    `Colaborador vinculado com sucesso: ${colaborador.Nome}`
+    `Colaborador vinculado com sucesso: ${colaborador.Nome}\n${VERSAO_SAIDA}`
   )
 
   console.log('DEBUG_COLAB_LID_VINCULADO_MANUAL', {
@@ -455,14 +456,14 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const colaborador = await buscarColaborador(pool, remetente)
 
   if (!colaborador) {
-    await enviar(sock, grupoId, 'Comando não aceito. Use: colaborador + telefone cadastrado.')
+    await enviar(sock, grupoId, `Comando não aceito. Use: colaborador + telefone cadastrado.\n${VERSAO_SAIDA}`)
     return true
   }
 
   const grupoAgenda = await buscarGrupoAgenda(pool, grupoId)
 
   if (!grupoAgenda) {
-    await enviar(sock, grupoId, 'Não encontrei este grupo na base de grupos da agenda.')
+    await enviar(sock, grupoId, `Não encontrei este grupo na base de grupos da agenda.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -475,7 +476,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   })
 
   if (!codEmbPb || !grupoCompLetra) {
-    await enviar(sock, grupoId, 'Não consegui identificar a embarcação/grupo desta conversa.')
+    await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -484,7 +485,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
 
   // Sem nenhum registro
   if (!registros.length) {
-    await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
+    await enviar(sock, grupoId, `Não encontrei agendamento de saída para esta embarcação/grupo hoje.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -497,7 +498,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   // Verifica navegação ativa (#2)
   const emNavegacao = estados.filter(e => e.estado === 2)
   if (emNavegacao.length > 0) {
-    await enviar(sock, grupoId, `${resumo}\n\nEsta embarcação já está em navegação.`)
+    await enviar(sock, grupoId, `${resumo}\n\nEsta embarcação já está em navegação.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -505,12 +506,12 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const aguardando = estados.filter(e => e.estado === 1)
 
   if (aguardando.length === 0) {
-    await enviar(sock, grupoId, `${resumo}\n\nNão há agendamento ativo para hoje.`)
+    await enviar(sock, grupoId, `${resumo}\n\nNão há agendamento ativo para hoje.\n${VERSAO_SAIDA}`)
     return true
   }
 
   if (aguardando.length > 1) {
-    await enviar(sock, grupoId, `${resumo}\n\n⚠️ Situação irregular: mais de um agendamento ativo. Contate o administrador.`)
+    await enviar(sock, grupoId, `${resumo}\n\n⚠️ Situação irregular: mais de um agendamento ativo. Contate o administrador.\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -532,7 +533,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
       resumo
     })
 
-    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato *000,0*, ou D para desistir`)
+    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -544,7 +545,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   })
 
   const horaAgendada = extrairHora(saida['Dt_Agendamento'])
-  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para *${horaAgendada}*? S/N`)
+  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída para *${horaAgendada}*? S/N\n${VERSAO_SAIDA}`)
   return true
 }
 
@@ -560,13 +561,13 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
   if (msg === 'd') {
     estadosSaida.delete(key)
-    await enviar(sock, grupoId, 'Desistência registrada.')
+    await enviar(sock, grupoId, `Desistência registrada.\n${VERSAO_SAIDA}`)
     return true
   }
 
   if (estado.etapa === 'aguardando_hora_motor_saida') {
     if (!horaMotorValida(texto)) {
-      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
+      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -574,7 +575,7 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_hora_motor'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir`)
+    await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
     return true
   }
 
@@ -584,12 +585,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
       estado.horaMotorInformada = ''
       estadosSaida.set(key, estado)
 
-      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato *000,0*, ou D para desistir')
+      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir`)
+      await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -602,19 +603,19 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_saida'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, 'Confirma saída? S/N')
+    await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
     return true
   }
 
   if (estado.etapa === 'aguardando_confirmacao_saida') {
     if (msg === 'n') {
       estadosSaida.delete(key)
-      await enviar(sock, grupoId, 'Saída não confirmada.')
+      await enviar(sock, grupoId, `Saída não confirmada.\n${VERSAO_SAIDA}`)
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, 'Confirma saída? S/N')
+      await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
       return true
     }
 
@@ -633,6 +634,8 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     ) {
       resposta += `\nHora Motor Saída: ${String(estado.saida.Hora_Motor_Saida).replace('.', ',')}`
     }
+
+    resposta += `\n${VERSAO_SAIDA}`
 
     await enviar(sock, grupoId, resposta)
     return true
