@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER.JS — Allmax®2605261050
+// SERVER.JS — Allmax®2605261130
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
@@ -30,7 +30,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605261050'
+const VERSAO_WPP = 'Allmax®2605261130'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -445,6 +445,140 @@ app.post('/renomear-grupos', (req, res) => {
 
 app.post('/criar-ou-atualizar-grupo', (req, res) => {
   handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
+})
+
+// ============================================================
+// DRY-RUN: simula renomear-grupos sem executar nada de verdade
+// POST /renomear-grupos-preview
+// Filtra opcionalmente por nome: { filtro: "151" }
+// ============================================================
+app.post('/renomear-grupos-preview', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+
+    const filtro = String(req.body?.filtro || '').trim().toLowerCase()
+
+    const { buscarRegistrosPreview, simularRenomear } = await import('./renomear-grupos-preview.js')
+
+    const resultado = await simularRenomear(pool, sock, filtro)
+    res.json(resultado)
+  } catch (err) {
+    console.error('[renomear-grupos-preview] ERRO:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// GET /testar-grupo?filtro=151
+// Diagnóstico: mostra grupos WPP + autorizados do BD + matching para um PB
+app.get('/testar-grupo', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+
+    const filtro = String(req.query.filtro || '').trim()
+    if (!filtro) return res.status(400).json({ erro: 'Informe ?filtro=151 ou ?filtro=151-11' })
+
+    const gruposWpp = await sock.groupFetchAllParticipating()
+    const todosGrupos = Object.entries(gruposWpp).map(([id, data]) => ({
+      id,
+      subject: data.subject,
+      participants: (data.participants || []).map(p => ({
+        jid: p.id || p,
+        admin: p.admin || null
+      }))
+    }))
+
+    const gruposFiltrados = todosGrupos.filter(g =>
+      g.subject.toLowerCase().includes(filtro.toLowerCase())
+    )
+
+    // Busca autorizados no BD para os PBs encontrados
+    const pbs = [...new Set(gruposFiltrados.map(g => {
+      const m = g.subject.match(/^(\d+)/)
+      return m ? Number(m[1]) : null
+    }).filter(Boolean))]
+
+    let autorizados = []
+    if (pbs.length) {
+      const rs = await pool.query(
+        `SELECT a."Cod_Embarcacao" AS pb, a."Gropo_letra" AS letra,
+                a."Cod_Pessoa" AS cod_pessoa,
+                c."Cliente_Nome" AS nome,
+                c."Cliente_Telefone_Celular" AS telefone,
+                REPLACE(c."Cliente_Telefone_Celular", '+', '') || '@s.whatsapp.net' AS jid_dono
+           FROM public."P_BOAT_4_Autorizados" a
+           JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+          WHERE a."Cod_Embarcacao" = ANY($1)
+            AND a."Dt_Desautorizacao" IS NULL
+            AND c."Cliente_Telefone_Celular" IS NOT NULL
+          ORDER BY a."Cod_Embarcacao", a."Gropo_letra"`,
+        [pbs]
+      )
+      autorizados = rs.rows
+    }
+
+    // Para cada autorizado, verifica se algum participante bate
+    function normJid(jid) {
+      return String(jid || '').replace(/@.*$/, '').replace(/:.*$/, '')
+    }
+    function jidsBatem(a, b) {
+      const na = normJid(a), nb = normJid(b)
+      if (na === nb) return true
+      function semNove(n) {
+        let s = n.startsWith('55') ? n.slice(2) : n
+        if (s.length === 11 && s[2] === '9') return (n.startsWith('55') ? '55' : '') + s.slice(0, 2) + s.slice(3)
+        return null
+      }
+      const aSN = semNove(na), bSN = semNove(nb)
+      if (aSN && aSN === nb) return true
+      if (bSN && bSN === na) return true
+      if (aSN && bSN && aSN === bSN) return true
+      return false
+    }
+
+    const analise = autorizados.map(aut => {
+      const gruposDoBarco = gruposFiltrados.filter(g =>
+        g.subject.startsWith(`${aut.pb}-`)
+      )
+      const grupoMatch = gruposDoBarco.find(g =>
+        g.participants.some(p => jidsBatem(p.jid, aut.jid_dono))
+      )
+      const participantesDoMatch = grupoMatch
+        ? grupoMatch.participants.map(p => ({
+            jid: p.jid,
+            jidNorm: normJid(p.jid),
+            bate: jidsBatem(p.jid, aut.jid_dono)
+          }))
+        : null
+
+      return {
+        pb: aut.pb,
+        letra: aut.letra,
+        nome: aut.nome,
+        telefone: aut.telefone,
+        jid_dono: aut.jid_dono,
+        jid_dono_norm: normJid(aut.jid_dono),
+        grupos_do_barco: gruposDoBarco.map(g => g.subject),
+        grupo_encontrado: grupoMatch?.subject || null,
+        participantes_do_grupo: participantesDoMatch,
+        acao_seria: grupoMatch
+          ? `RENOMEAR "${grupoMatch.subject}" → "${aut.pb}-${aut.letra}-..."`
+          : `CRIAR NOVO grupo "${aut.pb}-${aut.letra}-NOVO"`
+      }
+    })
+
+    res.json({
+      filtro,
+      grupos_wpp_encontrados: gruposFiltrados.map(g => ({
+        subject: g.subject,
+        id: g.id,
+        participantes: g.participants.map(p => p.jid)
+      })),
+      autorizados_bd: autorizados.length,
+      analise
+    })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
 })
 // ============================================================
 // INICIALIZAÇÃO
