@@ -30,7 +30,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605261015'
+const VERSAO_WPP = 'Allmax®2605261045'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -396,9 +396,12 @@ app.post('/enviar-jid', async (req, res) => {
     if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const { jid, mensagem } = req.body
     if (!jid || !mensagem) return res.status(400).json({ erro: 'jid e mensagem são obrigatórios' })
+    console.log(`[enviar-jid] Enviando para ${jid} (${mensagem.length} chars)`)
     await sock.sendMessage(jid, { text: mensagem })
+    console.log(`[enviar-jid] Enviado com sucesso para ${jid}`)
     res.json({ sucesso: true, destino: jid })
   } catch (err) {
+    console.error(`[enviar-jid] ERRO ao enviar para ${req.body?.jid}:`, err.message)
     res.status(500).json({ erro: err.message })
   }
 })
