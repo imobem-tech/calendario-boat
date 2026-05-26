@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261540
+// wpp/grupos-admin.js — Allmax®2605261550
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -121,8 +121,21 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
   // JIDs protegidos: ADM2 e o próprio bot (não remover nunca)
   const protegidos = new Set([normJid(ADM2_JID)])
 
-  let adicionados = 0, removidos = 0, promovidos = 0, rebaixados = 0
+  let adicionados = 0, removidos = 0, promovidos = 0, rebaixados = 0, convites = 0
   const falhas = []
+
+  // Gera link de convite uma vez (reutilizado se necessário)
+  let linkConvite = null
+  async function obterLinkConvite() {
+    if (linkConvite) return linkConvite
+    try {
+      const code = await sock.groupInviteCode(grupoId)
+      linkConvite = `https://chat.whatsapp.com/${code}`
+    } catch (err) {
+      addLog(`AVISO: não foi possível gerar link de convite: ${err.message}`)
+    }
+    return linkConvite
+  }
 
   // ADICIONAR / PROMOVER colaboradores
   for (const colab of colaboradoresResolvidos) {
@@ -131,14 +144,46 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
 
     if (!jaEsta) {
       try {
-        await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'add')
-        addLog(`ADICIONADO: ${colab.Nome} (${colab.jidFinal})`)
-        adicionados++
+        const resultado = await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'add')
+        const status = String(resultado?.[0]?.status || '')
 
-        if (deveSerAdmin) {
-          await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'promote')
-          addLog(`PROMOVIDO: ${colab.Nome}`)
-          promovidos++
+        if (status === '200') {
+          addLog(`ADICIONADO: ${colab.Nome}`)
+          adicionados++
+
+          if (deveSerAdmin) {
+            try {
+              await sock.groupParticipantsUpdate(grupoId, [colab.jidFinal], 'promote')
+              addLog(`PROMOVIDO: ${colab.Nome}`)
+              promovidos++
+            } catch (errP) {
+              addLog(`FALHA ao promover ${colab.Nome}: ${errP.message}`)
+            }
+          }
+        } else if (status === '408') {
+          // Privacidade bloqueou — envia link de convite no privado
+          const link = await obterLinkConvite()
+          if (link) {
+            const primeiroNome = String(colab.Nome || '').split(' ')[0]
+            const msg =
+              `Olá, *${primeiroNome}*! 👋\n\n` +
+              `Você foi convidado para participar do grupo da embarcação.\n\n` +
+              `Clique no link abaixo para entrar:\n${link}`
+            try {
+              await sock.sendMessage(colab.jidFinal, { text: msg })
+              addLog(`CONVITE enviado no privado: ${colab.Nome}`)
+              convites++
+            } catch (errC) {
+              addLog(`FALHA ao enviar convite ${colab.Nome}: ${errC.message}`)
+              falhas.push({ nome: colab.Nome, erro: `convite: ${errC.message}` })
+            }
+          } else {
+            addLog(`FALHA 408 sem link: ${colab.Nome}`)
+            falhas.push({ nome: colab.Nome, erro: 'status 408 sem link de convite' })
+          }
+        } else {
+          addLog(`FALHA ao adicionar ${colab.Nome}: status ${status}`)
+          falhas.push({ nome: colab.Nome, erro: `status ${status}` })
         }
       } catch (err) {
         addLog(`FALHA ao adicionar ${colab.Nome}: ${err.message}`)
@@ -167,18 +212,18 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
   }
 
   // REMOVER participantes que são colaboradores inativos
-  // (estão no grupo, não são protegidos, não estão na lista ativa)
+  // Identifica pelo telefone normalizado (não pelo Lid que pode estar errado)
   for (const p of jidsAtuais) {
     if (protegidos.has(p.norm)) continue
     if (normsColaboradores.has(p.norm)) continue
 
-    // É colaborador inativo? Só remove se tiver Lid na tabela (foi adicionado pelo sistema)
+    // Verifica se esse JID pertencia a um colaborador (pelo telefone normalizado)
+    const normP = normJid(p.jid)
     const eraColab = await pool.query(
       `SELECT 1 FROM public.wpp_colaboradores
-        WHERE REPLACE(COALESCE("Lid", ''), '@lid', '') = $1
-           OR REPLACE(REPLACE("Telefone", '+', ''), ' ', '') LIKE $2
+        WHERE REPLACE(REPLACE(COALESCE("Telefone",''), '+', ''), ' ', '') LIKE $1
         LIMIT 1`,
-      [normJid(p.jid), '%' + normJid(p.jid).slice(-8) + '%']
+      ['%' + normP.slice(-8) + '%']
     )
 
     if (eraColab.rowCount > 0) {
@@ -193,7 +238,7 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
     }
   }
 
-  return { adicionados, removidos, promovidos, rebaixados, falhas }
+  return { adicionados, removidos, promovidos, rebaixados, convites, falhas }
 }
 
 // ============================================================
