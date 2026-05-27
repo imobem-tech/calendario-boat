@@ -601,7 +601,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605271600</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605271745</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -1010,7 +1010,7 @@
 
         if(!resp.ok || json.inadimplente){
           // Só agora abre o modal — confirmada inadimplência
-          if(json.wppEnfileirado){
+          if(json.wppEnfileirado || json.privadoEnviado || json.espelhoEnviado){
             marcarWppDisparado();
           }
           inadimSpinner.style.display = "none";
