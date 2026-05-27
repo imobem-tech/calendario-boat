@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605271025";
+const VERSAO_API = "Allmax®2605271130";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const pool = new Pool({
@@ -285,7 +285,7 @@ export default async function handler(req, res) {
     const rsEmb = await client.query(
       `SELECT "Cod_Cliente"
          FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Código" = $1
+        WHERE "Num_PB" = $1
         LIMIT 1`,
       [codEmbPB]
     );
