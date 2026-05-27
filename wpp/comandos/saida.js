@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605271600
+// Allmax Gestão de Cotas
 // Compatível com pg Pool
 //
 // Comandos:
@@ -11,7 +11,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605271317'
+const VERSAO_SAIDA = 'V.2605271530'
 
 // ============================================================
 // HELPERS
@@ -281,32 +281,8 @@ async function buscarGrupoAgenda(pool, grupoId) {
   return rs.rows[0] || null
 }
 
-function normalizarGrupoCompLetra(cota, nomeGrupo) {
-  const cotaStr = String(cota || '').trim().toUpperCase()
-  if (cotaStr) return cotaStr
-
-  // cota nula: extrai do nome do grupo (ex: "151-11 _C SUMMER..." → "11")
-  const m = String(nomeGrupo || '').match(/^\d+-([A-Z0-9]+)/i)
-  return m ? m[1].toUpperCase() : ''
-}
-
-// ============================================================
-// BUSCA NOME DA EMBARCAÇÃO
-// ============================================================
-async function buscarDadosEmbar(pool, pb) {
-  try {
-    const rs = await pool.query(
-      `SELECT "Nome_Embar"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [pb]
-    )
-    return rs.rows[0] || {}
-  } catch (err) {
-    console.warn('[buscarDadosEmbar]', err.message)
-    return {}
-  }
+function normalizarGrupoCompLetra(cota) {
+  return String(cota || '').trim().toUpperCase()
 }
 
 // ============================================================
@@ -321,8 +297,7 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND "Dt_Agendamento" >= ($3::date)
-       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
+       AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
@@ -348,11 +323,11 @@ async function registrarSaida(pool, saida, colaborador) {
 
   await pool.query(`
     UPDATE public."P_BOAT_z_10_Saida_Emb"
-       SET "Dt_Saída" = (NOW() AT TIME ZONE 'America/Sao_Paulo')::timestamp AT TIME ZONE 'America/Sao_Paulo',
+       SET "Dt_Saída" = $1,
            "Dt_Desistencia" = NULL,
-           "Colab_Responsavel" = $1
-     WHERE "ID" = $2
-  `, [colaborador.Nome, saida.ID])
+           "Colab_Responsavel" = $2
+     WHERE "ID" = $3
+  `, [agora, colaborador.Nome, saida.ID])
 
   await pool.query(`
     UPDATE public."P_BOAT_9_OS"
@@ -385,7 +360,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   }
 
   const codEmbPb = Number(grupoAgenda.pb)
-  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota, grupoAgenda.nomegrupowpp)
+  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
 
   console.log('DEBUG_SAIDA_ENTRADA', {
     grupoId,
@@ -581,4 +556,3 @@ export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) 
 
   return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
 }
-export { buscarColaborador }
