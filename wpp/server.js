@@ -1,14 +1,20 @@
- 
+// ============================================================
+// SERVER.JS — Allmax®2605261400
+// Inicialização, conexão WhatsApp e rotas HTTP
+// ============================================================
+
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
-import retornoRoutes from "./msg_externa.js";
+
 import { handleRenomearGrupos } from './renomear-grupos.js'
 
 import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
+import { handleRenomearGrupo, handleColaboradoresGrupo, handleColaboradoresTodos, handleAdicionarTitular } from './grupos-admin.js'
+import retornoRoutes from './msg_externa.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -16,16 +22,22 @@ import makeWASocket, {
   DisconnectReason,
   Browsers
 } from '@whiskeysockets/baileys'
- 
+
+import { processarFila } from './fila.js'
+import { sincronizarGruposAgenda } from './grupos.js'
+import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
+import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
+import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
+import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
+
 const { Pool } = pkg
-const VERSAO_WPP = "Allmax®2604240031"
+const VERSAO_WPP = 'Allmax®2605261400'
 
 const app = express()
 const PORT = process.env.PORT || 8080
 
-
 app.use(express.json())
-app.use("/msg_externa", retornoRoutes);
+app.use('/msg_externa', retornoRoutes)
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -35,7 +47,6 @@ let sock = null
 let qrAtual = null
 let conectado = false
 let iniciando = false
-let processandoFila = false
 
 let ultimoEvento = null
 let ultimaConexaoEm = null
@@ -45,84 +56,8 @@ let ultimoQrEm = null
 let ultimaFalhaEnvioEm = null
 let erroUltimoEnvio = null
 let ultimaMensagemEnviadaEm = null
+let processandoFila = false
 const iniciadoEm = new Date()
-
-async function processarFila() {
-  if (processandoFila) return
-  if (!conectado || !sock) return
-
-  processandoFila = true
-
-  try {
-    const rs = await pool.query(`
-      SELECT id, grupo_id, mensagem
-      FROM public.wpp_fila_agenda
-      WHERE status = 'pendente'
-      ORDER BY id
-      LIMIT 5
-    `)
-
-    for (const row of rs.rows) {
-      try {
-        await sock.sendMessage(row.grupo_id, { text: row.mensagem })
-
-        await pool.query(`
-          UPDATE public.wpp_fila_agenda
-          SET status = 'enviado',
-              enviado_em = NOW(),
-              erro = NULL
-          WHERE id = $1
-        `, [row.id])
-
-        ultimaMensagemEnviadaEm = new Date().toISOString()
-
-      } catch (err) {
-        const erroMsg = err?.message || String(err)
-
-        await pool.query(`
-          UPDATE public.wpp_fila_agenda
-          SET status = 'erro',
-              erro = $2
-          WHERE id = $1
-        `, [row.id, erroMsg])
-
-        ultimaFalhaEnvioEm = new Date().toISOString()
-        erroUltimoEnvio = erroMsg
-      }
-    }
-
-  } catch (err) {
-    console.error('Erro geral ao processar fila:', err)
-  } finally {
-    processandoFila = false
-  }
-}
-
-function extrairGrupoAgenda(nome, grupoId) {
-  const nomeLimpo = String(nome || '').trim()
-
-  if (!/^\d{3}/.test(nomeLimpo)) return null
-
-  const comCota = nomeLimpo.match(/^(\d{3})-([A-Z]\d)\b/i)
-
-  if (comCota) {
-    return {
-      pb: Number(comCota[1]),
-      cota: comCota[2].toUpperCase(),
-      nomeGrupoWpp: nomeLimpo,
-      grupoWppId: grupoId
-    }
-  }
-
-  const semCota = nomeLimpo.match(/^(\d{3})/)
-
-  return {
-    pb: Number(semCota[1]),
-    cota: null,
-    nomeGrupoWpp: nomeLimpo,
-    grupoWppId: grupoId
-  }
-}
 
 async function limparSessao() {
   await rm('/data/auth_info', { recursive: true, force: true })
@@ -162,27 +97,27 @@ async function iniciarBot() {
       })
 
       if (qr) {
-  qrAtual = qr
-  conectado = false
-  ultimoQrEm = new Date().toISOString()
-  ultimoEvento = 'QR_GERADO'
-}
+        qrAtual = qr
+        conectado = false
+        ultimoQrEm = new Date().toISOString()
+        ultimoEvento = 'QR_GERADO'
+      }
 
       if (connection === 'open') {
-  console.log('✅ WhatsApp conectado!')
-  conectado = true
-  qrAtual = null
-  ultimoEvento = 'CONECTADO'
-  ultimaConexaoEm = new Date().toISOString()
-  motivoDesconexao = null
-}
+        console.log('✅ WhatsApp conectado!')
+        conectado = true
+        qrAtual = null
+        ultimoEvento = 'CONECTADO'
+        ultimaConexaoEm = new Date().toISOString()
+        motivoDesconexao = null
+      }
 
       if (connection === 'close') {
         conectado = false
         iniciando = false
-          ultimoEvento = 'DESCONECTADO'
-  ultimaDesconexaoEm = new Date().toISOString()
-  motivoDesconexao = lastDisconnect?.error?.message || null
+        ultimoEvento = 'DESCONECTADO'
+        ultimaDesconexaoEm = new Date().toISOString()
+        motivoDesconexao = lastDisconnect?.error?.message || null
 
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
           await limparSessao()
@@ -194,6 +129,69 @@ async function iniciarBot() {
         setTimeout(iniciarBot, 8000)
       }
     })
+
+    // ============================================================
+    // LISTENER DE MENSAGENS
+    // ============================================================
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return
+
+      for (const msg of messages) {
+        try {
+          if (!msg.key.remoteJid?.endsWith('@g.us')) continue
+          if (msg.key.fromMe) continue
+
+          const grupoId = msg.key.remoteJid
+          // Remetente: em grupos vem em msg.key.participant
+          const remetente = msg.key.participant || msg.key.remoteJid
+          const texto = (
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            ''
+          ).trim()
+
+          if (!texto) continue
+
+          const horaMotorTratado = await tratarComandoHoraMotor(
+  sock, pool, grupoId, remetente, texto, buscarColaborador
+)
+if (horaMotorTratado) continue
+
+          // ============================================================
+          // Comando Saída — SSS / colaborador
+          // ============================================================
+          const saidaTratada = await tratarComandoSaida(sock, pool, grupoId, remetente, texto)
+          if (saidaTratada) {
+            continue
+          }
+
+          // Aguardando confirmação de retorno
+          if (estaAguardandoRetorno(grupoId)) {
+            await handleConfirmacaoRetorno(sock, pool, grupoId, texto)
+            continue
+          }
+
+          // Comando Calendário
+          if (ehComandoCalendario(texto)) {
+            await handleCalendario(sock, pool, grupoId)
+            continue
+          }
+
+          // Comando Retorno
+          if (ehComandoRetorno(texto)) {
+            await handleRetorno(sock, pool, grupoId, remetente)
+            continue
+          }
+
+         } catch (err) {
+          console.error('Erro ao processar mensagem:', err.message)
+          try {
+            await sock.sendMessage(grupoId, { text: `🔴 ERRO: ${err.message}` })
+          } catch {}
+        }
+      }
+    })
+
   } catch (err) {
     console.error('💥 Erro ao iniciar bot:', err)
     iniciando = false
@@ -201,87 +199,9 @@ async function iniciarBot() {
   }
 }
 
-async function sincronizarGruposAgenda() {
-  if (!conectado || !sock) {
-    throw new Error('WhatsApp não conectado')
-  }
-
-  const grupos = await sock.groupFetchAllParticipating()
-  const client = await pool.connect()
-
-  try {
-    let inseridos = 0
-    let atualizados = 0
-    let ignorados = 0
-    let removidos = 0
-
-    const idsAtuais = []
-
-    await client.query(`
-      DROP INDEX IF EXISTS ux_wpp_grupos_agenda_pb_cota
-    `)
-
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_wpp_grupos_agenda_grupowppid
-      ON public.wpp_grupos_agenda (grupowppid)
-    `)
-
-    for (const g of Object.values(grupos)) {
-      const item = extrairGrupoAgenda(g.subject, g.id)
-
-      if (!item) {
-        ignorados++
-        continue
-      }
-
-      idsAtuais.push(item.grupoWppId)
-
-      const rsExiste = await client.query(
-        `SELECT id
-           FROM public.wpp_grupos_agenda
-          WHERE grupowppid = $1
-          LIMIT 1`,
-        [item.grupoWppId]
-      )
-
-      if (rsExiste.rowCount === 0) {
-        await client.query(
-          `INSERT INTO public.wpp_grupos_agenda
-           (pb, cota, nomegrupowpp, grupowppid, dataatualizacao)
-           VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'America/Sao_Paulo')`,
-          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
-        )
-        inseridos++
-      } else {
-        await client.query(
-          `UPDATE public.wpp_grupos_agenda
-              SET pb = $1,
-                  cota = $2,
-                  nomegrupowpp = $3,
-                  dataatualizacao = NOW() AT TIME ZONE 'America/Sao_Paulo'
-            WHERE grupowppid = $4`,
-          [item.pb, item.cota, item.nomeGrupoWpp, item.grupoWppId]
-        )
-        atualizados++
-      }
-    }
-
-    if (idsAtuais.length > 0) {
-      const rsDelete = await client.query(
-        `DELETE FROM public.wpp_grupos_agenda
-          WHERE NOT (grupowppid = ANY($1::text[]))`,
-        [idsAtuais]
-      )
-
-      removidos = rsDelete.rowCount
-    }
-
-    return { inseridos, atualizados, ignorados, removidos }
-
-  } finally {
-    client.release()
-  }
-}
+// ============================================================
+// ROTAS HTTP
+// ============================================================
 
 app.get('/', (req, res) => {
   res.send(`
@@ -302,9 +222,7 @@ app.get('/status', async (req, res) => {
 
   try {
     const rs = await pool.query(
-      `SELECT COUNT(*)::int AS total
-         FROM public.wpp_fila_agenda
-        WHERE status = 'pendente'`
+      `SELECT COUNT(*)::int AS total FROM public.wpp_fila_agenda WHERE status = 'pendente'`
     )
     pendentes = rs.rows[0].total
   } catch (err) {
@@ -320,19 +238,11 @@ app.get('/status', async (req, res) => {
   }
 
   const mem = process.memoryUsage()
-
   let statusConexao = 'desconectado'
+  if (conectado) statusConexao = 'conectado'
+  else if (qrAtual) statusConexao = 'aguardando_qr'
+  else if (iniciando) statusConexao = 'iniciando'
 
-  if (conectado) {
-    statusConexao = 'conectado'
-  } else if (qrAtual) {
-    statusConexao = 'aguardando_qr'
-  } else if (iniciando) {
-    statusConexao = 'iniciando'
-  }
-
-
-  
   res.json({
     online: true,
     whatsappConectado: conectado,
@@ -340,30 +250,24 @@ app.get('/status', async (req, res) => {
     qrDisponivel: !!qrAtual,
     filaPendentes: pendentes,
     filaProcessando: processandoFila,
-
     numeroConectado: numero,
     nomePerfil: nome,
-
     ultimoEvento,
     ultimaConexaoEm,
     ultimaDesconexaoEm,
     motivoDesconexao,
     ultimoQrEm,
-
     ultimaMensagemEnviadaEm,
     ultimaFalhaEnvioEm,
     erroUltimoEnvio,
-
     versao: VERSAO_WPP,
     horaServidor: new Date().toISOString(),
     uptimeSegundos: Math.floor(process.uptime()),
     iniciadoEm: iniciadoEm.toISOString(),
-
     nodeEnv: process.env.NODE_ENV || null,
     ambiente: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'production',
     railwayInstance: process.env.RAILWAY_REPLICA_ID || process.env.HOSTNAME || null,
     pid: process.pid,
-
     memoriaUsoMB: {
       rss: Math.round(mem.rss / 1024 / 1024),
       heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
@@ -378,78 +282,39 @@ app.get('/reset-sessao', async (req, res) => {
     qrAtual = null
     ultimoEvento = 'RESET_SESSAO_FORCADO'
     motivoDesconexao = 'Reset manual de sessão para troca de celular'
-
-    try {
-      if (sock) {
-        await sock.logout()
-      }
-    } catch (e) {
-      console.log('Logout ignorado:', e.message)
-    }
-
+    try { if (sock) await sock.logout() } catch (e) { console.log('Logout ignorado:', e.message) }
     sock = null
-
     await rm('./auth_info_baileys', { recursive: true, force: true })
-
-    setTimeout(() => {
-      iniciarBot()
-    }, 2000)
-
-    res.json({
-      sucesso: true,
-      mensagem: 'Sessão apagada. Aguarde alguns segundos e gere um novo QR.'
-    })
-
+    setTimeout(() => { iniciarBot() }, 2000)
+    res.json({ sucesso: true, mensagem: 'Sessão apagada. Aguarde alguns segundos e gere um novo QR.' })
   } catch (err) {
-    res.status(500).json({
-      sucesso: false,
-      erro: err.message
-    })
+    res.status(500).json({ sucesso: false, erro: err.message })
   }
 })
 
 app.get('/qr', async (req, res) => {
-  if (conectado) {
-    return res.send('<h2>WhatsApp já conectado ✅</h2>')
-  }
-
-  if (!qrAtual) {
-    return res.send('<h2>QR ainda não gerado... ⏳</h2>')
-  }
-
+  if (conectado) return res.send('<h2>WhatsApp já conectado ✅</h2>')
+  if (!qrAtual) return res.send('<h2>QR ainda não gerado... ⏳</h2>')
   const qrImage = await QRCode.toDataURL(qrAtual)
-
-  res.send(`
-    <h2>Escaneie o QR Code</h2>
-    <img src="${qrImage}" style="width:320px;height:320px;" />
-  `)
+  res.send(`<h2>Escaneie o QR Code</h2><img src="${qrImage}" style="width:320px;height:320px;" />`)
 })
 
 app.get('/reset', async (req, res) => {
   conectado = false
   qrAtual = null
   iniciando = false
-
   await limparSessao()
   setTimeout(iniciarBot, 1000)
-
   res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
 })
 
 app.get('/grupos', async (req, res) => {
   try {
-    if (!conectado || !sock) {
-      return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    }
-
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const grupos = await sock.groupFetchAllParticipating()
-
     const lista = Object.values(grupos).map(g => ({
-      nome: g.subject,
-      id: g.id,
-      participantes: g.participants?.length || 0
+      nome: g.subject, id: g.id, participantes: g.participants?.length || 0
     }))
-
     res.json(lista)
   } catch (err) {
     res.status(500).json({ erro: err.message })
@@ -458,7 +323,7 @@ app.get('/grupos', async (req, res) => {
 
 app.get('/sincronizar-grupos-agenda', async (req, res) => {
   try {
-    const resultado = await sincronizarGruposAgenda()
+    const resultado = await sincronizarGruposAgenda(pool, sock, conectado)
     res.json({ sucesso: true, metodo: 'GET', ...resultado })
   } catch (err) {
     res.status(500).json({ erro: err.message })
@@ -467,7 +332,7 @@ app.get('/sincronizar-grupos-agenda', async (req, res) => {
 
 app.post('/sincronizar-grupos-agenda', async (req, res) => {
   try {
-    const resultado = await sincronizarGruposAgenda()
+    const resultado = await sincronizarGruposAgenda(pool, sock, conectado)
     res.json({ sucesso: true, metodo: 'POST', ...resultado })
   } catch (err) {
     res.status(500).json({ erro: err.message })
@@ -478,58 +343,23 @@ app.get('/testar-rota-grupo', async (req, res) => {
   try {
     const pb = Number(req.query.pb)
     const cota = String(req.query.cota || '').trim().toUpperCase()
-
-    if (!pb) {
-      return res.status(400).json({
-        erro: 'Informe o PB. Exemplo: /testar-rota-grupo?pb=576&cota=X4'
-      })
-    }
+    if (!pb) return res.status(400).json({ erro: 'Informe o PB. Exemplo: /testar-rota-grupo?pb=576&cota=X4' })
 
     const rsCota = await pool.query(
-      `SELECT pb, cota, nomegrupowpp, grupowppid
-         FROM public.wpp_grupos_agenda
-        WHERE pb = $1
-          AND UPPER(COALESCE(cota, '')) = UPPER($2)
-        LIMIT 1`,
+      `SELECT pb, cota, nomegrupowpp, grupowppid FROM public.wpp_grupos_agenda
+        WHERE pb = $1 AND UPPER(COALESCE(cota, '')) = UPPER($2) LIMIT 1`,
       [pb, cota]
     )
-
-    if (rsCota.rowCount > 0) {
-      return res.json({
-        encontrado: true,
-        tipo: 'cota',
-        pb,
-        cota,
-        grupo: rsCota.rows[0]
-      })
-    }
+    if (rsCota.rowCount > 0) return res.json({ encontrado: true, tipo: 'cota', pb, cota, grupo: rsCota.rows[0] })
 
     const rsGeral = await pool.query(
-      `SELECT pb, cota, nomegrupowpp, grupowppid
-         FROM public.wpp_grupos_agenda
-        WHERE pb = $1
-          AND cota IS NULL
-        LIMIT 1`,
+      `SELECT pb, cota, nomegrupowpp, grupowppid FROM public.wpp_grupos_agenda
+        WHERE pb = $1 AND cota IS NULL LIMIT 1`,
       [pb]
     )
+    if (rsGeral.rowCount > 0) return res.json({ encontrado: true, tipo: 'fallback_pb', pb, cota, grupo: rsGeral.rows[0] })
 
-    if (rsGeral.rowCount > 0) {
-      return res.json({
-        encontrado: true,
-        tipo: 'fallback_pb',
-        pb,
-        cota,
-        grupo: rsGeral.rows[0]
-      })
-    }
-
-    return res.status(404).json({
-      encontrado: false,
-      pb,
-      cota,
-      erro: 'Nenhum grupo encontrado para este PB/Cota'
-    })
-
+    return res.status(404).json({ encontrado: false, pb, cota, erro: 'Nenhum grupo encontrado para este PB/Cota' })
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
@@ -538,22 +368,12 @@ app.get('/testar-rota-grupo', async (req, res) => {
 app.post('/fila', async (req, res) => {
   try {
     const { grupo_id, mensagem } = req.body
-
-    if (!grupo_id || !mensagem) {
-      return res.status(400).json({
-        erro: 'grupo_id e mensagem são obrigatórios'
-      })
-    }
-
+    if (!grupo_id || !mensagem) return res.status(400).json({ erro: 'grupo_id e mensagem são obrigatórios' })
     await pool.query(
-      `INSERT INTO public.wpp_fila_agenda
-       (grupo_id, mensagem, status)
-       VALUES ($1, $2, 'pendente')`,
+      `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status) VALUES ($1, $2, 'pendente')`,
       [grupo_id, mensagem]
     )
-
     res.json({ sucesso: true })
-
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
@@ -561,50 +381,60 @@ app.post('/fila', async (req, res) => {
 
 app.post('/enviar-grupo', async (req, res) => {
   try {
-    if (!conectado || !sock) {
-      return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    }
-
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const { grupoId, mensagem } = req.body
+    if (!grupoId || !mensagem) return res.status(400).json({ erro: 'grupoId e mensagem são obrigatórios' })
+    await sock.sendMessage(grupoId, { text: mensagem })
+    res.json({ sucesso: true, destino: grupoId })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
 
-    if (!grupoId || !mensagem) {
-      return res.status(400).json({ erro: 'grupoId e mensagem são obrigatórios' })
+// Envia mensagem para qualquer JID (privado ou grupo) — usado por serviços externos
+app.post('/enviar-jid', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    const { jid, mensagem } = req.body
+    if (!jid || !mensagem) return res.status(400).json({ erro: 'jid e mensagem são obrigatórios' })
+
+    console.log(`[enviar-jid] Iniciando envio para ${jid}`)
+
+    let jidFinal = jid
+
+    // Para privados (@s.whatsapp.net), verifica se o número existe no WhatsApp
+    if (jid.endsWith('@s.whatsapp.net')) {
+      try {
+        const [resultado] = await sock.onWhatsApp(jid.replace('@s.whatsapp.net', ''))
+        if (!resultado?.exists) {
+          console.warn(`[enviar-jid] Número não encontrado no WhatsApp: ${jid}`)
+          return res.status(404).json({ erro: 'Número não encontrado no WhatsApp', jid })
+        }
+        jidFinal = resultado.jid
+        console.log(`[enviar-jid] Número verificado: ${jidFinal}`)
+      } catch (checkErr) {
+        console.warn(`[enviar-jid] Falha ao verificar número, tentando enviar direto:`, checkErr.message)
+      }
     }
 
-    await sock.sendMessage(grupoId, { text: mensagem })
-
-    res.json({ sucesso: true, destino: grupoId })
-
+    await sock.sendMessage(jidFinal, { text: mensagem })
+    console.log(`[enviar-jid] Enviado com sucesso para ${jidFinal}`)
+    res.json({ sucesso: true, destino: jidFinal })
   } catch (err) {
+    console.error(`[enviar-jid] ERRO:`, err.message)
     res.status(500).json({ erro: err.message })
   }
 })
 
 app.get('/botao_agenda_todos', async (req, res) => {
   try {
-    if (!conectado || !sock) {
-      return res.status(503).json({ erro: 'WhatsApp não conectado' })
-    }
-
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const grupoId = '120363330197701730@g.us'
     const linkAgenda = 'https://allmaxcalendar.vercel.app/egfxddachch'
-
     await sock.sendMessage(grupoId, {
-      text:
-`📅 *Agenda disponível*
-
-Clique abaixo para acessar:
-
-${linkAgenda}`
+      text: `📅 *Agenda disponível*\n\nClique abaixo para acessar:\n\n${linkAgenda}`
     })
-
-    res.json({
-      sucesso: true,
-      tipo: 'link_clicavel',
-      destino: grupoId,
-      link: linkAgenda
-    })
-
+    res.json({ sucesso: true, tipo: 'link_clicavel', destino: grupoId, link: linkAgenda })
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
@@ -618,11 +448,172 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
   handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
 })
 
+// ============================================================
+// GESTÃO DE GRUPOS — grupos-admin.js
+// ============================================================
+app.post('/grupos/renomear', (req, res) => {
+  handleRenomearGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/grupo', (req, res) => {
+  handleColaboradoresGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/todos', (req, res) => {
+  handleColaboradoresTodos(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/titular', (req, res) => {
+  handleAdicionarTitular(req, res, () => sock, () => conectado)
+})
+
+// ============================================================
+// DRY-RUN: simula renomear-grupos sem executar nada de verdade
+// POST /renomear-grupos-preview
+// Filtra opcionalmente por nome: { filtro: "151" }
+// ============================================================
+app.post('/renomear-grupos-preview', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+
+    const filtro = String(req.body?.filtro || '').trim().toLowerCase()
+
+    const { buscarRegistrosPreview, simularRenomear } = await import('./renomear-grupos-preview.js')
+
+    const resultado = await simularRenomear(pool, sock, filtro)
+    res.json(resultado)
+  } catch (err) {
+    console.error('[renomear-grupos-preview] ERRO:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// GET /testar-grupo?filtro=151
+// Diagnóstico: mostra grupos WPP + autorizados do BD + matching para um PB
+app.get('/testar-grupo', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+
+    const filtro = String(req.query.filtro || '').trim()
+    if (!filtro) return res.status(400).json({ erro: 'Informe ?filtro=151 ou ?filtro=151-11' })
+
+    const gruposWpp = await sock.groupFetchAllParticipating()
+    const todosGrupos = Object.entries(gruposWpp).map(([id, data]) => ({
+      id,
+      subject: data.subject,
+      participants: (data.participants || []).map(p => ({
+        jid: p.id || p,
+        admin: p.admin || null
+      }))
+    }))
+
+    const gruposFiltrados = todosGrupos.filter(g =>
+      g.subject.toLowerCase().includes(filtro.toLowerCase())
+    )
+
+    // Busca autorizados no BD para os PBs encontrados
+    const pbs = [...new Set(gruposFiltrados.map(g => {
+      const m = g.subject.match(/^(\d+)/)
+      return m ? Number(m[1]) : null
+    }).filter(Boolean))]
+
+    let autorizados = []
+    if (pbs.length) {
+      const rs = await pool.query(
+        `SELECT a."Cod_Embarcacao" AS pb, a."Gropo_letra" AS letra,
+                a."Cod_Pessoa" AS cod_pessoa,
+                c."Cliente_Nome" AS nome,
+                c."Cliente_Telefone_Celular" AS telefone,
+                REPLACE(c."Cliente_Telefone_Celular", '+', '') || '@s.whatsapp.net' AS jid_dono
+           FROM public."P_BOAT_4_Autorizados" a
+           JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+          WHERE a."Cod_Embarcacao" = ANY($1)
+            AND a."Dt_Desautorizacao" IS NULL
+            AND c."Cliente_Telefone_Celular" IS NOT NULL
+          ORDER BY a."Cod_Embarcacao", a."Gropo_letra"`,
+        [pbs]
+      )
+      autorizados = rs.rows
+    }
+
+    // Para cada autorizado, verifica se algum participante bate
+    function normJid(jid) {
+      return String(jid || '').replace(/@.*$/, '').replace(/:.*$/, '')
+    }
+    function jidsBatem(a, b) {
+      const na = normJid(a), nb = normJid(b)
+      if (na === nb) return true
+      function semNove(n) {
+        let s = n.startsWith('55') ? n.slice(2) : n
+        if (s.length === 11 && s[2] === '9') return (n.startsWith('55') ? '55' : '') + s.slice(0, 2) + s.slice(3)
+        return null
+      }
+      const aSN = semNove(na), bSN = semNove(nb)
+      if (aSN && aSN === nb) return true
+      if (bSN && bSN === na) return true
+      if (aSN && bSN && aSN === bSN) return true
+      return false
+    }
+
+    const analise = autorizados.map(aut => {
+      const gruposDoBarco = gruposFiltrados.filter(g =>
+        g.subject.startsWith(`${aut.pb}-`)
+      )
+      const grupoMatch = gruposDoBarco.find(g =>
+        g.participants.some(p => jidsBatem(p.jid, aut.jid_dono))
+      )
+      const participantesDoMatch = grupoMatch
+        ? grupoMatch.participants.map(p => ({
+            jid: p.jid,
+            jidNorm: normJid(p.jid),
+            bate: jidsBatem(p.jid, aut.jid_dono)
+          }))
+        : null
+
+      return {
+        pb: aut.pb,
+        letra: aut.letra,
+        nome: aut.nome,
+        telefone: aut.telefone,
+        jid_dono: aut.jid_dono,
+        jid_dono_norm: normJid(aut.jid_dono),
+        grupos_do_barco: gruposDoBarco.map(g => g.subject),
+        grupo_encontrado: grupoMatch?.subject || null,
+        participantes_do_grupo: participantesDoMatch,
+        acao_seria: grupoMatch
+          ? `RENOMEAR "${grupoMatch.subject}" → "${aut.pb}-${aut.letra}-..."`
+          : `CRIAR NOVO grupo "${aut.pb}-${aut.letra}-NOVO"`
+      }
+    })
+
+    res.json({
+      filtro,
+      grupos_wpp_encontrados: gruposFiltrados.map(g => ({
+        subject: g.subject,
+        id: g.id,
+        participantes: g.participants.map(p => p.jid)
+      })),
+      autorizados_bd: autorizados.length,
+      analise
+    })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+// ============================================================
+// INICIALIZAÇÃO
+// ============================================================
+
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
   iniciarBot()
 
-  setInterval(() => {
-    processarFila().catch(console.error)
+  setInterval(async () => {
+    processandoFila = true
+    await processarFila(pool, sock, conectado, {
+      onEnviado: () => { ultimaMensagemEnviadaEm = new Date().toISOString() },
+      onErro: (msg) => { ultimaFalhaEnvioEm = new Date().toISOString(); erroUltimoEnvio = msg }
+    }).catch(console.error)
+    processandoFila = false
   }, 10000)
 })

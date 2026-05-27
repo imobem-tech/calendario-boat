@@ -1,7 +1,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2604240040";
+const VERSAO_API = "Allmax®2605271130";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const pool = new Pool({
@@ -22,14 +22,23 @@ function decodificar(txt) {
 }
 
 function calcularDV(pb, grupoNum, autorizado) {
-  const base = `${pb}${grupoNum}${autorizado}`;
+  // Inclui MMDD do dia atual na soma para validação
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const mm = String(agora.getMonth() + 1).padStart(2, "0");
+  const dd = String(agora.getDate()).padStart(2, "0");
+  const mmdd = `${mm}${dd}`;
+  const base = `${pb}${grupoNum}${autorizado}${mmdd}`;
   const soma = base.split("").reduce((acc, n) => acc + Number(n), 0);
   return String(soma).padStart(2, "0");
 }
 
 function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
-  const m = t.match(/^([a-j]+)([a-z])([a-j])([a-j]{4})([a-j]{2})$/);
+
+  // Novo formato com MMDD: [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
+
+   
+      const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
   if (!m) return null;
 
@@ -37,18 +46,31 @@ function decodeToken(token) {
   const grupoLetra = m[2].toUpperCase();
   const grupoNum = decodificar(m[3]);
   const autorizado = decodificar(m[4]);
-  const dv = decodificar(m[5]);
+  const mmdd = decodificar(m[5]).padStart(4, "0");
+  const dv = decodificar(m[6]);
 
   if (!pb || !grupoNum || !autorizado || !dv) return null;
+
+  // Valida MMDD: token deve ser do dia atual (horário Brasil)
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
+  const ddHoje = String(agora.getDate()).padStart(2, "0");
+  const mmddHoje = `${mmHoje}${ddHoje}`;
+
+  if (mmdd !== mmddHoje) return null; // token expirado
 
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
-  return {
-    pb,
-    grupo: `${grupoLetra}${grupoNum}`,
-    codAutorizado: autorizado
-  };
+ const primeiroGrupo = decodificar(m[2]);
+const grupoFinal = primeiroGrupo ? `${primeiroGrupo}${grupoNum}` : `${grupoLetra}${grupoNum}`;
+
+return {
+  pb,
+  grupo: grupoFinal,
+  codAutorizado: autorizado,
+  token: t
+};
 }
 
 function extrairLimiteDoGrupo(grupo) {
@@ -259,6 +281,37 @@ export default async function handler(req, res) {
       }
     }
 
+    // Busca Cod_Cliente (proprietário) real na P_BOAT_1_Embarcacao
+    const rsEmb = await client.query(
+      `SELECT "Cod_Cliente"
+         FROM public."P_BOAT_1_Embarcacao"
+        WHERE "Num_PB" = $1
+        LIMIT 1`,
+      [codEmbPB]
+    );
+
+    if (rsEmb.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: `Embarcação ${codEmbPB} não encontrada.`,
+        versao: VERSAO_API
+      });
+    }
+
+    const codProprietario = Number(
+      rsEmb.rows[0]["Cod_Cliente"] ??
+      rsEmb.rows[0]["cod_cliente"] ??
+      0
+    );
+
+    if (!codProprietario) {
+      await client.query("ROLLBACK");
+      return res.status(422).json({
+        error: `Embarcação ${codEmbPB} sem proprietário cadastrado.`,
+        versao: VERSAO_API
+      });
+    }
+
     const rsCodigo = await client.query(
       `SELECT COALESCE(MAX("Código"), 0) + 1 AS proximo_codigo
          FROM public."P_BOAT_z_10_Saida_Emb"`
@@ -292,7 +345,7 @@ export default async function handler(req, res) {
       [
         proximoCodigo,
         codEmbPB,
-        4255,
+        codProprietario,
         codAutorizado,
         dataHoraAgendamento,
         grupo
