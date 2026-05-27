@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO HHH — HORA MOTOR (SAÍDA E RETORNO)
-// Allmax Gestão de Cotas — V.2605260110
+// Allmax Gestão de Cotas — V.2605271600
 // Compatível com pg Pool
 //
 // Comando: hhh / hhhh / HHH / misto (3+ h's)
@@ -108,7 +108,7 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND "Dt_Agendamento"::date = $3::date
+       AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
        AND "Dt_Desistencia"   IS NULL
        AND "Dt_Cancela_saida" IS NULL
      ORDER BY "Dt_Agendamento" ASC
@@ -346,7 +346,14 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   }
 
   const codEmbPb       = Number(grupoAgenda.pb)
-  const grupoCompLetra = String(grupoAgenda.cota || '').trim().toUpperCase()
+  // extrai cota do nome quando cota é null (ex: "151-11 _C SUMMER..." → "11")
+  const _cotaRaw = grupoAgenda.cota
+  const _nomeGrupo = grupoAgenda.nomegrupowpp || ''
+  let grupoCompLetra = String(_cotaRaw || '').trim().toUpperCase()
+  if (!grupoCompLetra) {
+    const _m = _nomeGrupo.match(/^\d+-([A-Z0-9]+)/i)
+    grupoCompLetra = _m ? _m[1].toUpperCase() : ''
+  }
 
   if (!codEmbPb || !grupoCompLetra) {
     await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_HM}`)
@@ -369,9 +376,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
     return true
   }
 
-  const dadosEmbar  = await buscarDadosEmbar(pool, codEmbPb)
-  const nomeEmbar   = dadosEmbar["Nome_Embar"] || ""
-  const cabecalho   = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'], nomeEmbar)
+  const cabecalho = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'])
   const key       = chaveEstado(grupoId, remetente)
 
   await executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key)
