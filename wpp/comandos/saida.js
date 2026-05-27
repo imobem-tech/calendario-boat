@@ -11,7 +11,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605271530'
+const VERSAO_SAIDA = 'V.2605271600'
 
 // ============================================================
 // HELPERS
@@ -281,8 +281,31 @@ async function buscarGrupoAgenda(pool, grupoId) {
   return rs.rows[0] || null
 }
 
-function normalizarGrupoCompLetra(cota) {
-  return String(cota || '').trim().toUpperCase()
+// ============================================================
+// BUSCA NOME DA EMBARCAÇÃO
+// ============================================================
+async function buscarDadosEmbar(pool, pb) {
+  try {
+    const rs = await pool.query(
+      `SELECT "Nome_Embar"
+         FROM public."P_BOAT_1_Embarcacao"
+        WHERE "Num_PB" = $1
+        LIMIT 1`,
+      [pb]
+    )
+    return rs.rows[0] || {}
+  } catch (err) {
+    console.warn('[buscarDadosEmbar]', err.message)
+    return {}
+  }
+}
+
+function normalizarGrupoCompLetra(cota, nomeGrupo) {
+  const cotaStr = String(cota || '').trim().toUpperCase()
+  if (cotaStr) return cotaStr
+  // cota nula: extrai do nome do grupo (ex: "151-11 _C SUMMER..." → "11")
+  const m = String(nomeGrupo || '').match(/^\d+-([A-Z0-9]+)/i)
+  return m ? m[1].toUpperCase() : ''
 }
 
 // ============================================================
@@ -323,11 +346,11 @@ async function registrarSaida(pool, saida, colaborador) {
 
   await pool.query(`
     UPDATE public."P_BOAT_z_10_Saida_Emb"
-       SET "Dt_Saída" = $1,
+       SET "Dt_Saída" = (NOW() AT TIME ZONE 'America/Sao_Paulo')::timestamp AT TIME ZONE 'America/Sao_Paulo',
            "Dt_Desistencia" = NULL,
-           "Colab_Responsavel" = $2
-     WHERE "ID" = $3
-  `, [agora, colaborador.Nome, saida.ID])
+           "Colab_Responsavel" = $1
+     WHERE "ID" = $2
+  `, [colaborador.Nome, saida.ID])
 
   await pool.query(`
     UPDATE public."P_BOAT_9_OS"
@@ -360,7 +383,9 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   }
 
   const codEmbPb = Number(grupoAgenda.pb)
-  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
+  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota, grupoAgenda.nomegrupowpp)
+  const dadosEmbar    = await buscarDadosEmbar(pool, codEmbPb)
+  const nomeEmbar     = dadosEmbar["Nome_Embar"] || ""
 
   console.log('DEBUG_SAIDA_ENTRADA', {
     grupoId,
@@ -418,7 +443,8 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     estadosSaida.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       saida,
-      colaborador
+      colaborador,
+      nomeEmbar
     })
 
     await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
@@ -428,7 +454,8 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   estadosSaida.set(key, {
     etapa: 'aguardando_confirmacao_saida',
     saida,
-    colaborador
+    colaborador,
+    nomeEmbar
   })
 
   await enviar(sock, grupoId, 'Confirma saída? S/N')
@@ -509,12 +536,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
     estadosSaida.delete(key)
 
+    const _nomeEmbarSaida = estado.nomeEmbar || ""
     let resposta =
-      `Saída registrada com sucesso.\n\n` +
-      `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
-      `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
-      `Colaborador: ${estado.colaborador.Nome}\n` +
-      `Data/Hora: ${dataHoraBR}`
+      `*Saída confirmada* — ${dataHoraBR}\n\n` +
+      `*${estado.saida.Cod_Emb_PB}-${estado.saida.Grupo_Comp_letra}*\n` +
+      (_nomeEmbarSaida ? `${_nomeEmbarSaida}\n` : "") +
+      `Colaborador: ${estado.colaborador.Nome}`
 
     if (
       estado.saida.Hora_Motor_Saida !== null &&
