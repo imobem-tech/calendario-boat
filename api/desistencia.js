@@ -1,6 +1,6 @@
 // ============================================================
 // /api/desistencia
-// Allmax Gestão de Cotas — V.2605252310
+// Allmax Gestão de Cotas — V.2605271251
 // Cancela agendamento: grava Dt_Desistencia e enfileira WPP.
 //
 // POST /api/desistencia
@@ -10,8 +10,8 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605252320";
-const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2605252320";
+const VERSAO_API = "Allmax®2605271251";
+const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2605271251";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -174,14 +174,14 @@ export default async function handler(req, res) {
     }
 
     // Grava desistência
-    const agora = agoraSaoPaulo();
-
     await client.query(
       `UPDATE public."P_BOAT_z_10_Saida_Emb"
-          SET "Dt_Desistencia" = $1
-        WHERE "ID" = $2`,
-      [agora, ag.ID]
+          SET "Dt_Desistencia" = (NOW() AT TIME ZONE 'America/Sao_Paulo')::timestamp AT TIME ZONE 'America/Sao_Paulo'
+        WHERE "ID" = $1`,
+      [ag.ID]
     );
+
+    const agora = agoraSaoPaulo();
 
     await client.query("COMMIT");
 
