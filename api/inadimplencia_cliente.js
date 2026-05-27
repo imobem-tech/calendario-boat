@@ -1,6 +1,6 @@
 // ============================================================
 // /api/inadimplencia_cliente
-// Allmax Gestão de Cotas — Allmax®2605271600
+// Allmax Gestão de Cotas — Allmax®2605271745
 // Verifica inadimplência do cotista.
 // Se inadimplente:
 //   1. Envia relatório CR no privado do cliente (Cliente_Telefone_Celular)
@@ -210,11 +210,14 @@ export default async function handler(req, res) {
       }
     }
 
+    const wppEnfileirado = privadoEnviado || espelhoEnviado;
+
     return res.status(200).json({
       inadimplente: true,
       totalFaturas: faturas.length,
       privadoEnviado,
       espelhoEnviado,
+      wppEnfileirado,
       versao: VERSAO_API
     });
 
