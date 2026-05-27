@@ -10,7 +10,7 @@
 // ============================================================
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605260110'
+const VERSAO_HM = 'V.2605271600'
 
 // ============================================================
 // HELPERS
@@ -62,13 +62,14 @@ async function enviar(sock, grupoId, texto) {
   await sock.sendMessage(grupoId, { text: texto })
 }
 
-function montarCabecalho(pb, grupo, dtAgendamento) {
+function montarCabecalho(pb, grupo, dtAgendamento, nomeEmbar) {
   const hoje = hojeIsoSaoPaulo()
   const [ano, mes, dia] = hoje.split('-')
   const dataFormatada = dtAgendamento
     ? formatarDataBR(dtAgendamento)
     : `${dia}/${mes}/${ano}`
-  return `📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}`
+  const cabEmbar = nomeEmbar ? `*${pb}-${grupo}* — ${nomeEmbar}` : `*${pb}-${grupo}*`
+  return `📋 ${cabEmbar} — ${dataFormatada}`
 }
 
 // ============================================================
@@ -115,6 +116,22 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows[0] || null
+}
+
+async function buscarDadosEmbar(pool, pb) {
+  try {
+    const rs = await pool.query(
+      `SELECT "Nome_Embar"
+         FROM public."P_BOAT_1_Embarcacao"
+        WHERE "Num_PB" = $1
+        LIMIT 1`,
+      [pb]
+    )
+    return rs.rows[0] || {}
+  } catch (err) {
+    console.warn('[buscarDadosEmbar]', err.message)
+    return {}
+  }
 }
 
 async function gravarHoraMotorSaida(pool, id, valor) {
@@ -352,7 +369,9 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
     return true
   }
 
-  const cabecalho = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'])
+  const dadosEmbar  = await buscarDadosEmbar(pool, codEmbPb)
+  const nomeEmbar   = dadosEmbar["Nome_Embar"] || ""
+  const cabecalho   = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'], nomeEmbar)
   const key       = chaveEstado(grupoId, remetente)
 
   await executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key)
