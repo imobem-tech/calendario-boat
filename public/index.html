@@ -321,182 +321,6 @@
       line-height: 1.4;
     }
 
-    /* ---- Modal ocupado / cancelamento ---- */
-    .ocupado-dialog{
-      border: none;
-      border-radius: 22px;
-      padding: 0;
-      width: min(92vw, 440px);
-      background: #fff;
-      color: var(--text);
-      box-shadow: 0 24px 60px rgba(0,0,0,.22);
-    }
-
-    .ocupado-dialog::backdrop{
-      background: rgba(0,0,0,.38);
-    }
-
-    .ocupado-box{
-      padding: 28px 24px 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      text-align: center;
-    }
-
-    .ocupado-icon{ font-size: 52px; line-height: 1; }
-
-    .ocupado-title{
-      margin: 0;
-      font-size: 20px;
-      font-weight: 900;
-      line-height: 1.2;
-    }
-
-    .ocupado-msg{
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.55;
-      color: var(--muted);
-    }
-
-    .ocupado-detail{
-      background: #f8fafc;
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 14px;
-      width: 100%;
-      text-align: left;
-      line-height: 1.7;
-      color: var(--text);
-    }
-
-    .btn-cancelar-ag{
-      background: #dc2626;
-      color: #fff;
-      font-weight: 800;
-      font-size: 15px;
-      padding: 12px 22px;
-      border-radius: 14px;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-    }
-
-    .btn-cancelar-ag:disabled{
-      opacity: .5;
-      cursor: default;
-    }
-
-    .ocupado-fechar{
-      background: #f1f5f9;
-      color: var(--text);
-      font-weight: 700;
-      font-size: 14px;
-      padding: 10px 22px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-    }
-
-    .cancel-spinner{
-      display: none;
-      width: 22px;
-      height: 22px;
-      border: 3px solid #e5e7eb;
-      border-top-color: #dc2626;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin: 0 auto;
-    }
-
-    /* ---- */
-    .brand-footer{
-    .inadim-dialog{
-      border: none;
-      border-radius: 22px;
-      padding: 0;
-      width: min(92vw, 440px);
-      background: #fff;
-      color: var(--text);
-      box-shadow: 0 24px 60px rgba(0,0,0,.22);
-    }
-
-    .inadim-dialog::backdrop{
-      background: rgba(0,0,0,.38);
-    }
-
-    .inadim-box{
-      padding: 28px 24px 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      text-align: center;
-    }
-
-    .inadim-icon{
-      font-size: 52px;
-      line-height: 1;
-    }
-
-    .inadim-title{
-      margin: 0;
-      font-size: 20px;
-      font-weight: 900;
-      color: #dc2626;
-      line-height: 1.2;
-    }
-
-    .inadim-msg{
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.55;
-      color: var(--text);
-    }
-
-    .inadim-wpp{
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: #25d366;
-      color: #fff;
-      font-weight: 800;
-      font-size: 15px;
-      padding: 12px 22px;
-      border-radius: 14px;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-    }
-
-    .inadim-fechar{
-      background: #f1f5f9;
-      color: var(--text);
-      font-weight: 700;
-      font-size: 14px;
-      padding: 10px 22px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-    }
-
-    .inadim-spinner{
-      display: none;
-      width: 22px;
-      height: 22px;
-      border: 3px solid #e5e7eb;
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin: 4px auto;
-    }
-
-    @keyframes spin{ to{ transform: rotate(360deg); } }
-
-    /* ---- */
     .brand-footer{
       text-align:center;
       margin-top: 18px;
@@ -562,6 +386,43 @@
         font-size: 20px;
       }
     }
+
+    /* ── Modal de agendamento ── */
+    .modal-overlay{
+      position:fixed; inset:0; background:rgba(15,23,42,.52);
+      display:none; align-items:center; justify-content:center;
+      padding:18px; z-index:9999;
+    }
+    .modal-overlay.show{ display:flex; }
+    .modal-card{
+      width:min(420px,100%); background:#fff; border-radius:22px;
+      box-shadow:0 18px 50px rgba(15,23,42,.28); overflow:hidden;
+      border:1px solid #e5e7eb; animation:popIn .18s ease;
+    }
+    @keyframes popIn{
+      from{ transform:translateY(10px) scale(.98); opacity:0; }
+      to{   transform:translateY(0)    scale(1);   opacity:1; }
+    }
+    .modal-head{
+      padding:16px 18px 12px; font-size:20px; font-weight:900; line-height:1.1;
+    }
+    .modal-head.info{ background:#eff6ff; color:#1d4ed8; border-bottom:1px solid #bfdbfe; }
+    .modal-head.warn{ background:#fff7ed; color:#c2410c; border-bottom:1px solid #fdba74; }
+    .modal-head.confirm{ background:#ecfdf5; color:#15803d; border-bottom:1px solid #bbf7d0; }
+    .modal-body{
+      padding:16px 18px; font-size:17px; line-height:1.45;
+      color:#10213d; font-weight:700; white-space:pre-line;
+    }
+    .modal-actions{
+      padding:0 18px 18px; display:flex; gap:10px; justify-content:flex-end;
+    }
+    .modal-btn{
+      min-width:100px; height:46px; border:0; border-radius:12px;
+      font-size:16px; font-weight:900; cursor:pointer;
+    }
+    .modal-btn.primary{ background:#1d4ed8; color:#fff; }
+    .modal-btn.secondary{ background:#f1f5f9; color:#10213d; }
+    .modal-btn.danger{ background:#dc2626; color:#fff; }
   </style>
 </head>
 <body>
@@ -600,7 +461,7 @@
 
     <section class="calendar" id="calendar"></section>
 
-    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605252310</div>
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605222030</div>
   </div>
 
   <dialog class="legend-dialog" id="legendDialog">
@@ -635,56 +496,6 @@
       <div class="footer-note">
         Apenas dias livres e feriados ficam clicáveis.
       </div>
-    </div>
-  </dialog>
-
-  <!-- Modal: dia agendado por outro cotista -->
-  <dialog class="ocupado-dialog" id="outroCotistaDialog">
-    <div class="ocupado-box">
-      <div class="ocupado-icon">📅</div>
-      <h2 class="ocupado-title" style="color:#7c3aed;">Data Reservada</h2>
-      <p class="ocupado-msg">Esta data foi agendada por outro Cotista.</p>
-      <button class="ocupado-fechar" id="outroCotistaFechar" type="button">Fechar</button>
-    </div>
-  </dialog>
-
-  <!-- Modal: cancelamento do próprio agendamento -->
-  <dialog class="ocupado-dialog" id="cancelarDialog">
-    <div class="ocupado-box">
-      <div class="ocupado-icon">🗓️</div>
-      <h2 class="ocupado-title" style="color:#dc2626;">Seu Agendamento</h2>
-      <div class="ocupado-detail" id="cancelarDetalhe">—</div>
-      <p class="ocupado-msg">Deseja cancelar este agendamento?</p>
-      <div class="cancel-spinner" id="cancelSpinner"></div>
-      <button class="btn-cancelar-ag" id="btnConfirmarCancelamento" type="button">Sim, cancelar</button>
-      <button class="ocupado-fechar" id="cancelarFechar" type="button">Não, manter</button>
-    </div>
-  </dialog>
-
-  <!-- Modal de inadimplência -->
-  <dialog class="inadim-dialog" id="inadimDialog">
-    <div class="inadim-box">
-      <div class="inadim-icon">⚠️</div>
-      <h2 class="inadim-title">Agendamento suspenso</h2>
-      <div class="inadim-spinner" id="inadimSpinner"></div>
-      <p class="inadim-msg">
-        Não foi possível realizar o agendamento on-line.<br>
-        Faça contato com a Marina através do WhatsApp.
-      </p>
-      <button class="inadim-fechar" id="inadimFechar" type="button">Fechar</button>
-    </div>
-  </dialog>
-
-  <!-- Modal de folga -->
-  <dialog class="inadim-dialog" id="folgaDialog">
-    <div class="inadim-box">
-      <div class="inadim-icon">🏖️</div>
-      <h2 class="inadim-title" style="color:#b45309;">Folga da Marina</h2>
-      <p class="inadim-msg">
-        Essa data é folga da Marina.<br>
-        Escolha outro dia disponível para agendar.
-      </p>
-      <button class="inadim-fechar" id="folgaFechar" type="button">Fechar</button>
     </div>
   </dialog>
 
@@ -874,170 +685,25 @@
       return div;
     }
 
-    // ----------------------------------------------------------
-    // Modal: outro cotista
-    // ----------------------------------------------------------
-    const outroCotistaDialog = document.getElementById("outroCotistaDialog");
-    const outroCotistaFechar = document.getElementById("outroCotistaFechar");
-    outroCotistaFechar.addEventListener("click", () => outroCotistaDialog.close());
-    outroCotistaDialog.addEventListener("click", (e) => {
-      if(e.target === outroCotistaDialog) outroCotistaDialog.close();
-    });
-
-    // ----------------------------------------------------------
-    // Modal: cancelamento do próprio agendamento
-    // ----------------------------------------------------------
-    const cancelarDialog           = document.getElementById("cancelarDialog");
-    const cancelarFechar           = document.getElementById("cancelarFechar");
-    const cancelarDetalhe          = document.getElementById("cancelarDetalhe");
-    const btnConfirmarCancelamento = document.getElementById("btnConfirmarCancelamento");
-    const cancelSpinner            = document.getElementById("cancelSpinner");
-
-    let agendamentoParaCancelar = null; // { id, dtAgendada, hora, grupo }
-
-    cancelarFechar.addEventListener("click", () => {
-      cancelarDialog.close();
-      agendamentoParaCancelar = null;
-    });
-    cancelarDialog.addEventListener("click", (e) => {
-      if(e.target === cancelarDialog){
-        cancelarDialog.close();
-        agendamentoParaCancelar = null;
-      }
-    });
-
-    function abrirModalCancelamento(info){
-      agendamentoParaCancelar = info;
-      cancelarDetalhe.innerHTML =
-        `<strong>Data:</strong> ${info.dtFormatada}<br>` +
-        `<strong>Hora:</strong> ${info.hora}<br>` +
-        `<strong>Grupo:</strong> ${info.grupo}`;
-      btnConfirmarCancelamento.disabled = false;
-      cancelSpinner.style.display = "none";
-      cancelarDialog.showModal();
-    }
-
-    btnConfirmarCancelamento.addEventListener("click", async () => {
-      if(!agendamentoParaCancelar || !acesso) return;
-
-      btnConfirmarCancelamento.disabled = true;
-      cancelSpinner.style.display = "block";
-
-      try{
-        const resp = await fetch("/api/desistencia", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: acesso.token,
-            agendamentoId: agendamentoParaCancelar.id
-          })
-        });
-
-        const json = await resp.json();
-        cancelarDialog.close();
-        agendamentoParaCancelar = null;
-
-        if(resp.ok){
-          // Recarrega o calendário para refletir o cancelamento
-          await carregarMes();
-        } else {
-          mostrarErro(json.error || "Erro ao cancelar agendamento.");
-        }
-      } catch(err){
-        cancelarDialog.close();
-        mostrarErro("Falha de conexão ao cancelar. Tente novamente.");
-      }
-    });
-
-    // ----------------------------------------------------------
-    // Modal de inadimplência
-    // ----------------------------------------------------------
-    const inadimDialog  = document.getElementById("inadimDialog");
-    const inadimSpinner = document.getElementById("inadimSpinner");
-    const inadimFechar  = document.getElementById("inadimFechar");
-
-    inadimFechar.addEventListener("click", () => inadimDialog.close());
-    inadimDialog.addEventListener("click", (e) => {
-      if(e.target === inadimDialog) inadimDialog.close();
-    });
-
-    // ----------------------------------------------------------
-    // Modal de folga
-    // ----------------------------------------------------------
-    const folgaDialog = document.getElementById("folgaDialog");
-    const folgaFechar = document.getElementById("folgaFechar");
-
-    folgaFechar.addEventListener("click", () => folgaDialog.close());
-    folgaDialog.addEventListener("click", (e) => {
-      if(e.target === folgaDialog) folgaDialog.close();
-    });
-
-    // ----------------------------------------------------------
-    // Controle de sessão — WPP disparado apenas uma vez por sessão
-    // ----------------------------------------------------------
-    const chaveWppSessao = `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
-
-    function wppJaDisparadoNaSessao(){
-      try{ return !!sessionStorage.getItem(chaveWppSessao); }
-      catch(e){ return false; }
-    }
-
-    function marcarWppDisparado(){
-      try{ sessionStorage.setItem(chaveWppSessao, "1"); }
-      catch(e){}
-    }
-
-    // Flag anti-duplo: impede segunda chamada enquanto já está verificando
-    let verificandoInadimplencia = false;
-
-    // ----------------------------------------------------------
-    // Navegar para agendamento com verificação de inadimplência
-    // ----------------------------------------------------------
-    async function navegarParaAgendamento(data){
+    function navegarParaAgendamento(data){
       if(!acesso || !acesso.dvOk) return;
-      if(verificandoInadimplencia) return;
 
-      verificandoInadimplencia = true;
       const dataStr = isoDate(data);
-
-      try{
-        // Consulta silenciosa — sem abrir modal ainda
-        const dispararWpp = !wppJaDisparadoNaSessao();
-        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
-        const resp = await fetch(url, { cache: "no-store" });
-        const json = await resp.json();
-
-        if(!resp.ok || json.inadimplente){
-          // Só agora abre o modal — confirmada inadimplência
-          if(json.wppEnfileirado){
-            marcarWppDisparado();
-          }
-          inadimSpinner.style.display = "none";
-          inadimDialog.showModal();
-          return;
-        }
-
-        // Adimplente — navega direto, sem abrir nada
-        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
-
-      }catch(err){
-        // Falha de rede: libera o acesso sem bloquear o cotista
-        console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
-        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
-      } finally {
-        verificandoInadimplencia = false;
-      }
+      window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
     }
 
     function criarCelulaDia(data, info){
-      const status   = info?.status || "free";
-      const label    = normalizarLabel(status, info?.label);
+      const status = info?.status || "free";
+      const label = normalizarLabel(status, info?.label);
       const ehFeriado = !!info?.holiday;
-      const ehFolga  = status === "folga";
-      const ehBusy   = status === "busy";
 
-      const el = document.createElement("button");
-      el.type  = "button";
+      const clicavel = status === "free" || status === "holiday" || status === "busy";
+      const el = document.createElement(clicavel ? "button" : "div");
+
+      if(clicavel){
+        el.type = "button";
+      }
+
       el.className = `day ${status}`;
 
       const num = document.createElement("div");
@@ -1048,45 +714,15 @@
       center.className = "day-center";
       center.textContent = label;
 
-      if(status === "free" || status === "holiday"){
+      if(clicavel){
         el.classList.add("empty-current");
-        el.addEventListener("click", () => navegarParaAgendamento(data));
-
-      } else if(ehFolga){
-        el.addEventListener("click", () => folgaDialog.showModal());
-
-      } else if(ehBusy){
-        el.style.cursor = "pointer";
         el.addEventListener("click", () => {
-          // Verifica se o agendamento é do próprio cotista
-          const codAutorizadoAg = Number(info.codAutorizado);
-          const codAutorizadoMeu = Number(acesso?.codAutorizado || 0);
-          const grupoAg  = String(info.grupo || "").toUpperCase();
-          const grupoMeu = String(acesso?.grupo || "").toUpperCase();
-
-          const ehMeu = codAutorizadoAg === codAutorizadoMeu && grupoAg === grupoMeu;
-
-          if(!ehMeu){
-            outroCotistaDialog.showModal();
-            return;
+          if(status === "busy"){
+            tratarCliqueBusy(data, info);
+          } else {
+            navegarParaAgendamento(data);
           }
-
-          // É do próprio cotista — abre modal de cancelamento
-          const iso = isoDate(data);
-          const [ano, mes, dia] = iso.split("-");
-          const dtFormatada = `${dia}/${mes}/${ano}`;
-
-          abrirModalCancelamento({
-            id:          info.agendamentoId,
-            dtFormatada,
-            hora:        info.hora || "—",
-            grupo:       grupoAg
-          });
         });
-
-      } else {
-        el.disabled = true;
-        el.style.cursor = "default";
       }
 
       el.appendChild(num);
@@ -1101,13 +737,12 @@
         if(!item || !item.date) return;
 
         mapa.set(item.date, {
-          status:        item.status || "free",
-          label:         item.label || "",
-          holiday:       !!item.holiday,
+          status: item.status || "free",
+          label: item.label || "",
+          holiday: !!item.holiday,
           agendamentoId: item.agendamentoId || null,
-          grupo:         item.grupo || "",
-          codAutorizado: item.codAutorizado || null,
-          hora:          item.hora || ""
+          codAutorizado: item.codAutorizado ? Number(item.codAutorizado) : null,
+          hora: item.hora || ""
         });
       });
 
@@ -1220,6 +855,102 @@
       carregarMes();
     });
 
+
+    // ── Modal helpers ──
+    const agModalOverlay  = document.getElementById("agModalOverlay");
+    const agModalHead     = document.getElementById("agModalHead");
+    const agModalBody     = document.getElementById("agModalBody");
+    const agModalActions  = document.getElementById("agModalActions");
+    const agModalFechar   = document.getElementById("agModalFechar");
+
+    agModalFechar.addEventListener("click", () => fecharAgModal());
+    agModalOverlay.addEventListener("click", e => { if(e.target===agModalOverlay) fecharAgModal(); });
+
+    function fecharAgModal(){
+      agModalOverlay.classList.remove("show");
+      agModalOverlay.setAttribute("aria-hidden","true");
+    }
+
+    function abrirAgModal(titulo, texto, tipo, acoes){
+      agModalHead.textContent = titulo;
+      agModalHead.className = "modal-head " + (tipo || "info");
+      agModalBody.textContent = texto;
+      agModalActions.innerHTML = "";
+
+      if(acoes && acoes.length){
+        acoes.forEach(a => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "modal-btn " + (a.cls || "primary");
+          btn.textContent = a.label;
+          btn.addEventListener("click", () => { fecharAgModal(); if(a.fn) a.fn(); });
+          agModalActions.appendChild(btn);
+        });
+      } else {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "modal-btn primary";
+        btn.textContent = "Fechar";
+        btn.addEventListener("click", fecharAgModal);
+        agModalActions.appendChild(btn);
+      }
+
+      agModalOverlay.classList.add("show");
+      agModalOverlay.setAttribute("aria-hidden","false");
+    }
+
+    function formatarDataModal(isoStr){
+      const [y,m,d] = isoStr.split("-").map(Number);
+      const diasSem = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+      const diaSem  = diasSem[new Date(y,m-1,d).getDay()];
+      const dd = String(d).padStart(2,"0");
+      const mm = String(m).padStart(2,"0");
+      return `${dd}/${mm} ${diaSem}`;
+    }
+
+    async function confirmarCancelamento(agendamentoId, dataFormatada){
+      try{
+        const resp = await fetch("/api/desistencia", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ token, agendamentoId })
+        });
+        const json = await resp.json();
+        if(!resp.ok){
+          abrirAgModal("Erro", json.error || "Falha ao cancelar.", "warn");
+          return;
+        }
+        abrirAgModal("Cancelado", `Agendamento de ${dataFormatada} cancelado.`, "confirm");
+        setTimeout(() => { fecharAgModal(); carregarMes(); }, 2000);
+      } catch(err){
+        abrirAgModal("Erro", "Falha ao cancelar. Tente novamente.", "warn");
+      }
+    }
+
+    function tratarCliqueBusy(data, info){
+      const isoStr   = isoDate(data);
+      const codAgend = info?.codAutorizado;
+      const meuCod   = acesso?.codAutorizado ? Number(acesso.codAutorizado) : null;
+      const agId     = info?.agendamentoId;
+      const dataFmt  = formatarDataModal(isoStr);
+
+      if(!codAgend || !meuCod || codAgend !== meuCod){
+        abrirAgModal("Data Ocupada", "Data agendada por outro Cotista.", "info");
+        return;
+      }
+
+      // É do próprio cotista — oferece cancelamento
+      abrirAgModal(
+        "Cancelar Agendamento?",
+        dataFmt,
+        "warn",
+        [
+          { label: "Não",  cls: "secondary", fn: null },
+          { label: "Sim",  cls: "danger",    fn: () => confirmarCancelamento(agId, dataFmt) }
+        ]
+      );
+    }
+
     if(!acesso || !acesso.dvOk){
       tituloEmb.textContent = "LINK INVÁLIDO";
       subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
@@ -1235,5 +966,16 @@
       carregarMes();
     }
   </script>
+
+  <!-- Modal agendamento -->
+  <div id="agModalOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div id="agModalHead" class="modal-head info">Aviso</div>
+      <div id="agModalBody" class="modal-body"></div>
+      <div id="agModalActions" class="modal-actions">
+        <button id="agModalFechar" type="button" class="modal-btn primary">Fechar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
