@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas
+// Allmax Gestão de Cotas — V.2605271600
 // Compatível com pg Pool
 //
 // Comandos:
@@ -11,6 +11,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
+const VERSAO_SAIDA = 'V.2605271600'
 
 // ============================================================
 // HELPERS
@@ -575,3 +576,4 @@ export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) 
 
   return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
 }
+export { buscarColaborador }
