@@ -1,6 +1,6 @@
 // ============================================================
 // COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas — V.2605260050
+// Allmax Gestão de Cotas
 // Compatível com pg Pool
 //
 // Comandos:
@@ -8,16 +8,9 @@
 //   colaborador63984030406
 //   colaborador 63984030406
 //      => vincula o LID do remetente ao colaborador cadastrado
-//
-// V.2605252345:
-//   - buscarSaidaDoDia retorna TODOS os registros do dia
-//   - classifica cada registro em estado (#1 a #10)
-//   - exibe histórico completo antes de qualquer ação
-//   - permite nova saída mesmo havendo ciclos anteriores completos
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605260050'
 
 // ============================================================
 // HELPERS
@@ -239,7 +232,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
     await enviar(
       sock,
       grupoId,
-      `Não encontrei colaborador com este telefone. Verifique o número cadastrado.\n${VERSAO_SAIDA}`
+      'Não encontrei colaborador com este telefone. Verifique o número cadastrado.'
     )
     return true
   }
@@ -247,7 +240,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   const lid = String(remetente || '').trim().toLowerCase()
 
   if (!lid) {
-    await enviar(sock, grupoId, `Não consegui identificar o remetente para vincular.\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Não consegui identificar o remetente para vincular.')
     return true
   }
 
@@ -260,7 +253,7 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   await enviar(
     sock,
     grupoId,
-    `Colaborador vinculado com sucesso: ${colaborador.Nome}\n${VERSAO_SAIDA}`
+    `Colaborador vinculado com sucesso: ${colaborador.Nome}`
   )
 
   console.log('DEBUG_COLAB_LID_VINCULADO_MANUAL', {
@@ -292,6 +285,25 @@ function normalizarGrupoCompLetra(cota) {
 }
 
 // ============================================================
+// BUSCA NOME DA EMBARCAÇÃO
+// ============================================================
+async function buscarDadosEmbar(pool, pb) {
+  try {
+    const rs = await pool.query(
+      `SELECT "Nome_Embar"
+         FROM public."P_BOAT_1_Embarcacao"
+        WHERE "Num_PB" = $1
+        LIMIT 1`,
+      [pb]
+    )
+    return rs.rows[0] || {}
+  } catch (err) {
+    console.warn('[buscarDadosEmbar]', err.message)
+    return {}
+  }
+}
+
+// ============================================================
 // BUSCA SAÍDA DO DIA
 // ============================================================
 
@@ -305,112 +317,9 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
        AND "Dt_Agendamento" >= ($3::date)
        AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
-       AND "Dt_Desistencia"   IS NULL
-       AND "Dt_Cancela_saida" IS NULL
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
-}
-
-// ============================================================
-// BUSCA TODOS OS REGISTROS DO DIA
-// ============================================================
-
-async function buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra) {
-  const hoje = hojeIsoSaoPaulo()
-
-  const rs = await pool.query(`
-    SELECT *
-      FROM public."P_BOAT_z_10_Saida_Emb"
-     WHERE "Cod_Emb_PB" = $1
-       AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND "Dt_Agendamento" >= ($3::date)
-       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
-     ORDER BY "Dt_Agendamento" ASC
-  `, [codEmbPb, grupoCompLetra, hoje])
-
-  return rs.rows || []
-}
-
-// ============================================================
-// CLASSIFICA ESTADO DE CADA REGISTRO
-// ============================================================
-
-function classificarEstado(r) {
-  const saida      = r['Dt_Saída']
-  const retorno    = r['Dt_Retorno']
-  const desist     = r['Dt_Desistencia']
-  const cancela    = r['Dt_Cancela_saida']
-
-  if (!saida && !desist && !cancela)           return 1  // aguardando saída
-  if (saida  && !retorno && !desist && !cancela) return 2  // em navegação
-  if (saida  &&  retorno && !desist && !cancela) return 3  // ciclo completo
-  if (!saida &&  desist  && !cancela)            return 4  // desistência cotista
-  if (!saida && !desist  &&  cancela)            return 5  // cancelado admin
-  if (!saida &&  desist  &&  cancela)            return 6  // desist + cancela
-  if (saida  && !retorno &&  desist)             return 7  // inconsistente
-  if (saida  && !retorno &&  cancela)            return 8  // inconsistente
-  if (!saida &&  retorno)                        return 9  // inconsistente
-  if (saida  &&  retorno &&  desist)             return 10 // inconsistente
-  return 99 // desconhecido
-}
-
-// ============================================================
-// FORMATA HORA A PARTIR DE TIMESTAMP
-// ============================================================
-
-function extrairHora(dt) {
-  if (!dt) return '—'
-  const d = dt instanceof Date ? dt : new Date(dt)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${hh}:${mi}`
-}
-
-// ============================================================
-// MONTA RESUMO HISTÓRICO
-// ============================================================
-
-function montarResumoHistorico(registros, pb, grupo) {
-  const hoje = hojeIsoSaoPaulo()
-  const [ano, mes, dia] = hoje.split('-')
-  const dataFormatada = `${dia}/${mes}/${ano}`
-
-  const linhas = [`📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}\n`]
-
-  // Separa #1 dos demais — #1 sempre aparece por último
-  const historico = registros.filter(r => classificarEstado(r) !== 1)
-  const aguardando = registros.filter(r => classificarEstado(r) === 1)
-
-  for (const r of [...historico, ...aguardando]) {
-    const estado = classificarEstado(r)
-    const agHora = extrairHora(r['Dt_Agendamento'])
-    const saHora = extrairHora(r['Dt_Saída'])
-    const reHora = extrairHora(r['Dt_Retorno'])
-
-    switch (estado) {
-      case 1:
-        linhas.push(`⏳ Aguardando saída`)
-        break
-      case 2:
-        linhas.push(`🚢 Em navegação\n   Agendado: ${agHora} | Saída: ${saHora}`)
-        break
-      case 3:
-        linhas.push(`✅ Ciclo encerrado\n   Saída: ${saHora} | Retorno: ${reHora}`)
-        break
-      case 4:
-        linhas.push(`❌ Desistência\n   Agendado: ${agHora}`)
-        break
-      case 5:
-      case 6:
-        linhas.push(`🚫 Cancelado\n   Agendado: ${agHora}`)
-        break
-      default:
-        linhas.push(`⚠️ Situação irregular\n   Agendado: ${agHora}`)
-    }
-  }
-
-  return linhas.join('\n')
 }
 
 // ============================================================
@@ -439,18 +348,13 @@ async function registrarSaida(pool, saida, colaborador) {
      WHERE "ID" = $3
   `, [agora, colaborador.Nome, saida.ID])
 
-  // P_BOAT_9_OS pode não estar disponível no Neon ainda
-  try {
-    await pool.query(`
-      UPDATE public."P_BOAT_9_OS"
-         SET "OS_obs_Fechamento" = $1
-       WHERE "OS_Dt_Fechamento" IS NULL
-         AND "Num_Emb_PB" = $2
-         AND "Tipo" = 'SAÍDA'
-    `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
-  } catch (osErr) {
-    console.warn('[registrarSaida] P_BOAT_9_OS indisponível:', osErr.message)
-  }
+  await pool.query(`
+    UPDATE public."P_BOAT_9_OS"
+       SET "OS_obs_Fechamento" = $1
+     WHERE "OS_Dt_Fechamento" IS NULL
+       AND "Num_Emb_PB" = $2
+       AND "Tipo" = 'SAÍDA'
+  `, [`Decida ou cancelamento em_${agoraBR}  `, saida.Cod_Emb_PB])
 
   return agoraBR
 }
@@ -463,109 +367,90 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const colaborador = await buscarColaborador(pool, remetente)
 
   if (!colaborador) {
-    await enviar(sock, grupoId, `Comando não aceito. Use: colaborador + telefone cadastrado.\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Comando não aceito. Use: colaborador + telefone cadastrado.')
     return true
   }
 
   const grupoAgenda = await buscarGrupoAgenda(pool, grupoId)
 
   if (!grupoAgenda) {
-    await enviar(sock, grupoId, `Não encontrei este grupo na base de grupos da agenda.\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Não encontrei este grupo na base de grupos da agenda.')
     return true
   }
 
-  const codEmbPb      = Number(grupoAgenda.pb)
+  const codEmbPb = Number(grupoAgenda.pb)
   const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
 
   console.log('DEBUG_SAIDA_ENTRADA', {
-    grupoId, remetente, codEmbPb, grupoCompLetra,
+    grupoId,
+    remetente,
+    codEmbPb,
+    grupoCompLetra,
     colaborador: colaborador.Nome
   })
 
   if (!codEmbPb || !grupoCompLetra) {
-    await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Não consegui identificar a embarcação/grupo desta conversa.')
     return true
   }
 
-  // Busca TODOS os registros do dia
-  const registros = await buscarRegistrosDoDia(pool, codEmbPb, grupoCompLetra)
+  const saidas = await buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra)
 
-  // Sem nenhum registro
-  if (!registros.length) {
-    await enviar(sock, grupoId, `Não encontrei agendamento de saída para esta embarcação/grupo hoje.\n${VERSAO_SAIDA}`)
+  if (!saidas.length) {
+    await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
     return true
   }
 
-  // Monta e exibe histórico
-  const resumo = montarResumoHistorico(registros, codEmbPb, grupoCompLetra)
-
-  // Classifica todos
-  const estados = registros.map(r => ({ r, estado: classificarEstado(r) }))
-
-  // Verifica navegação ativa (#2)
-  const emNavegacao = estados.filter(e => e.estado === 2)
-  if (emNavegacao.length > 0) {
-    await enviar(sock, grupoId, `${resumo}\n\nEsta embarcação já está em navegação.\n${VERSAO_SAIDA}`)
+  if (saidas.length > 1) {
+    await enviar(sock, grupoId, 'Encontrei mais de uma saída para hoje. Não consegui registrar automaticamente.')
     return true
   }
 
-  // Filtra aguardando saída (#1)
-  const aguardando = estados.filter(e => e.estado === 1)
+  const saida = saidas[0]
 
-  if (aguardando.length === 0) {
-    await enviar(sock, grupoId, `${resumo}\n\nNão há agendamento ativo para hoje.\n${VERSAO_SAIDA}`)
+  if (saida.Dt_Desistencia) {
+    await enviar(sock, grupoId, 'Esta saída consta como desistência. Não é possível registrar a saída.')
     return true
   }
 
-  if (aguardando.length > 1) {
-    await enviar(sock, grupoId, `${resumo}\n\n⚠️ Situação irregular: mais de um agendamento ativo. Contate o administrador.\n${VERSAO_SAIDA}`)
+  if (saida.Dt_Cancela_saida) {
+    await enviar(sock, grupoId, 'Esta saída consta como cancelada. Não é possível registrar a saída.')
     return true
   }
 
-  // Exatamente um #1 — prossegue para registrar saída
-  const saida = aguardando[0].r
-  const key   = chaveEstado(grupoId, remetente)
+  if (saida['Dt_Saída']) {
+    await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
+    return true
+  }
 
-  // Leitura robusta — pg pode normalizar o nome da coluna com acento
-  const codProprietario = Number(
-    saida['Cod_Proprietário'] ??
-    saida['Cod_Proprietario'] ??
-    saida['cod_proprietário'] ??
-    saida['cod_proprietario'] ??
-    0
-  )
-
-  console.log('DEBUG_PROPRIETARIO', {
-    codProprietario,
-    keys: Object.keys(saida).filter(k => k.toLowerCase().includes('propri'))
-  })
+  const key = chaveEstado(grupoId, remetente)
 
   const precisaHoraMotor =
-    codProprietario === 4255 &&
-    (saida.Hora_Motor_Saida === null ||
-     saida.Hora_Motor_Saida === undefined ||
-     saida.Hora_Motor_Saida === '')
+    Number(saida['Cod_Proprietário']) === 4255 &&
+    (
+      saida.Hora_Motor_Saida === null ||
+      saida.Hora_Motor_Saida === undefined ||
+      saida.Hora_Motor_Saida === ''
+    )
 
   if (precisaHoraMotor) {
     estadosSaida.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       saida,
-      colaborador,
-      resumo
+      colaborador
     })
 
-    await enviar(sock, grupoId, `${resumo}\n\nInforme a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
     return true
   }
 
   estadosSaida.set(key, {
     etapa: 'aguardando_confirmacao_saida',
     saida,
-    colaborador,
-    resumo
+    colaborador
   })
 
-  await enviar(sock, grupoId, `${resumo}\n\nConfirma saída? S/N\n${VERSAO_SAIDA}`)
+  await enviar(sock, grupoId, 'Confirma saída? S/N')
   return true
 }
 
@@ -581,13 +466,13 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
   if (msg === 'd') {
     estadosSaida.delete(key)
-    await enviar(sock, grupoId, `Desistência registrada.\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Desistência registrada.')
     return true
   }
 
   if (estado.etapa === 'aguardando_hora_motor_saida') {
     if (!horaMotorValida(texto)) {
-      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir\n${VERSAO_SAIDA}`)
+      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
       return true
     }
 
@@ -595,7 +480,7 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_hora_motor'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
     return true
   }
 
@@ -605,12 +490,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
       estado.horaMotorInformada = ''
       estadosSaida.set(key, estado)
 
-      await enviar(sock, grupoId, `Informe a Hora Motor de Saída, no formato *000,0*, ou D para desistir\n${VERSAO_SAIDA}`)
+      await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, `CONFIRMA *${estado.horaMotorInformada}*? S/N ou D para desistir/corrigir\n${VERSAO_SAIDA}`)
+      await enviar(sock, grupoId, `CONFIRMA ${estado.horaMotorInformada}? S/N ou D para desistir/corrigir`)
       return true
     }
 
@@ -623,19 +508,19 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     estado.etapa = 'aguardando_confirmacao_saida'
     estadosSaida.set(key, estado)
 
-    await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
+    await enviar(sock, grupoId, 'Confirma saída? S/N')
     return true
   }
 
   if (estado.etapa === 'aguardando_confirmacao_saida') {
     if (msg === 'n') {
       estadosSaida.delete(key)
-      await enviar(sock, grupoId, `Saída não confirmada.\n${VERSAO_SAIDA}`)
+      await enviar(sock, grupoId, 'Saída não confirmada.')
       return true
     }
 
     if (msg !== 's') {
-      await enviar(sock, grupoId, `Confirma saída? S/N\n${VERSAO_SAIDA}`)
+      await enviar(sock, grupoId, 'Confirma saída? S/N')
       return true
     }
 
@@ -643,10 +528,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
     estadosSaida.delete(key)
 
-    let resposta = `*Saída confirmada* — ${dataHoraBR}\n\n` +
+    let resposta =
+      `Saída registrada com sucesso.\n\n` +
       `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
       `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
-      `Colaborador: ${estado.colaborador.Nome}`
+      `Colaborador: ${estado.colaborador.Nome}\n` +
+      `Data/Hora: ${dataHoraBR}`
 
     if (
       estado.saida.Hora_Motor_Saida !== null &&
@@ -654,8 +541,6 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
     ) {
       resposta += `\nHora Motor Saída: ${String(estado.saida.Hora_Motor_Saida).replace('.', ',')}`
     }
-
-    resposta += `\n${VERSAO_SAIDA}`
 
     await enviar(sock, grupoId, resposta)
     return true
@@ -690,4 +575,3 @@ export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) 
 
   return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
 }
-export { buscarColaborador }
