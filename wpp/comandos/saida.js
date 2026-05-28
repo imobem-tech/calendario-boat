@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/saida.js — V.2605281334
+// wpp/saida.js — V.2605281343
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
