@@ -1,5 +1,6 @@
 // ============================================================
-// wpp/grupos-admin.js — Allmax®2605261640
+// wpp/grupos-admin.js — V.2605281314
+// Allmax Gestão de Cotas
 // 4 endpoints de gestão de grupos WhatsApp
 //
 // POST /grupos/renomear           — renomeia grupo pelo padrão
@@ -64,12 +65,32 @@ async function buscarColaboradoresAtivos(pool) {
   const { rows } = await pool.query(`
     SELECT "ID", "Nome", "Telefone", "Lid",
            COALESCE("Administrador", 'N') AS "Administrador",
-           COALESCE("Ativo", 'S') AS "Ativo"
+           COALESCE("Ativo", 'S') AS "Ativo",
+           "Local"
       FROM public.wpp_colaboradores
      WHERE "Telefone" IS NOT NULL AND TRIM("Telefone") <> ''
      ORDER BY "Nome"
   `)
   return rows
+}
+
+// Deriva unidade do grupo a partir do plano: 'ctg' no plano => 'C', caso contrário => 'G'
+function unidadeDoPlano(plano) {
+  return String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
+}
+
+// Verifica se o colaborador deve entrar no grupo conforme seu Local
+// Retorna true se deve sincronizar, false se deve ser bloqueado/ignorado
+function colaboradorPertenceAoLocal(colab, unidadeGrupo, addLog) {
+  const local = String(colab.Local || '').trim().toUpperCase()
+  if (!local) {
+    addLog(`BLOQUEADO (Local não preenchido): ${colab.Nome}`)
+    return false
+  }
+  if (local === 'T') return true
+  if (local === unidadeGrupo) return true
+  addLog(`SKIP (Local=${local} ≠ grupo ${unidadeGrupo}): ${colab.Nome}`)
+  return false
 }
 
 // Resolve JID para adicionar ao grupo: sempre usa telefone via onWhatsApp
@@ -110,7 +131,8 @@ async function gravarLidColaborador(pool, colabId, lid, addLog) {
 }
 
 // Sincroniza colaboradores num único grupo
-async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
+// unidadeGrupo: 'G' (Graciosa) ou 'C' (CTG) — derivado do plano
+async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, addLog) {
   const colaboradores = await buscarColaboradoresAtivos(pool)
 
   // Busca participantes atuais do grupo
@@ -131,8 +153,10 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, addLog) {
   }))
 
   // Resolve JIDs dos colaboradores via onWhatsApp (telefone)
+  // Filtra por Local antes de qualquer resolução de JID
   const colaboradoresResolvidos = []
   for (const colab of colaboradores) {
+    if (!colaboradorPertenceAoLocal(colab, unidadeGrupo, addLog)) continue
     const jid = await resolverJidColaborador(sock, colab)
     if (jid) {
       const normTel = normJid(jid)
@@ -418,8 +442,26 @@ export async function handleColaboradoresGrupo(req, res, getSock, getConectado) 
 
   try {
     addLog(`Sincronizando colaboradores no grupo ${grupowppid}`)
-    const resultado = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, addLog)
-    return res.json({ sucesso: true, grupowppid, ...resultado, log })
+
+    // Busca plano do grupo para derivar unidade (G ou C)
+    const rsPlano = await pool.query(`
+      SELECT a."Plano"
+        FROM public.wpp_grupos_agenda g
+        JOIN public."P_BOAT_4_Autorizados" a
+          ON a."Cod_Embarcacao" = g.pb
+         AND UPPER(COALESCE(a."Gropo_letra",'')) = UPPER(COALESCE(g.cota,''))
+       WHERE g.grupowppid = $1
+         AND a."Dt_Desautorizacao" IS NULL
+         AND a."Dt_Cancelamento"   IS NULL
+       LIMIT 1
+    `, [grupowppid])
+
+    const plano = rsPlano.rows[0]?.Plano || ''
+    const unidadeGrupo = unidadeDoPlano(plano)
+    addLog(`Plano: "${plano}" → Unidade: ${unidadeGrupo}`)
+
+    const resultado = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
+    return res.json({ sucesso: true, grupowppid, unidadeGrupo, ...resultado, log })
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
     return res.status(500).json({ erro: err.message, log })
@@ -439,10 +481,11 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
   const addLog = msg => { console.log('[colab-todos]', msg); logGeral.push(msg) }
 
   try {
-    // Busca pares pb+cota ativos em P_BOAT_4_Autorizados
+    // Busca pares pb+cota+plano ativos em P_BOAT_4_Autorizados
     const rsAtivos = await pool.query(`
       SELECT DISTINCT a."Cod_Embarcacao" AS pb,
-                      a."Gropo_letra"    AS letra
+                      a."Gropo_letra"    AS letra,
+                      a."Plano"          AS plano
         FROM public."P_BOAT_4_Autorizados" a
        WHERE a."Dt_Desautorizacao" IS NULL
          AND a."Dt_Cancelamento"   IS NULL
@@ -454,7 +497,7 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
 
     const resultados = []
 
-    for (const { pb, letra } of pares) {
+    for (const { pb, letra, plano } of pares) {
       // Busca grupowppid na wpp_grupos_agenda
       const rsGrupo = await pool.query(`
         SELECT grupowppid, nomegrupowpp
@@ -472,11 +515,12 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
 
       const grupowppid = rsGrupo.rows[0].grupowppid
       const nomeGrupo  = rsGrupo.rows[0].nomegrupowpp
-      addLog(`Processando PB ${pb}/${letra} — ${nomeGrupo}`)
+      const unidadeGrupo = unidadeDoPlano(plano)
+      addLog(`Processando PB ${pb}/${letra} — ${nomeGrupo} — Unidade: ${unidadeGrupo}`)
 
       const logGrupo = []
       try {
-        const r = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, msg => logGrupo.push(msg))
+        const r = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, unidadeGrupo, msg => logGrupo.push(msg))
         resultados.push({ pb, letra, nomeGrupo, grupowppid, status: 'OK', ...r, log: logGrupo })
       } catch (err) {
         addLog(`ERRO PB ${pb}/${letra}: ${err.message}`)
