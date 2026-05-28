@@ -1,7 +1,7 @@
 // ============================================================
 // /api/asaas_webhook
 // Allmax Gestão de Cotas — Baixa automática de CR
-// V.2605272302
+// V.2605280015
 //
 // Recebe eventos do Asaas (PAYMENT_RECEIVED / PAYMENT_CONFIRMED)
 // e grava Data_Pagamento em public."Contas_Receber".
@@ -19,12 +19,19 @@
 //
 // Retorno sempre 200 para o Asaas (evita retentativas desnecessárias).
 // Erros são logados mas não devolvem 5xx — o VBA continua como fallback.
+//
+// UPDATE grava apenas:
+//   Total                  — valor pago (vBase + vJuros + vMulta - vDesc)
+//   Data_Pagamento         — paymentDate vindo do Asaas
+//   Observacões_Pagamento  — "Asaas_<timestamp> webhook <clientPaymentDate>"
+//
+// Idempotência: busca filtra Data_Pagamento IS NULL — se já baixada, ignora.
 // ============================================================
 
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®V.2605272302";
+const VERSAO_API = "Allmax®V.2605280015";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -33,7 +40,6 @@ const pool = new Pool({
 
 // ------------------------------------------------------------
 // Tokens de validação por empresa
-// Cada empresa tem seu próprio webhook no Asaas com token distinto
 // ------------------------------------------------------------
 const TOKENS_POR_CENTRO = {
   "6": process.env.ASAAS_WEBHOOK_TOKEN_6 || "",
@@ -51,12 +57,17 @@ function agoraSaoPaulo() {
   );
 }
 
+function formatarTimestamp(dt) {
+  const d = new Date(dt);
+  return d.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
 // Replica a lógica do VBA: vBase + vJuros + vMulta - vDesc
 function calcularValorPago(payment) {
-  const vBase  = parseFloat(payment.value         || 0);
-  const vJuros = parseFloat(payment.interestValue || 0);
-  const vMulta = parseFloat(payment.fineValue     || 0);
-  const vDesc  = parseFloat(payment.discountValue || 0);
+  const vBase  = parseFloat(payment.value                    || 0);
+  const vJuros = parseFloat(payment.interestValue            || 0);
+  const vMulta = parseFloat(payment.fineValue                || 0);
+  const vDesc  = parseFloat(payment.discount?.value          || 0);
   return vBase + vJuros + vMulta - vDesc;
 }
 
@@ -65,7 +76,6 @@ function calcularValorPago(payment) {
 // ------------------------------------------------------------
 export default async function handler(req, res) {
 
-  // Asaas só faz POST; qualquer outro método retorna 405
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido", versao: VERSAO_API });
   }
@@ -82,7 +92,6 @@ export default async function handler(req, res) {
 
   // ----------------------------------------------------------
   // 2. Valida token do webhook
-  //    O Asaas envia o token configurado no header "asaas-access-token"
   // ----------------------------------------------------------
   const tokenEsperado = TOKENS_POR_CENTRO[centro];
   const tokenRecebido = req.headers["asaas-access-token"] || "";
@@ -99,17 +108,16 @@ export default async function handler(req, res) {
   const evento  = String(body.event || "").toUpperCase();
   const payment = body.payment || {};
 
-  // Só processa pagamentos confirmados
   const EVENTOS_PAGAMENTO = ["PAYMENT_RECEIVED", "PAYMENT_CONFIRMED"];
   if (!EVENTOS_PAGAMENTO.includes(evento)) {
     return res.status(200).json({ ok: true, motivo: `evento "${evento}" ignorado`, versao: VERSAO_API });
   }
 
-  const asaasId        = String(payment.id                  || "").trim();
-  const externalRef    = String(payment.externalReference   || "").trim();
-  const invoiceUrl     = String(payment.invoiceUrl          || "").trim();
-  const paymentDateRaw = payment.paymentDate || null;
-  const valorPago      = calcularValorPago(payment);
+  const asaasId          = String(payment.id                  || "").trim();
+  const externalRef      = String(payment.externalReference   || "").trim();
+  const paymentDateRaw   = payment.paymentDate                || null;
+  const clientPayDateRaw = payment.clientPaymentDate          || null;
+  const valorPago        = calcularValorPago(payment);
 
   // externalReference deve ser numérico (= Codigo em Contas_Receber)
   if (!externalRef || isNaN(Number(externalRef))) {
@@ -119,11 +127,13 @@ export default async function handler(req, res) {
 
   const codigoCR = Number(externalRef);
 
-  // Data de pagamento vinda do Asaas (formato ISO: "2025-06-01")
-  // Usa meio-dia BRT para evitar virada de dia por conversão UTC
+  // Data de pagamento — meio-dia BRT evita virada de dia por conversão UTC
   const dataPagamento = paymentDateRaw
     ? new Date(paymentDateRaw + "T12:00:00-03:00")
     : agoraSaoPaulo();
+
+  // Observação: "Asaas_<timestamp> webhook <clientPaymentDate>"
+  const obsGravacao = `Asaas_${formatarTimestamp(agoraSaoPaulo())} webhook ${clientPayDateRaw || paymentDateRaw || ""}`.trim();
 
   let client;
 
@@ -131,17 +141,15 @@ export default async function handler(req, res) {
     client = await pool.connect();
 
     // --------------------------------------------------------
-    // 4. Busca a conta — mesma lógica de critério do VBA:
-    //    Codigo = externalRef AND Centro_Custo LIKE centro AND Data_Pagamento IS NULL
+    // 4. Busca a conta
+    //    Idempotência garantida pelo filtro Data_Pagamento IS NULL
     // --------------------------------------------------------
     const rsBusca = await client.query(
       `SELECT
-         "Codigo"                                        AS codigo,
-         "Código_Cliente"                                AS cod_cliente,
-         "Descrição"                                     AS descricao,
-         "Valor"                                         AS valor,
-         TO_CHAR("Data_Vencimento", 'DD/MM/YYYY')        AS vencimento,
-         COALESCE("Portador", '')                        AS portador
+         "Codigo"                                 AS codigo,
+         "Código_Cliente"                         AS cod_cliente,
+         "Descrição"                              AS descricao,
+         TO_CHAR("Data_Vencimento", 'DD/MM/YYYY') AS vencimento
        FROM public."Contas_Receber"
       WHERE "Codigo" = $1
         AND "Data_Pagamento" IS NULL
@@ -156,44 +164,31 @@ export default async function handler(req, res) {
 
     const conta = rsBusca.rows[0];
 
-    // Idempotência: se Portador já tem este asaasId, foi processado antes
-    if (conta.portador && conta.portador.includes(asaasId)) {
-      console.log(`[asaas_webhook] Pagamento ${asaasId} já processado — ignorando reenvio`);
-      return res.status(200).json({ ok: true, motivo: "já processado", versao: VERSAO_API });
-    }
-
     // --------------------------------------------------------
-    // 5. Baixa definitiva — replica exatamente o VBA:
-    //    Total, Data_Pagamento, Observações_Pagamento, agendamento_obs, Portador
+    // 5. Baixa definitiva
     // --------------------------------------------------------
     await client.query("BEGIN");
 
-    const obsGravacao = `Asaas_${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`;
-
     await client.query(
       `UPDATE public."Contas_Receber"
-          SET "Total"                   = $1,
-              "Data_Pagamento"          = $2,
-              "Observações_Pagamento"   = $3,
-              "agendamento_obs"         = CASE WHEN $4 <> '' THEN $4 ELSE "agendamento_obs" END,
-              "Portador"                = $5
-        WHERE "Codigo" = $6`,
+          SET "Total"                  = $1,
+              "Data_Pagamento"         = $2,
+              "Observacões_Pagamento"  = $3
+        WHERE "Codigo" = $4`,
       [
         valorPago,
         dataPagamento,
         obsGravacao,
-        invoiceUrl,
-        asaasId,
         codigoCR
       ]
     );
 
     await client.query("COMMIT");
 
-    console.log(`[asaas_webhook] ✅ Conta ${codigoCR} baixada | centro ${centro} | R$ ${valorPago.toFixed(2)} | ${asaasId}`);
+    console.log(`[asaas_webhook] ✅ Conta ${codigoCR} baixada | centro ${centro} | R$ ${valorPago.toFixed(2)} | ${asaasId} | obs: ${obsGravacao}`);
 
     // --------------------------------------------------------
-    // 6. WPP desativado temporariamente
+    // 6. WPP — desativado temporariamente
     // --------------------------------------------------------
     /*
     try {
@@ -209,7 +204,7 @@ export default async function handler(req, res) {
               [g.grupowppid, mensagem]
             );
           }
-          console.log(`[asaas_webhook] WPP enfileirado para ${grupos.length} grupo(s) | cliente ${codCliente}`);
+          console.log(`[asaas_webhook] WPP enfileirado para ${grupos.length} grupo(s) | cliente ${conta.cod_cliente}`);
         }
       }
     } catch (wppErr) {
@@ -230,8 +225,6 @@ export default async function handler(req, res) {
     }
     console.error(`[asaas_webhook] Erro: ${err.message}`);
 
-    // Retorna 200 mesmo em erro interno para evitar loop de retentativas do Asaas
-    // O VBA continua funcionando como fallback enquanto o erro não for corrigido
     return res.status(200).json({
       ok: false,
       motivo: "erro interno",
