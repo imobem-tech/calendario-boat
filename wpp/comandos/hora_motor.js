@@ -1,16 +1,19 @@
 // ============================================================
-// COMANDO HHH — HORA MOTOR (SAÍDA E RETORNO)
-// Allmax Gestão de Cotas — V.2605271600
+// wpp/comandos/hora_motor.js — V.2605281955
+// Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
 // Comando: hhh / hhhh / HHH / misto (3+ h's)
 //
 // Fluxo:
 //   Pré-validações → Etapa 1 (Hora Motor Saída) → Etapa 2 (Hora Motor Retorno)
+//   → Ao confirmar Retorno: calcula horas usadas × tarifa → gera CR + Asaas
 // ============================================================
 
+import { gerarCobrancaCompleta } from './asaas.js'
+
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605271600'
+const VERSAO_HM = 'V.2605260110'
 
 // ============================================================
 // HELPERS
@@ -62,14 +65,13 @@ async function enviar(sock, grupoId, texto) {
   await sock.sendMessage(grupoId, { text: texto })
 }
 
-function montarCabecalho(pb, grupo, dtAgendamento, nomeEmbar) {
+function montarCabecalho(pb, grupo, dtAgendamento) {
   const hoje = hojeIsoSaoPaulo()
   const [ano, mes, dia] = hoje.split('-')
   const dataFormatada = dtAgendamento
     ? formatarDataBR(dtAgendamento)
     : `${dia}/${mes}/${ano}`
-  const cabEmbar = nomeEmbar ? `*${pb}-${grupo}* — ${nomeEmbar}` : `*${pb}-${grupo}*`
-  return `📋 ${cabEmbar} — ${dataFormatada}`
+  return `📋 Emb ${pb} / Grupo ${grupo} — ${dataFormatada}`
 }
 
 // ============================================================
@@ -108,7 +110,7 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
+       AND "Dt_Agendamento"::date = $3::date
        AND "Dt_Desistencia"   IS NULL
        AND "Dt_Cancela_saida" IS NULL
      ORDER BY "Dt_Agendamento" ASC
@@ -118,28 +120,98 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
   return rs.rows[0] || null
 }
 
-async function buscarDadosEmbar(pool, pb) {
-  try {
-    const rs = await pool.query(
-      `SELECT "Nome_Embar"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [pb]
-    )
-    return rs.rows[0] || {}
-  } catch (err) {
-    console.warn('[buscarDadosEmbar]', err.message)
-    return {}
-  }
-}
-
 async function gravarHoraMotorSaida(pool, id, valor) {
   await pool.query(`
     UPDATE public."P_BOAT_z_10_Saida_Emb"
        SET "Hora_Motor_Saida" = $1
      WHERE "ID" = $2
   `, [valor, id])
+}
+
+// ============================================================
+// COBRANÇA AUTOMÁTICA HORA MOTOR
+// ============================================================
+
+async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
+  try {
+    const codEmb = Number(agendamento['Cod_Emb_PB'] ?? agendamento['Cod_Emb_PB'])
+    const hmSaida   = Number(agendamento['Hora_Motor_Saida'])
+    const hmRetorno = Number(agendamento['Hora_Motor_Retorno'])
+
+    if (!codEmb || isNaN(hmSaida) || isNaN(hmRetorno)) {
+      console.warn('[HM_COBRANÇA] Dados insuficientes para cobrança', { codEmb, hmSaida, hmRetorno })
+      return
+    }
+
+    const horasUsadas = Math.max(0, hmRetorno - hmSaida)
+
+    if (horasUsadas <= 0) {
+      console.warn('[HM_COBRANÇA] Horas usadas <= 0, cobrança não gerada')
+      return
+    }
+
+    // Busca tarifa vinculada à embarcação
+    const rsEmb = await pool.query(`
+      SELECT e."Vinculo_Hora_Motor", h."Valor_Hora_Motor", h."Desc_Hora_Moror"
+        FROM public."P_BOAT_1_Embarcacao" e
+        LEFT JOIN public."Hora_Motor_Valor_Atual" h
+          ON h."Cod_Hora_Motor" = e."Vinculo_Hora_Motor"
+       WHERE e."Num_PB" = $1
+       LIMIT 1
+    `, [codEmb])
+
+    const tarifa = rsEmb.rows[0]
+
+    if (!tarifa || !tarifa.Vinculo_Hora_Motor || tarifa.Valor_Hora_Motor <= 0) {
+      console.warn('[HM_COBRANÇA] Embarcação sem tarifa configurada, cobrança não gerada')
+      await enviar(sock, grupoId,
+        `⚠️ Hora Motor registrada, mas embarcação sem tarifa configurada. Cobrança não gerada.`
+      )
+      return
+    }
+
+    const valor = Number((horasUsadas * tarifa.Valor_Hora_Motor).toFixed(2))
+    const dtAgendamento = agendamento['Dt_Agendamento']
+    const codEmb2 = agendamento['Cod_Emb_PB']
+    const grupo   = agendamento['Grupo_Comp_letra']
+
+    const descricao = `Hora_MOTOR ${codEmb2}-${grupo} ` +
+      `${new Date(dtAgendamento).toLocaleDateString('pt-BR')} ` +
+      `${horasUsadas.toFixed(1)}h`
+
+    // Cod_Autorizado é o cliente da cobrança
+    const codCliente = Number(agendamento['Cod_Autorizado'])
+
+    if (!codCliente) {
+      console.warn('[HM_COBRANÇA] Cod_Autorizado não encontrado no agendamento')
+      return
+    }
+
+    const vencimento = new Date()
+    vencimento.setDate(vencimento.getDate() + 2)
+
+    const resultado = await gerarCobrancaCompleta(pool, 8, codCliente, {
+      valor,
+      descricao,
+      vencimento,
+      centroCusto: '8'
+    })
+
+    await enviar(sock, grupoId,
+      `💰 *Cobrança gerada automaticamente*\n\n` +
+      `${descricao}\n` +
+      `Horas: *${horasUsadas.toFixed(1)}h* × R$ ${tarifa.Valor_Hora_Motor.toFixed(2)} = *R$ ${valor.toFixed(2)}*\n\n` +
+      `CR: ${resultado.codigo} | Vence: ${vencimento.toLocaleDateString('pt-BR')}`
+    )
+
+    console.log('[HM_COBRANÇA] Cobrança gerada', resultado)
+
+  } catch (err) {
+    console.error('[HM_COBRANÇA] Erro ao gerar cobrança:', err.message)
+    await enviar(sock, grupoId,
+      `⚠️ Hora Motor registrada. Erro ao gerar cobrança automática: ${err.message}`
+    )
+  }
 }
 
 async function gravarHoraMotorRetorno(pool, id, valor) {
@@ -321,12 +393,19 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
     const valor = Number(estado.horaInformada.replace(',', '.'))
     await gravarHoraMotorRetorno(pool, estado.agendamento['ID'], valor)
 
+    // Atualiza o agendamento em memória com o retorno gravado
+    estado.agendamento['Hora_Motor_Retorno'] = valor
+
     estadosHoraMotor.delete(key)
 
     await enviar(sock, grupoId,
       `✅ *Hora Motor de Retorno registrada: ${estado.horaInformada}*\n\n` +
       `Emb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
     )
+
+    // Gera cobrança automática
+    await gerarCobrancaHoraMotor(sock, pool, grupoId, estado.agendamento)
+
     return true
   }
 
@@ -346,14 +425,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   }
 
   const codEmbPb       = Number(grupoAgenda.pb)
-  // extrai cota do nome quando cota é null (ex: "151-11 _C SUMMER..." → "11")
-  const _cotaRaw = grupoAgenda.cota
-  const _nomeGrupo = grupoAgenda.nomegrupowpp || ''
-  let grupoCompLetra = String(_cotaRaw || '').trim().toUpperCase()
-  if (!grupoCompLetra) {
-    const _m = _nomeGrupo.match(/^\d+-([A-Z0-9]+)/i)
-    grupoCompLetra = _m ? _m[1].toUpperCase() : ''
-  }
+  const grupoCompLetra = String(grupoAgenda.cota || '').trim().toUpperCase()
 
   if (!codEmbPb || !grupoCompLetra) {
     await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_HM}`)
