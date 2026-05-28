@@ -1,17 +1,23 @@
 // ============================================================
-// COMANDO SSS — REGISTRO DE SAÍDA
-// Allmax Gestão de Cotas
+// wpp/saida.js — V.2605281334
+// Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
 // Comandos:
 //   sss / ssss / SSS  => inicia registro de saída
 //   colaborador63984030406
 //   colaborador 63984030406
-//      => vincula o LID do remetente ao colaborador cadastrado
+//      => solicita confirmação no privado e vincula o LID
 // ============================================================
 
+import { registrarEstadoPrivado } from './privado.js'
+
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605271600'
+
+const CABECALHO =
+`\`\`\`Assistente Virtual\`\`\`
+*Marujo⚓*
+\`\`\`------------------\`\`\``
 
 // ============================================================
 // HELPERS
@@ -217,23 +223,19 @@ async function buscarColaborador(pool, remetente) {
 }
 
 // ============================================================
-// COMANDO DE VINCULAÇÃO DO LID
+// COMANDO DE VINCULAÇÃO DO LID — com confirmação no privado
 // ============================================================
 
 async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   const numeroInformado = extrairComandoColaborador(texto)
 
-  if (!numeroInformado) {
-    return false
-  }
+  if (!numeroInformado) return false
 
   const colaborador = await buscarColaboradorPorTelefone(pool, numeroInformado)
 
   if (!colaborador) {
-    await enviar(
-      sock,
-      grupoId,
-      'Não encontrei colaborador com este telefone. Verifique o número cadastrado.'
+    await enviar(sock, grupoId,
+      `${CABECALHO}\n\nNão encontrei colaborador com este telefone. Verifique o número cadastrado.`
     )
     return true
   }
@@ -241,23 +243,52 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   const lid = String(remetente || '').trim().toLowerCase()
 
   if (!lid) {
-    await enviar(sock, grupoId, 'Não consegui identificar o remetente para vincular.')
+    await enviar(sock, grupoId,
+      `${CABECALHO}\n\nNão consegui identificar o remetente para vincular.`
+    )
     return true
   }
 
-  await pool.query(`
-    UPDATE public.wpp_colaboradores
-       SET "Lid" = $1
-     WHERE "ID" = $2
-  `, [lid, colaborador.ID])
-
-  await enviar(
-    sock,
-    grupoId,
-    `Colaborador vinculado com sucesso: ${colaborador.Nome}`
+  // Avisa no grupo que aguarda confirmação
+  await enviar(sock, grupoId,
+    `${CABECALHO}\n\n⏳ Aguardando confirmação de *${colaborador.Nome}* no privado...`
   )
 
-  console.log('DEBUG_COLAB_LID_VINCULADO_MANUAL', {
+  // Envia pedido de confirmação no privado
+  await sock.sendMessage(lid, {
+    text:
+      `${CABECALHO}\n\n` +
+      `Olá, *${colaborador.Nome.split(' ')[0]}*! 👋\n\n` +
+      `Uma solicitação de vinculação do seu acesso ao *Marujo⚓* foi recebida.\n\n` +
+      `Confirma que é você? Digite *S* para confirmar ou *N* para cancelar.\n\n` +
+      `⏱️ Você tem 2 minutos para responder.`
+  })
+
+  // Registra estado pendente no privado com timeout de 2 minutos
+  const { registrarEstadoPrivado, temEstadoPrivado, removerEstadoPrivado } = await import('./privado.js')
+
+  const timeoutHandle = setTimeout(async () => {
+    if (temEstadoPrivado(lid)) {
+      removerEstadoPrivado(lid)
+      await sock.sendMessage(lid, {
+        text: `${CABECALHO}\n\n⏱️ Tempo expirado. Vinculação cancelada.`
+      })
+      await enviar(sock, grupoId,
+        `${CABECALHO}\n\n⏱️ Tempo expirado. Vinculação não confirmada: *${colaborador.Nome}*`
+      )
+    }
+  }, 2 * 60 * 1000)
+
+  registrarEstadoPrivado(lid, {
+    tipo: 'confirmar_vinculacao_lid',
+    lid,
+    colabId: colaborador.ID,
+    nomeColab: colaborador.Nome,
+    grupoId,
+    timeoutHandle
+  })
+
+  console.log('LID_VINCULACAO_AGUARDANDO', {
     nome: colaborador.Nome,
     telefone: colaborador.Telefone,
     lid
@@ -281,31 +312,8 @@ async function buscarGrupoAgenda(pool, grupoId) {
   return rs.rows[0] || null
 }
 
-// ============================================================
-// BUSCA NOME DA EMBARCAÇÃO
-// ============================================================
-async function buscarDadosEmbar(pool, pb) {
-  try {
-    const rs = await pool.query(
-      `SELECT "Nome_Embar"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [pb]
-    )
-    return rs.rows[0] || {}
-  } catch (err) {
-    console.warn('[buscarDadosEmbar]', err.message)
-    return {}
-  }
-}
-
-function normalizarGrupoCompLetra(cota, nomeGrupo) {
-  const cotaStr = String(cota || '').trim().toUpperCase()
-  if (cotaStr) return cotaStr
-  // cota nula: extrai do nome do grupo (ex: "151-11 _C SUMMER..." → "11")
-  const m = String(nomeGrupo || '').match(/^\d+-([A-Z0-9]+)/i)
-  return m ? m[1].toUpperCase() : ''
+function normalizarGrupoCompLetra(cota) {
+  return String(cota || '').trim().toUpperCase()
 }
 
 // ============================================================
@@ -320,7 +328,8 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
+       AND "Dt_Agendamento" >= ($3::date)
+       AND "Dt_Agendamento" <  ($3::date + INTERVAL '1 day')
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
@@ -346,11 +355,11 @@ async function registrarSaida(pool, saida, colaborador) {
 
   await pool.query(`
     UPDATE public."P_BOAT_z_10_Saida_Emb"
-       SET "Dt_Saída" = (NOW() AT TIME ZONE 'America/Sao_Paulo')::timestamp AT TIME ZONE 'America/Sao_Paulo',
+       SET "Dt_Saída" = $1,
            "Dt_Desistencia" = NULL,
-           "Colab_Responsavel" = $1
-     WHERE "ID" = $2
-  `, [colaborador.Nome, saida.ID])
+           "Colab_Responsavel" = $2
+     WHERE "ID" = $3
+  `, [agora, colaborador.Nome, saida.ID])
 
   await pool.query(`
     UPDATE public."P_BOAT_9_OS"
@@ -383,9 +392,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   }
 
   const codEmbPb = Number(grupoAgenda.pb)
-  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota, grupoAgenda.nomegrupowpp)
-  const dadosEmbar    = await buscarDadosEmbar(pool, codEmbPb)
-  const nomeEmbar     = dadosEmbar["Nome_Embar"] || ""
+  const grupoCompLetra = normalizarGrupoCompLetra(grupoAgenda.cota)
 
   console.log('DEBUG_SAIDA_ENTRADA', {
     grupoId,
@@ -443,8 +450,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
     estadosSaida.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       saida,
-      colaborador,
-      nomeEmbar
+      colaborador
     })
 
     await enviar(sock, grupoId, 'Informe a Hora Motor de Saída, no formato 000,0, ou D para desistir')
@@ -454,8 +460,7 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   estadosSaida.set(key, {
     etapa: 'aguardando_confirmacao_saida',
     saida,
-    colaborador,
-    nomeEmbar
+    colaborador
   })
 
   await enviar(sock, grupoId, 'Confirma saída? S/N')
@@ -536,12 +541,12 @@ async function tratarEstadoSaida(sock, pool, grupoId, remetente, texto) {
 
     estadosSaida.delete(key)
 
-    const _nomeEmbarSaida = estado.nomeEmbar || ""
     let resposta =
-      `*Saída confirmada* — ${dataHoraBR}\n\n` +
-      `*${estado.saida.Cod_Emb_PB}-${estado.saida.Grupo_Comp_letra}*\n` +
-      (_nomeEmbarSaida ? `${_nomeEmbarSaida}\n` : "") +
-      `Colaborador: ${estado.colaborador.Nome}`
+      `Saída registrada com sucesso.\n\n` +
+      `Embarcação: ${estado.saida.Cod_Emb_PB}\n` +
+      `Grupo: ${estado.saida.Grupo_Comp_letra}\n` +
+      `Colaborador: ${estado.colaborador.Nome}\n` +
+      `Data/Hora: ${dataHoraBR}`
 
     if (
       estado.saida.Hora_Motor_Saida !== null &&
@@ -583,4 +588,3 @@ export async function tratarComandoSaida(sock, pool, grupoId, remetente, texto) 
 
   return await iniciarFluxoSaida(sock, pool, grupoId, remetente)
 }
-export { buscarColaborador }
