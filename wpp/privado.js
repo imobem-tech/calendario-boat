@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/privado.js — V.2605281334
+// wpp/privado.js — V.2605281343
 // Allmax Gestão de Cotas — Marujo⚓
 // Handler de mensagens privadas (@s.whatsapp.net)
 //
