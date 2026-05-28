@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2605281343
+// wpp/server.js — V.2605281347
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
