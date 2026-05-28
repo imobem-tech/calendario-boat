@@ -1,6 +1,7 @@
 // ============================================================
 // /api/asaas_webhook
 // Allmax Gestão de Cotas — Baixa automática de CR
+// V.2605272302
 //
 // Recebe eventos do Asaas (PAYMENT_RECEIVED / PAYMENT_CONFIRMED)
 // e grava Data_Pagamento em public."Contas_Receber".
@@ -8,7 +9,7 @@
 // Configurar UM webhook por empresa no painel Asaas:
 //   Empresa 6 (Summer/Náutica): .../api/asaas_webhook?centro=6
 //   Empresa 8 (Allmax):         .../api/asaas_webhook?centro=8
-//   Empresa 9:                  .../api/asaas_webhook?centro=9
+//   Empresa 9 (Imobem):         .../api/asaas_webhook?centro=9
 //
 // Variáveis de ambiente necessárias:
 //   POSTGRES_URL  ou  DATABASE_URL
@@ -23,8 +24,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605271900";
-const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2605271900";
+const VERSAO_API = "Allmax®V.2605272302";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -51,23 +51,6 @@ function agoraSaoPaulo() {
   );
 }
 
-function formatarDataHoraBR(dt) {
-  const d = new Date(dt);
-  const dd   = String(d.getDate()).padStart(2, "0");
-  const mm   = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh   = String(d.getHours()).padStart(2, "0");
-  const mi   = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
-}
-
-function formatarValorBR(valor) {
-  return Number(valor || 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
 // Replica a lógica do VBA: vBase + vJuros + vMulta - vDesc
 function calcularValorPago(payment) {
   const vBase  = parseFloat(payment.value         || 0);
@@ -75,49 +58,6 @@ function calcularValorPago(payment) {
   const vMulta = parseFloat(payment.fineValue     || 0);
   const vDesc  = parseFloat(payment.discountValue || 0);
   return vBase + vJuros + vMulta - vDesc;
-}
-
-// ------------------------------------------------------------
-// Busca grupos WPP do cotista (padrão do projeto)
-// ------------------------------------------------------------
-async function buscarGruposWpp(client, codCliente) {
-  // Busca grupos pelo código do cliente via Contas_Receber → Cliente → wpp_grupos
-  // Tenta encontrar o PB e grupo do cliente para notificar o grupo correto
-  const rs = await client.query(
-    `SELECT DISTINCT wg.grupowppid, wg.nomegrupowpp
-       FROM public.wpp_grupos_agenda wg
-      WHERE wg.pb IN (
-        SELECT DISTINCT a."Cod_Embarcacao"
-          FROM public."P_BOAT_4_Autorizados" a
-         WHERE a."Cod_Pessoa" = $1
-           AND a."Dt_Desautorizacao" IS NULL
-           AND a."Dt_Cancelamento"  IS NULL
-      )
-      ORDER BY wg.nomegrupowpp`,
-    [codCliente]
-  );
-  return rs.rows;
-}
-
-// ------------------------------------------------------------
-// Monta mensagem WPP de confirmação de pagamento
-// ------------------------------------------------------------
-function montarMensagemWpp(conta, valorPago, asaasId, centro) {
-  const nomeEmpresa = centro === "6" ? "Náutica/Summer" :
-                      centro === "8" ? "Allmax" : `Empresa ${centro}`;
-
-  return [
-    `✅ *Pagamento Recebido — ${nomeEmpresa}*\n`,
-    `*${conta.descricao || "Cobrança"}*`,
-    `  | Vencimento: ${conta.vencimento}`,
-    `  | Valor pago: R$ ${formatarValorBR(valorPago)}`,
-    `  | Asaas ID: ${asaasId}`,
-    `  | Baixa: ${formatarDataHoraBR(agoraSaoPaulo())}`,
-    "",
-    "_Agendamentos liberados automaticamente._",
-    "",
-    VERSAO_WPP
-  ].join("\n");
 }
 
 // ------------------------------------------------------------
@@ -137,7 +77,6 @@ export default async function handler(req, res) {
 
   if (!["6", "8", "9"].includes(centro)) {
     console.error(`[asaas_webhook] Parâmetro centro inválido: "${centro}"`);
-    // Retorna 200 mesmo assim — Asaas não deve ficar reprocessando
     return res.status(200).json({ ok: false, motivo: "centro inválido", versao: VERSAO_API });
   }
 
@@ -166,9 +105,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, motivo: `evento "${evento}" ignorado`, versao: VERSAO_API });
   }
 
-  const asaasId        = String(payment.id            || "").trim();
-  const externalRef    = String(payment.externalReference || "").trim();
-  const invoiceUrl     = String(payment.invoiceUrl    || "").trim();
+  const asaasId        = String(payment.id                  || "").trim();
+  const externalRef    = String(payment.externalReference   || "").trim();
+  const invoiceUrl     = String(payment.invoiceUrl          || "").trim();
   const paymentDateRaw = payment.paymentDate || null;
   const valorPago      = calcularValorPago(payment);
 
@@ -181,8 +120,9 @@ export default async function handler(req, res) {
   const codigoCR = Number(externalRef);
 
   // Data de pagamento vinda do Asaas (formato ISO: "2025-06-01")
+  // Usa meio-dia BRT para evitar virada de dia por conversão UTC
   const dataPagamento = paymentDateRaw
-    ? new Date(paymentDateRaw + "T12:00:00-03:00")   // meio-dia BRT evita virada de dia UTC
+    ? new Date(paymentDateRaw + "T12:00:00-03:00")
     : agoraSaoPaulo();
 
   let client;
@@ -193,7 +133,6 @@ export default async function handler(req, res) {
     // --------------------------------------------------------
     // 4. Busca a conta — mesma lógica de critério do VBA:
     //    Codigo = externalRef AND Centro_Custo LIKE centro AND Data_Pagamento IS NULL
-    //    Proteção idempotência: se Portador já tem o asaasId, ignora
     // --------------------------------------------------------
     const rsBusca = await client.query(
       `SELECT
@@ -211,14 +150,13 @@ export default async function handler(req, res) {
     );
 
     if (rsBusca.rowCount === 0) {
-      // Pode já estar baixada (reprocessamento do Asaas) — apenas loga
       console.log(`[asaas_webhook] Conta ${codigoCR} não encontrada pendente para centro ${centro} | asaasId: ${asaasId}`);
       return res.status(200).json({ ok: true, motivo: "conta não encontrada ou já baixada", versao: VERSAO_API });
     }
 
     const conta = rsBusca.rows[0];
 
-    // Idempotência: se o Portador já tem este asaasId, foi processado antes
+    // Idempotência: se Portador já tem este asaasId, foi processado antes
     if (conta.portador && conta.portador.includes(asaasId)) {
       console.log(`[asaas_webhook] Pagamento ${asaasId} já processado — ignorando reenvio`);
       return res.status(200).json({ ok: true, motivo: "já processado", versao: VERSAO_API });
@@ -250,20 +188,20 @@ export default async function handler(req, res) {
       ]
     );
 
-    // --------------------------------------------------------
-    // 6. Enfileira WPP de confirmação para o grupo do cotista
-    // --------------------------------------------------------
-    let wppEnfileirado = false;
+    await client.query("COMMIT");
 
+    console.log(`[asaas_webhook] ✅ Conta ${codigoCR} baixada | centro ${centro} | R$ ${valorPago.toFixed(2)} | ${asaasId}`);
+
+    // --------------------------------------------------------
+    // 6. WPP desativado temporariamente
+    // --------------------------------------------------------
+    /*
     try {
       const codCliente = conta.cod_cliente;
-
       if (codCliente) {
         const grupos = await buscarGruposWpp(client, codCliente);
-
         if (grupos.length > 0) {
           const mensagem = montarMensagemWpp(conta, valorPago, asaasId, centro);
-
           for (const g of grupos) {
             await client.query(
               `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status)
@@ -271,26 +209,18 @@ export default async function handler(req, res) {
               [g.grupowppid, mensagem]
             );
           }
-          wppEnfileirado = true;
           console.log(`[asaas_webhook] WPP enfileirado para ${grupos.length} grupo(s) | cliente ${codCliente}`);
-        } else {
-          console.warn(`[asaas_webhook] Nenhum grupo WPP encontrado para cliente ${codCliente}`);
         }
       }
     } catch (wppErr) {
-      // WPP é secundário — não reverte a baixa se falhar
       console.error(`[asaas_webhook] Erro ao enfileirar WPP: ${wppErr.message}`);
     }
-
-    await client.query("COMMIT");
-
-    console.log(`[asaas_webhook] ✅ Conta ${codigoCR} baixada | centro ${centro} | R$ ${valorPago.toFixed(2)} | ${asaasId}`);
+    */
 
     return res.status(200).json({
       ok: true,
       codigoCR,
       valorPago,
-      wppEnfileirado,
       versao: VERSAO_API
     });
 
