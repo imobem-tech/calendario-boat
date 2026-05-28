@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/saida.js — V.2605281343
+// wpp/saida.js — V.2605281347
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -10,7 +10,7 @@
 //      => solicita confirmação no privado e vincula o LID
 // ============================================================
 
-import { registrarEstadoPrivado } from './privado.js'
+import { registrarEstadoPrivado, temEstadoPrivado, removerEstadoPrivado } from './privado.js'
 
 const estadosSaida = new Map()
 
@@ -265,8 +265,6 @@ async function vincularLidColaborador(sock, pool, grupoId, remetente, texto) {
   })
 
   // Registra estado pendente no privado com timeout de 2 minutos
-  const { registrarEstadoPrivado, temEstadoPrivado, removerEstadoPrivado } = await import('./privado.js')
-
   const timeoutHandle = setTimeout(async () => {
     if (temEstadoPrivado(lid)) {
       removerEstadoPrivado(lid)
