@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER.JS — V.2605281334
+// wpp/server.js — V.2605281343
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
@@ -28,8 +28,8 @@ import { sincronizarGruposAgenda } from './grupos.js'
 import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
 import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
-import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
-import { tratarMensagemPrivada } from './comandos/privado.js'
+import { tratarComandoSaida, buscarColaborador } from './saida.js'
+import { tratarMensagemPrivada } from './privado.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605242125'
