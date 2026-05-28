@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2605281955
+// wpp/comandos/hora_motor.js — V.2605282001
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -10,7 +10,7 @@
 //   → Ao confirmar Retorno: calcula horas usadas × tarifa → gera CR + Asaas
 // ============================================================
 
-import { gerarCobrancaCompleta } from './asaas.js'
+import { gerarCobrancaCompleta } from '../asaas.js'
 
 const estadosHoraMotor = new Map()
 const VERSAO_HM = 'V.2605260110'
