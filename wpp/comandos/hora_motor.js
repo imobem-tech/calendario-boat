@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2605282030
+// wpp/comandos/hora_motor.js — V.2605282108
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -13,7 +13,7 @@
 import { gerarCobrancaCompleta } from '../asaas.js'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605282030'
+const VERSAO_HM = 'V.2605282108'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -202,7 +202,31 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
       centroCusto: '8'
     })
 
-    await enviar(sock, grupoId,
+    // Resolve JID do cotista via onWhatsApp para o @menção
+    let jidCotista = null
+    let mencao = ''
+    try {
+      const rsCli = await pool.query(`
+        SELECT "Cliente_Telefone_Celular"
+          FROM public."Cliente"
+         WHERE "Codigo" = $1
+         LIMIT 1
+      `, [codCliente])
+
+      const telRaw = rsCli.rows[0]?.Cliente_Telefone_Celular || ''
+      const tel = telRaw.replace(/\D/g, '').replace(/^0/, '')
+      const telBr = tel.startsWith('55') ? tel : `55${tel}`
+
+      const [resultado55] = await sock.onWhatsApp(telBr)
+      if (resultado55?.exists) {
+        jidCotista = resultado55.jid
+        mencao = `@${jidCotista.split('@')[0]}`
+      }
+    } catch (errMencao) {
+      console.warn('[HM_COBRANÇA] Não foi possível resolver JID para @:', errMencao.message)
+    }
+
+    const textoMsg =
       `${CABECALHO_HM}\n` +
       `*REPASSE_DE_CUSTOS/HORA_MOTOR*\n\n` +
       `Horímetro - *Saída*: ${String(hmSaida).replace('.', ',')}  *Retorno*: ${String(hmRetorno).replace('.', ',')}\n` +
@@ -210,8 +234,13 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
       `${descricao}\n\n` +
       `*Valor:* R$ ${valor.toFixed(2).replace('.', ',')}\n` +
       `*Link Boleto/PIX:* ${resultado.linkBoleto}\n\n` +
-      `Para pagamento *à vista*!`
-    )
+      `Para pagamento *à vista*!` +
+      (mencao ? `\n\n${mencao}` : '')
+
+    const msgOpts = { text: textoMsg }
+    if (jidCotista) msgOpts.mentions = [jidCotista]
+
+    await sock.sendMessage(grupoId, msgOpts)
 
     console.log('[HM_COBRANÇA] Cobrança gerada', resultado)
 
@@ -248,7 +277,7 @@ async function executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabec
     })
 
     await enviar(sock, grupoId,
-      `${CABECALHO_HM}\n${cabecalho}\n   Hora motor saída\nInforme a *Hora Motor de Saída*, no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+      `${cabecalho}\n   Hora motor saída\nInforme a *Hora Motor de Saída*, no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
     )
     return
   }
@@ -262,7 +291,7 @@ async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabec
 
   if (!dtRetorno) {
     await enviar(sock, grupoId,
-      `${CABECALHO_HM}\n${cabecalho}\n\nEmbarcação ainda não retornou. Hora Motor de Retorno não pode ser registrada.\n${VERSAO_HM}`
+      `${cabecalho}\n\nEmbarcação ainda não retornou. Hora Motor de Retorno não pode ser registrada.\n${VERSAO_HM}`
     )
     return
   }
@@ -272,7 +301,7 @@ async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabec
 
   if (temHoraRetorno) {
     await enviar(sock, grupoId,
-      `${CABECALHO_HM}\n${cabecalho}\n\nHora Motor de Retorno já registrada: *${String(horaMotorRetorno).replace('.', ',')}*\n${VERSAO_HM}`
+      `${cabecalho}\n\nHora Motor de Retorno já registrada: *${String(horaMotorRetorno).replace('.', ',')}*\n${VERSAO_HM}`
     )
     return
   }
@@ -285,7 +314,7 @@ async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabec
   })
 
   await enviar(sock, grupoId,
-    `${CABECALHO_HM}\n${cabecalho}\n   Hora motor retorno\nInforme a *Hora Motor de Retorno*, no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+    `${cabecalho}\n   Hora motor retorno\nInforme a *Hora Motor de Retorno*, no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
   )
 }
 
@@ -303,7 +332,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
 
   if (msg === 'd') {
     estadosHoraMotor.delete(key)
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nDesistência registrada.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Desistência registrada.\n${VERSAO_HM}`)
     return true
   }
 
@@ -311,7 +340,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
   if (estado.etapa === 'aguardando_hora_motor_saida') {
     if (!horaMotorValida(texto)) {
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nInforme a Hora Motor de Saída no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+        `Informe a Hora Motor de Saída no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
       )
       return true
     }
@@ -321,7 +350,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
     estadosHoraMotor.set(key, estado)
 
     await enviar(sock, grupoId,
-      `${CABECALHO_HM}\nCONFIRMA *${estado.horaInformada}* como Hora Motor de Saída? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
+      `CONFIRMA *${estado.horaInformada}* como Hora Motor de Saída? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
     )
     return true
   }
@@ -333,14 +362,14 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
       estado.horaInformada = ''
       estadosHoraMotor.set(key, estado)
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nInforme a Hora Motor de Saída no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+        `Informe a Hora Motor de Saída no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
       )
       return true
     }
 
     if (msg !== 's') {
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nCONFIRMA *${estado.horaInformada}* como Hora Motor de Saída? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
+        `CONFIRMA *${estado.horaInformada}* como Hora Motor de Saída? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
       )
       return true
     }
@@ -352,7 +381,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
 
     await enviar(sock, grupoId,
       `✅ *Hora Motor de Saída registrada: ${estado.horaInformada}*\n\n` +
-      `${CABECALHO_HM}\nEmb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
+      `Emb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
     )
 
     // Segue para Etapa 2
@@ -365,7 +394,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
   if (estado.etapa === 'aguardando_hora_motor_retorno') {
     if (!horaMotorValida(texto)) {
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nInforme a Hora Motor de Retorno no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+        `Informe a Hora Motor de Retorno no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
       )
       return true
     }
@@ -375,7 +404,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
     estadosHoraMotor.set(key, estado)
 
     await enviar(sock, grupoId,
-      `${CABECALHO_HM}\nCONFIRMA *${estado.horaInformada}* como Hora Motor de Retorno? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
+      `CONFIRMA *${estado.horaInformada}* como Hora Motor de Retorno? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
     )
     return true
   }
@@ -387,14 +416,14 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
       estado.horaInformada = ''
       estadosHoraMotor.set(key, estado)
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nInforme a Hora Motor de Retorno no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
+        `Informe a Hora Motor de Retorno no formato *000,0*, ou D para desistir\n${VERSAO_HM}`
       )
       return true
     }
 
     if (msg !== 's') {
       await enviar(sock, grupoId,
-        `${CABECALHO_HM}\nCONFIRMA *${estado.horaInformada}* como Hora Motor de Retorno? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
+        `CONFIRMA *${estado.horaInformada}* como Hora Motor de Retorno? S/N ou D para desistir/corrigir\n${VERSAO_HM}`
       )
       return true
     }
@@ -409,7 +438,7 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
 
     await enviar(sock, grupoId,
       `✅ *Hora Motor de Retorno registrada: ${estado.horaInformada}*\n\n` +
-      `${CABECALHO_HM}\nEmb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
+      `Emb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
     )
 
     // Gera cobrança automática
@@ -429,7 +458,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   const grupoAgenda = await buscarGrupoAgenda(pool, grupoId)
 
   if (!grupoAgenda) {
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nNão encontrei este grupo na base de grupos da agenda.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Não encontrei este grupo na base de grupos da agenda.\n${VERSAO_HM}`)
     return true
   }
 
@@ -437,7 +466,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   const grupoCompLetra = String(grupoAgenda.cota || '').trim().toUpperCase()
 
   if (!codEmbPb || !grupoCompLetra) {
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nNão consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Não consegui identificar a embarcação/grupo desta conversa.\n${VERSAO_HM}`)
     return true
   }
 
@@ -445,7 +474,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   const agendamento = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
 
   if (!agendamento) {
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nNão há agendamento ativo para hoje.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Não há agendamento ativo para hoje.\n${VERSAO_HM}`)
     return true
   }
 
@@ -453,7 +482,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   const codProprietario = lerCodProprietario(agendamento)
 
   if (codProprietario !== 4255) {
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nComando não aplicável a esta embarcação.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Comando não aplicável a esta embarcação.\n${VERSAO_HM}`)
     return true
   }
 
@@ -479,7 +508,7 @@ export async function tratarComandoHoraMotor(sock, pool, grupoId, remetente, tex
   // Valida colaborador
   const colaborador = await buscarColaborador(pool, remetente)
   if (!colaborador) {
-    await enviar(sock, grupoId, `${CABECALHO_HM}\nComando inválido. Use: colaborador + telefone cadastrado.\n${VERSAO_HM}`)
+    await enviar(sock, grupoId, `Comando inválido. Use: colaborador + telefone cadastrado.\n${VERSAO_HM}`)
     return true
   }
 
