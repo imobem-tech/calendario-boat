@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2605282108
+// wpp/comandos/hora_motor.js — V.2605282316
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -11,9 +11,12 @@
 // ============================================================
 
 import { gerarCobrancaCompleta } from '../asaas.js'
+import { alertarAdm } from './admin.js'
+
+const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605282108'
+const VERSAO_HM = 'V.2605282316'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -123,6 +126,189 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows[0] || null
+}
+
+// ============================================================
+// BUSCA ÚLTIMO HM RETORNO VÁLIDO DA EMBARCAÇÃO
+// ============================================================
+
+async function buscarUltimoHMRetorno(pool, codEmb) {
+  const { rows } = await pool.query(`
+    SELECT "Hora_Motor_Retorno", "ID"
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND "Dt_Desistencia"    IS NULL
+       AND "Dt_Cancela_saida"  IS NULL
+       AND "Hora_Motor_Retorno" IS NOT NULL
+     ORDER BY "Dt_Agendamento" DESC
+     LIMIT 1
+  `, [codEmb])
+  return rows[0] || null
+}
+
+async function buscarMediaHMHistorica(pool, codEmb) {
+  const { rows } = await pool.query(`
+    SELECT AVG("Hora_Motor_Retorno" - "Hora_Motor_Saida") AS media
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND "Dt_Desistencia"    IS NULL
+       AND "Dt_Cancela_saida"  IS NULL
+       AND "Hora_Motor_Saida"  IS NOT NULL
+       AND "Hora_Motor_Retorno" IS NOT NULL
+     ORDER BY "Dt_Agendamento" DESC
+     LIMIT 10
+  `, [codEmb])
+  return rows[0]?.media ? Number(rows[0].media) : null
+}
+
+async function contarRetornosAusentes(pool, codEmb) {
+  const { rows } = await pool.query(`
+    SELECT COUNT(*) AS qtd
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND "Dt_Desistencia"    IS NULL
+       AND "Dt_Cancela_saida"  IS NULL
+       AND "Hora_Motor_Saida"  IS NOT NULL
+       AND "Hora_Motor_Retorno" IS NULL
+       AND "Dt_Agendamento" >= NOW() - INTERVAL '30 days'
+  `, [codEmb])
+  return Number(rows[0]?.qtd || 0)
+}
+
+function cabecalhoAlerta(idSaida, codEmb, grupo, dtAgendamento, colaborador) {
+  return `Emb: ${codEmb} / Grupo: ${grupo} — ${new Date(dtAgendamento).toLocaleDateString('pt-BR')}\n` +
+         `ID Saída: ${idSaida}\nColaborador: ${colaborador}`
+}
+
+// ============================================================
+// CRÍTICAS DE HM SAÍDA
+// ============================================================
+
+async function criticarHMSaida(sock, pool, idSaida, codEmb, grupo, dtAgendamento, colaborador, hmSaida) {
+  const ultimo = await buscarUltimoHMRetorno(pool, codEmb)
+
+  if (ultimo) {
+    const hmAnterior = Number(ultimo.Hora_Motor_Retorno)
+    const diff = Number((hmSaida - hmAnterior).toFixed(1))
+
+    // CRÍTICO 1 — fora do intervalo esperado
+    if (diff < 0 || diff > 0.1) {
+      const cab = cabecalhoAlerta(idSaida, codEmb, grupo, dtAgendamento, colaborador)
+      await alertarAdm(sock,
+        `🔴 *HM SAÍDA BLOQUEADA*\n${cab}\n` +
+        `Valor informado: ${String(hmSaida).replace('.', ',')}\n` +
+        `Último HM retorno válido: ${String(hmAnterior).replace('.', ',')}\n` +
+        `Diferença: ${diff > 0 ? '+' : ''}${diff}\n` +
+        `Esperado: entre ${hmAnterior} e ${Number((hmAnterior + 0.1).toFixed(1))}\n` +
+        `Ação: registro bloqueado.\n\nPara corrigir: *corrigir_${idSaida}_S*`
+      )
+      return { bloqueado: true, motivo: 'HM_SAIDA_FORA_INTERVALO' }
+    }
+  }
+
+  return { bloqueado: false }
+}
+
+// ============================================================
+// CRÍTICAS DE HM RETORNO
+// ============================================================
+
+async function criticarHMRetorno(sock, pool, idSaida, codEmb, grupo, dtAgendamento, dtSaida, dtRetorno, colaborador, hmSaida, hmRetorno) {
+  const cab = cabecalhoAlerta(idSaida, codEmb, grupo, dtAgendamento, colaborador)
+  const hmUsado = Number((hmRetorno - hmSaida).toFixed(1))
+
+  // CRÍTICO 2 — HM retorno < HM saída
+  if (hmRetorno < hmSaida) {
+    await alertarAdm(sock,
+      `🔴 *HM RETORNO INVÁLIDO*\n${cab}\n` +
+      `HM Saída: ${String(hmSaida).replace('.', ',')} / HM Retorno: ${String(hmRetorno).replace('.', ',')}\n` +
+      `Diferença: ${hmUsado}\n` +
+      `Ação: registro bloqueado.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+    return { bloqueado: true, motivo: 'HM_RETORNO_MENOR_SAIDA' }
+  }
+
+  // CRÍTICO 3 — HM usado < 0,1
+  if (hmUsado < 0.1) {
+    await alertarAdm(sock,
+      `🔴 *HM MUITO BAIXO*\n${cab}\n` +
+      `HM Saída: ${String(hmSaida).replace('.', ',')} / HM Retorno: ${String(hmRetorno).replace('.', ',')}\n` +
+      `Diferença: ${hmUsado}\n` +
+      `Ação: registro bloqueado.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+    return { bloqueado: true, motivo: 'HM_USADO_MUITO_BAIXO' }
+  }
+
+  // Calcula tempo de navegação em horas
+  let tempoNavH = null
+  if (dtSaida && dtRetorno) {
+    tempoNavH = Number(((new Date(dtRetorno) - new Date(dtSaida)) / 3600000).toFixed(2))
+  }
+
+  // CRÍTICO 4 — HM usado > tempo navegação
+  if (tempoNavH !== null && hmUsado > tempoNavH) {
+    await alertarAdm(sock,
+      `🔴 *HM ACIMA DO TEMPO DE NAVEGAÇÃO*\n${cab}\n` +
+      `HM usado: ${String(hmUsado).replace('.', ',')}h / Tempo navegação: ${String(tempoNavH).replace('.', ',')}h\n` +
+      `Razão: ${Math.round(hmUsado / tempoNavH * 100)}%\n` +
+      `Ação: registro bloqueado.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+    return { bloqueado: true, motivo: 'HM_ACIMA_TEMPO_NAVEGACAO' }
+  }
+
+  // IMPORTANTE 5 — HM usado > 60% tempo navegação
+  if (tempoNavH !== null && hmUsado > tempoNavH * 0.6) {
+    await alertarAdm(sock,
+      `🟡 *HM ALTO EM RELAÇÃO AO TEMPO*\n${cab}\n` +
+      `HM usado: ${String(hmUsado).replace('.', ',')}h / Tempo navegação: ${String(tempoNavH).replace('.', ',')}h\n` +
+      `Consumo: ${Math.round(hmUsado / tempoNavH * 100)}% (limite 60%)\n` +
+      `Registro efetuado. Verificar ocorrência.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+  }
+
+  // IMPORTANTE 6 — HM usado < 0,5
+  if (hmUsado < 0.5) {
+    await alertarAdm(sock,
+      `🟡 *HM BAIXO*\n${cab}\n` +
+      `HM usado: ${String(hmUsado).replace('.', ',')}h (${Math.round(hmUsado * 60)} min)\n` +
+      `Registro efetuado. Verificar se motor foi utilizado normalmente.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+  }
+
+  // IMPORTANTE 7 — abandono de registro
+  const ausentes = await contarRetornosAusentes(pool, codEmb)
+  if (ausentes >= 3) {
+    await alertarAdm(sock,
+      `🟡 *PADRÃO DE ABANDONO DE REGISTRO*\n${cab}\n` +
+      `HM retorno ausente em ${ausentes} viagem(ns) nos últimos 30 dias.\n` +
+      `Registro efetuado. Orientar colaborador.\n\nPara ver saídas: *ver_saida_${codEmb}*`
+    )
+  }
+
+  // IMPORTANTE 8 — HM muito acima da média histórica
+  const media = await buscarMediaHMHistorica(pool, codEmb)
+  if (media !== null && hmUsado > media * 2.5) {
+    await alertarAdm(sock,
+      `🟡 *HM ACIMA DA MÉDIA HISTÓRICA*\n${cab}\n` +
+      `HM usado hoje: ${String(hmUsado).replace('.', ',')}h / Média histórica: ${String(Number(media.toFixed(1))).replace('.', ',')}h\n` +
+      `Desvio: +${Math.round((hmUsado / media - 1) * 100)}%\n` +
+      `Registro efetuado. Verificar ocorrência.\n\nPara corrigir: *corrigir_${idSaida}_R*`
+    )
+  }
+
+  // IMPORTANTE 9 — fora do horário (10h às 21h)
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const hora = agora.getHours()
+  if (hora < 10 || hora >= 21) {
+    await alertarAdm(sock,
+      `🟡 *REGISTRO FORA DO HORÁRIO*\n${cab}\n` +
+      `Horário do registro: ${String(hora).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}\n` +
+      `Horário permitido: 10h às 21h\n` +
+      `Registro efetuado. Verificar ocorrência.`
+    )
+  }
+
+  return { bloqueado: false }
 }
 
 async function gravarHoraMotorSaida(pool, id, valor) {
@@ -375,6 +561,26 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
     }
 
     const valor = Number(estado.horaInformada.replace(',', '.'))
+
+    // CRÍTICA HM SAÍDA
+    const critica = await criticarHMSaida(
+      sock, pool,
+      estado.agendamento['ID'],
+      estado.agendamento['Cod_Emb_PB'],
+      estado.agendamento['Grupo_Comp_letra'],
+      estado.agendamento['Dt_Agendamento'],
+      estado.colaborador?.Nome || 'Colaborador',
+      valor
+    )
+
+    if (critica.bloqueado) {
+      estadosHoraMotor.delete(key)
+      await enviar(sock, grupoId,
+        `⚠️ Hora Motor de Saída não aceita. Verifique o valor e tente novamente.\n${VERSAO_HM}`
+      )
+      return true
+    }
+
     await gravarHoraMotorSaida(pool, estado.agendamento['ID'], valor)
 
     estado.agendamento['Hora_Motor_Saida'] = valor
@@ -429,6 +635,29 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
     }
 
     const valor = Number(estado.horaInformada.replace(',', '.'))
+
+    // CRÍTICA HM RETORNO
+    const critica = await criticarHMRetorno(
+      sock, pool,
+      estado.agendamento['ID'],
+      estado.agendamento['Cod_Emb_PB'],
+      estado.agendamento['Grupo_Comp_letra'],
+      estado.agendamento['Dt_Agendamento'],
+      estado.agendamento['Dt_Saída'],
+      estado.agendamento['Dt_Retorno'],
+      estado.colaborador?.Nome || 'Colaborador',
+      Number(estado.agendamento['Hora_Motor_Saida']),
+      valor
+    )
+
+    if (critica.bloqueado) {
+      estadosHoraMotor.delete(key)
+      await enviar(sock, grupoId,
+        `⚠️ Hora Motor de Retorno não aceita. Verifique o valor e tente novamente.\n${VERSAO_HM}`
+      )
+      return true
+    }
+
     await gravarHoraMotorRetorno(pool, estado.agendamento['ID'], valor)
 
     // Atualiza o agendamento em memória com o retorno gravado
