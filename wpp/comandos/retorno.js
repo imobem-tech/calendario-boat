@@ -1,33 +1,18 @@
 // ============================================================
-// COMANDO RETORNO (RRR) — Allmax®2605271600
+// wpp/comandos/retorno.js — V.2605282103
+// Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
 import { MENU } from './menu.js'
 
-const ESPELHO_RETORNO_ID = '120363426928542914@g.us'
+const CABECALHO_RETORNO =
+`\`\`\`Olá, sou o seu
+Assistente Virtual\`\`\` *Marujo⚓*
+\`\`\`--------------------------\`\`\``
 
 // Estado em memória: grupoId → { agendamentoId, dadosRetorno, timeoutHandle }
 const aguardandoRetorno = new Map()
-
-// ============================================================
-// BUSCA DADOS DA EMBARCAÇÃO
-// ============================================================
-async function buscarDadosEmbar(pool, pb) {
-  try {
-    const rs = await pool.query(
-      `SELECT "Nome_Embar", "Tipo_Embar", "Cor", "Marca", "Modelo"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [pb]
-    )
-    return rs.rows[0] || {}
-  } catch (err) {
-    console.warn('[buscarDadosEmbar]', err.message)
-    return {}
-  }
-}
 
 export function ehComandoRetorno(texto) {
   return /^r{3,}$/i.test(texto)
@@ -110,15 +95,13 @@ function montarMensagemRetorno(dadosRetorno) {
   const dataHora = `${dd}/${mm} ${hh}:${min}`
 
   const nomeAutorizado = dadosRetorno.nomeAutorizado || `Autorizado: ${dadosRetorno.codAutorizado}`
-  const nomeRemetente  = dadosRetorno.nomeRemetente || ''
-  const nomeEmbar      = dadosRetorno.nomeEmbar || ''
+  const nomeRemetente = dadosRetorno.nomeRemetente || ''
 
   let msg = `RETORNO_${sufixo}\n`
   msg += `${dataHora}\n`
   msg += `${nomeAutorizado}\n`
   if (nomeRemetente) msg += `${nomeRemetente}\n`
-  msg += `*${dadosRetorno.pb}-${dadosRetorno.grupoLetra}*`
-  if (nomeEmbar) msg += `\n${nomeEmbar}`
+  msg += `Emb ${dadosRetorno.pb}-${dadosRetorno.grupoLetra}`
 
   if (dadosRetorno.comanda) {
     const valorFmt = dadosRetorno.comanda.toLocaleString('pt-BR', {
@@ -127,38 +110,6 @@ function montarMensagemRetorno(dadosRetorno) {
     })
     msg += `\n\n*Comanda aberta R$ ${valorFmt}*`
   }
-
-  return msg
-}
-
-function montarMensagemEspelhoRetorno(dadosRetorno) {
-  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-  const dd  = String(agora.getDate()).padStart(2, '0')
-  const mm  = String(agora.getMonth() + 1).padStart(2, '0')
-  const yyyy = agora.getFullYear()
-  const hh  = String(agora.getHours()).padStart(2, '0')
-  const min = String(agora.getMinutes()).padStart(2, '0')
-
-  const diasSemana = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado']
-  const diaSemana  = diasSemana[agora.getDay()]
-  const dataFormatada = `${dd}/${mm}/${yyyy}`
-  const horaRetorno   = `${hh}:${min}`
-
-  const { pb, grupoLetra, nomeAutorizado, codAutorizado, nomeEmbar,
-          tipoEmbar, corEmbar, marcaEmbar, modeloEmbar } = dadosRetorno
-
-  const linhasTipoCor    = [tipoEmbar, corEmbar].filter(Boolean).join(' ')
-  const linhaMarcaModelo = [marcaEmbar, modeloEmbar].filter(Boolean).join(' ')
-  const nomeAut          = nomeAutorizado || `Autorizado: ${codAutorizado}`
-
-  let msg = `🚤 RETORNO\n`
-  msg += `*${pb}-${grupoLetra}*\n`
-  if (linhasTipoCor)    msg += `${linhasTipoCor}\n`
-  if (linhaMarcaModelo) msg += `${linhaMarcaModelo}\n`
-  if (nomeEmbar)        msg += `${nomeEmbar}\n`
-  msg += `Data: *${dataFormatada} - ${diaSemana}*\n`
-  msg += `Hora retorno: ${horaRetorno}\n`
-  msg += `Autorizado: ${nomeAut}`
 
   return msg
 }
@@ -185,17 +136,8 @@ export async function handleConfirmacaoRetorno(sock, pool, grupoId, texto) {
     const msgRetorno = montarMensagemRetorno(estado.dadosRetorno)
 
     await sock.sendMessage(grupoId, {
-      text: `✅ ${msgRetorno}${MENU}`
+      text: `${CABECALHO_RETORNO}\n✅ ${msgRetorno}${MENU}`
     })
-
-    // Espelho retorno
-    try {
-      const msgEspelho = montarMensagemEspelhoRetorno(estado.dadosRetorno)
-      await sock.sendMessage(ESPELHO_RETORNO_ID, { text: msgEspelho })
-      console.log(`📡 Espelho retorno enviado para ${ESPELHO_RETORNO_ID}`)
-    } catch (espErr) {
-      console.error('[espelho_retorno]', espErr.message)
-    }
 
     console.log(`✅ Retorno registrado — agendamento ${estado.agendamentoId}`)
 
@@ -285,28 +227,26 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
   const grupoLetra = ag['Grupo_Comp_letra']
   const numeroRemetente = String(remetente || '').replace('@s.whatsapp.net', '').replace(/\D/g, '')
 
-  const [nomeAutorizado, nomeRemetente, comanda, embarDados] = await Promise.all([
+  const [nomeAutorizado, nomeRemetente, comanda] = await Promise.all([
     buscarNomeAutorizado(pool, codAutorizado),
     buscarNomeRemetente(pool, numeroRemetente),
-    buscarComandaAberta(pool, codAutorizado),
-    buscarDadosEmbar(pool, pb)
+    buscarComandaAberta(pool, codAutorizado)
   ])
 
-  const nomeEmbar   = embarDados["Nome_Embar"]  || ""
-  const tipoEmbar   = embarDados["Tipo_Embar"]  || ""
-  const corEmbar    = embarDados["Cor"]          || ""
-  const marcaEmbar  = embarDados["Marca"]        || ""
-  const modeloEmbar = embarDados["Modelo"]       || ""
-
-  const dadosRetorno = {
-    pb, grupoLetra, codAutorizado, nomeAutorizado, nomeRemetente, comanda,
-    nomeEmbar, tipoEmbar, corEmbar, marcaEmbar, modeloEmbar
-  }
+  const dadosRetorno = { pb, grupoLetra, codAutorizado, nomeAutorizado, nomeRemetente, comanda }
 
   const nomeAutExibido = nomeAutorizado || `Autorizado: ${codAutorizado}`
   let textoConfirmacao = `❓ Confirma retorno S/N\n\n${nomeAutExibido}`
   if (nomeRemetente) textoConfirmacao += `\n${nomeRemetente}`
   textoConfirmacao += `\nEmb ${pb}-${grupoLetra}`
+
+  if (comanda) {
+    const valorFmt = comanda.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+    textoConfirmacao += `\n⚠️ Comanda aberta R$ ${valorFmt}`
+  }
 
   await sock.sendMessage(grupoId, { text: textoConfirmacao })
 
