@@ -1,8 +1,17 @@
+// ============================================================
+// wpp/agendar.js — V.2605282129
+// Allmax Gestão de Cotas — Marujo⚓
+// ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605271130";
+const VERSAO_API = "Allmax®2605221942";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
+
+const CABECALHO_MARUJO =
+`\`\`\`Olá, sou o seu
+Assistente Virtual\`\`\` *Marujo⚓*
+\`\`\`--------------------------\`\`\``
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -281,37 +290,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Busca Cod_Cliente (proprietário) real na P_BOAT_1_Embarcacao
-    const rsEmb = await client.query(
-      `SELECT "Cod_Cliente"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [codEmbPB]
-    );
-
-    if (rsEmb.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({
-        error: `Embarcação ${codEmbPB} não encontrada.`,
-        versao: VERSAO_API
-      });
-    }
-
-    const codProprietario = Number(
-      rsEmb.rows[0]["Cod_Cliente"] ??
-      rsEmb.rows[0]["cod_cliente"] ??
-      0
-    );
-
-    if (!codProprietario) {
-      await client.query("ROLLBACK");
-      return res.status(422).json({
-        error: `Embarcação ${codEmbPB} sem proprietário cadastrado.`,
-        versao: VERSAO_API
-      });
-    }
-
     const rsCodigo = await client.query(
       `SELECT COALESCE(MAX("Código"), 0) + 1 AS proximo_codigo
          FROM public."P_BOAT_z_10_Saida_Emb"`
@@ -345,7 +323,7 @@ export default async function handler(req, res) {
       [
         proximoCodigo,
         codEmbPB,
-        codProprietario,
+        4255,
         codAutorizado,
         dataHoraAgendamento,
         grupo
@@ -363,7 +341,8 @@ export default async function handler(req, res) {
       : "Agendamento com sucesso";
 
     const mensagemWpp =
-`🚤 NOVO AGENDAMENTO
+`${CABECALHO_MARUJO}
+🚤 NOVO AGENDAMENTO
 PB: ${codEmbPB}
 Grupo: ${grupo}
 Autorizado: ${codAutorizado}
