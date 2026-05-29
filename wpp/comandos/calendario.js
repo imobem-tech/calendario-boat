@@ -1,6 +1,6 @@
 // ============================================================
-// COMANDO CALENDÁRIO (CCC / calendario / calendar)
-// Allmax®2605242125
+// wpp/comandos/calendario.js — V.2605282127
+// Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 import { buscarGrupoInfo, buscarAutorizado } from '../db.js'
 import { gerarToken } from '../token.js'
@@ -8,6 +8,11 @@ import { MENU } from './menu.js'
 
 const BASE_URL = process.env.BASE_URL_AGENDA || 'https://allmaxcalendar.vercel.app'
 const PREVIEW_IMG = 'https://allmaxcalendar.vercel.app/agenda-preview.png'
+
+const CABECALHO =
+`\`\`\`Olá, sou o seu
+Assistente Virtual\`\`\` *Marujo⚓*
+\`\`\`--------------------------\`\`\``
 
 export function ehComandoCalendario(texto) {
   return (
@@ -64,7 +69,7 @@ export async function handleCalendario(sock, pool, grupoId) {
   const link = `${BASE_URL}/?t=${token}`
 
  await sock.sendMessage(grupoId, {
-  text: `📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
+  text: `${CABECALHO}\n📅 *Link de agendamento do dia*\n\n${link}\n\n_Válido somente hoje_${MENU}`
 })
 
   console.log(`✅ Token gerado para PB ${pb} / ${grupoLetra}`)
