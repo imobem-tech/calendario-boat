@@ -11,7 +11,7 @@ import pkg from 'pg'
 import { rm } from 'fs/promises'
 
 import { handleRenomearGrupos, handleRenomearGrupoUnico } from './renomear-grupos.js'
-
+import { handleColaboradoresGrupo, handleColaboradoresTodos, handleAdicionarTitular } from './grupos-admin.js'
 import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
 import retornoRoutes from './msg_externa.js'
@@ -32,7 +32,7 @@ import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605242125'
+const VERSAO_WPP = 'Allmax®2605301500'
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -420,6 +420,18 @@ app.post('/renomear-grupos', (req, res) => {
 
 app.post('/grupos/renomear', (req, res) => {
   handleRenomearGrupoUnico(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/grupo', (req, res) => {
+  handleColaboradoresGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/colaboradores/todos', (req, res) => {
+  handleColaboradoresTodos(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/titular', (req, res) => {
+  handleAdicionarTitular(req, res, () => sock, () => conectado)
 })
 
 app.post('/criar-ou-atualizar-grupo', (req, res) => {

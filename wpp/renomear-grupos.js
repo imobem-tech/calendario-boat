@@ -1,10 +1,12 @@
 // ============================================================
-// wpp/renomear-grupos.js
+// wpp/renomear-grupos.js — V.2605301500
 // Endpoint POST /renomear-grupos  e  POST /grupos/renomear
 // ============================================================
 
 import pkg from 'pg'
 const { Pool } = pkg
+
+import { sincronizarColaboradoresGrupo, unidadeDoPlano, adicionarTitularGrupo } from './grupos-admin.js'
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -73,17 +75,17 @@ function abreviarNome(nomeCompleto) {
 // Monta nome do grupo com cota:
 // Ex: pb=138, letra="11", plano="SUMMER", nome="DANILO ALVES"
 //   → "138-11 _G SUMMER (DANILO A)"
-// Preserva _G ou _C se já existir no nome atual
+// _C ou _G derivado do campo plano (ctg → _C, demais → _G)
 // ------------------------------------------------------------
-function montarNomeGrupoUnico(pb, letra, plano, nomeCliente, nomeAtual) {
-  const tipo = nomeAtual && /_C\s/.test(nomeAtual) ? '_C' : '_G'
+function montarNomeGrupoUnico(pb, letra, plano, nomeCliente) {
+  const unidade = unidadeDoPlano(plano)
   const abrev = abreviarNome(nomeCliente)
-  return `${pb}-${letra} ${tipo} ${plano.toUpperCase()} (${abrev})`
+  return `${pb}-${letra} _${unidade} ${plano.toUpperCase()} (${abrev})`
 }
 
 // ============================================================
 // POST /grupos/renomear
-// Renomeia UM grupo específico por pb + letra
+// Renomeia UM grupo, adiciona titular e sincroniza colaboradores
 // Body: { pb, letra, cod_cliente, plano, nome_cliente }
 // ============================================================
 export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) {
@@ -94,14 +96,17 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
     return res.status(503).json({ erro: 'WhatsApp não conectado' })
   }
 
-  const { pb, letra, plano, nome_cliente } = req.body
+  const { pb, letra, cod_cliente, plano, nome_cliente } = req.body
 
-  if (!pb || !letra || !plano || !nome_cliente) {
-    return res.status(400).json({ erro: 'Campos obrigatórios: pb, letra, plano, nome_cliente' })
+  if (!pb || !letra || !cod_cliente || !plano || !nome_cliente) {
+    return res.status(400).json({ erro: 'Campos obrigatórios: pb, letra, cod_cliente, plano, nome_cliente' })
   }
 
+  const log = []
+  const addLog = msg => { console.log('[grupos/renomear]', msg); log.push(msg) }
+
   try {
-    // Busca o grupo na tabela
+    // 1. Busca o grupo na tabela
     const rs = await pool.query(
       `SELECT grupowppid, nomegrupowpp FROM public.wpp_grupos_agenda
        WHERE pb = $1 AND UPPER(COALESCE(cota, '')) = UPPER($2) LIMIT 1`,
@@ -113,28 +118,57 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
     }
 
     const { grupowppid, nomegrupowpp } = rs.rows[0]
-    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente, nomegrupowpp)
+    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente)
+    const unidadeGrupo = unidadeDoPlano(plano)
 
+    // 2. Renomear (se necessário)
+    let acaoRenomear
     if (novoNome === nomegrupowpp) {
-      return res.json({ acao: 'JA_OK', nome: novoNome })
+      addLog(`Nome já correto: "${novoNome}"`)
+      acaoRenomear = 'JA_OK'
+    } else {
+      await sock.groupUpdateSubject(grupowppid, novoNome)
+      await pool.query(
+        `UPDATE public.wpp_grupos_agenda
+            SET nomegrupowpp = $1, dataatualizacao = NOW() AT TIME ZONE 'America/Sao_Paulo'
+          WHERE grupowppid = $2`,
+        [novoNome, grupowppid]
+      )
+      addLog(`Renomeado: "${nomegrupowpp}" → "${novoNome}"`)
+      acaoRenomear = 'RENOMEADO'
     }
 
-    // Renomeia no WhatsApp
-    await sock.groupUpdateSubject(grupowppid, novoNome)
+    // 3. Adicionar titular
+    let titular = {}
+    try {
+      titular = await adicionarTitularGrupo(sock, pool, grupowppid, cod_cliente, addLog)
+    } catch (err) {
+      addLog(`AVISO titular: ${err.message}`)
+      titular = { acao: 'ERRO', erro: err.message }
+    }
 
-    // Atualiza o banco
-    await pool.query(
-      `UPDATE public.wpp_grupos_agenda
-          SET nomegrupowpp = $1, dataatualizacao = NOW() AT TIME ZONE 'America/Sao_Paulo'
-        WHERE grupowppid = $2`,
-      [novoNome, grupowppid]
-    )
+    // 4. Sincronizar colaboradores
+    let colaboradores = {}
+    try {
+      colaboradores = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
+    } catch (err) {
+      addLog(`AVISO colaboradores: ${err.message}`)
+      colaboradores = { erro: err.message }
+    }
 
-    return res.json({ acao: 'RENOMEADO', de: nomegrupowpp, para: novoNome })
+    return res.json({
+      acao: acaoRenomear,
+      de: nomegrupowpp,
+      para: novoNome,
+      titular,
+      colaboradores,
+      log
+    })
 
   } catch (err) {
+    addLog(`ERRO: ${err.message}`)
     console.error('[grupos/renomear] ERRO:', err)
-    return res.status(500).json({ erro: err.message })
+    return res.status(500).json({ erro: err.message, log })
   }
 }
 

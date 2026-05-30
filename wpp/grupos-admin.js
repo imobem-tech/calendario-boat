@@ -75,7 +75,7 @@ async function buscarColaboradoresAtivos(pool) {
 }
 
 // Deriva unidade do grupo a partir do plano: 'ctg' no plano => 'C', caso contrário => 'G'
-function unidadeDoPlano(plano) {
+export function unidadeDoPlano(plano) {
   return String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
 }
 
@@ -132,7 +132,7 @@ async function gravarLidColaborador(pool, colabId, lid, addLog) {
 
 // Sincroniza colaboradores num único grupo
 // unidadeGrupo: 'G' (Graciosa) ou 'C' (CTG) — derivado do plano
-async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, addLog) {
+export async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, addLog) {
   const colaboradores = await buscarColaboradoresAtivos(pool)
 
   // Busca participantes atuais do grupo
@@ -545,9 +545,100 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
 }
 
 // ============================================================
+// HELPER — adiciona titular a um grupo (sem camada HTTP)
+// Retorna { acao, nome, jid } — acao: ADICIONADO | JA_NO_GRUPO |
+//   CONVITE_LINK_ENVIADO | CONVITE_FALHOU | BLOQUEADO | NAO_ENCONTRADO
+// ============================================================
+export async function adicionarTitularGrupo(sock, pool, grupowppid, codAutorizado, addLog) {
+  const rsCliente = await pool.query(`
+    SELECT c."Cliente_Nome" AS nome,
+           c."Cliente_Telefone_Celular" AS telefone
+      FROM public."P_BOAT_4_Autorizados" a
+      JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+     WHERE a."Cod_Pessoa" = $1
+       AND a."Dt_Desautorizacao" IS NULL
+       AND a."Dt_Cancelamento"   IS NULL
+       AND c."Cliente_Telefone_Celular" IS NOT NULL
+     LIMIT 1
+  `, [codAutorizado])
+
+  if (rsCliente.rowCount === 0) {
+    addLog(`Titular cod=${codAutorizado} não encontrado ou sem telefone`)
+    return { acao: 'NAO_ENCONTRADO' }
+  }
+
+  const { nome, telefone } = rsCliente.rows[0]
+  const tel = String(telefone).replace(/\D/g, '')
+  const telComDDI = tel.startsWith('55') ? tel : '55' + tel
+
+  addLog(`Titular: ${nome} | Tel: ${telefone} | Normalizado: ${telComDDI}`)
+
+  const variantes = [telComDDI]
+  if (telComDDI.length === 12) {
+    variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
+  } else if (telComDDI.length === 13) {
+    variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
+  }
+
+  let jidTitular = null
+  for (const variante of variantes) {
+    try {
+      const [res] = await sock.onWhatsApp(variante)
+      if (res?.exists) { jidTitular = res.jid; break }
+    } catch {}
+  }
+
+  if (!jidTitular) {
+    addLog(`Número ${telefone} não encontrado no WhatsApp`)
+    return { acao: 'NAO_ENCONTRADO', nome }
+  }
+  addLog(`JID resolvido: ${jidTitular}`)
+
+  const meta = await sock.groupMetadata(grupowppid)
+  const jaEsta = meta.participants.some(p => normJid(p.id) === normJid(jidTitular))
+  if (jaEsta) {
+    addLog(`Titular já está no grupo.`)
+    return { acao: 'JA_NO_GRUPO', nome, jid: jidTitular }
+  }
+
+  const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
+  addLog(`groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
+  const status = String(resultado?.[0]?.status || '')
+
+  if (status === '200') {
+    addLog(`Titular adicionado: ${nome}`)
+    return { acao: 'ADICIONADO', nome, jid: jidTitular }
+  }
+
+  if (status === '408') {
+    try {
+      const linkCode = await sock.groupInviteCode(grupowppid)
+      const msgConvite =
+        `Olá, *${nome.split(' ')[0]}*! 👋\n\n` +
+        `Você foi convidado para participar do grupo da sua embarcação.\n\n` +
+        `Clique no link abaixo para entrar:\n` +
+        `https://chat.whatsapp.com/${linkCode}`
+      await sock.sendMessage(jidTitular, { text: msgConvite })
+      addLog(`Convite enviado no privado de ${nome}`)
+      return { acao: 'CONVITE_LINK_ENVIADO', nome, jid: jidTitular }
+    } catch (errLink) {
+      addLog(`Falha ao enviar convite: ${errLink.message}`)
+      return { acao: 'CONVITE_FALHOU', nome, jid: jidTitular, erro: errLink.message }
+    }
+  }
+
+  if (status === '403') {
+    addLog(`Titular bloqueou adições: ${nome}`)
+    return { acao: 'BLOQUEADO', nome, jid: jidTitular }
+  }
+
+  addLog(`Status inesperado: ${status}`)
+  return { acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status }
+}
+
+// ============================================================
 // ENDPOINT 4 — POST /grupos/titular
 // Body: { grupowppid, cod_autorizado }
-// Adiciona o titular ao grupo como membro simples
 // ============================================================
 export async function handleAdicionarTitular(req, res, getSock, getConectado) {
   const sock = getSock()
@@ -564,101 +655,8 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
   const addLog = msg => { console.log('[titular]', msg); log.push(msg) }
 
   try {
-    // Busca telefone do autorizado
-    const rsCliente = await pool.query(`
-      SELECT c."Cliente_Nome" AS nome,
-             c."Cliente_Telefone_Celular" AS telefone
-        FROM public."P_BOAT_4_Autorizados" a
-        JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
-       WHERE a."Cod_Pessoa" = $1
-         AND a."Dt_Desautorizacao" IS NULL
-         AND a."Dt_Cancelamento"   IS NULL
-         AND c."Cliente_Telefone_Celular" IS NOT NULL
-       LIMIT 1
-    `, [codAutorizado])
-
-    if (rsCliente.rowCount === 0) {
-      return res.status(404).json({ erro: `Autorizado ${codAutorizado} não encontrado ou sem telefone`, log })
-    }
-
-    const { nome, telefone } = rsCliente.rows[0]
-    const tel = String(telefone).replace(/\D/g, '')
-    // Garante DDI 55
-    const telComDDI = tel.startsWith('55') ? tel : '55' + tel
-
-    addLog(`Titular: ${nome} | Tel: ${telefone} | Normalizado: ${telComDDI}`)
-
-    // Tenta com nono dígito e sem nono dígito
-    const variantes = [telComDDI]
-    if (telComDDI.length === 12) {
-      // sem nono → adiciona nono: 556384030406 → 5563984030406
-      variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
-    } else if (telComDDI.length === 13) {
-      // com nono → remove nono: 5563984030406 → 556384030406
-      variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
-    }
-
-    let jidTitular = null
-    for (const variante of variantes) {
-      try {
-        const [resultado] = await sock.onWhatsApp(variante)
-        if (resultado?.exists) {
-          jidTitular = resultado.jid
-          addLog(`JID resolvido via ${variante}: ${jidTitular}`)
-          break
-        }
-      } catch {}
-    }
-
-    if (!jidTitular) {
-      return res.status(404).json({ erro: `Número ${telefone} não encontrado no WhatsApp`, log })
-    }
-
-    // Verifica se já está no grupo
-    const meta = await sock.groupMetadata(grupowppid)
-    const jaEsta = meta.participants.some(p => normJid(p.id) === normJid(jidTitular))
-
-    if (jaEsta) {
-      addLog(`Titular já está no grupo.`)
-      return res.json({ acao: 'JA_NO_GRUPO', nome, jid: jidTitular, log })
-    }
-
-    const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
-    addLog(`Resultado groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
-
-    const status = String(resultado?.[0]?.status || '')
-
-    if (status === '200') {
-      addLog(`Titular adicionado diretamente: ${nome}`)
-      return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
-    }
-
-    if (status === '408') {
-      // Privacidade bloqueou adição direta — envia link de convite no privado
-      try {
-        const linkCode = await sock.groupInviteCode(grupowppid)
-        const msgConvite =
-          `Olá, *${nome.split(' ')[0]}*! 👋\n\n` +
-          `Você foi convidado para participar do grupo da sua embarcação.\n\n` +
-          `Clique no link abaixo para entrar:\n` +
-          `https://chat.whatsapp.com/${linkCode}`
-        await sock.sendMessage(jidTitular, { text: msgConvite })
-        addLog(`Link de convite enviado no privado de ${nome}: ${jidTitular}`)
-        return res.json({ acao: 'CONVITE_LINK_ENVIADO', nome, jid: jidTitular, log })
-      } catch (errLink) {
-        addLog(`Falha ao gerar/enviar link de convite: ${errLink.message}`)
-        return res.json({ acao: 'CONVITE_FALHOU', nome, jid: jidTitular, erro: errLink.message, log })
-      }
-    }
-
-    if (status === '403') {
-      addLog(`Titular bloqueou adições: ${nome}`)
-      return res.json({ acao: 'BLOQUEADO', nome, jid: jidTitular, log })
-    }
-
-    addLog(`Status inesperado: ${status}`)
-    return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
-
+    const resultado = await adicionarTitularGrupo(sock, pool, grupowppid, codAutorizado, addLog)
+    return res.json({ ...resultado, log })
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
     return res.status(500).json({ erro: err.message, log })
