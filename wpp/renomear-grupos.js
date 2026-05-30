@@ -78,7 +78,7 @@ function abreviarNome(nomeCompleto) {
 // _C ou _G preservado do nome atual gravado no banco
 // ------------------------------------------------------------
 function montarNomeGrupoUnico(pb, letra, plano, nomeCliente, nomeAtual) {
-  const m = / _([CG]) /.exec(String(nomeAtual || ''))
+  const m = /\d+-\S+\s+_([CG])/i.exec(String(nomeAtual || ''))
   const unidade = m ? m[1] : 'G'
   const abrev = abreviarNome(nomeCliente)
   return `${pb}-${letra} _${unidade} ${plano.toUpperCase()} (${abrev})`
@@ -120,7 +120,7 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
 
     const { grupowppid, nomegrupowpp } = rs.rows[0]
     const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente, nomegrupowpp)
-    const m = / _([CG]) /.exec(String(nomegrupowpp || ''))
+    const m = /\d+-\S+\s+_([CG])/i.exec(String(nomegrupowpp || ''))
     const unidadeGrupo = m ? m[1] : 'G'
 
     // 2. Renomear (se necessário)
