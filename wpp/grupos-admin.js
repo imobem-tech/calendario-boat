@@ -567,17 +567,40 @@ export async function cancelarGrupo(sock, pool, grupowppid, unidadeGrupo, addLog
   // 1. Busca todos os participantes atuais
   const meta = await sock.groupMetadata(grupowppid)
   const participantes = meta.participants || []
+  addLog(`Participantes encontrados: ${participantes.length}`)
 
   let removidos = 0
   const falhas = []
 
   // 2. Remove todos exceto protegidos
+  // Admin precisa ser rebaixado antes de ser removido
   for (const p of participantes) {
-    if (protegidos.has(normJid(p.id))) continue
+    if (protegidos.has(normJid(p.id))) {
+      addLog(`PROTEGIDO (mantido): ${p.id}`)
+      continue
+    }
+
     try {
-      await sock.groupParticipantsUpdate(grupowppid, [p.id], 'remove')
-      addLog(`REMOVIDO (cancelamento): ${p.id}`)
-      removidos++
+      // Rebaixa admin antes de remover
+      if (p.admin === 'admin' || p.admin === 'superadmin') {
+        try {
+          await sock.groupParticipantsUpdate(grupowppid, [p.id], 'demote')
+          addLog(`REBAIXADO antes de remover: ${p.id}`)
+        } catch (errD) {
+          addLog(`AVISO rebaixar ${p.id}: ${errD.message}`)
+        }
+      }
+
+      const resultado = await sock.groupParticipantsUpdate(grupowppid, [p.id], 'remove')
+      const status = String(resultado?.[0]?.status ?? '200')
+
+      if (status === '200') {
+        addLog(`REMOVIDO: ${p.id}`)
+        removidos++
+      } else {
+        addLog(`FALHA remover ${p.id}: status ${status}`)
+        falhas.push({ jid: p.id, erro: `status ${status}` })
+      }
     } catch (err) {
       addLog(`FALHA ao remover ${p.id}: ${err.message}`)
       falhas.push({ jid: p.id, erro: err.message })
