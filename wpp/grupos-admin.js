@@ -306,7 +306,9 @@ export async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidade
   }
 
   // REMOVER colaboradores INATIVOS pelo Lid gravado
-  for (const colab of inativos) {
+  // Usa TODOS os inativos independente do Local — remoção ignora Local
+  const todosInativos = colaboradores.filter(c => (c.Ativo || 'S') !== 'S')
+  for (const colab of todosInativos) {
     if (!colab.Lid) {
       addLog(`SKIP remoção ${colab.Nome}: sem Lid gravado`)
       continue
@@ -327,25 +329,25 @@ export async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidade
     }
   }
 
-  // REMOVER participantes que eram colaboradores ativos mas foram desativados
-  // (fallback: identifica pelo telefone normalizado caso Lid não gravado)
+  // REMOVER participantes que eram colaboradores inativos sem Lid gravado
+  // (fallback por telefone — filtra apenas inativos para não remover ativo com Local errado)
   for (const p of jidsAtuais) {
     if (protegidos.has(p.norm)) continue
     if (normsColaboradores.has(p.norm)) continue
 
-    // Verifica se esse JID pertencia a um colaborador (pelo telefone normalizado)
     const normP = normJid(p.jid)
-    const eraColab = await pool.query(
+    const eraColabInativo = await pool.query(
       `SELECT 1 FROM public.wpp_colaboradores
         WHERE REPLACE(REPLACE(COALESCE("Telefone",''), '+', ''), ' ', '') LIKE $1
+          AND COALESCE("Ativo", 'S') <> 'S'
         LIMIT 1`,
       ['%' + normP.slice(-8) + '%']
     )
 
-    if (eraColab.rowCount > 0) {
+    if (eraColabInativo.rowCount > 0) {
       try {
         await sock.groupParticipantsUpdate(grupoId, [p.jid], 'remove')
-        addLog(`REMOVIDO (inativo): ${p.jid}`)
+        addLog(`REMOVIDO (inativo sem Lid): ${p.jid}`)
         removidos++
       } catch (err) {
         addLog(`FALHA ao remover ${p.jid}: ${err.message}`)
