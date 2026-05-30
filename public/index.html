@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendário Boat</title>
+
+<meta property="og:title" content="Agenda Allmax Cotas" />
+<meta property="og:description" content="Clique para acessar" />
+<meta property="og:image" content="https://allmaxcalendar.vercel.app/agenda-preview.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:url" content="https://allmaxcalendar.vercel.app/egfxddachch" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Allmax Náutica" />
+
+  
+  <style>
+    :root{
+      --bg: #f3f5f9;
+      --card: #ffffff;
+      --text: #10213d;
+      --muted: #6b7280;
+      --line: #dbe2ea;
+
+      --primary: #1d4ed8;
+      --primary-soft: #e8efff;
+      --header-bg: #1d4ed8;
+      --header-text: #ffffff;
+
+      --livre: #22c55e;
+      --ocupado: #d946ef;
+      --feriado: #22c55e;
+      --folga: #facc15;
+      --passado: #cfd5dd;
+      --vazio: #e5e7eb;
+    }
+
+    *{ box-sizing: border-box; }
+
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 14px 12px 40px;
+    }
+
+    .top-card{
+      background: var(--header-bg);
+      color: var(--header-text);
+      border: 1px solid var(--header-bg);
+      border-radius: 22px;
+      padding: 16px 18px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 0 rgba(16,33,61,.03);
+    }
+
+    .top-row{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 14px;
+    }
+
+    .title-box h1{
+      margin:0;
+      font-size: clamp(24px, 4.8vw, 40px);
+      line-height:1;
+      font-weight: 900;
+      letter-spacing:.2px;
+      color:#fff;
+    }
+
+    .title-box p{
+      margin:8px 0 0;
+      color: rgba(255,255,255,.92);
+      font-size: clamp(14px, 2.8vw, 20px);
+    }
+
+    .actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .link-btn,
+    .today-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height: 54px;
+      padding: 0 18px;
+      border-radius: 16px;
+      text-decoration:none;
+      font-weight: 800;
+      font-size: 18px;
+      border: none;
+      cursor:pointer;
+    }
+
+    .link-btn{
+      background: transparent;
+      color: #ffffff;
+      text-decoration: underline;
+      min-height:auto;
+      padding: 0;
+      border-radius:0;
+    }
+
+    .today-btn{
+      background: rgba(255,255,255,.18);
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,.24);
+    }
+
+    .month-nav{
+      display:grid;
+      grid-template-columns: 64px 1fr 64px;
+      align-items:center;
+      gap: 12px;
+    }
+
+    .nav-btn{
+      width:64px;
+      height:64px;
+      border:0;
+      border-radius: 18px;
+      background: rgba(255,255,255,.18);
+      color: #ffffff;
+      font-size: 34px;
+      font-weight: 900;
+      cursor: pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border: 1px solid rgba(255,255,255,.24);
+    }
+
+    .month-title{
+      text-align:center;
+      font-size: clamp(22px, 4.3vw, 40px);
+      font-weight: 900;
+      line-height:1.1;
+      text-transform: lowercase;
+      color:#fff;
+    }
+
+    .error{
+      display:none;
+      margin: 0 0 16px;
+      background: #fff1f2;
+      color: #dc2626;
+      border: 1px solid #fecdd3;
+      border-radius: 18px;
+      padding: 18px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .weekdays{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:8px;
+      margin-bottom:8px;
+      padding: 0 2px;
+    }
+
+    .weekday{
+      text-align:center;
+      font-weight: 800;
+      font-size: clamp(14px, 2.3vw, 18px);
+      padding: 8px 2px 4px;
+      color: #111827;
+    }
+
+    .calendar{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:8px;
+    }
+
+    .day{
+      position:relative;
+      min-height: 92px;
+      border-radius: 16px;
+      padding: 8px;
+      overflow:hidden;
+      border: 0;
+      text-align:left;
+    }
+
+    .day.free,
+    .day.holiday{
+      cursor:pointer;
+    }
+
+    .day.past,
+    .day.blank{
+      background: var(--passado);
+      cursor: default;
+    }
+
+    .day.free{ background: var(--livre); }
+    .day.busy{ background: var(--ocupado); color: #fff; }
+    .day.holiday{ background: var(--feriado); }
+    .day.folga{ background: var(--folga); }
+
+    .day-number{
+      position:absolute;
+      top:8px;
+      left:10px;
+      font-size: 15px;
+      font-weight: 900;
+      line-height:1;
+      z-index: 2;
+    }
+
+    .day-center{
+      width:100%;
+      height:100%;
+      min-height: 76px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      font-size: clamp(18px, 3vw, 28px);
+      font-weight: 900;
+      letter-spacing: .3px;
+      padding: 10px 4px 0;
+    }
+
+    .busy .day-center{
+      font-size: clamp(16px, 2.8vw, 24px);
+    }
+
+    .day.empty-current .day-center{
+      color: transparent;
+      user-select:none;
+    }
+
+    .legend-dialog{
+      border: none;
+      border-radius: 20px;
+      padding: 0;
+      width: min(92vw, 420px);
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(0,0,0,.18);
+    }
+
+    .legend-dialog::backdrop{
+      background: rgba(0,0,0,.28);
+    }
+
+    .legend-box{
+      padding: 20px;
+    }
+
+    .legend-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 14px;
+    }
+
+    .legend-head h2{
+      margin:0;
+      font-size: 24px;
+    }
+
+    .close-btn{
+      border:0;
+      background:#eef2ff;
+      color:#1d4ed8;
+      border-radius:12px;
+      width:42px;
+      height:42px;
+      font-size:24px;
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .legend-list{
+      display:grid;
+      gap:10px;
+    }
+
+    .legend-item{
+      display:grid;
+      grid-template-columns: 28px 1fr;
+      align-items:center;
+      gap:10px;
+      font-size:16px;
+      line-height:1.35;
+    }
+
+    .legend-color{
+      width:28px;
+      height:28px;
+      border-radius:8px;
+      border:1px solid rgba(0,0,0,.08);
+    }
+
+    .footer-note{
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* ---- Modal ocupado / cancelamento ---- */
+    .ocupado-dialog{
+      border: none;
+      border-radius: 22px;
+      padding: 0;
+      width: min(92vw, 440px);
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(0,0,0,.22);
+    }
+
+    .ocupado-dialog::backdrop{
+      background: rgba(0,0,0,.38);
+    }
+
+    .ocupado-box{
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .ocupado-icon{ font-size: 52px; line-height: 1; }
+
+    .ocupado-title{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .ocupado-msg{
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .ocupado-detail{
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      width: 100%;
+      text-align: left;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .btn-cancelar-ag{
+      background: #dc2626;
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 12px 22px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .btn-cancelar-ag:disabled{
+      opacity: .5;
+      cursor: default;
+    }
+
+    .ocupado-fechar{
+      background: #f1f5f9;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .cancel-spinner{
+      display: none;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #dc2626;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto;
+    }
+
+    }
+
+    /* ---- */
+    .inadim-dialog{
+      border: none;
+      border-radius: 22px;
+      padding: 0;
+      width: min(92vw, 440px);
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(0,0,0,.22);
+    }
+
+    .inadim-dialog::backdrop{
+      background: rgba(0,0,0,.38);
+    }
+
+    .inadim-box{
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .inadim-icon{
+      font-size: 52px;
+      line-height: 1;
+    }
+
+    .inadim-title{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      color: #dc2626;
+      line-height: 1.2;
+    }
+
+    .inadim-msg{
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+
+    .inadim-wpp{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #25d366;
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 12px 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .inadim-fechar{
+      background: #f1f5f9;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .inadim-spinner{
+      display: none;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #e5e7eb;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 4px auto;
+    }
+
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    /* ---- */
+    .brand-footer{
+      text-align:center;
+      margin-top: 18px;
+      padding: 6px 4px 0;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 700px){
+      .wrap{ padding: 10px 8px 30px; }
+
+      .top-card{
+        padding: 14px 14px 16px;
+        border-radius: 18px;
+      }
+
+      .actions{
+        align-items:flex-end;
+        gap:8px;
+      }
+
+      .today-btn{
+        min-height: 46px;
+        padding: 0 14px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+
+      .month-nav{
+        grid-template-columns: 56px 1fr 56px;
+      }
+
+      .nav-btn{
+        width:56px;
+        height:56px;
+        border-radius:16px;
+        font-size: 30px;
+      }
+
+      .calendar{ gap:6px; }
+      .weekdays{ gap:6px; }
+
+      .day{
+        min-height: 82px;
+        border-radius: 14px;
+      }
+
+      .day-number{
+        font-size: 13px;
+        top:7px;
+        left:8px;
+      }
+
+      .day-center{
+        min-height: 66px;
+        font-size: 22px;
+      }
+
+      .busy .day-center{
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="top-card">
+      <div class="top-row">
+        <div class="title-box">
+          <h1 id="tituloEmb">EMB_</h1>
+          <p id="subTitulo">Calendário de agendamento</p>
+        </div>
+
+        <div class="actions">
+          <a href="#" class="link-btn" id="abrirLegenda">Legenda</a>
+          <button class="today-btn" id="btnHoje" type="button">Hoje</button>
+        </div>
+      </div>
+
+      <div class="month-nav">
+        <button class="nav-btn" id="btnPrev" type="button" aria-label="Mês anterior">‹</button>
+        <div class="month-title" id="tituloMes">abril de 2026</div>
+        <button class="nav-btn" id="btnNext" type="button" aria-label="Próximo mês">›</button>
+      </div>
+    </section>
+
+    <div class="error" id="erroBox"></div>
+
+    <div class="weekdays">
+      <div class="weekday">Dom</div>
+      <div class="weekday">Seg</div>
+      <div class="weekday">Ter</div>
+      <div class="weekday">Qua</div>
+      <div class="weekday">Qui</div>
+      <div class="weekday">Sex</div>
+      <div class="weekday">Sáb</div>
+    </div>
+
+    <section class="calendar" id="calendar"></section>
+
+    <div class="brand-footer">Powered by Allmax Gestão de Cotas® V.2605271745</div>
+  </div>
+
+  <dialog class="legend-dialog" id="legendDialog">
+    <div class="legend-box">
+      <div class="legend-head">
+        <h2>Legenda</h2>
+        <button class="close-btn" id="fecharLegenda" type="button">×</button>
+      </div>
+
+      <div class="legend-list">
+        <div class="legend-item">
+          <div class="legend-color" style="background:#22c55e"></div>
+          <div><strong>Livre</strong> — apenas o número do dia.</div>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color" style="background:#d946ef"></div>
+          <div><strong>Ocupado</strong> — aparece o grupo no centro, como <strong>S1</strong>.</div>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color" style="background:#22c55e"></div>
+          <div><strong>Feriado</strong> — aparece no canto como <strong>12-F</strong> e continua clicável.</div>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color" style="background:#facc15"></div>
+          <div><strong>Folga</strong> — aparece <strong>fol</strong>.</div>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        Apenas dias livres e feriados ficam clicáveis.
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal: dia agendado por outro cotista -->
+  <dialog class="ocupado-dialog" id="outroCotistaDialog">
+    <div class="ocupado-box">
+      <div class="ocupado-icon">📅</div>
+      <h2 class="ocupado-title" style="color:#7c3aed;">Data Reservada</h2>
+      <p class="ocupado-msg">Esta data foi agendada por outro Cotista.</p>
+      <button class="ocupado-fechar" id="outroCotistaFechar" type="button">Fechar</button>
+    </div>
+  </dialog>
+
+  <!-- Modal: cancelamento do próprio agendamento -->
+  <dialog class="ocupado-dialog" id="cancelarDialog">
+    <div class="ocupado-box">
+      <div class="ocupado-icon">🗓️</div>
+      <h2 class="ocupado-title" style="color:#dc2626;">Seu Agendamento</h2>
+      <div class="ocupado-detail" id="cancelarDetalhe">—</div>
+      <p class="ocupado-msg">Deseja cancelar este agendamento?</p>
+      <div class="cancel-spinner" id="cancelSpinner"></div>
+      <button class="btn-cancelar-ag" id="btnConfirmarCancelamento" type="button">Sim, cancelar</button>
+      <button class="ocupado-fechar" id="cancelarFechar" type="button">Não, manter</button>
+    </div>
+  </dialog>
+
+  <!-- Modal de inadimplência -->
+  <dialog class="inadim-dialog" id="inadimDialog">
+    <div class="inadim-box">
+      <div class="inadim-icon">⚠️</div>
+      <h2 class="inadim-title">Agendamento suspenso</h2>
+      <div class="inadim-spinner" id="inadimSpinner"></div>
+      <p class="inadim-msg">
+        Não foi possível realizar o agendamento on-line.<br>
+        Faça contato com a Marina através do WhatsApp.
+      </p>
+      <button class="inadim-fechar" id="inadimFechar" type="button">Fechar</button>
+    </div>
+  </dialog>
+
+  <!-- Modal de folga -->
+  <dialog class="inadim-dialog" id="folgaDialog">
+    <div class="inadim-box">
+      <div class="inadim-icon">🏖️</div>
+      <h2 class="inadim-title" style="color:#b45309;">Folga da Marina</h2>
+      <p class="inadim-msg">
+        Essa data é folga da Marina.<br>
+        Escolha outro dia disponível para agendar.
+      </p>
+      <button class="inadim-fechar" id="folgaFechar" type="button">Fechar</button>
+    </div>
+  </dialog>
+
+  <script>
+    const MAP_LETRA_PARA_NUM = {
+      a: "1",
+      b: "2",
+      c: "3",
+      d: "4",
+      e: "5",
+      f: "6",
+      g: "7",
+      h: "8",
+      i: "9",
+      j: "0"
+    };
+
+    const MAP_NUM_PARA_LETRA = {
+      "1": "a",
+      "2": "b",
+      "3": "c",
+      "4": "d",
+      "5": "e",
+      "6": "f",
+      "7": "g",
+      "8": "h",
+      "9": "i",
+      "0": "j"
+    };
+
+    function somenteDigitos(txt){
+      return String(txt || "").replace(/\D+/g, "");
+    }
+
+    function decodificarDigitosCodificados(txt){
+      return String(txt || "")
+        .split("")
+        .map(ch => MAP_LETRA_PARA_NUM[ch] || "")
+        .join("");
+    }
+
+    function calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd){
+      const base = `${somenteDigitos(pb)}${somenteDigitos(grupoNum)}${somenteDigitos(codAutorizado)}${mmdd}`;
+      const soma = base
+        .split("")
+        .reduce((acc, n) => acc + Number(n), 0);
+
+      return String(soma).padStart(2, "0");
+    }
+
+    function decodificarToken(token){
+      const t = String(token || "").trim().toLowerCase();
+
+      // Formato novo com MMDD:
+      // [pb][letraGrupo][grupoNum][autorizado4][mmdd4][dv2]
+      const m = t.match(/^([a-j]+)([a-z])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
+      if(!m) return null;
+
+      const embCod = m[1];
+      const grupoLetraCod = m[2];
+      const grupoNumCod = m[3];
+      const autorizadoCod = m[4];
+      const mmddCod = m[5];
+      const dvCod = m[6];
+
+      const pb = decodificarDigitosCodificados(embCod);
+
+      const primeiroGrupo = decodificarDigitosCodificados(grupoLetraCod);
+      const grupoNum = decodificarDigitosCodificados(grupoNumCod);
+
+      const grupoFinal = primeiroGrupo
+        ? `${primeiroGrupo}${grupoNum}`
+        : `${grupoLetraCod.toUpperCase()}${grupoNum}`;
+
+      const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
+      const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
+      const dvInformado = decodificarDigitosCodificados(dvCod);
+
+      if(!pb || !grupoNum || !codAutorizado || !dvInformado) return null;
+      if(codAutorizado.length !== 4 || dvInformado.length !== 2) return null;
+
+      // Valida MMDD: token deve ser do dia atual (horário Brasil)
+      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const mmHoje = String(agora.getMonth() + 1).padStart(2, "0");
+      const ddHoje = String(agora.getDate()).padStart(2, "0");
+      const mmddHoje = `${mmHoje}${ddHoje}`;
+
+      if(mmdd !== mmddHoje) return null;
+
+      const dvEsperado = calcularDvEsperado(pb, grupoNum, codAutorizado, mmdd);
+      const dvOk = dvInformado === dvEsperado;
+
+      return {
+        token: t,
+        pb,
+        grupo: grupoFinal,
+        grupoLetra: grupoLetraCod.toUpperCase(),
+        grupoNum,
+        codAutorizado,
+        dvInformado,
+        dvEsperado,
+        dvOk
+      };
+    }
+
+    function obterTokenDaUrl(){
+      const qs = new URLSearchParams(window.location.search);
+      const tokenQs = qs.get("t") || qs.get("token") || "";
+      if(tokenQs) return tokenQs.toLowerCase();
+
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+      if(path && path.toLowerCase() !== "index.html"){
+        return path.toLowerCase();
+      }
+
+      return "";
+    }
+
+    const tokenUrl = obterTokenDaUrl();
+    const acesso = decodificarToken(tokenUrl);
+
+    const tituloEmb = document.getElementById("tituloEmb");
+    const subTitulo = document.getElementById("subTitulo");
+    const tituloMes = document.getElementById("tituloMes");
+    const calendar = document.getElementById("calendar");
+    const erroBox = document.getElementById("erroBox");
+
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+    const btnHoje = document.getElementById("btnHoje");
+
+    const legendDialog = document.getElementById("legendDialog");
+    const abrirLegenda = document.getElementById("abrirLegenda");
+    const fecharLegenda = document.getElementById("fecharLegenda");
+
+    function zerarHora(d){
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    function formatMesAno(data){
+      return data.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric"
+      });
+    }
+
+    function isoDate(data){
+      const y = data.getFullYear();
+      const m = String(data.getMonth() + 1).padStart(2, "0");
+      const d = String(data.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function normalizarLabel(status, label){
+      const txt = (label || "").toString().trim().toUpperCase();
+
+      if(status === "busy"){
+        return txt || "AG";
+      }
+
+      if(status === "folga"){
+        return "fol";
+      }
+
+      return "";
+    }
+
+    function mostrarErro(msg){
+      erroBox.style.display = "block";
+      erroBox.textContent = msg;
+    }
+
+    function esconderErro(){
+      erroBox.style.display = "none";
+      erroBox.textContent = "";
+    }
+
+    function criarCelulaVazia(){
+      const div = document.createElement("div");
+      div.className = "day blank";
+      return div;
+    }
+
+    function criarCelulaPassado(){
+      const div = document.createElement("div");
+      div.className = "day past";
+      return div;
+    }
+
+    // ----------------------------------------------------------
+    // Modal: outro cotista
+    // ----------------------------------------------------------
+    const outroCotistaDialog = document.getElementById("outroCotistaDialog");
+    const outroCotistaFechar = document.getElementById("outroCotistaFechar");
+    outroCotistaFechar.addEventListener("click", () => outroCotistaDialog.close());
+    outroCotistaDialog.addEventListener("click", (e) => {
+      if(e.target === outroCotistaDialog) outroCotistaDialog.close();
+    });
+
+    // ----------------------------------------------------------
+    // Modal: cancelamento do próprio agendamento
+    // ----------------------------------------------------------
+    const cancelarDialog           = document.getElementById("cancelarDialog");
+    const cancelarFechar           = document.getElementById("cancelarFechar");
+    const cancelarDetalhe          = document.getElementById("cancelarDetalhe");
+    const btnConfirmarCancelamento = document.getElementById("btnConfirmarCancelamento");
+    const cancelSpinner            = document.getElementById("cancelSpinner");
+
+    let agendamentoParaCancelar = null; // { id, dtAgendada, hora, grupo }
+
+    cancelarFechar.addEventListener("click", () => {
+      cancelarDialog.close();
+      agendamentoParaCancelar = null;
+    });
+    cancelarDialog.addEventListener("click", (e) => {
+      if(e.target === cancelarDialog){
+        cancelarDialog.close();
+        agendamentoParaCancelar = null;
+      }
+    });
+
+    function abrirModalCancelamento(info){
+      agendamentoParaCancelar = info;
+      cancelarDetalhe.innerHTML =
+        `<strong>Data:</strong> ${info.dtFormatada}<br>` +
+        `<strong>Hora:</strong> ${info.hora}<br>` +
+        `<strong>Grupo:</strong> ${info.grupo}`;
+      btnConfirmarCancelamento.disabled = false;
+      cancelSpinner.style.display = "none";
+      cancelarDialog.showModal();
+    }
+
+    btnConfirmarCancelamento.addEventListener("click", async () => {
+      if(!agendamentoParaCancelar || !acesso) return;
+
+      btnConfirmarCancelamento.disabled = true;
+      cancelSpinner.style.display = "block";
+
+      try{
+        const resp = await fetch("/api/desistencia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: acesso.token,
+            agendamentoId: agendamentoParaCancelar.id
+          })
+        });
+
+        const json = await resp.json();
+        cancelarDialog.close();
+        agendamentoParaCancelar = null;
+
+        if(resp.ok){
+          // Recarrega o calendário para refletir o cancelamento
+          await carregarMes();
+        } else {
+          mostrarErro(json.error || "Erro ao cancelar agendamento.");
+        }
+      } catch(err){
+        cancelarDialog.close();
+        mostrarErro("Falha de conexão ao cancelar. Tente novamente.");
+      }
+    });
+
+    // ----------------------------------------------------------
+    // Modal de inadimplência
+    // ----------------------------------------------------------
+    const inadimDialog  = document.getElementById("inadimDialog");
+    const inadimSpinner = document.getElementById("inadimSpinner");
+    const inadimFechar  = document.getElementById("inadimFechar");
+
+    inadimFechar.addEventListener("click", () => inadimDialog.close());
+    inadimDialog.addEventListener("click", (e) => {
+      if(e.target === inadimDialog) inadimDialog.close();
+    });
+
+    // ----------------------------------------------------------
+    // Modal de folga
+    // ----------------------------------------------------------
+    const folgaDialog = document.getElementById("folgaDialog");
+    const folgaFechar = document.getElementById("folgaFechar");
+
+    folgaFechar.addEventListener("click", () => folgaDialog.close());
+    folgaDialog.addEventListener("click", (e) => {
+      if(e.target === folgaDialog) folgaDialog.close();
+    });
+
+    // ----------------------------------------------------------
+    // Controle de sessão — WPP disparado apenas uma vez por sessão
+    // ----------------------------------------------------------
+    const chaveWppSessao = `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
+
+    function wppJaDisparadoNaSessao(){
+      try{ return !!sessionStorage.getItem(chaveWppSessao); }
+      catch(e){ return false; }
+    }
+
+    function marcarWppDisparado(){
+      try{ sessionStorage.setItem(chaveWppSessao, "1"); }
+      catch(e){}
+    }
+
+    // Flag anti-duplo: impede segunda chamada enquanto já está verificando
+    let verificandoInadimplencia = false;
+
+    // ----------------------------------------------------------
+    // Navegar para agendamento com verificação de inadimplência
+    // ----------------------------------------------------------
+    async function navegarParaAgendamento(data){
+      if(!acesso || !acesso.dvOk) return;
+      if(verificandoInadimplencia) return;
+
+      verificandoInadimplencia = true;
+      const dataStr = isoDate(data);
+
+      try{
+        // Consulta silenciosa — sem abrir modal ainda
+        const dispararWpp = !wppJaDisparadoNaSessao();
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
+        const resp = await fetch(url, { cache: "no-store" });
+        const json = await resp.json();
+
+        if(!resp.ok || json.inadimplente){
+          // Só agora abre o modal — confirmada inadimplência
+          if(json.wppEnfileirado || json.privadoEnviado || json.espelhoEnviado){
+            marcarWppDisparado();
+          }
+          inadimSpinner.style.display = "none";
+          inadimDialog.showModal();
+          return;
+        }
+
+        // Adimplente — navega direto, sem abrir nada
+        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+
+      }catch(err){
+        // Falha de rede: libera o acesso sem bloquear o cotista
+        console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
+        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+      } finally {
+        verificandoInadimplencia = false;
+      }
+    }
+
+    function criarCelulaDia(data, info){
+      const status   = info?.status || "free";
+      const label    = normalizarLabel(status, info?.label);
+      const ehFeriado = !!info?.holiday;
+      const ehFolga  = status === "folga";
+      const ehBusy   = status === "busy";
+
+      const el = document.createElement("button");
+      el.type  = "button";
+      el.className = `day ${status}`;
+
+      const num = document.createElement("div");
+      num.className = "day-number";
+      num.textContent = ehFeriado ? `${data.getDate()}-F` : data.getDate();
+
+      const center = document.createElement("div");
+      center.className = "day-center";
+      center.textContent = label;
+
+      if(status === "free" || status === "holiday"){
+        el.classList.add("empty-current");
+        el.addEventListener("click", () => navegarParaAgendamento(data));
+
+      } else if(ehFolga){
+        el.addEventListener("click", () => folgaDialog.showModal());
+
+      } else if(ehBusy){
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => {
+          // Verifica se o agendamento é do próprio cotista
+          const codAutorizadoAg = Number(info.codAutorizado);
+          const codAutorizadoMeu = Number(acesso?.codAutorizado || 0);
+          const grupoAg  = String(info.grupo || "").toUpperCase();
+          const grupoMeu = String(acesso?.grupo || "").toUpperCase();
+
+          const ehMeu = codAutorizadoAg === codAutorizadoMeu && grupoAg === grupoMeu;
+
+          if(!ehMeu){
+            outroCotistaDialog.showModal();
+            return;
+          }
+
+          // É do próprio cotista — abre modal de cancelamento
+          const iso = isoDate(data);
+          const [ano, mes, dia] = iso.split("-");
+          const dtFormatada = `${dia}/${mes}/${ano}`;
+
+          abrirModalCancelamento({
+            id:          info.agendamentoId,
+            dtFormatada,
+            hora:        info.hora || "—",
+            grupo:       grupoAg
+          });
+        });
+
+      } else {
+        el.disabled = true;
+        el.style.cursor = "default";
+      }
+
+      el.appendChild(num);
+      el.appendChild(center);
+      return el;
+    }
+
+    function montarMapa(lista){
+      const mapa = new Map();
+
+      (lista || []).forEach(item => {
+        if(!item || !item.date) return;
+
+        mapa.set(item.date, {
+          status:        item.status || "free",
+          label:         item.label || "",
+          holiday:       !!item.holiday,
+          agendamentoId: item.agendamentoId || null,
+          grupo:         item.grupo || "",
+          codAutorizado: item.codAutorizado || null,
+          hora:          item.hora || ""
+        });
+      });
+
+      return mapa;
+    }
+
+    function renderizarCalendario(mapa){
+      calendar.innerHTML = "";
+
+      const ano = mesAtual.getFullYear();
+      const mes = mesAtual.getMonth();
+
+      tituloMes.textContent = formatMesAno(mesAtual);
+
+      const primeiroDia = new Date(ano, mes, 1);
+      const ultimoDia = new Date(ano, mes + 1, 0);
+      const totalDias = ultimoDia.getDate();
+
+      const inicioSemana = primeiroDia.getDay();
+
+      for(let i = 0; i < inicioSemana; i++){
+        calendar.appendChild(criarCelulaVazia());
+      }
+
+      for(let dia = 1; dia <= totalDias; dia++){
+        const data = new Date(ano, mes, dia);
+        const iso = isoDate(data);
+
+        if(data < hoje){
+          calendar.appendChild(criarCelulaPassado());
+          continue;
+        }
+
+        const info = mapa.get(iso) || {
+          status: "free",
+          label: "",
+          holiday: false
+        };
+
+        calendar.appendChild(criarCelulaDia(data, info));
+      }
+    }
+
+    async function buscarDisponibilidade(dataMes){
+      const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
+      const start = isoDate(inicio);
+
+      const url = `/api/availability?pb=${encodeURIComponent(acesso.pb)}&start=${encodeURIComponent(start)}&months=1`;
+      const resp = await fetch(url, { cache: "no-store" });
+
+      if(!resp.ok){
+        throw new Error(`Falha ao carregar calendário (${resp.status})`);
+      }
+
+      return await resp.json();
+    }
+
+    async function carregarMes(){
+      esconderErro();
+
+      try{
+        const lista = await buscarDisponibilidade(mesAtual);
+        const mapa = montarMapa(lista);
+        renderizarCalendario(mapa);
+      }catch(err){
+        renderizarCalendario(new Map());
+        mostrarErro(err.message || "Falha ao carregar calendário.");
+      }
+    }
+
+    const hoje = zerarHora(new Date());
+
+    function obterMesInicial(){
+      const qs = new URLSearchParams(window.location.search);
+      const ym = qs.get("ym") || "";
+      const m = ym.match(/^(\d{4})-(\d{2})$/);
+
+      if(m){
+        const ano = Number(m[1]);
+        const mes = Number(m[2]);
+        if(ano >= 2000 && mes >= 1 && mes <= 12){
+          return new Date(ano, mes - 1, 1);
+        }
+      }
+
+      return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    }
+
+    let mesAtual = obterMesInicial();
+
+    abrirLegenda.addEventListener("click", (e) => {
+      e.preventDefault();
+      legendDialog.showModal();
+    });
+
+    fecharLegenda.addEventListener("click", () => legendDialog.close());
+
+    btnHoje.addEventListener("click", () => {
+      mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      carregarMes();
+    });
+
+    btnPrev.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
+      carregarMes();
+    });
+
+    btnNext.addEventListener("click", () => {
+      mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1);
+      carregarMes();
+    });
+
+    if(!acesso || !acesso.dvOk){
+      tituloEmb.textContent = "LINK INVÁLIDO";
+      subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
+      mostrarErro("Link inválido. Verifique o endereço enviado.");
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      btnHoje.disabled = true;
+      abrirLegenda.style.pointerEvents = "none";
+      abrirLegenda.style.opacity = "0.6";
+    }else{
+      tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
+      subTitulo.textContent = `ID_${acesso.codAutorizado}`;
+      carregarMes();
+    }
+  </script>
+</body>
+</html>

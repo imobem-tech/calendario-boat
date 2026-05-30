@@ -1,0 +1,16 @@
+{
+  "name": "calendario-boat",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node wpp/server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "express": "latest",
+    "pg": "latest",
+    "pino": "latest",
+    "qrcode": "latest"
+  }
+}
+ 
