@@ -143,7 +143,7 @@ export function parsearComandoPrevisao(texto) {
 // BUSCA E MONTA A PREVISÃO
 // diasAFrente: 0 = hoje, 1 = amanhã, etc.
 // ============================================================
-export async function obterPrevisaoNavegacao(diasAFrente = 0) {
+export async function obterPrevisaoNavegacao(diasAFrente = 0, forcarManha = false) {
   const agora = agoraSP()
   const hora  = agora.getHours()
   const base  = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + diasAFrente)
@@ -183,7 +183,7 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0) {
 
   // Cabeçalho "feliz" — somente para hoje, antes do meio-dia
   let resposta = ''
-  if (diasAFrente === 0 && hora < 12) {
+  if ((diasAFrente === 0 && hora < 12) || forcarManha) {
     resposta =
       `*Vamos navegar hoje!!!* 🌊\n` +
       `Aqui é o seu\n` +

@@ -450,6 +450,19 @@ app.post('/grupos/titular', (req, res) => {
 app.post('/criar-ou-atualizar-grupo', (req, res) => {
   handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
 })
+
+app.post('/previsao/teste', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    const { grupowppid } = req.body
+    if (!grupowppid) return res.status(400).json({ erro: 'grupowppid é obrigatório' })
+    const previsao = await obterPrevisaoNavegacao(0, true)
+    await sock.sendMessage(grupowppid, { text: previsao })
+    res.json({ sucesso: true, enviado: grupowppid })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
