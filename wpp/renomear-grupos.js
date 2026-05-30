@@ -1,10 +1,12 @@
 // ============================================================
-// wpp/renomear-grupos.js
-// Endpoint POST /renomear-grupos
+// wpp/renomear-grupos.js — V.2605301500
+// Endpoint POST /renomear-grupos  e  POST /grupos/renomear
 // ============================================================
 
 import pkg from 'pg'
 const { Pool } = pkg
+
+import { sincronizarColaboradoresGrupo, adicionarTitularGrupo, cancelarGrupo, unidadeDoPlano, empresaDaLetra } from './grupos-admin.js'
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -58,6 +60,135 @@ async function criarGrupo(sock, codEmbarcacao, gropoLetra, jidDono) {
 
   console.log(`[CRIADO] ${nomeGrupo} → ${novoId}`)
   return { acao: 'criado', grupoId: novoId, nomeGrupo }
+}
+
+// ------------------------------------------------------------
+// Abrevia nome: "DANILO ALVES COSTA" → "DANILO A" (inicial do segundo nome)
+// ------------------------------------------------------------
+function abreviarNome(nomeCompleto) {
+  const partes = String(nomeCompleto || '').trim().toUpperCase().split(/\s+/)
+  if (partes.length <= 1) return partes[0] || ''
+  return partes[0] + ' ' + partes[1][0]
+}
+
+// ------------------------------------------------------------
+// Monta nome do grupo:
+// Ex: pb=576, letra="X4", plano="Plano_A_ctg", nome="DANILO ALVES COSTA"
+//   → "576-X4 _C ALLMAX (DANILO A)"
+// Empresa: letra começa com letra → ALLMAX, com número → SUMMER
+// Unidade: últimas 3 letras do plano = "ctg" → _C, senão → _G
+// ------------------------------------------------------------
+function montarNomeGrupoUnico(pb, letra, plano, nomeCliente) {
+  const unidade = unidadeDoPlano(plano)
+  const empresa  = empresaDaLetra(letra)
+  const abrev    = abreviarNome(nomeCliente)
+  return `${pb}-${letra} _${unidade} ${empresa} (${abrev})`
+}
+
+// ============================================================
+// POST /grupos/renomear
+// Renomeia UM grupo, adiciona titular e sincroniza colaboradores
+// Body: { pb, letra, cod_cliente, plano, nome_cliente }
+// ============================================================
+export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) {
+  const sock = getSock()
+  const conectado = getConectado()
+
+  if (!conectado || !sock) {
+    return res.status(503).json({ erro: 'WhatsApp não conectado' })
+  }
+
+  const { pb, letra, cod_cliente, plano, nome_cliente } = req.body
+
+  if (!pb || !letra || !cod_cliente || !plano || !nome_cliente) {
+    return res.status(400).json({ erro: 'Campos obrigatórios: pb, letra, cod_cliente, plano, nome_cliente' })
+  }
+
+  const log = []
+  const addLog = msg => { console.log('[grupos/renomear]', msg); log.push(msg) }
+
+  try {
+    // 1. Busca o grupo na tabela
+    const rs = await pool.query(
+      `SELECT grupowppid, nomegrupowpp FROM public.wpp_grupos_agenda
+       WHERE pb = $1 AND UPPER(COALESCE(cota, '')) = UPPER($2) LIMIT 1`,
+      [pb, letra]
+    )
+
+    if (rs.rowCount === 0) {
+      return res.status(404).json({ erro: `Grupo não encontrado para pb=${pb} letra=${letra}` })
+    }
+
+    const { grupowppid, nomegrupowpp } = rs.rows[0]
+    const unidadeGrupo = unidadeDoPlano(plano)
+    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente)
+
+    // 2. Renomear (se necessário)
+    let acaoRenomear
+    if (novoNome === nomegrupowpp) {
+      addLog(`Nome já correto: "${novoNome}"`)
+      acaoRenomear = 'JA_OK'
+    } else {
+      await sock.groupUpdateSubject(grupowppid, novoNome)
+      await pool.query(
+        `UPDATE public.wpp_grupos_agenda
+            SET nomegrupowpp = $1, dataatualizacao = NOW() AT TIME ZONE 'America/Sao_Paulo'
+          WHERE grupowppid = $2`,
+        [novoNome, grupowppid]
+      )
+      addLog(`Renomeado: "${nomegrupowpp}" → "${novoNome}"`)
+      acaoRenomear = 'RENOMEADO'
+    }
+
+    // 3. Fluxo CANCELADO: remove todos e recoloca só admins
+    if (plano.toLowerCase() === 'cancelado') {
+      let cancelamento = {}
+      try {
+        cancelamento = await cancelarGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
+      } catch (err) {
+        addLog(`AVISO cancelamento: ${err.message}`)
+        cancelamento = { erro: err.message }
+      }
+      return res.json({
+        acao: acaoRenomear,
+        de: nomegrupowpp,
+        para: novoNome,
+        cancelamento,
+        log
+      })
+    }
+
+    // 4. Fluxo NORMAL: adicionar titular + sincronizar colaboradores
+    let titular = {}
+    try {
+      titular = await adicionarTitularGrupo(sock, pool, grupowppid, cod_cliente, addLog)
+    } catch (err) {
+      addLog(`AVISO titular: ${err.message}`)
+      titular = { acao: 'ERRO', erro: err.message }
+    }
+
+    let colaboradores = {}
+    try {
+      colaboradores = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
+    } catch (err) {
+      addLog(`AVISO colaboradores: ${err.message}`)
+      colaboradores = { erro: err.message }
+    }
+
+    return res.json({
+      acao: acaoRenomear,
+      de: nomegrupowpp,
+      para: novoNome,
+      titular,
+      colaboradores,
+      log
+    })
+
+  } catch (err) {
+    addLog(`ERRO: ${err.message}`)
+    console.error('[grupos/renomear] ERRO:', err)
+    return res.status(500).json({ erro: err.message, log })
+  }
 }
 
 export async function handleRenomearGrupos(req, res, getSock, getConectado) {

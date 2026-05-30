@@ -75,8 +75,12 @@ async function buscarColaboradoresAtivos(pool) {
 }
 
 // Deriva unidade do grupo a partir do plano: 'ctg' no plano => 'C', caso contrário => 'G'
-function unidadeDoPlano(plano) {
-  return String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
+export function unidadeDoPlano(plano) {
+  return String(plano || '').toLowerCase().slice(-3) === 'ctg' ? 'C' : 'G'
+}
+
+export function empresaDaLetra(letra) {
+  return /^[a-zA-Z]/.test(String(letra || '').trim()) ? 'ALLMAX' : 'SUMMER'
 }
 
 // Verifica se o colaborador deve entrar no grupo conforme seu Local
@@ -132,7 +136,7 @@ async function gravarLidColaborador(pool, colabId, lid, addLog) {
 
 // Sincroniza colaboradores num único grupo
 // unidadeGrupo: 'G' (Graciosa) ou 'C' (CTG) — derivado do plano
-async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, addLog) {
+export async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, addLog) {
   const colaboradores = await buscarColaboradoresAtivos(pool)
 
   // Busca participantes atuais do grupo
@@ -306,7 +310,9 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, 
   }
 
   // REMOVER colaboradores INATIVOS pelo Lid gravado
-  for (const colab of inativos) {
+  // Usa TODOS os inativos independente do Local — remoção ignora Local
+  const todosInativos = colaboradores.filter(c => (c.Ativo || 'S') !== 'S')
+  for (const colab of todosInativos) {
     if (!colab.Lid) {
       addLog(`SKIP remoção ${colab.Nome}: sem Lid gravado`)
       continue
@@ -327,25 +333,25 @@ async function sincronizarColaboradoresGrupo(sock, pool, grupoId, unidadeGrupo, 
     }
   }
 
-  // REMOVER participantes que eram colaboradores ativos mas foram desativados
-  // (fallback: identifica pelo telefone normalizado caso Lid não gravado)
+  // REMOVER participantes que eram colaboradores inativos sem Lid gravado
+  // (fallback por telefone — filtra apenas inativos para não remover ativo com Local errado)
   for (const p of jidsAtuais) {
     if (protegidos.has(p.norm)) continue
     if (normsColaboradores.has(p.norm)) continue
 
-    // Verifica se esse JID pertencia a um colaborador (pelo telefone normalizado)
     const normP = normJid(p.jid)
-    const eraColab = await pool.query(
+    const eraColabInativo = await pool.query(
       `SELECT 1 FROM public.wpp_colaboradores
         WHERE REPLACE(REPLACE(COALESCE("Telefone",''), '+', ''), ' ', '') LIKE $1
+          AND COALESCE("Ativo", 'S') <> 'S'
         LIMIT 1`,
       ['%' + normP.slice(-8) + '%']
     )
 
-    if (eraColab.rowCount > 0) {
+    if (eraColabInativo.rowCount > 0) {
       try {
         await sock.groupParticipantsUpdate(grupoId, [p.jid], 'remove')
-        addLog(`REMOVIDO (inativo): ${p.jid}`)
+        addLog(`REMOVIDO (inativo sem Lid): ${p.jid}`)
         removidos++
       } catch (err) {
         addLog(`FALHA ao remover ${p.jid}: ${err.message}`)
@@ -545,9 +551,199 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
 }
 
 // ============================================================
+// HELPER — cancelamento de grupo
+// Remove todos exceto o bot e ADM2, depois re-adiciona e promove
+// apenas os colaboradores administradores ativos do local do grupo
+// ============================================================
+export async function cancelarGrupo(sock, pool, grupowppid, unidadeGrupo, addLog) {
+  // JID do próprio bot (si mesmo)
+  const botJid = sock.user?.id
+    ? sock.user.id.split(':')[0] + '@s.whatsapp.net'
+    : null
+
+  const protegidos = new Set([normJid(ADM2_JID)])
+  if (botJid) protegidos.add(normJid(botJid))
+
+  // 1. Busca todos os participantes atuais
+  const meta = await sock.groupMetadata(grupowppid)
+  const participantes = meta.participants || []
+  addLog(`Participantes encontrados: ${participantes.length}`)
+
+  let removidos = 0
+  const falhas = []
+
+  // 2. Remove todos exceto protegidos
+  // Admin precisa ser rebaixado antes de ser removido
+  for (const p of participantes) {
+    if (protegidos.has(normJid(p.id))) {
+      addLog(`PROTEGIDO (mantido): ${p.id}`)
+      continue
+    }
+
+    try {
+      // Rebaixa admin antes de remover
+      if (p.admin === 'admin' || p.admin === 'superadmin') {
+        try {
+          await sock.groupParticipantsUpdate(grupowppid, [p.id], 'demote')
+          addLog(`REBAIXADO antes de remover: ${p.id}`)
+        } catch (errD) {
+          addLog(`AVISO rebaixar ${p.id}: ${errD.message}`)
+        }
+      }
+
+      const resultado = await sock.groupParticipantsUpdate(grupowppid, [p.id], 'remove')
+      const status = String(resultado?.[0]?.status ?? '200')
+
+      if (status === '200') {
+        addLog(`REMOVIDO: ${p.id}`)
+        removidos++
+      } else {
+        addLog(`FALHA remover ${p.id}: status ${status}`)
+        falhas.push({ jid: p.id, erro: `status ${status}` })
+      }
+    } catch (err) {
+      addLog(`FALHA ao remover ${p.id}: ${err.message}`)
+      falhas.push({ jid: p.id, erro: err.message })
+    }
+  }
+
+  // 3. Re-adiciona apenas colaboradores administradores ativos do local
+  const colaboradores = await buscarColaboradoresAtivos(pool)
+  let adicionados = 0
+  let promovidos = 0
+
+  for (const colab of colaboradores) {
+    if ((colab.Ativo || 'S') !== 'S') continue
+    if (colab.Administrador !== 'S') continue
+    if (!colaboradorPertenceAoLocal(colab, unidadeGrupo, addLog)) continue
+
+    const jid = await resolverJidColaborador(sock, colab)
+    if (!jid) {
+      addLog(`AVISO: não resolveu JID para admin ${colab.Nome}`)
+      continue
+    }
+
+    try {
+      const resultado = await sock.groupParticipantsUpdate(grupowppid, [jid], 'add')
+      const status = String(resultado?.[0]?.status || '')
+      if (status === '200') {
+        adicionados++
+        addLog(`ADICIONADO (admin): ${colab.Nome}`)
+        try {
+          await sock.groupParticipantsUpdate(grupowppid, [jid], 'promote')
+          promovidos++
+          addLog(`PROMOVIDO: ${colab.Nome}`)
+        } catch (errP) {
+          addLog(`FALHA ao promover ${colab.Nome}: ${errP.message}`)
+        }
+      } else {
+        addLog(`FALHA ao adicionar admin ${colab.Nome}: status ${status}`)
+        falhas.push({ nome: colab.Nome, erro: `status ${status}` })
+      }
+    } catch (err) {
+      addLog(`FALHA ao adicionar ${colab.Nome}: ${err.message}`)
+      falhas.push({ nome: colab.Nome, erro: err.message })
+    }
+  }
+
+  return { removidos, adicionados, promovidos, falhas }
+}
+
+// ============================================================
+// HELPER — adiciona titular a um grupo (sem camada HTTP)
+// Retorna { acao, nome, jid } — acao: ADICIONADO | JA_NO_GRUPO |
+//   CONVITE_LINK_ENVIADO | CONVITE_FALHOU | BLOQUEADO | NAO_ENCONTRADO
+// ============================================================
+export async function adicionarTitularGrupo(sock, pool, grupowppid, codAutorizado, addLog) {
+  const rsCliente = await pool.query(`
+    SELECT c."Cliente_Nome" AS nome,
+           c."Cliente_Telefone_Celular" AS telefone
+      FROM public."P_BOAT_4_Autorizados" a
+      JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+     WHERE a."Cod_Pessoa" = $1
+       AND a."Dt_Desautorizacao" IS NULL
+       AND a."Dt_Cancelamento"   IS NULL
+       AND c."Cliente_Telefone_Celular" IS NOT NULL
+     LIMIT 1
+  `, [codAutorizado])
+
+  if (rsCliente.rowCount === 0) {
+    addLog(`Titular cod=${codAutorizado} não encontrado ou sem telefone`)
+    return { acao: 'NAO_ENCONTRADO' }
+  }
+
+  const { nome, telefone } = rsCliente.rows[0]
+  const tel = String(telefone).replace(/\D/g, '')
+  const telComDDI = tel.startsWith('55') ? tel : '55' + tel
+
+  addLog(`Titular: ${nome} | Tel: ${telefone} | Normalizado: ${telComDDI}`)
+
+  const variantes = [telComDDI]
+  if (telComDDI.length === 12) {
+    variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
+  } else if (telComDDI.length === 13) {
+    variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
+  }
+
+  let jidTitular = null
+  for (const variante of variantes) {
+    try {
+      const [res] = await sock.onWhatsApp(variante)
+      if (res?.exists) { jidTitular = res.jid; break }
+    } catch {}
+  }
+
+  if (!jidTitular) {
+    addLog(`Número ${telefone} não encontrado no WhatsApp`)
+    return { acao: 'NAO_ENCONTRADO', nome }
+  }
+  addLog(`JID resolvido: ${jidTitular}`)
+
+  const meta = await sock.groupMetadata(grupowppid)
+  const jaEsta = meta.participants.some(p => normJid(p.id) === normJid(jidTitular))
+  if (jaEsta) {
+    addLog(`Titular já está no grupo.`)
+    return { acao: 'JA_NO_GRUPO', nome, jid: jidTitular }
+  }
+
+  const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
+  addLog(`groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
+  const status = String(resultado?.[0]?.status || '')
+
+  if (status === '200') {
+    addLog(`Titular adicionado: ${nome}`)
+    return { acao: 'ADICIONADO', nome, jid: jidTitular }
+  }
+
+  if (status === '408') {
+    try {
+      const linkCode = await sock.groupInviteCode(grupowppid)
+      const msgConvite =
+        `Olá, *${nome.split(' ')[0]}*! 👋\n\n` +
+        `Você foi convidado para participar do grupo da sua embarcação.\n\n` +
+        `Clique no link abaixo para entrar:\n` +
+        `https://chat.whatsapp.com/${linkCode}`
+      await sock.sendMessage(jidTitular, { text: msgConvite })
+      addLog(`Convite enviado no privado de ${nome}`)
+      return { acao: 'CONVITE_LINK_ENVIADO', nome, jid: jidTitular }
+    } catch (errLink) {
+      addLog(`Falha ao enviar convite: ${errLink.message}`)
+      return { acao: 'CONVITE_FALHOU', nome, jid: jidTitular, erro: errLink.message }
+    }
+  }
+
+  if (status === '403') {
+    addLog(`Titular bloqueou adições: ${nome}`)
+    return { acao: 'BLOQUEADO', nome, jid: jidTitular }
+  }
+
+  addLog(`Status inesperado: ${status}`)
+  return { acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status }
+}
+
+// ============================================================
 // ENDPOINT 4 — POST /grupos/titular
 // Body: { grupowppid, cod_autorizado }
-// Adiciona o titular ao grupo como membro simples
 // ============================================================
 export async function handleAdicionarTitular(req, res, getSock, getConectado) {
   const sock = getSock()
@@ -564,101 +760,8 @@ export async function handleAdicionarTitular(req, res, getSock, getConectado) {
   const addLog = msg => { console.log('[titular]', msg); log.push(msg) }
 
   try {
-    // Busca telefone do autorizado
-    const rsCliente = await pool.query(`
-      SELECT c."Cliente_Nome" AS nome,
-             c."Cliente_Telefone_Celular" AS telefone
-        FROM public."P_BOAT_4_Autorizados" a
-        JOIN public."Cliente" c ON c."Codigo" = a."Cod_Pessoa"
-       WHERE a."Cod_Pessoa" = $1
-         AND a."Dt_Desautorizacao" IS NULL
-         AND a."Dt_Cancelamento"   IS NULL
-         AND c."Cliente_Telefone_Celular" IS NOT NULL
-       LIMIT 1
-    `, [codAutorizado])
-
-    if (rsCliente.rowCount === 0) {
-      return res.status(404).json({ erro: `Autorizado ${codAutorizado} não encontrado ou sem telefone`, log })
-    }
-
-    const { nome, telefone } = rsCliente.rows[0]
-    const tel = String(telefone).replace(/\D/g, '')
-    // Garante DDI 55
-    const telComDDI = tel.startsWith('55') ? tel : '55' + tel
-
-    addLog(`Titular: ${nome} | Tel: ${telefone} | Normalizado: ${telComDDI}`)
-
-    // Tenta com nono dígito e sem nono dígito
-    const variantes = [telComDDI]
-    if (telComDDI.length === 12) {
-      // sem nono → adiciona nono: 556384030406 → 5563984030406
-      variantes.push(telComDDI.slice(0, 4) + '9' + telComDDI.slice(4))
-    } else if (telComDDI.length === 13) {
-      // com nono → remove nono: 5563984030406 → 556384030406
-      variantes.push(telComDDI.slice(0, 4) + telComDDI.slice(5))
-    }
-
-    let jidTitular = null
-    for (const variante of variantes) {
-      try {
-        const [resultado] = await sock.onWhatsApp(variante)
-        if (resultado?.exists) {
-          jidTitular = resultado.jid
-          addLog(`JID resolvido via ${variante}: ${jidTitular}`)
-          break
-        }
-      } catch {}
-    }
-
-    if (!jidTitular) {
-      return res.status(404).json({ erro: `Número ${telefone} não encontrado no WhatsApp`, log })
-    }
-
-    // Verifica se já está no grupo
-    const meta = await sock.groupMetadata(grupowppid)
-    const jaEsta = meta.participants.some(p => normJid(p.id) === normJid(jidTitular))
-
-    if (jaEsta) {
-      addLog(`Titular já está no grupo.`)
-      return res.json({ acao: 'JA_NO_GRUPO', nome, jid: jidTitular, log })
-    }
-
-    const resultado = await sock.groupParticipantsUpdate(grupowppid, [jidTitular], 'add')
-    addLog(`Resultado groupParticipantsUpdate: ${JSON.stringify(resultado)}`)
-
-    const status = String(resultado?.[0]?.status || '')
-
-    if (status === '200') {
-      addLog(`Titular adicionado diretamente: ${nome}`)
-      return res.json({ acao: 'ADICIONADO', nome, jid: jidTitular, log })
-    }
-
-    if (status === '408') {
-      // Privacidade bloqueou adição direta — envia link de convite no privado
-      try {
-        const linkCode = await sock.groupInviteCode(grupowppid)
-        const msgConvite =
-          `Olá, *${nome.split(' ')[0]}*! 👋\n\n` +
-          `Você foi convidado para participar do grupo da sua embarcação.\n\n` +
-          `Clique no link abaixo para entrar:\n` +
-          `https://chat.whatsapp.com/${linkCode}`
-        await sock.sendMessage(jidTitular, { text: msgConvite })
-        addLog(`Link de convite enviado no privado de ${nome}: ${jidTitular}`)
-        return res.json({ acao: 'CONVITE_LINK_ENVIADO', nome, jid: jidTitular, log })
-      } catch (errLink) {
-        addLog(`Falha ao gerar/enviar link de convite: ${errLink.message}`)
-        return res.json({ acao: 'CONVITE_FALHOU', nome, jid: jidTitular, erro: errLink.message, log })
-      }
-    }
-
-    if (status === '403') {
-      addLog(`Titular bloqueou adições: ${nome}`)
-      return res.json({ acao: 'BLOQUEADO', nome, jid: jidTitular, log })
-    }
-
-    addLog(`Status inesperado: ${status}`)
-    return res.json({ acao: 'RESULTADO_INESPERADO', nome, jid: jidTitular, status, log })
-
+    const resultado = await adicionarTitularGrupo(sock, pool, grupowppid, codAutorizado, addLog)
+    return res.json({ ...resultado, log })
   } catch (err) {
     addLog(`ERRO: ${err.message}`)
     return res.status(500).json({ erro: err.message, log })
