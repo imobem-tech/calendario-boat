@@ -6,7 +6,7 @@
 import pkg from 'pg'
 const { Pool } = pkg
 
-import { sincronizarColaboradoresGrupo, unidadeDoPlano, adicionarTitularGrupo } from './grupos-admin.js'
+import { sincronizarColaboradoresGrupo, adicionarTitularGrupo } from './grupos-admin.js'
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -75,10 +75,11 @@ function abreviarNome(nomeCompleto) {
 // Monta nome do grupo com cota:
 // Ex: pb=138, letra="11", plano="SUMMER", nome="DANILO ALVES"
 //   → "138-11 _G SUMMER (DANILO A)"
-// _C ou _G derivado do campo plano (ctg → _C, demais → _G)
+// _C ou _G preservado do nome atual gravado no banco
 // ------------------------------------------------------------
-function montarNomeGrupoUnico(pb, letra, plano, nomeCliente) {
-  const unidade = unidadeDoPlano(plano)
+function montarNomeGrupoUnico(pb, letra, plano, nomeCliente, nomeAtual) {
+  const m = / _([CG]) /.exec(String(nomeAtual || ''))
+  const unidade = m ? m[1] : 'G'
   const abrev = abreviarNome(nomeCliente)
   return `${pb}-${letra} _${unidade} ${plano.toUpperCase()} (${abrev})`
 }
@@ -118,8 +119,9 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
     }
 
     const { grupowppid, nomegrupowpp } = rs.rows[0]
-    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente)
-    const unidadeGrupo = unidadeDoPlano(plano)
+    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente, nomegrupowpp)
+    const m = / _([CG]) /.exec(String(nomegrupowpp || ''))
+    const unidadeGrupo = m ? m[1] : 'G'
 
     // 2. Renomear (se necessário)
     let acaoRenomear
