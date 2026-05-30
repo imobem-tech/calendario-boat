@@ -187,7 +187,7 @@ if (horaMotorTratado) continue
             if (cmdPrevisao.erro) {
               await sock.sendMessage(grupoId, { text: cmdPrevisao.erro })
             } else {
-              const previsao = await obterPrevisaoNavegacao(cmdPrevisao.dias)
+              const previsao = await obterPrevisaoNavegacao(cmdPrevisao.diasAFrente)
               await sock.sendMessage(grupoId, { text: previsao })
             }
             continue

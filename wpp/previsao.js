@@ -96,23 +96,47 @@ function montarBloco(nivel, hIni, hFim, minT, maxT, maxProb, maxMm, maxVento, ma
 
 // ============================================================
 // PARSER DO COMANDO ppp
-// Retorna { valido, dias, erro }
+// ppp        → hoje
+// ppp 05     → próximo dia 05 do calendário
+// Retorna { valido, diasAFrente, erro }
 // ============================================================
 export function parsearComandoPrevisao(texto) {
   const m = /^p{3,}(?:\s+(\d{1,2}))?$/i.exec(String(texto || '').trim())
   if (!m) return { valido: false }
 
-  const dias = m[1] ? parseInt(m[1]) : 0
+  const agora = agoraSP()
+  const hojeMin = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
 
-  if (dias > DIAS_LIMITE) {
+  let diasAFrente
+
+  if (!m[1]) {
+    diasAFrente = 0
+  } else {
+    const dia = parseInt(m[1])
+
+    // Próxima ocorrência do dia DD no calendário
+    let alvo = new Date(agora.getFullYear(), agora.getMonth(), dia)
+
+    // Se o dia já passou neste mês, vai para o próximo mês
+    if (dia < agora.getDate()) {
+      alvo = new Date(agora.getFullYear(), agora.getMonth() + 1, dia)
+    }
+
+    const alvoMin = new Date(alvo.getFullYear(), alvo.getMonth(), alvo.getDate())
+    diasAFrente = Math.round((alvoMin - hojeMin) / 86400000)
+  }
+
+  if (diasAFrente > DIAS_LIMITE) {
+    const lim = new Date(hojeMin.getTime() + DIAS_LIMITE * 86400000)
+    const dd  = String(lim.getDate()).padStart(2, '0')
+    const mm  = String(lim.getMonth() + 1).padStart(2, '0')
     return {
       valido: true,
-      dias,
-      erro: `⚠️ O limite máximo é ${DIAS_LIMITE} dias à frente. Tente *ppp ${DIAS_LIMITE}* ou menos.`
+      erro: `⚠️ Data fora do limite. Máximo disponível até ${dd}/${mm}.`
     }
   }
 
-  return { valido: true, dias }
+  return { valido: true, diasAFrente }
 }
 
 // ============================================================
@@ -120,8 +144,9 @@ export function parsearComandoPrevisao(texto) {
 // diasAFrente: 0 = hoje, 1 = amanhã, etc.
 // ============================================================
 export async function obterPrevisaoNavegacao(diasAFrente = 0) {
-  const base = agoraSP()
-  base.setDate(base.getDate() + diasAFrente)
+  const agora = agoraSP()
+  const hora  = agora.getHours()
+  const base  = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + diasAFrente)
 
   const data   = dtStr(base)
   const dd     = String(base.getDate()).padStart(2, '0')
@@ -156,7 +181,19 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0) {
 
   const sunset = (daily.sunset?.[0] || '').slice(11, 16)
 
-  let resposta = `*PREVISÃO NAVEGAÇÃO* ⚓\n${dd}/${mm} ${diaSem} (meteo.com)\n\n`
+  // Cabeçalho "feliz" — somente para hoje, antes do meio-dia
+  let resposta = ''
+  if (diasAFrente === 0 && hora < 12) {
+    resposta =
+      `*Vamos navegar hoje!!!* 🌊\n` +
+      `Aqui é o seu\n` +
+      `Assistente Virtual Marujo ⚓\n` +
+      `— — — — — — — — — — —\n` +
+      `Vou atualizar a previsão do tempo para o nosso lago de Palmas 🗺️\n` +
+      `tenha um ótimo dia de recreação 🎉 🩴⛱️\n\n`
+  }
+
+  resposta += `*PREVISÃO NAVEGAÇÃO* ⚓\n${dd}/${mm} ${diaSem} (meteo.com)\n\n`
 
   let blocoAtivo = false
   let blocoNivel, hIni, hFim
