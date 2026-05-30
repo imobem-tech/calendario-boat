@@ -76,7 +76,11 @@ async function buscarColaboradoresAtivos(pool) {
 
 // Deriva unidade do grupo a partir do plano: 'ctg' no plano => 'C', caso contrário => 'G'
 export function unidadeDoPlano(plano) {
-  return String(plano || '').toLowerCase().includes('ctg') ? 'C' : 'G'
+  return String(plano || '').toLowerCase().slice(-3) === 'ctg' ? 'C' : 'G'
+}
+
+export function empresaDaLetra(letra) {
+  return /^[a-zA-Z]/.test(String(letra || '').trim()) ? 'ALLMAX' : 'SUMMER'
 }
 
 // Verifica se o colaborador deve entrar no grupo conforme seu Local

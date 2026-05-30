@@ -6,7 +6,7 @@
 import pkg from 'pg'
 const { Pool } = pkg
 
-import { sincronizarColaboradoresGrupo, adicionarTitularGrupo } from './grupos-admin.js'
+import { sincronizarColaboradoresGrupo, adicionarTitularGrupo, unidadeDoPlano, empresaDaLetra } from './grupos-admin.js'
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -63,25 +63,26 @@ async function criarGrupo(sock, codEmbarcacao, gropoLetra, jidDono) {
 }
 
 // ------------------------------------------------------------
-// Abrevia nome: "DANILO ALVES" → "DANILO A"
+// Abrevia nome: "DANILO ALVES COSTA" → "DANILO A" (inicial do segundo nome)
 // ------------------------------------------------------------
 function abreviarNome(nomeCompleto) {
   const partes = String(nomeCompleto || '').trim().toUpperCase().split(/\s+/)
   if (partes.length <= 1) return partes[0] || ''
-  return partes[0] + ' ' + partes[partes.length - 1][0]
+  return partes[0] + ' ' + partes[1][0]
 }
 
 // ------------------------------------------------------------
-// Monta nome do grupo com cota:
-// Ex: pb=138, letra="11", plano="SUMMER", nome="DANILO ALVES"
-//   → "138-11 _G SUMMER (DANILO A)"
-// _C ou _G preservado do nome atual gravado no banco
+// Monta nome do grupo:
+// Ex: pb=576, letra="X4", plano="Plano_A_ctg", nome="DANILO ALVES COSTA"
+//   → "576-X4 _C ALLMAX (DANILO A)"
+// Empresa: letra começa com letra → ALLMAX, com número → SUMMER
+// Unidade: últimas 3 letras do plano = "ctg" → _C, senão → _G
 // ------------------------------------------------------------
-function montarNomeGrupoUnico(pb, letra, plano, nomeCliente, nomeAtual) {
-  const m = /\d+-\S+\s+_([CG])/i.exec(String(nomeAtual || ''))
-  const unidade = m ? m[1] : 'G'
-  const abrev = abreviarNome(nomeCliente)
-  return `${pb}-${letra} _${unidade} ${plano.toUpperCase()} (${abrev})`
+function montarNomeGrupoUnico(pb, letra, plano, nomeCliente) {
+  const unidade = unidadeDoPlano(plano)
+  const empresa  = empresaDaLetra(letra)
+  const abrev    = abreviarNome(nomeCliente)
+  return `${pb}-${letra} _${unidade} ${empresa} (${abrev})`
 }
 
 // ============================================================
@@ -119,9 +120,8 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
     }
 
     const { grupowppid, nomegrupowpp } = rs.rows[0]
-    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente, nomegrupowpp)
-    const m = /\d+-\S+\s+_([CG])/i.exec(String(nomegrupowpp || ''))
-    const unidadeGrupo = m ? m[1] : 'G'
+    const unidadeGrupo = unidadeDoPlano(plano)
+    const novoNome = montarNomeGrupoUnico(pb, letra, plano, nome_cliente)
 
     // 2. Renomear (se necessário)
     let acaoRenomear
