@@ -590,8 +590,6 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
       `Emb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
     )
 
-    // Segue para Etapa 2
-    await executarEtapa2(sock, pool, grupoId, remetente, estado.agendamento, estado.cabecalho, key)
     estadosHoraMotor.delete(key)
     return true
   }
