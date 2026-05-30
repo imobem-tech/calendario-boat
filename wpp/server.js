@@ -24,6 +24,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 
 import { processarFila } from './fila.js'
+import { obterPrevisaoNavegacao, parsearComandoPrevisao, enviarPrevisaoDiaria } from './previsao.js'
 import { sincronizarGruposAgenda } from './grupos.js'
 import { ehComandoCalendario, handleCalendario } from './comandos/calendario.js'
 import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmacaoRetorno } from './comandos/retorno.js'
@@ -177,6 +178,18 @@ if (horaMotorTratado) continue
           // Aguardando confirmação de retorno
           if (estaAguardandoRetorno(grupoId)) {
             await handleConfirmacaoRetorno(sock, pool, grupoId, texto)
+            continue
+          }
+
+          // Comando Previsão do tempo — ppp / ppp 02
+          const cmdPrevisao = parsearComandoPrevisao(texto)
+          if (cmdPrevisao.valido) {
+            if (cmdPrevisao.erro) {
+              await sock.sendMessage(grupoId, { text: cmdPrevisao.erro })
+            } else {
+              const previsao = await obterPrevisaoNavegacao(cmdPrevisao.dias)
+              await sock.sendMessage(grupoId, { text: previsao })
+            }
             continue
           }
 
@@ -453,4 +466,17 @@ app.listen(PORT, () => {
     }).catch(console.error)
     processandoFila = false
   }, 10000)
+
+  // Previsão diária às 8h — controla data para não enviar mais de uma vez por dia
+  let previsaoDiariaUltimaData = ''
+  setInterval(async () => {
+    const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+    const hora  = agora.getHours()
+    const hoje  = agora.toISOString().slice(0, 10)
+    if (hora === 8 && previsaoDiariaUltimaData !== hoje) {
+      previsaoDiariaUltimaData = hoje
+      console.log('[PREVISAO] Iniciando envio diário das 8h...')
+      await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
+    }
+  }, 60000)
 })
