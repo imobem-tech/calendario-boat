@@ -329,15 +329,19 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
     const hmSaida   = Number(agendamento['Hora_Motor_Saida'])
     const hmRetorno = Number(agendamento['Hora_Motor_Retorno'])
 
+    console.log('[HM_COBRANÇA] Iniciando', { codEmb, hmSaida, hmRetorno, codAutorizado: agendamento['Cod_Autorizado'] })
+
     if (!codEmb || isNaN(hmSaida) || isNaN(hmRetorno)) {
-      console.warn('[HM_COBRANÇA] Dados insuficientes para cobrança', { codEmb, hmSaida, hmRetorno })
+      console.warn('[HM_COBRANÇA] Dados insuficientes', { codEmb, hmSaida, hmRetorno })
+      await enviar(sock, grupoId, `⚠️ HM registrado. Cobrança não gerada: dados insuficientes (emb=${codEmb} saída=${hmSaida} retorno=${hmRetorno}).`)
       return
     }
 
     const horasUsadas = Math.max(0, hmRetorno - hmSaida)
 
     if (horasUsadas <= 0) {
-      console.warn('[HM_COBRANÇA] Horas usadas <= 0, cobrança não gerada')
+      console.warn('[HM_COBRANÇA] Horas usadas <= 0')
+      await enviar(sock, grupoId, `⚠️ HM registrado. Cobrança não gerada: horas usadas = 0.`)
       return
     }
 
@@ -374,7 +378,8 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
     const codCliente = Number(agendamento['Cod_Autorizado'])
 
     if (!codCliente) {
-      console.warn('[HM_COBRANÇA] Cod_Autorizado não encontrado no agendamento')
+      console.warn('[HM_COBRANÇA] Cod_Autorizado ausente ou zero', { agendamentoId: agendamento['ID'] })
+      await enviar(sock, grupoId, `⚠️ HM registrado. Cobrança não gerada: cliente não identificado no agendamento (ID ${agendamento['ID']}).`)
       return
     }
 
