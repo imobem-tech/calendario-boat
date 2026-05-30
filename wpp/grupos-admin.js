@@ -551,6 +551,82 @@ export async function handleColaboradoresTodos(req, res, getSock, getConectado) 
 }
 
 // ============================================================
+// HELPER — cancelamento de grupo
+// Remove todos exceto o bot e ADM2, depois re-adiciona e promove
+// apenas os colaboradores administradores ativos do local do grupo
+// ============================================================
+export async function cancelarGrupo(sock, pool, grupowppid, unidadeGrupo, addLog) {
+  // JID do próprio bot (si mesmo)
+  const botJid = sock.user?.id
+    ? sock.user.id.split(':')[0] + '@s.whatsapp.net'
+    : null
+
+  const protegidos = new Set([normJid(ADM2_JID)])
+  if (botJid) protegidos.add(normJid(botJid))
+
+  // 1. Busca todos os participantes atuais
+  const meta = await sock.groupMetadata(grupowppid)
+  const participantes = meta.participants || []
+
+  let removidos = 0
+  const falhas = []
+
+  // 2. Remove todos exceto protegidos
+  for (const p of participantes) {
+    if (protegidos.has(normJid(p.id))) continue
+    try {
+      await sock.groupParticipantsUpdate(grupowppid, [p.id], 'remove')
+      addLog(`REMOVIDO (cancelamento): ${p.id}`)
+      removidos++
+    } catch (err) {
+      addLog(`FALHA ao remover ${p.id}: ${err.message}`)
+      falhas.push({ jid: p.id, erro: err.message })
+    }
+  }
+
+  // 3. Re-adiciona apenas colaboradores administradores ativos do local
+  const colaboradores = await buscarColaboradoresAtivos(pool)
+  let adicionados = 0
+  let promovidos = 0
+
+  for (const colab of colaboradores) {
+    if ((colab.Ativo || 'S') !== 'S') continue
+    if (colab.Administrador !== 'S') continue
+    if (!colaboradorPertenceAoLocal(colab, unidadeGrupo, addLog)) continue
+
+    const jid = await resolverJidColaborador(sock, colab)
+    if (!jid) {
+      addLog(`AVISO: não resolveu JID para admin ${colab.Nome}`)
+      continue
+    }
+
+    try {
+      const resultado = await sock.groupParticipantsUpdate(grupowppid, [jid], 'add')
+      const status = String(resultado?.[0]?.status || '')
+      if (status === '200') {
+        adicionados++
+        addLog(`ADICIONADO (admin): ${colab.Nome}`)
+        try {
+          await sock.groupParticipantsUpdate(grupowppid, [jid], 'promote')
+          promovidos++
+          addLog(`PROMOVIDO: ${colab.Nome}`)
+        } catch (errP) {
+          addLog(`FALHA ao promover ${colab.Nome}: ${errP.message}`)
+        }
+      } else {
+        addLog(`FALHA ao adicionar admin ${colab.Nome}: status ${status}`)
+        falhas.push({ nome: colab.Nome, erro: `status ${status}` })
+      }
+    } catch (err) {
+      addLog(`FALHA ao adicionar ${colab.Nome}: ${err.message}`)
+      falhas.push({ nome: colab.Nome, erro: err.message })
+    }
+  }
+
+  return { removidos, adicionados, promovidos, falhas }
+}
+
+// ============================================================
 // HELPER — adiciona titular a um grupo (sem camada HTTP)
 // Retorna { acao, nome, jid } — acao: ADICIONADO | JA_NO_GRUPO |
 //   CONVITE_LINK_ENVIADO | CONVITE_FALHOU | BLOQUEADO | NAO_ENCONTRADO

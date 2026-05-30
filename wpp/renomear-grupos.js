@@ -6,7 +6,7 @@
 import pkg from 'pg'
 const { Pool } = pkg
 
-import { sincronizarColaboradoresGrupo, adicionarTitularGrupo, unidadeDoPlano, empresaDaLetra } from './grupos-admin.js'
+import { sincronizarColaboradoresGrupo, adicionarTitularGrupo, cancelarGrupo, unidadeDoPlano, empresaDaLetra } from './grupos-admin.js'
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -140,7 +140,25 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
       acaoRenomear = 'RENOMEADO'
     }
 
-    // 3. Adicionar titular
+    // 3. Fluxo CANCELADO: remove todos e recoloca só admins
+    if (plano.toLowerCase() === 'cancelado') {
+      let cancelamento = {}
+      try {
+        cancelamento = await cancelarGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
+      } catch (err) {
+        addLog(`AVISO cancelamento: ${err.message}`)
+        cancelamento = { erro: err.message }
+      }
+      return res.json({
+        acao: acaoRenomear,
+        de: nomegrupowpp,
+        para: novoNome,
+        cancelamento,
+        log
+      })
+    }
+
+    // 4. Fluxo NORMAL: adicionar titular + sincronizar colaboradores
     let titular = {}
     try {
       titular = await adicionarTitularGrupo(sock, pool, grupowppid, cod_cliente, addLog)
@@ -149,7 +167,6 @@ export async function handleRenomearGrupoUnico(req, res, getSock, getConectado) 
       titular = { acao: 'ERRO', erro: err.message }
     }
 
-    // 4. Sincronizar colaboradores
     let colaboradores = {}
     try {
       colaboradores = await sincronizarColaboradoresGrupo(sock, pool, grupowppid, unidadeGrupo, addLog)
