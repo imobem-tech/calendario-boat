@@ -193,6 +193,7 @@ async function obterParticipantesGrupo(sock, grupoId) {
   }))
 }
 
+
 async function garantirBotAdministrador(sock, grupoId) {
   const botId = normalizarBotId(sock)
 
@@ -203,28 +204,49 @@ async function garantirBotAdministrador(sock, grupoId) {
   const metadata = await sock.groupMetadata(grupoId)
   const participantes = metadata?.participants || []
 
-  console.log('[DEBUG BOT]', {
-    grupoId,
-    botId,
-    sockUser: sock.user,
-    totalParticipantes: participantes.length,
-    participantes: participantes.map(p => ({
-      id: p.id,
-      lid: p.lid,
-      admin: p.admin
-    }))
-  })
+  function normalizarJid(jid) {
+    if (!jid) return null
+
+    const s = String(jid)
+
+    if (s.includes('@lid')) {
+      return s.split(':')[0] + '@lid'
+    }
+
+    if (s.includes('@s.whatsapp.net')) {
+      return s.split(':')[0] + '@s.whatsapp.net'
+    }
+
+    return s
+  }
 
   const possiveisIdsBot = [
     botId,
     sock?.user?.id,
     sock?.user?.jid,
     sock?.user?.lid
-  ].filter(Boolean)
+  ]
+    .map(normalizarJid)
+    .filter(Boolean)
+
+  console.log('[DEBUG BOT]', {
+    grupoId,
+    botId,
+    sockUser: sock.user,
+    possiveisIdsBot,
+    totalParticipantes: participantes.length,
+    participantes: participantes.map(p => ({
+      id: p.id,
+      idNorm: normalizarJid(p.id),
+      lid: p.lid,
+      lidNorm: normalizarJid(p.lid),
+      admin: p.admin
+    }))
+  })
 
   const bot = participantes.find(p =>
-    possiveisIdsBot.includes(p.id) ||
-    possiveisIdsBot.includes(p.lid)
+    possiveisIdsBot.includes(normalizarJid(p.id)) ||
+    possiveisIdsBot.includes(normalizarJid(p.lid))
   )
 
   if (!bot) {
@@ -240,7 +262,7 @@ async function garantirBotAdministrador(sock, grupoId) {
   }
 
   return {
-    botId: bot.id,
+    botId: normalizarJid(bot.id),
     participantes: participantes.map(p => ({
       id: p.id,
       admin: p.admin || null
