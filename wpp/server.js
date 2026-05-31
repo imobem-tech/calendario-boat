@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2605282316
+// wpp/server.js — V.2605310001
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
@@ -33,7 +33,7 @@ import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605301500'
+const VERSAO_WPP = 'Allmax®2605310001'
 
 const app = express()
 const PORT = process.env.PORT || 8080
