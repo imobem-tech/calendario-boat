@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/admin.js — V.2605282316
+// wpp/comandos/admin.js — V.2605310001
 // Allmax Gestão de Cotas — Marujo⚓
 //
 // Módulo administrativo — só funciona no grupo ADM
@@ -15,6 +15,8 @@
 //   help                   — lista todos os comandos
 // ============================================================
 
+import { gerarCobrancaCompleta } from '../asaas.js'
+
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const CABECALHO =
@@ -26,7 +28,7 @@ Assistente Virtual\`\`\` *Marujo⚓*
 // chave: remetente | valor: { tipo (S|R), idSaida, etapa, valorAtual, nomeColab, emb, grupo }
 const estadosCorrecao = new Map()
 
-const VERSAO_ADM = 'V.2605282316'
+const VERSAO_ADM = 'V.2605310001'
 
 // ============================================================
 // HELPERS
@@ -208,12 +210,18 @@ async function cmdVerEmb(sock, pool, emb) {
 // ============================================================
 
 async function cmdCorrigir(sock, pool, remetente, idSaida, tipo) {
-  // Busca dados da saída
   const { rows } = await pool.query(`
     SELECT s."ID", s."Cod_Emb_PB", s."Grupo_Comp_letra",
            s."Dt_Agendamento", s."Hora_Motor_Saida", s."Hora_Motor_Retorno",
-           s."Dt_Saída", s."Dt_Retorno"
+           s."Dt_Saída", s."Dt_Retorno", s."Cod_Autorizado",
+           g.grupowppid,
+           h."Valor_Hora_Motor"
       FROM public."P_BOAT_z_10_Saida_Emb" s
+      LEFT JOIN public.wpp_grupos_agenda g
+        ON g.pb = s."Cod_Emb_PB"
+       AND UPPER(COALESCE(g.cota,'')) = UPPER(COALESCE(s."Grupo_Comp_letra",''))
+      LEFT JOIN public."P_BOAT_1_Embarcacao" e ON e."Num_PB" = s."Cod_Emb_PB"
+      LEFT JOIN public."Hora_Motor_Valor_Atual" h ON h."Cod_Hora_Motor" = e."Vinculo_Hora_Motor"
      WHERE s."ID" = $1
      LIMIT 1
   `, [Number(idSaida)])
@@ -234,7 +242,12 @@ async function cmdCorrigir(sock, pool, remetente, idSaida, tipo) {
     valorAtual,
     emb: s.Cod_Emb_PB,
     grupo: s.Grupo_Comp_letra,
-    dtAgendamento: s.Dt_Agendamento
+    dtAgendamento: s.Dt_Agendamento,
+    codAutorizado: s.Cod_Autorizado,
+    grupowppid: s.grupowppid,
+    valorHoraMotor: s.Valor_Hora_Motor,
+    hmSaidaAtual: s.Hora_Motor_Saida,
+    hmRetornoAtual: s.Hora_Motor_Retorno
   })
 
   await enviar(sock,
@@ -244,6 +257,78 @@ async function cmdCorrigir(sock, pool, remetente, idSaida, tipo) {
     `Valor atual: ${formatarHM(valorAtual)}\n\n` +
     `Informe o novo valor no formato *000,0*\nou D para cancelar\n\n${VERSAO_ADM}`
   )
+}
+
+// ------------------------------------------------------------
+// Gera CR após correção de HM Retorno
+// Crítico (bloquearia) → alerta ADM "GERE COBRANÇA MANUAL"
+// Não crítico          → gera CR + envia boleto no grupo
+// ------------------------------------------------------------
+async function gerarCRPosCorrecao(sock, pool, estado, hmRetorno) {
+  const hmSaida = Number(estado.hmSaidaAtual)
+  if (!hmSaida || isNaN(hmSaida) || isNaN(hmRetorno)) {
+    await enviar(sock, `⚠️ Dados insuficientes para gerar CR automaticamente (ID ${estado.idSaida}).`)
+    return
+  }
+
+  const hmUsado = Number((hmRetorno - hmSaida).toFixed(1))
+
+  // Verifica criticidade: valores que bloqueariam no fluxo normal
+  const eCritico = hmRetorno < hmSaida || hmUsado < 0.1
+
+  if (eCritico) {
+    await enviar(sock,
+      `⛔ *GERE COBRANÇA MANUAL*\n` +
+      `ID ${estado.idSaida} / Emb ${estado.emb} / Grupo ${estado.grupo}\n` +
+      `HM Saída: ${formatarHM(hmSaida)} | HM Retorno: ${formatarHM(hmRetorno)}\n` +
+      `HM Usado: ${String(hmUsado).replace('.', ',')}h — caso crítico, cobrança não gerada.`
+    )
+    return
+  }
+
+  if (!estado.codAutorizado || !estado.valorHoraMotor) {
+    await enviar(sock, `⚠️ Sem cliente ou tarifa para gerar CR (ID ${estado.idSaida}). Gere manualmente.`)
+    return
+  }
+
+  try {
+    const valor = Number((hmUsado * Number(estado.valorHoraMotor)).toFixed(2))
+    const dtAg  = new Date(estado.dtAgendamento)
+    const dtBR  = `${String(dtAg.getDate()).padStart(2,'0')}/${String(dtAg.getMonth()+1).padStart(2,'0')}/${dtAg.getFullYear()}`
+    const descricao = `Hora_MOTOR ${estado.emb}-${estado.grupo} ${dtBR} ${hmUsado.toFixed(1)}h`
+
+    const vencimento = new Date()
+    vencimento.setDate(vencimento.getDate() + 2)
+
+    const resultado = await gerarCobrancaCompleta(pool, 8, estado.codAutorizado, {
+      valor, descricao, vencimento, centroCusto: '8'
+    })
+
+    // Confirma no ADM
+    await enviar(sock,
+      `✅ *CR gerada automaticamente*\n` +
+      `ID ${estado.idSaida} | ${descricao}\n` +
+      `Valor: R$ ${valor.toFixed(2).replace('.', ',')} | CR nº ${resultado.codigo}\n` +
+      `🔗 ${resultado.linkBoleto}`
+    )
+
+    // Envia boleto no grupo da embarcação
+    if (estado.grupowppid) {
+      const cabHM = `\`\`\`Olá, sou o seu\nAssistente Virtual\`\`\` *Marujo⚓*\n\`\`\`--------------------------\`\`\``
+      await sock.sendMessage(estado.grupowppid, {
+        text:
+          `${cabHM}\n` +
+          `*REPASSE_DE_CUSTOS/HORA_MOTOR*\n\n` +
+          `Horímetro - *Saída*: ${formatarHM(hmSaida)}  *Retorno*: ${formatarHM(hmRetorno)}\n` +
+          `*Descrição:*\n${descricao}\n\n` +
+          `*Valor:* R$ ${valor.toFixed(2).replace('.', ',')}\n` +
+          `*Link Boleto/PIX:* ${resultado.linkBoleto}\n\n` +
+          `Para pagamento *à vista*!`
+      })
+    }
+  } catch (err) {
+    await enviar(sock, `❌ Erro ao gerar CR para ID ${estado.idSaida}: ${err.message}\nGere manualmente.`)
+  }
 }
 
 async function tratarEstadoCorrecao(sock, pool, remetente, texto, nomeAdmin) {
@@ -292,13 +377,13 @@ async function tratarEstadoCorrecao(sock, pool, remetente, texto, nomeAdmin) {
 
     // Grava a correção
     const campo = estado.tipo === 'S' ? '"Hora_Motor_Saida"' : '"Hora_Motor_Retorno"'
-    const valor = Number(estado.novoValor.replace(',', '.'))
+    const novoValorNum = Number(estado.novoValor.replace(',', '.'))
 
     await pool.query(`
       UPDATE public."P_BOAT_z_10_Saida_Emb"
          SET ${campo} = $1
        WHERE "ID" = $2
-    `, [valor, estado.idSaida])
+    `, [novoValorNum, estado.idSaida])
 
     estadosCorrecao.delete(remetente)
 
@@ -308,10 +393,14 @@ async function tratarEstadoCorrecao(sock, pool, remetente, texto, nomeAdmin) {
       `✅ *${tipoLabel} corrigido: ${estado.novoValor}*\n` +
       `ID: ${estado.idSaida} / Emb: ${estado.emb} / Grupo: ${estado.grupo}\n` +
       `Anterior: ${formatarHM(estado.valorAtual)} → Novo: ${estado.novoValor}\n` +
-      `Corrigido por: ${nomeAdmin}\n\n` +
-      `⚠️ *Cobrança de Hora Motor NÃO gerada automaticamente.*\n` +
-      `Gere manualmente via sistema.\n\n${VERSAO_ADM}`
+      `Corrigido por: ${nomeAdmin}\n\n${VERSAO_ADM}`
     )
+
+    // Tenta gerar CR automática após correção do HM Retorno
+    if (estado.tipo === 'R') {
+      await gerarCRPosCorrecao(sock, pool, estado, novoValorNum)
+    }
+
     return true
   }
 
