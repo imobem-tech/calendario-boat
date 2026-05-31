@@ -413,6 +413,18 @@ app.post('/enviar-grupo', async (req, res) => {
   }
 })
 
+app.post('/enviar-jid', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    const { jid, mensagem } = req.body
+    if (!jid || !mensagem) return res.status(400).json({ erro: 'jid e mensagem são obrigatórios' })
+    await sock.sendMessage(jid, { text: mensagem })
+    res.json({ sucesso: true, destino: jid })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
 app.get('/botao_agenda_todos', async (req, res) => {
   try {
     if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
