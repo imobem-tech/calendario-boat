@@ -160,13 +160,16 @@ async function buscarColaboradoresCadastro(unidadeGrupo) {
 
   const rs = await pool.query(
     `SELECT DISTINCT
-        REPLACE(c."Cliente_Telefone_Celular", '+', '') || '@s.whatsapp.net' AS jid,
-        COALESCE(c."Ativo", true) AS ativo,
-        COALESCE(c."Administrador", false) AS admin,
-        UPPER(COALESCE(c."Unidade", '')) AS unidade
-       FROM public."Cliente" c
-      WHERE c."Cliente_Telefone_Celular" IS NOT NULL
-        AND UPPER(COALESCE(c."Unidade", '')) = UPPER($1)`,
+        CASE
+          WHEN wc."Lid" IS NOT NULL AND wc."Lid" <> ''
+            THEN REPLACE(wc."Lid", '@lid', '') || '@lid'
+          ELSE REPLACE(wc."Telefone", '+', '') || '@s.whatsapp.net'
+        END AS jid,
+        CASE WHEN UPPER(COALESCE(wc."Ativo", 'S')) = 'S' THEN true ELSE false END AS ativo,
+        CASE WHEN UPPER(COALESCE(wc."Administrador", 'N')) = 'S' THEN true ELSE false END AS admin,
+        $1 AS unidade
+       FROM public.wpp_colaboradores wc
+      WHERE wc."Telefone" IS NOT NULL`,
     [unidade]
   )
 
@@ -179,7 +182,6 @@ async function buscarColaboradoresCadastro(unidadeGrupo) {
     }))
     .filter(r => r.jid && unidadePermitida(r.unidade))
 }
-
 // ------------------------------------------------------------
 // WhatsApp base
 // ------------------------------------------------------------
