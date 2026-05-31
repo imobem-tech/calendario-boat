@@ -1,6 +1,6 @@
-// ============================================================
-// wpp/renomear-grupos.js — V.2605310300
-// Endpoint principal: POST /grupos/alterar
+// ============================================================// Endpoint principal: POST /grupos/alterar/
+
+// wpp/renomear-grupos.js — V.2605310615
 //
 // Regra:
 //   0 registros em wpp_grupos_agenda para PB+COTA => cria grupo novo e grava ID
@@ -200,80 +200,52 @@ async function garantirBotAdministrador(sock, grupoId) {
     throw new Error('Não foi possível identificar o JID do bot conectado')
   }
 
-  const participantes = await obterParticipantesGrupo(sock, grupoId)
-  const bot = participantes.find(p => p.id === botId)
+  const metadata = await sock.groupMetadata(grupoId)
+  const participantes = metadata?.participants || []
+
+  console.log('[DEBUG BOT]', {
+    grupoId,
+    botId,
+    sockUser: sock.user,
+    totalParticipantes: participantes.length,
+    participantes: participantes.map(p => ({
+      id: p.id,
+      lid: p.lid,
+      admin: p.admin
+    }))
+  })
+
+  const possiveisIdsBot = [
+    botId,
+    sock?.user?.id,
+    sock?.user?.jid,
+    sock?.user?.lid
+  ].filter(Boolean)
+
+  const bot = participantes.find(p =>
+    possiveisIdsBot.includes(p.id) ||
+    possiveisIdsBot.includes(p.lid)
+  )
 
   if (!bot) {
-    throw new Error(`Bot não está no grupo ${grupoId}`)
+    throw new Error(
+      `Bot não localizado na lista de participantes do grupo ${grupoId}. Verifique logs [DEBUG BOT].`
+    )
   }
 
   if (!bot.admin) {
     throw new Error(
-      `Bot não é administrador no grupo ${grupoId}. ` +
-      `Não é possível alterar nome, remover, adicionar, promover ou rebaixar participantes.`
+      `Bot está no grupo ${grupoId}, mas não é administrador.`
     )
   }
 
-  return { botId, participantes }
-}
-
-async function renomearGrupo(sock, grupoId, nomeGrupo, addLog) {
-  await sock.groupUpdateSubject(grupoId, nomeGrupo)
-  await atualizarNomeAgenda(grupoId, nomeGrupo)
-  addLog(`Nome atualizado: ${nomeGrupo}`)
-}
-
-async function criarGrupoNovo(sock, pb, cota, nomePadrao, jidTitular, addLog) {
-  const membros = [jidTitular, ADM2_JID].filter(Boolean)
-
-  if (membros.length === 0) {
-    throw new Error('Não foi possível criar grupo: nenhum membro válido informado')
+  return {
+    botId: bot.id,
+    participantes: participantes.map(p => ({
+      id: p.id,
+      admin: p.admin || null
+    }))
   }
-
-  const criado = await sock.groupCreate(nomePadrao, membros)
-  const grupoId = criado?.id
-
-  if (!validarGrupoId(grupoId)) {
-    throw new Error(`WhatsApp não retornou um grupowppid válido: ${grupoId || 'vazio'}`)
-  }
-
-  try {
-    await sock.groupParticipantsUpdate(grupoId, [ADM2_JID], 'promote')
-  } catch (err) {
-    addLog(`AVISO admin ADM2: ${err.message}`)
-  }
-
-  const registro = await inserirGrupoAgenda(pb, cota, grupoId, nomePadrao)
-  addLog(`Grupo criado e gravado: ${grupoId}`)
-
-  return registro
-}
-
-async function enviarTesteDuplicados(sock, pb, cota, registros, addLog) {
-  const codigo = codigoConfirmacaoGrupoCerto(pb, cota)
-
-  const texto =
-    `VALIDAÇÃO DE GRUPO\n\n` +
-    `PB/COTA: ${pb}-${normalizarCota(cota)}\n\n` +
-    `Este PB/COTA possui mais de um grupo cadastrado.\n` +
-    `Para confirmar ESTE grupo como o oficial, responda exatamente:\n\n` +
-    `${codigo}`
-
-  for (const reg of registros) {
-    if (!validarGrupoId(reg.grupowppid)) {
-      addLog(`SKIP teste duplicado: ID inválido no registro ${reg.id}`)
-      continue
-    }
-
-    try {
-      await enviarMensagem(sock, reg.grupowppid, texto)
-      addLog(`Mensagem de validação enviada para ${reg.grupowppid}`)
-    } catch (err) {
-      addLog(`ERRO ao enviar validação para ${reg.grupowppid}: ${err.message}`)
-    }
-  }
-
-  return codigo
 }
 
 // ------------------------------------------------------------
