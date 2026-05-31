@@ -1,17 +1,8 @@
-// ============================================================
-// wpp/agendar.js — V.2605282129
-// Allmax Gestão de Cotas — Marujo⚓
-// ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605221942";
+const VERSAO_API = "Allmax®2605311552";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
-
-const CABECALHO_MARUJO =
-`\`\`\`Olá, sou o seu
-Assistente Virtual\`\`\` *Marujo⚓*
-\`\`\`--------------------------\`\`\``
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -83,8 +74,8 @@ return {
 }
 
 function extrairLimiteDoGrupo(grupo) {
-  const m = String(grupo || "").match(/(\d+)$/);
-  return m ? Number(m[1]) : 0;
+  const ultimo = String(grupo || "").slice(-1);
+  return Number(ultimo) || 0;
 }
 
 function normalizarHora(hora) {
@@ -341,8 +332,7 @@ export default async function handler(req, res) {
       : "Agendamento com sucesso";
 
     const mensagemWpp =
-`${CABECALHO_MARUJO}
-🚤 NOVO AGENDAMENTO
+`🚤 NOVO AGENDAMENTO
 PB: ${codEmbPB}
 Grupo: ${grupo}
 Autorizado: ${codAutorizado}
