@@ -467,6 +467,10 @@ app.post('/grupos/renomear', (req, res) => {
   handleAlterarGrupo(req, res, () => sock, () => conectado)
 })
 
+app.post('/grupos/alterar', (req, res) => {
+  handleAlterarGrupo(req, res, () => sock, () => conectado)
+})
+
 app.post('/grupos/colaboradores/grupo', (req, res) => {
   handleColaboradoresGrupo(req, res, () => sock, () => conectado)
 })
