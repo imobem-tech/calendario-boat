@@ -10,7 +10,10 @@ import P from 'pino'
 import pkg from 'pg'
 import { rm } from 'fs/promises'
 
-import { handleRenomearGrupos, handleRenomearGrupoUnico } from './renomear-grupos.js'
+import {
+  handleAlterarGrupo,
+  tratarConfirmacaoGrupoCerto
+} from './renomear-grupos.js'
 import { handleColaboradoresGrupo, handleColaboradoresTodos, handleAdicionarTitular } from './grupos-admin.js'
 import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
