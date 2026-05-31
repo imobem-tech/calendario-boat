@@ -460,12 +460,10 @@ app.get('/botao_agenda_todos', async (req, res) => {
   }
 })
 
-app.post('/renomear-grupos', (req, res) => {
-  handleRenomearGrupos(req, res, () => sock, () => conectado)
-})
+
 
 app.post('/grupos/renomear', (req, res) => {
-  handleRenomearGrupoUnico(req, res, () => sock, () => conectado)
+  handleAlterarGrupo(req, res, () => sock, () => conectado)
 })
 
 app.post('/grupos/colaboradores/grupo', (req, res) => {
