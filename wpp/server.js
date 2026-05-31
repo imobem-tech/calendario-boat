@@ -418,8 +418,26 @@ app.post('/enviar-jid', async (req, res) => {
     if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
     const { jid, mensagem } = req.body
     if (!jid || !mensagem) return res.status(400).json({ erro: 'jid e mensagem são obrigatórios' })
-    await sock.sendMessage(jid, { text: mensagem })
-    res.json({ sucesso: true, destino: jid })
+
+    let jidFinal = jid
+    // Para privados (@s.whatsapp.net), resolve via onWhatsApp para obter JID correto (@lid ou @s.whatsapp.net)
+    if (!jid.endsWith('@g.us')) {
+      const tel = jid.replace(/@.*$/, '')
+      try {
+        const [r] = await sock.onWhatsApp(tel)
+        if (r?.exists) {
+          jidFinal = r.jid
+          console.log(`[enviar-jid] JID resolvido: ${jid} → ${jidFinal}`)
+        } else {
+          console.warn(`[enviar-jid] Número ${tel} não encontrado no WhatsApp`)
+        }
+      } catch (errOW) {
+        console.warn(`[enviar-jid] onWhatsApp falhou para ${tel}:`, errOW.message)
+      }
+    }
+
+    await sock.sendMessage(jidFinal, { text: mensagem })
+    res.json({ sucesso: true, destino: jidFinal })
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
