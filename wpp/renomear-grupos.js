@@ -1,6 +1,6 @@
-// ============================================================// Endpoint principal: POST /grupos/alterar/
-
-// wpp/renomear-grupos.js — V.2605310615
+// ============================================================
+// wpp/renomear-grupos.js — V.2605310625
+// Endpoint principal: POST /grupos/alterar
 //
 // Regra:
 //   0 registros em wpp_grupos_agenda para PB+COTA => cria grupo novo e grava ID
@@ -30,6 +30,8 @@ const pool = new Pool({
 })
 
 const ADM2_JID = '556332258473@s.whatsapp.net'
+
+console.log('CARREGOU renomear-grupos.js V.2605310625')
 
 // ------------------------------------------------------------
 // Utilidades
@@ -193,7 +195,6 @@ async function obterParticipantesGrupo(sock, grupoId) {
   }))
 }
 
-
 async function garantirBotAdministrador(sock, grupoId) {
   const botId = normalizarBotId(sock)
 
@@ -210,11 +211,13 @@ async function garantirBotAdministrador(sock, grupoId) {
     const s = String(jid)
 
     if (s.includes('@lid')) {
-      return s.split(':')[0] + '@lid'
+      const base = s.split('@')[0].split(':')[0]
+      return `${base}@lid`
     }
 
     if (s.includes('@s.whatsapp.net')) {
-      return s.split(':')[0] + '@s.whatsapp.net'
+      const base = s.split('@')[0].split(':')[0]
+      return `${base}@s.whatsapp.net`
     }
 
     return s
@@ -268,6 +271,65 @@ async function garantirBotAdministrador(sock, grupoId) {
       admin: p.admin || null
     }))
   }
+}
+
+async function renomearGrupo(sock, grupoId, nomeGrupo, addLog) {
+  await sock.groupUpdateSubject(grupoId, nomeGrupo)
+  await atualizarNomeAgenda(grupoId, nomeGrupo)
+  addLog(`Nome atualizado: ${nomeGrupo}`)
+}
+
+async function criarGrupoNovo(sock, pb, cota, nomePadrao, jidTitular, addLog) {
+  const membros = [jidTitular, ADM2_JID].filter(Boolean)
+
+  if (membros.length === 0) {
+    throw new Error('Não foi possível criar grupo: nenhum membro válido informado')
+  }
+
+  const criado = await sock.groupCreate(nomePadrao, membros)
+  const grupoId = criado?.id
+
+  if (!validarGrupoId(grupoId)) {
+    throw new Error(`WhatsApp não retornou um grupowppid válido: ${grupoId || 'vazio'}`)
+  }
+
+  try {
+    await sock.groupParticipantsUpdate(grupoId, [ADM2_JID], 'promote')
+  } catch (err) {
+    addLog(`AVISO admin ADM2: ${err.message}`)
+  }
+
+  const registro = await inserirGrupoAgenda(pb, cota, grupoId, nomePadrao)
+  addLog(`Grupo criado e gravado: ${grupoId}`)
+
+  return registro
+}
+
+async function enviarTesteDuplicados(sock, pb, cota, registros, addLog) {
+  const codigo = codigoConfirmacaoGrupoCerto(pb, cota)
+
+  const texto =
+    `VALIDAÇÃO DE GRUPO\n\n` +
+    `PB/COTA: ${pb}-${normalizarCota(cota)}\n\n` +
+    `Este PB/COTA possui mais de um grupo cadastrado.\n` +
+    `Para confirmar ESTE grupo como o oficial, responda exatamente:\n\n` +
+    `${codigo}`
+
+  for (const reg of registros) {
+    if (!validarGrupoId(reg.grupowppid)) {
+      addLog(`SKIP teste duplicado: ID inválido no registro ${reg.id}`)
+      continue
+    }
+
+    try {
+      await enviarMensagem(sock, reg.grupowppid, texto)
+      addLog(`Mensagem de validação enviada para ${reg.grupowppid}`)
+    } catch (err) {
+      addLog(`ERRO ao enviar validação para ${reg.grupowppid}: ${err.message}`)
+    }
+  }
+
+  return codigo
 }
 
 // ------------------------------------------------------------
