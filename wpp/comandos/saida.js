@@ -346,7 +346,7 @@ async function registrarSaida(pool, saida, colaborador) {
 
   await pool.query(`
     UPDATE public."P_BOAT_z_10_Saida_Emb"
-       SET "Dt_Saída" = (NOW() AT TIME ZONE 'America/Sao_Paulo')::timestamp AT TIME ZONE 'America/Sao_Paulo',
+       SET "Dt_Saída" = NOW() AT TIME ZONE 'America/Sao_Paulo',
            "Dt_Desistencia" = NULL,
            "Colab_Responsavel" = $1
      WHERE "ID" = $2
