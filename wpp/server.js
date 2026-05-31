@@ -37,6 +37,7 @@ import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605310001'
+console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
 const PORT = process.env.PORT || 8080
