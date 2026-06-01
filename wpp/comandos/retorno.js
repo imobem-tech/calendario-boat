@@ -1,12 +1,12 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2606011045
+// wpp/comandos/retorno.js — V.2606011743
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
 import { MENU } from './menu.js'
 
-const VERSAO_RETORNO = 'V.2606011045'
+const VERSAO_RETORNO = 'V.2606011743'
 
 const CABECALHO_RETORNO =
 `\`\`\`Olá, sou o seu
