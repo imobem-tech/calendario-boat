@@ -28,7 +28,7 @@ Assistente Virtual\`\`\` *Marujo⚓*
 // chave: remetente | valor: { tipo (S|R), idSaida, etapa, valorAtual, nomeColab, emb, grupo }
 const estadosCorrecao = new Map()
 
-const VERSAO_ADM = 'V.2605310001'
+const VERSAO_ADM = 'V.2606010935'
 
 // ============================================================
 // HELPERS
@@ -327,7 +327,20 @@ async function gerarCRPosCorrecao(sock, pool, estado, hmRetorno) {
       })
     }
   } catch (err) {
-    await enviar(sock, `❌ Erro ao gerar CR para ID ${estado.idSaida}: ${err.message}\nGere manualmente.`)
+    // 🚨 ALERTA CRÍTICO - Correção manual de HM falhou ao gerar CR
+    await enviar(sock,
+      `🚨 *ERRO CRÍTICO - COBRANÇA NÃO GERADA*\n\n` +
+      `⚠️ *AÇÃO MANUAL NECESSÁRIA*\n\n` +
+      `*Tipo:* Correção Hora Motor (ADM)\n` +
+      `*ID Saída:* ${estado.idSaida}\n` +
+      `*Embarcação:* ${estado.emb}\n` +
+      `*Grupo:* ${estado.grupo}\n` +
+      `*Cliente:* ${estado.codAutorizado}\n` +
+      `*HM Saída:* ${formatarHM(estado.hmSaida || 0)}\n` +
+      `*HM Retorno:* ${formatarHM(estado.hmRetorno || 0)}\n\n` +
+      `*Erro:* ${err.message}\n\n` +
+      `⚠️ *GERAR COBRANÇA MANUALMENTE NO SISTEMA*`
+    )
   }
 }
 

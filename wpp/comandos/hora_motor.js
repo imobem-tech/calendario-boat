@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2605302224
+// wpp/comandos/hora_motor.js — V.2606010935
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -16,7 +16,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605302224'
+const VERSAO_HM = 'V.2606010935'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -451,8 +451,24 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
 
   } catch (err) {
     console.error('[HM_COBRANÇA] Erro ao gerar cobrança:', err.message)
+
+    // Alerta no grupo
     await enviar(sock, grupoId,
       `⚠️ Hora Motor registrada. Erro ao gerar cobrança automática: ${err.message}`
+    )
+
+    // 🚨 ALERTA CRÍTICO AO ADM
+    await alertarAdm(sock,
+      `🚨 *ERRO CRÍTICO - COBRANÇA NÃO GERADA*\n\n` +
+      `⚠️ *AÇÃO MANUAL NECESSÁRIA*\n\n` +
+      `*Tipo:* Hora Motor\n` +
+      `*Embarcação:* ${agendamento['Cod_Emb_PB']}\n` +
+      `*Grupo:* ${agendamento['Grupo_Comp_letra']}\n` +
+      `*Cliente:* ${agendamento['Cod_Autorizado']}\n` +
+      `*HM Saída:* ${hmSaida}\n` +
+      `*HM Retorno:* ${hmRetorno}\n\n` +
+      `*Erro:* ${err.message}\n\n` +
+      `⚠️ *VERIFICAR E GERAR COBRANÇA MANUALMENTE*`
     )
   }
 }
