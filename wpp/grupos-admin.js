@@ -10,6 +10,7 @@
 // ============================================================
 
 import pkg from 'pg'
+console.log('CARREGOU renomear-grupos.js V.2605310300')
 const { Pool } = pkg
 
 const pool = new Pool({

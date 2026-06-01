@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/renomear-grupos.js — V.2605310300
+// wpp/renomear-grupos.js — V.2605310625
 // Endpoint principal: POST /grupos/alterar
 //
 // Regra:
@@ -30,6 +30,8 @@ const pool = new Pool({
 })
 
 const ADM2_JID = '556332258473@s.whatsapp.net'
+
+console.log('CARREGOU renomear-grupos.js V.2605310625')
 
 // ------------------------------------------------------------
 // Utilidades
@@ -158,13 +160,16 @@ async function buscarColaboradoresCadastro(unidadeGrupo) {
 
   const rs = await pool.query(
     `SELECT DISTINCT
-        REPLACE(c."Cliente_Telefone_Celular", '+', '') || '@s.whatsapp.net' AS jid,
-        COALESCE(c."Ativo", true) AS ativo,
-        COALESCE(c."Administrador", false) AS admin,
-        UPPER(COALESCE(c."Unidade", '')) AS unidade
-       FROM public."Cliente" c
-      WHERE c."Cliente_Telefone_Celular" IS NOT NULL
-        AND UPPER(COALESCE(c."Unidade", '')) = UPPER($1)`,
+        CASE
+          WHEN wc."Lid" IS NOT NULL AND wc."Lid" <> ''
+            THEN REPLACE(wc."Lid", '@lid', '') || '@lid'
+          ELSE REPLACE(wc."Telefone", '+', '') || '@s.whatsapp.net'
+        END AS jid,
+        CASE WHEN UPPER(COALESCE(wc."Ativo", 'S')) = 'S' THEN true ELSE false END AS ativo,
+        CASE WHEN UPPER(COALESCE(wc."Administrador", 'N')) = 'S' THEN true ELSE false END AS admin,
+        $1 AS unidade
+       FROM public.wpp_colaboradores wc
+      WHERE wc."Telefone" IS NOT NULL`,
     [unidade]
   )
 
@@ -177,7 +182,6 @@ async function buscarColaboradoresCadastro(unidadeGrupo) {
     }))
     .filter(r => r.jid && unidadePermitida(r.unidade))
 }
-
 // ------------------------------------------------------------
 // WhatsApp base
 // ------------------------------------------------------------
@@ -200,21 +204,75 @@ async function garantirBotAdministrador(sock, grupoId) {
     throw new Error('Não foi possível identificar o JID do bot conectado')
   }
 
-  const participantes = await obterParticipantesGrupo(sock, grupoId)
-  const bot = participantes.find(p => p.id === botId)
+  const metadata = await sock.groupMetadata(grupoId)
+  const participantes = metadata?.participants || []
+
+  function normalizarJid(jid) {
+    if (!jid) return null
+
+    const s = String(jid)
+
+    if (s.includes('@lid')) {
+      const base = s.split('@')[0].split(':')[0]
+      return `${base}@lid`
+    }
+
+    if (s.includes('@s.whatsapp.net')) {
+      const base = s.split('@')[0].split(':')[0]
+      return `${base}@s.whatsapp.net`
+    }
+
+    return s
+  }
+
+  const possiveisIdsBot = [
+    botId,
+    sock?.user?.id,
+    sock?.user?.jid,
+    sock?.user?.lid
+  ]
+    .map(normalizarJid)
+    .filter(Boolean)
+
+  console.log('[DEBUG BOT]', {
+    grupoId,
+    botId,
+    sockUser: sock.user,
+    possiveisIdsBot,
+    totalParticipantes: participantes.length,
+    participantes: participantes.map(p => ({
+      id: p.id,
+      idNorm: normalizarJid(p.id),
+      lid: p.lid,
+      lidNorm: normalizarJid(p.lid),
+      admin: p.admin
+    }))
+  })
+
+  const bot = participantes.find(p =>
+    possiveisIdsBot.includes(normalizarJid(p.id)) ||
+    possiveisIdsBot.includes(normalizarJid(p.lid))
+  )
 
   if (!bot) {
-    throw new Error(`Bot não está no grupo ${grupoId}`)
+    throw new Error(
+      `Bot não localizado na lista de participantes do grupo ${grupoId}. Verifique logs [DEBUG BOT].`
+    )
   }
 
   if (!bot.admin) {
     throw new Error(
-      `Bot não é administrador no grupo ${grupoId}. ` +
-      `Não é possível alterar nome, remover, adicionar, promover ou rebaixar participantes.`
+      `Bot está no grupo ${grupoId}, mas não é administrador.`
     )
   }
 
-  return { botId, participantes }
+  return {
+    botId: normalizarJid(bot.id),
+    participantes: participantes.map(p => ({
+      id: p.id,
+      admin: p.admin || null
+    }))
+  }
 }
 
 async function renomearGrupo(sock, grupoId, nomeGrupo, addLog) {

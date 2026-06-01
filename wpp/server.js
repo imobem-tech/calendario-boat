@@ -37,6 +37,7 @@ import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605310001'
+console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
 const PORT = process.env.PORT || 8080
@@ -460,12 +461,14 @@ app.get('/botao_agenda_todos', async (req, res) => {
   }
 })
 
-app.post('/renomear-grupos', (req, res) => {
-  handleRenomearGrupos(req, res, () => sock, () => conectado)
-})
+
 
 app.post('/grupos/renomear', (req, res) => {
-  handleRenomearGrupoUnico(req, res, () => sock, () => conectado)
+  handleAlterarGrupo(req, res, () => sock, () => conectado)
+})
+
+app.post('/grupos/alterar', (req, res) => {
+  handleAlterarGrupo(req, res, () => sock, () => conectado)
 })
 
 app.post('/grupos/colaboradores/grupo', (req, res) => {
