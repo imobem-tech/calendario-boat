@@ -1,12 +1,12 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2606011743
+// wpp/comandos/retorno.js — V.2606011746
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
 import { MENU } from './menu.js'
 
-const VERSAO_RETORNO = 'V.2606011743'
+const VERSAO_RETORNO = 'V.2606011746'
 
 const CABECALHO_RETORNO =
 `\`\`\`Olá, sou o seu
@@ -288,7 +288,7 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     }, 60000)
 
     aguardandoRetorno.set(grupoId, {
-      ag: agPendente,
+      agendamentoId: agPendente['ID'],
       dadosRetorno,
       timeoutHandle
     })
