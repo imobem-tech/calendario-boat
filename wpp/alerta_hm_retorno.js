@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/alerta_hm_retorno.js — V.260601-HM11
+// wpp/alerta_hm_retorno.js — V.2606011928-HM11
 // Allmax Gestão de Cotas — Marujo⚓
 //
 // Rotina automática das 11h:
