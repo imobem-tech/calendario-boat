@@ -7,7 +7,7 @@
 
 # Node
 node_modules/
-package-lock.json
+# package-lock.json deve subir para produção garantir versões corretas
 
 # Scripts de teste/debug (não fazer deploy)
 testar_*.js
