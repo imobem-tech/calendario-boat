@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2606010945
+// wpp/comandos/retorno.js — V.2606011025
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
@@ -240,12 +240,15 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     // Usa a saída pendente
     const agPendente = rsPendente.rows[0]
     const dataAgendamento = agPendente.data_agendamento
-    const dtFormatada = new Date(dataAgendamento).toLocaleDateString('pt-BR', {
+
+    // Fix: Forçar interpretação como data local Brasil (evita bug de timezone)
+    const [ano, mes, dia] = String(dataAgendamento).split('-').map(Number)
+    const dataLocal = new Date(ano, mes - 1, dia)
+    const dtFormatada = dataLocal.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      timeZone: 'America/Sao_Paulo'
+      day: '2-digit'
     })
 
     // Segue o fluxo normal mas avisa que é de outro dia
