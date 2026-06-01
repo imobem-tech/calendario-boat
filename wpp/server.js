@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2605310001
+// wpp/server.js — V.2606011921
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
@@ -34,6 +34,8 @@ import { ehComandoRetorno, estaAguardandoRetorno, handleRetorno, handleConfirmac
 import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
+import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
+
 
 const { Pool } = pkg
 const VERSAO_WPP = 'Allmax®2605310001'
@@ -516,6 +518,22 @@ app.listen(PORT, () => {
     processandoFila = false
   }, 10000)
 
+
+let alertaHMUltimaData = ''
+
+setInterval(async () => {
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const hora  = agora.getHours()
+  const hoje  = agora.toISOString().slice(0, 10)
+
+  if (hora === 11 && alertaHMUltimaData !== hoje) {
+    alertaHMUltimaData = hoje
+    console.log('[HM_PENDENTE] Iniciando verificação diária das 11h...')
+    await enviarAlertasHMRetornoPendente(pool, sock, conectado).catch(console.error)
+  }
+}, 60000)
+
+  
   // Previsão diária às 8h — controla data para não enviar mais de uma vez por dia
   let previsaoDiariaUltimaData = ''
   setInterval(async () => {
