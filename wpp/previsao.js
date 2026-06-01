@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/previsao.js — V.2605301800
+// wpp/previsao.js — V.2606010927
 // Allmax Gestão de Cotas — Marujo⚓
 // Previsão de navegação via open-meteo.com
 // ============================================================
@@ -18,7 +18,7 @@ const LIM_RUIM_CHUVA_PCT    = 95
 const LIM_RUIM_CHUVA_MM     = 10
 const LIM_RUIM_RAJADA       = 50
 
-const DIAS_LIMITE = 16
+const DIAS_LIMITE = 15
 
 // ============================================================
 // HELPERS
