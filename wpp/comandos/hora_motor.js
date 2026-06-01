@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2606010935
+// wpp/comandos/hora_motor.js — V.2606010945
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -16,7 +16,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2606010935'
+const VERSAO_HM = 'V.2606010945'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -124,6 +124,25 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
      ORDER BY "Dt_Agendamento" ASC
      LIMIT 1
   `, [codEmbPb, grupoCompLetra, hoje])
+
+  return rs.rows[0] || null
+}
+
+async function buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra) {
+  // Busca agendamentos com saída registrada mas sem HM_Retorno (de qualquer dia)
+  const rs = await pool.query(`
+    SELECT *,
+           DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') as data_agendamento
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
+       AND "Dt_Saída" IS NOT NULL
+       AND "Hora_Motor_Retorno" IS NULL
+       AND "Dt_Desistencia" IS NULL
+       AND "Dt_Cancela_saida" IS NULL
+     ORDER BY "Dt_Saída" DESC
+     LIMIT 1
+  `, [codEmbPb, grupoCompLetra])
 
   return rs.rows[0] || null
 }
@@ -769,11 +788,21 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   }
 
   // Busca agendamento de hoje
-  const agendamento = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
+  let agendamento = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
+  let ehPendente = false
+  let dataPendente = null
 
+  // Se não encontrou hoje, busca pendências de HM_Retorno de dias anteriores
   if (!agendamento) {
-    await enviar(sock, grupoId, `Não há agendamento ativo para hoje.\n${VERSAO_HM}`)
-    return true
+    agendamento = await buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra)
+
+    if (!agendamento) {
+      await enviar(sock, grupoId, `Não há agendamento ativo para hoje nem pendências de Hora Motor.\n${VERSAO_HM}`)
+      return true
+    }
+
+    ehPendente = true
+    dataPendente = agendamento.data_agendamento
   }
 
   // Verifica Cod_Proprietário
@@ -784,8 +813,21 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
     return true
   }
 
-  const cabecalho = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'])
-  const key       = chaveEstado(grupoId, remetente)
+  let cabecalho = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'])
+
+  // Se for pendente, adiciona aviso da data
+  if (ehPendente && dataPendente) {
+    const dtFormatada = new Date(dataPendente).toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    })
+    cabecalho += `\n\n⚠️ *Pendência de HM_Retorno*\nde ${dtFormatada}`
+  }
+
+  const key = chaveEstado(grupoId, remetente)
 
   await executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key, colaborador)
   return true

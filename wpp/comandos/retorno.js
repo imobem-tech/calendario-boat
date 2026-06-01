@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2606010923
+// wpp/comandos/retorno.js — V.2606010945
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
@@ -196,11 +196,93 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     )
   }
 
-  // Caso A — sem agendamento hoje
+  // Caso A — sem agendamento hoje → buscar saídas pendentes de dias anteriores
   if (rsAg.rowCount === 0) {
-    await sock.sendMessage(grupoId, {
-      text: `ℹ️ Não encontrei agendamento para hoje.${MENU}`
+    let rsPendente
+    if (cota) {
+      rsPendente = await pool.query(
+        `SELECT "ID", "Dt_Saída", "Dt_Retorno", "Cod_Autorizado", "Grupo_Comp_letra",
+                DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') as data_agendamento
+           FROM public."P_BOAT_z_10_Saida_Emb"
+          WHERE "Cod_Emb_PB" = $1
+            AND "Grupo_Comp_letra" = $2
+            AND "Dt_Saída" IS NOT NULL
+            AND "Dt_Retorno" IS NULL
+            AND "Dt_Desistencia" IS NULL
+            AND "Dt_Cancela_saida" IS NULL
+          ORDER BY "Dt_Saída" DESC
+          LIMIT 1`,
+        [pb, cota]
+      )
+    } else {
+      rsPendente = await pool.query(
+        `SELECT "ID", "Dt_Saída", "Dt_Retorno", "Cod_Autorizado", "Grupo_Comp_letra",
+                DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') as data_agendamento
+           FROM public."P_BOAT_z_10_Saida_Emb"
+          WHERE "Cod_Emb_PB" = $1
+            AND "Dt_Saída" IS NOT NULL
+            AND "Dt_Retorno" IS NULL
+            AND "Dt_Desistencia" IS NULL
+            AND "Dt_Cancela_saida" IS NULL
+          ORDER BY "Dt_Saída" DESC
+          LIMIT 1`,
+        [pb]
+      )
+    }
+
+    if (rsPendente.rowCount === 0) {
+      await sock.sendMessage(grupoId, {
+        text: `ℹ️ Não encontrei agendamento para hoje nem saídas pendentes de retorno.${MENU}`
+      })
+      return
+    }
+
+    // Usa a saída pendente
+    const agPendente = rsPendente.rows[0]
+    const dataAgendamento = agPendente.data_agendamento
+    const dtFormatada = new Date(dataAgendamento).toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'America/Sao_Paulo'
     })
+
+    // Segue o fluxo normal mas avisa que é de outro dia
+    const codAutorizado = agPendente['Cod_Autorizado']
+    const grupoLetra = agPendente['Grupo_Comp_letra']
+    const numeroRemetente = String(remetente || '').replace('@s.whatsapp.net', '').replace(/\D/g, '')
+
+    const [nomeAutorizado, nomeRemetente, comanda] = await Promise.all([
+      buscarNomeAutorizado(pool, codAutorizado),
+      buscarNomeRemetente(pool, numeroRemetente),
+      buscarComandaAberta(pool, codAutorizado)
+    ])
+
+    const dadosRetorno = { pb, grupoLetra, codAutorizado, nomeAutorizado, nomeRemetente, comanda }
+
+    const nomeAutExibido = nomeAutorizado || `Autorizado: ${codAutorizado}`
+    let textoConfirmacao = `❓ Confirma retorno S/N\n\n*Pendência de retorno*\nde ${dtFormatada}\n\n${nomeAutExibido}`
+    if (nomeRemetente) textoConfirmacao += `\n${nomeRemetente}`
+    textoConfirmacao += `\nEmb ${pb}-${grupoLetra}`
+
+    await sock.sendMessage(grupoId, { text: textoConfirmacao })
+
+    const timeoutHandle = setTimeout(async () => {
+      if (aguardandoRetorno.has(grupoId)) {
+        aguardandoRetorno.delete(grupoId)
+        await sock.sendMessage(grupoId, {
+          text: `⏱️ Tempo expirado, retorno Não Confirmado.${MENU}`
+        })
+      }
+    }, 60000)
+
+    aguardandoRetorno.set(grupoId, {
+      ag: agPendente,
+      dadosRetorno,
+      timeoutHandle
+    })
+
     return
   }
 
