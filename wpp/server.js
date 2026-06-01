@@ -4,7 +4,15 @@
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
-import 'dotenv/config'
+// Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+  try {
+    await import('dotenv/config')
+  } catch (err) {
+    console.warn('⚠️ dotenv não encontrado (ok em produção com variáveis de ambiente)')
+  }
+}
+
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'
