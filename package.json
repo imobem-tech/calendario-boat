@@ -7,10 +7,10 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
+    "dotenv": "^17.4.2",
     "express": "latest",
     "pg": "latest",
     "pino": "latest",
     "qrcode": "latest"
   }
 }
- 

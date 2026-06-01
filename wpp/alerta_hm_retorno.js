@@ -14,9 +14,8 @@
 const TIMEZONE_BR = 'America/Sao_Paulo'
 
 // ID do grupo espelho de retorno.
-// Se no seu projeto este ID estiver em outro lugar, mantenha este valor igual ao grupo usado pelo retorno.js.
-// Pelo pacote enviado, o único grupo fixo encontrado no fluxo WPP foi este.
-const GRUPO_ESPELHO_RETORNO_ID = '120363330197701730@g.us'
+// Este é o grupo onde são espelhadas as confirmações de retorno e alertas de HM pendente.
+const GRUPO_ESPELHO_RETORNO_ID = '120363426928542914@g.us'
 
 const PAUSA_ENTRE_ENVIOS_MS = 1800
 

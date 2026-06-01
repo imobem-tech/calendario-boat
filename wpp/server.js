@@ -4,6 +4,7 @@
 // Inicialização, conexão WhatsApp e rotas HTTP
 // ============================================================
 
+import 'dotenv/config'
 import express from 'express'
 import QRCode from 'qrcode'
 import P from 'pino'

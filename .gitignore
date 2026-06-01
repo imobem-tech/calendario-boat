@@ -1,0 +1,30 @@
+# Vercel
+.vercel
+
+# Environment
+.env
+.env*
+
+# Node
+node_modules/
+package-lock.json
+
+# Scripts de teste/debug (não fazer deploy)
+testar_*.js
+debug_*.js
+enviar_alerta_wpp.js
+enviar_alerta_railway.js
+forcar_alerta_hm.js
+buscar_grupo_espelho.js
+__send_boleto.mjs
+
+# WhatsApp auth data
+wpp/data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
