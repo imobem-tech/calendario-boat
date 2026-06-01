@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2606010945
+// wpp/comandos/hora_motor.js — V.2606010950
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -16,7 +16,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2606010945'
+const VERSAO_HM = 'V.2606010950'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -130,12 +130,14 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
 
 async function buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra) {
   // Busca agendamentos com saída registrada mas sem HM_Retorno (de qualquer dia)
+  // APENAS para embarcações da ALLMAX (Cod_Proprietário = 4255)
   const rs = await pool.query(`
     SELECT *,
            DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') as data_agendamento
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
+       AND "Cod_Proprietário" = 4255
        AND "Dt_Saída" IS NOT NULL
        AND "Hora_Motor_Retorno" IS NULL
        AND "Dt_Desistencia" IS NULL
