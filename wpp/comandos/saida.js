@@ -2,6 +2,7 @@
 // COMANDO SSS — REGISTRO DE SAÍDA
 // Allmax Gestão de Cotas
 // Compatível com pg Pool
+// V.2605311552
 //
 // Comandos:
 //   sss / ssss / SSS  => inicia registro de saída
@@ -11,7 +12,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2605271600'
+const VERSAO_SAIDA = 'V.2605310539'
 
 // ============================================================
 // HELPERS
@@ -327,6 +328,27 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
 }
 
 // ============================================================
+// VERIFICA INADIMPLÊNCIA
+// ============================================================
+
+async function verificarInadimplencia(pool, codAutorizado) {
+  if (!codAutorizado || codAutorizado <= 0) return false
+
+  const rs = await pool.query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM public."Contas_Receber"
+        WHERE "Código_Cliente" = $1
+          AND "Data_Pagamento" IS NULL
+          AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
+     ) AS inadimplente`,
+    [codAutorizado]
+  )
+
+  return rs.rows[0]?.inadimplente === true
+}
+
+// ============================================================
 // REGISTROS
 // ============================================================
 
@@ -427,6 +449,33 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   if (saida['Dt_Saída']) {
     await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
     return true
+  }
+
+  // ----------------------------------------------------------
+  // Verifica inadimplência do Cod_Autorizado
+  // ----------------------------------------------------------
+  const codAutorizado = Number(
+    saida['Cod_Autorizado'] ??
+    saida['cod_autorizado'] ??
+    0
+  )
+
+  if (codAutorizado > 0) {
+    try {
+      const inadimplente = await verificarInadimplencia(pool, codAutorizado)
+
+      if (inadimplente) {
+        console.log('[SAIDA_BLOQUEADA] Inadimplente:', { codAutorizado, codEmbPb, grupoCompLetra })
+        await enviar(sock, grupoId,
+          `⛔ *SAÍDA BLOQUEADA*\n\n` +
+          `Cliente Cód. ${codAutorizado} possui conta(s) vencida(s) há mais de 3 dias.\n\n` +
+          `Regularize a situação financeira para liberar a saída.\n\n${VERSAO_SAIDA}`
+        )
+        return true
+      }
+    } catch (errInadim) {
+      console.warn('[SAIDA] Falha ao verificar inadimplência, liberando saída:', errInadim.message)
+    }
   }
 
   const key = chaveEstado(grupoId, remetente)

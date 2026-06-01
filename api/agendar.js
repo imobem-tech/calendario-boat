@@ -1,11 +1,12 @@
 // ============================================================
-// wpp/agendar.js — V.2605282129
+// /api/agendar — V.2606010905
 // Allmax Gestão de Cotas — Marujo⚓
+// MERGE: Main + OneDrive (validação inadimplência + cabeçalho)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605221942";
+const VERSAO_API = "Allmax®2606010905";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -227,6 +228,24 @@ export default async function handler(req, res) {
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
     client = await pool.connect();
+
+    const rsInadim = await client.query(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM public."Contas_Receber"
+          WHERE "Código_Cliente" = $1
+            AND "Data_Pagamento" IS NULL
+            AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
+       ) AS inadimplente`,
+      [codAutorizado]
+    );
+
+    if (rsInadim.rows[0]?.inadimplente === true) {
+      return res.status(403).json({
+        error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
+        versao: VERSAO_API
+      });
+    }
 
     await client.query("BEGIN");
 

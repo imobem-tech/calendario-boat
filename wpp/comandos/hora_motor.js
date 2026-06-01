@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2605282316
+// wpp/comandos/hora_motor.js — V.2605302224
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -16,7 +16,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2605282316'
+const VERSAO_HM = 'V.2605302224'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -118,7 +118,7 @@ async function buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra) {
       FROM public."P_BOAT_z_10_Saida_Emb"
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
-       AND "Dt_Agendamento"::date = $3::date
+       AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
        AND "Dt_Desistencia"   IS NULL
        AND "Dt_Cancela_saida" IS NULL
      ORDER BY "Dt_Agendamento" ASC
@@ -325,9 +325,10 @@ async function gravarHoraMotorSaida(pool, id, valor) {
 
 async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
   try {
-    const codEmb = Number(agendamento['Cod_Emb_PB'] ?? agendamento['Cod_Emb_PB'])
-    const hmSaida   = Number(agendamento['Hora_Motor_Saida'])
-    const hmRetorno = Number(agendamento['Hora_Motor_Retorno'])
+    const codEmb    = Number(agendamento['Cod_Emb_PB'])
+    // Bug 5: campo pode vir do banco como string com vírgula ou como number — normaliza antes do Number()
+    const hmSaida   = Number(String(agendamento['Hora_Motor_Saida']  ?? '').replace(',', '.'))
+    const hmRetorno = Number(String(agendamento['Hora_Motor_Retorno'] ?? '').replace(',', '.'))
 
     console.log('[HM_COBRANÇA] Iniciando', { codEmb, hmSaida, hmRetorno, codAutorizado: agendamento['Cod_Autorizado'] })
 
@@ -359,8 +360,21 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
 
     if (!tarifa || !tarifa.Vinculo_Hora_Motor || tarifa.Valor_Hora_Motor <= 0) {
       console.warn('[HM_COBRANÇA] Embarcação sem tarifa configurada, cobrança não gerada')
+      const cabSemTarifa = cabecalhoAlerta(
+        agendamento['ID'], codEmb,
+        agendamento['Grupo_Comp_letra'],
+        agendamento['Dt_Agendamento'],
+        agendamento['Colab_Responsavel'] || 'Colaborador'
+      )
+      await alertarAdm(sock,
+        `🔴 *SEM TARIFA — COBRANÇA MANUAL NECESSÁRIA*\n${cabSemTarifa}\n` +
+        `HM Saída: ${String(hmSaida).replace('.', ',')} / HM Retorno: ${String(hmRetorno).replace('.', ',')}\n` +
+        `HM usado: ${String(Number((hmRetorno - hmSaida).toFixed(1))).replace('.', ',')}h\n` +
+        `Embarcação ${codEmb} sem tarifa de Hora Motor configurada.\n` +
+        `Ação: efetuar cobrança manual.`
+      )
       await enviar(sock, grupoId,
-        `⚠️ Hora Motor registrada, mas embarcação sem tarifa configurada. Cobrança não gerada.`
+        `⚠️ Hora Motor registrada. Cobrança não gerada automaticamente — administrador notificado.\n${VERSAO_HM}`
       )
       return
     }
@@ -455,7 +469,7 @@ async function gravarHoraMotorRetorno(pool, id, valor) {
 // ETAPAS DO FLUXO
 // ============================================================
 
-async function executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key) {
+async function executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key, colaborador) {
   const horaMotorSaida = agendamento['Hora_Motor_Saida']
   const temHoraSaida   = horaMotorSaida !== null && horaMotorSaida !== undefined && horaMotorSaida !== ''
 
@@ -464,7 +478,8 @@ async function executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabec
     estadosHoraMotor.set(key, {
       etapa: 'aguardando_hora_motor_saida',
       agendamento,
-      cabecalho
+      cabecalho,
+      colaborador
     })
 
     await enviar(sock, grupoId,
@@ -474,10 +489,21 @@ async function executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabec
   }
 
   // Hora motor saída já preenchida — vai para Etapa 2
-  await executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabecalho, key)
+  await executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabecalho, key, colaborador)
 }
 
-async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabecalho, key) {
+async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabecalho, key, colaborador) {
+  // Bug 3: Relê o agendamento do banco para garantir Dt_Retorno atualizado
+  // (o objeto em memória pode ter sido carregado antes do retorno ser registrado)
+  try {
+    const rsAtual = await pool.query(`
+      SELECT * FROM public."P_BOAT_z_10_Saida_Emb" WHERE "ID" = $1 LIMIT 1
+    `, [agendamento['ID']])
+    if (rsAtual.rows[0]) agendamento = rsAtual.rows[0]
+  } catch (errReleitura) {
+    console.warn('[HM_ETAPA2] Falha ao reler agendamento, usando objeto em memória:', errReleitura.message)
+  }
+
   const dtRetorno = agendamento['Dt_Retorno']
 
   if (!dtRetorno) {
@@ -501,7 +527,8 @@ async function executarEtapa2(sock, pool, grupoId, remetente, agendamento, cabec
   estadosHoraMotor.set(key, {
     etapa: 'aguardando_hora_motor_retorno',
     agendamento,
-    cabecalho
+    cabecalho,
+    colaborador
   })
 
   await enviar(sock, grupoId,
@@ -639,19 +666,33 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
 
     const valor = Number(estado.horaInformada.replace(',', '.'))
 
-    // CRÍTICA HM RETORNO
-    const critica = await criticarHMRetorno(
-      sock, pool,
-      estado.agendamento['ID'],
-      estado.agendamento['Cod_Emb_PB'],
-      estado.agendamento['Grupo_Comp_letra'],
-      estado.agendamento['Dt_Agendamento'],
-      estado.agendamento['Dt_Saída'],
-      estado.agendamento['Dt_Retorno'],
-      estado.colaborador?.Nome || 'Colaborador',
-      Number(estado.agendamento['Hora_Motor_Saida']),
-      valor
-    )
+    // Bug 5: garantir que hmSaida seja número válido mesmo quando Etapa 1 foi pulada
+    const hmSaidaRaw = estado.agendamento['Hora_Motor_Saida']
+    const hmSaidaNormalizado = Number(String(hmSaidaRaw ?? '').replace(',', '.'))
+
+    // Snapshot antes de ops assíncronas — evita referência inválida pós-delete do Map
+    const agendamentoSnap = estado.agendamento
+    const horaInformadaSnap = estado.horaInformada
+
+    // Bug novo: alertarAdm pode falhar (sock instável, rate limit) — captura para não travar o estado
+    let critica
+    try {
+      critica = await criticarHMRetorno(
+        sock, pool,
+        agendamentoSnap['ID'],
+        agendamentoSnap['Cod_Emb_PB'],
+        agendamentoSnap['Grupo_Comp_letra'],
+        agendamentoSnap['Dt_Agendamento'],
+        agendamentoSnap['Dt_Saída'],
+        agendamentoSnap['Dt_Retorno'],
+        estado.colaborador?.Nome || 'Colaborador',
+        hmSaidaNormalizado,
+        valor
+      )
+    } catch (errCritica) {
+      console.warn('[HM_RETORNO] Erro nas críticas (alertarAdm), continuando fluxo:', errCritica.message)
+      critica = { bloqueado: false }
+    }
 
     if (critica.bloqueado) {
       estadosHoraMotor.delete(key)
@@ -661,20 +702,29 @@ async function tratarEstadoHoraMotor(sock, pool, grupoId, remetente, texto) {
       return true
     }
 
-    await gravarHoraMotorRetorno(pool, estado.agendamento['ID'], valor)
+    // Bug 4: try/catch garante feedback e limpeza mesmo se banco falhar
+    try {
+      await gravarHoraMotorRetorno(pool, agendamentoSnap['ID'], valor)
+    } catch (errGravacao) {
+      console.error('[HM_RETORNO] Erro ao gravar HM retorno:', errGravacao.message)
+      estadosHoraMotor.delete(key)
+      await enviar(sock, grupoId,
+        `⚠️ Erro ao gravar Hora Motor de Retorno. Tente novamente ou acione o administrador.\n${VERSAO_HM}`
+      )
+      return true
+    }
 
-    // Atualiza o agendamento em memória com o retorno gravado
-    estado.agendamento['Hora_Motor_Retorno'] = valor
-
+    // Limpa estado ANTES de enviar mensagens — nunca fica travado independente do que vier depois
+    agendamentoSnap['Hora_Motor_Retorno'] = valor
     estadosHoraMotor.delete(key)
 
     await enviar(sock, grupoId,
-      `✅ *Hora Motor de Retorno registrada: ${estado.horaInformada}*\n\n` +
-      `Emb: ${estado.agendamento['Cod_Emb_PB']} / Grupo: ${estado.agendamento['Grupo_Comp_letra']}\n${VERSAO_HM}`
+      `✅ *Hora Motor de Retorno registrada: ${horaInformadaSnap}*\n\n` +
+      `Emb: ${agendamentoSnap['Cod_Emb_PB']} / Grupo: ${agendamentoSnap['Grupo_Comp_letra']}\n${VERSAO_HM}`
     )
 
-    // Gera cobrança automática
-    await gerarCobrancaHoraMotor(sock, pool, grupoId, estado.agendamento)
+    // Gera cobrança automática (falha aqui não afeta o HM já gravado)
+    await gerarCobrancaHoraMotor(sock, pool, grupoId, agendamentoSnap)
 
     return true
   }
@@ -721,7 +771,7 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   const cabecalho = montarCabecalho(codEmbPb, grupoCompLetra, agendamento['Dt_Agendamento'])
   const key       = chaveEstado(grupoId, remetente)
 
-  await executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key)
+  await executarEtapa1(sock, pool, grupoId, remetente, agendamento, cabecalho, key, colaborador)
   return true
 }
 
