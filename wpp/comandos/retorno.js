@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2605282103
+// wpp/comandos/retorno.js — V.2606010923
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
@@ -240,13 +240,7 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
   if (nomeRemetente) textoConfirmacao += `\n${nomeRemetente}`
   textoConfirmacao += `\nEmb ${pb}-${grupoLetra}`
 
-  if (comanda) {
-    const valorFmt = comanda.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-    textoConfirmacao += `\n⚠️ Comanda aberta R$ ${valorFmt}`
-  }
+  // Comanda aberta será mostrada apenas APÓS confirmação do retorno
 
   await sock.sendMessage(grupoId, { text: textoConfirmacao })
 
