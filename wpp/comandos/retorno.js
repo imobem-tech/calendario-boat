@@ -1,12 +1,12 @@
 // ============================================================
-// wpp/comandos/retorno.js — V.2606011030
+// wpp/comandos/retorno.js — V.2606011045
 // Allmax Gestão de Cotas — Marujo⚓
 // ============================================================
 
 import { buscarGrupoInfo } from '../db.js'
 import { MENU } from './menu.js'
 
-const VERSAO_RETORNO = 'V.2606011030'
+const VERSAO_RETORNO = 'V.2606011045'
 
 const CABECALHO_RETORNO =
 `\`\`\`Olá, sou o seu
@@ -244,10 +244,13 @@ export async function handleRetorno(sock, pool, grupoId, remetente) {
     const dataAgendamento = agPendente.data_agendamento
 
     // Fix: Forçar interpretação como data local Brasil (evita bug de timezone)
-    // Extrai ano, mês, dia da string ISO (2026-05-01) e cria Date local
-    const dataStr = String(dataAgendamento).split('T')[0] // Garante pegar só a data
-    const [ano, mes, dia] = dataStr.split('-').map(Number)
-    const dataLocal = new Date(ano, mes - 1, dia, 12, 0, 0) // Meio-dia evita bugs de DST
+    // dataAgendamento vem como Date object do PostgreSQL
+    // Extrai ano, mês, dia diretamente do objeto Date
+    const dataObj = new Date(dataAgendamento)
+    const ano = dataObj.getUTCFullYear()
+    const mes = dataObj.getUTCMonth()
+    const dia = dataObj.getUTCDate()
+    const dataLocal = new Date(ano, mes, dia, 12, 0, 0) // Meio-dia evita bugs de DST
     const dtFormatada = dataLocal.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
