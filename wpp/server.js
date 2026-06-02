@@ -63,8 +63,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
-// Pasta public está um nível acima de wpp/
-const publicPath = path.join(__dirname, '..', 'public')
+// No Railway, o working dir é a raiz do projeto, então public/ fica em ./public
+const publicPath = path.join(process.cwd(), 'public')
+console.log('📁 Working directory:', process.cwd())
 console.log('📁 Servindo arquivos estáticos de:', publicPath)
 app.use(express.static(publicPath))
 
@@ -381,17 +382,22 @@ app.get('/grupos', async (req, res) => {
 
 // Rota de debug para verificar arquivos na pasta public
 app.get('/debug-files', (req, res) => {
-  const publicPath = path.join(__dirname, '..', 'public')
+  const publicPath = path.join(process.cwd(), 'public')
 
   try {
     const files = fs.readdirSync(publicPath)
     res.json({
+      cwd: process.cwd(),
       publicPath,
       filesExist: files,
       rastrearExists: fs.existsSync(path.join(publicPath, 'rastrear.html'))
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(500).json({
+      error: err.message,
+      cwd: process.cwd(),
+      publicPath: path.join(process.cwd(), 'public')
+    })
   }
 })
 
