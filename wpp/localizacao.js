@@ -231,18 +231,25 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
       }
 
       if (precisaRenovar || !messageKey) {
-        // RENOVAÇÃO: Deletar mensagem antiga + Criar nova
+        // RENOVAÇÃO: Editar antiga para "atualizaremos..." + Criar nova
         if (precisaRenovar && messageKey) {
           try {
-            const keyParaDeletar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
-            await sock.sendMessage(grupoId, { delete: keyParaDeletar })
-            console.log(`🗑️ Mensagem antiga deletada no grupo ${grupoId}`)
-          } catch (errDel) {
-            console.warn(`⚠️ Não conseguiu deletar mensagem antiga: ${errDel.message}`)
+            const keyParaEditar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
+
+            // Mensagem elegante de transição
+            const msgTransicao = `⏳ *Atualizaremos o ranking...*`
+
+            await sock.sendMessage(grupoId, {
+              text: msgTransicao,
+              edit: keyParaEditar
+            })
+            console.log(`✏️ Mensagem antiga editada para transição no grupo ${grupoId}`)
+          } catch (errEdit) {
+            console.warn(`⚠️ Não conseguiu editar para transição: ${errEdit.message}`)
           }
         }
 
-        // Criar nova mensagem
+        // Criar nova mensagem atualizada
         const sentMsg = await sock.sendMessage(grupoId, { text: mensagemRanking })
 
         // Salvar nova messageKey com timestamp de renovação
@@ -254,7 +261,7 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
         )
 
         if (precisaRenovar) {
-          console.log(`🔄 Ranking RENOVADO no grupo ${grupoId} (14min expirados - deletou + criou nova)`)
+          console.log(`🔄 Ranking RENOVADO no grupo ${grupoId} (14min expirados - editou transição + criou nova)`)
         } else {
           console.log(`📤 Ranking CRIADO no grupo ${grupoId}`)
         }
@@ -275,14 +282,17 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
 
           console.log(`📝 Ranking editado no grupo ${grupoId}`)
         } catch (errEdit) {
-          // Se falhar edição, deleta a antiga e cria nova (renovação forçada)
-          console.warn(`⚠️ Falha ao editar, deletando antiga e criando nova: ${errEdit.message}`)
+          // Se falhar edição, edita para transição e cria nova (renovação forçada)
+          console.warn(`⚠️ Falha ao editar, forçando renovação: ${errEdit.message}`)
 
           try {
-            const keyParaDeletar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
-            await sock.sendMessage(grupoId, { delete: keyParaDeletar })
-          } catch (errDel) {
-            console.warn(`   ⚠️ Não conseguiu deletar: ${errDel.message}`)
+            const keyParaEditar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
+            await sock.sendMessage(grupoId, {
+              text: `⏳ *Atualizaremos o ranking...*`,
+              edit: keyParaEditar
+            })
+          } catch (errEdit2) {
+            console.warn(`   ⚠️ Não conseguiu editar para transição: ${errEdit2.message}`)
           }
 
           const sentMsg = await sock.sendMessage(grupoId, { text: mensagemRanking })
