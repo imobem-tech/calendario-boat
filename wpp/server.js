@@ -15,6 +15,8 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
 }
 
 import express from 'express'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
@@ -55,8 +57,13 @@ console.log('VERSAO SERVER:', VERSAO_WPP)
 const app = express()
 const PORT = process.env.PORT || 8080
 
+// Resolver caminho absoluto para ESM
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
-app.use(express.static('public'))
+// Pasta public está um nível acima de wpp/
+app.use(express.static(path.join(__dirname, '..', 'public')))
 
 app.use(express.json())
 app.use('/msg_externa', retornoRoutes)
