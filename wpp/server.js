@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/server.js — V.2606011921
+// wpp/server.js — V.2606021240
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
+// + Localização em tempo real dispara retorno automático
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -47,7 +48,7 @@ import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2605310001'
+const VERSAO_WPP = 'Allmax®2606021240'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -161,6 +162,17 @@ async function iniciarBot() {
           const grupoId = msg.key.remoteJid
           // Remetente: em grupos vem em msg.key.participant
           const remetente = msg.key.participant || msg.key.remoteJid
+
+          // ============================================================
+          // LOCALIZAÇÃO EM TEMPO REAL → Dispara retorno automaticamente
+          // ============================================================
+          const liveLocation = msg.message?.liveLocationMessage
+          if (liveLocation) {
+            console.log(`📍 Localização em tempo real recebida no grupo ${grupoId} — disparando retorno automático`)
+            await handleRetorno(sock, pool, grupoId, remetente)
+            continue
+          }
+
           const texto = (
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
