@@ -396,5 +396,127 @@ ${VERSAO_LOCALIZACAO}`
 }
 
 // ============================================================
+// VERIFICAR POSIÇÕES EXPIRADAS (ROTINA AUTOMÁTICA A CADA 1 MIN)
+// ============================================================
+export async function verificarPosicoesExpiradas(sock, pool) {
+  const TEMPO_EXPIRACAO_MS = 30 * 60 * 1000 // 30 minutos
+
+  try {
+    // Buscar todos com posição recente (em processo de retorno)
+    const rsAtivos = await pool.query(`
+      WITH ultimas_posicoes AS (
+        SELECT DISTINCT ON (agendamento_id)
+          l.agendamento_id,
+          l.pb,
+          l.cota,
+          l.criado_em,
+          g.grupowppid,
+          e."Nome_Embar" as nome_embarcacao,
+          EXTRACT(EPOCH FROM (NOW() - l.criado_em)) * 1000 as ms_desde_ultima_posicao
+        FROM public.wpp_localizacao_emb l
+        LEFT JOIN public.wpp_grupos_agenda g
+          ON g.pb = l.pb
+          AND UPPER(COALESCE(g.cota, '')) = UPPER(COALESCE(l.cota, ''))
+        LEFT JOIN public."P_BOAT_1_Embarcacao" e
+          ON e."Num_PB" = l.pb
+        WHERE l.agendamento_id IN (
+          SELECT s."ID"
+          FROM public."P_BOAT_z_10_Saida_Emb" s
+          WHERE DATE(s."Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') =
+                (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+            AND s."Dt_Saída" IS NOT NULL
+            AND s."Dt_Retorno" IS NULL
+            AND s."Dt_Desistencia" IS NULL
+            AND s."Dt_Cancela_saida" IS NULL
+        )
+        ORDER BY agendamento_id, l.criado_em DESC
+      )
+      SELECT *
+      FROM ultimas_posicoes
+      WHERE ms_desde_ultima_posicao >= $1
+    `, [TEMPO_EXPIRACAO_MS])
+
+    if (rsAtivos.rowCount === 0) {
+      // Ninguém expirado
+      return { temFilaAtiva: true, expirados: 0 }
+    }
+
+    console.log(`⏰ [EXPIRAÇÃO] ${rsAtivos.rowCount} embarcação(ões) com localização expirada`)
+
+    // Para cada expirado: avisar no grupo específico
+    for (const exp of rsAtivos.rows) {
+      if (!exp.grupowppid) continue
+
+      const embId = `${exp.pb}-${exp.cota || '?'}`
+      const nomeEmb = exp.nome_embarcacao || 'Embarcação'
+      const minutosAtras = Math.round(exp.ms_desde_ultima_posicao / 60000)
+
+      const msgExpiracao = `
+⚠️ *LOCALIZAÇÃO EXPIRADA*
+
+🚤 ${embId} ${nomeEmb}
+
+Sua localização em tempo real
+parou de ser compartilhada.
+
+⏰ Última posição: há ${minutosAtras} min
+
+Você saiu do *Ranking de Retorno*.
+
+Para voltar, compartilhe
+localização em tempo real novamente.
+
+${VERSAO_LOCALIZACAO}`
+
+      try {
+        await sock.sendMessage(exp.grupowppid, { text: msgExpiracao })
+        console.log(`   📤 Aviso enviado para grupo ${exp.grupowppid}`)
+      } catch (err) {
+        console.error(`   ❌ Erro ao enviar aviso para ${exp.grupowppid}:`, err.message)
+      }
+    }
+
+    // Buscar ranking atualizado (sem os expirados)
+    const ranking = await buscarRankingAtual(pool)
+
+    // Atualizar ranking em todos os grupos
+    await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+
+    console.log(`✅ [EXPIRAÇÃO] Ranking atualizado em todos os grupos (${rsAtivos.rowCount} removidos)`)
+
+    // Verificar se ainda tem fila ativa
+    const rsVerificaFila = await pool.query(`
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT DISTINCT ON (agendamento_id)
+          agendamento_id,
+          criado_em
+        FROM public.wpp_localizacao_emb
+        WHERE agendamento_id IN (
+          SELECT s."ID"
+          FROM public."P_BOAT_z_10_Saida_Emb" s
+          WHERE DATE(s."Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') =
+                (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+            AND s."Dt_Saída" IS NOT NULL
+            AND s."Dt_Retorno" IS NULL
+            AND s."Dt_Desistencia" IS NULL
+            AND s."Dt_Cancela_saida" IS NULL
+        )
+        ORDER BY agendamento_id, criado_em DESC
+      ) ultimas
+      WHERE EXTRACT(EPOCH FROM (NOW() - criado_em)) * 1000 < $1
+    `, [TEMPO_EXPIRACAO_MS])
+
+    const filaAtiva = parseInt(rsVerificaFila.rows[0]?.total || 0) > 0
+
+    return { temFilaAtiva: filaAtiva, expirados: rsAtivos.rowCount }
+
+  } catch (err) {
+    console.error('❌ [EXPIRAÇÃO] Erro ao verificar posições:', err.message)
+    return { temFilaAtiva: true, expirados: 0 } // Assume ativo em caso de erro
+  }
+}
+
+// ============================================================
 // V.2606021250
 // ============================================================

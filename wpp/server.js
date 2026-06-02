@@ -45,7 +45,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
-import { handleLocalizacao } from './localizacao.js'
+import { handleLocalizacao, verificarPosicoesExpiradas } from './localizacao.js'
 
 
 const { Pool } = pkg
@@ -613,4 +613,34 @@ setInterval(async () => {
       await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
     }
   }, 60000)
+
+  // ============================================================
+  // VERIFICAÇÃO DE POSIÇÕES EXPIRADAS
+  // A cada 1 minuto SE tiver fila ativa
+  // Dorme se não houver ninguém compartilhando localização
+  // ============================================================
+  let intervaloPosicoes = null
+
+  async function verificarEAgendar() {
+    if (!conectado || !sock) return
+
+    const resultado = await verificarPosicoesExpiradas(sock, pool).catch(err => {
+      console.error('[EXPIRAÇÃO] Erro na verificação:', err.message)
+      return { temFilaAtiva: true, expirados: 0 }
+    })
+
+    if (!resultado.temFilaAtiva && intervaloPosicoes) {
+      // Fila vazia - dorme
+      console.log('[EXPIRAÇÃO] Fila vazia - pausando verificações')
+      clearInterval(intervaloPosicoes)
+      intervaloPosicoes = null
+    } else if (resultado.temFilaAtiva && !intervaloPosicoes) {
+      // Fila ativa mas intervalo não está rodando - reativar
+      console.log('[EXPIRAÇÃO] Fila ativa - ativando verificações a cada 1 min')
+      intervaloPosicoes = setInterval(verificarEAgendar, 60000) // 1 minuto
+    }
+  }
+
+  // Primeira verificação após 1 minuto de boot
+  setTimeout(verificarEAgendar, 60000)
 })
