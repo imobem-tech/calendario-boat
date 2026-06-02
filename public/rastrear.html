@@ -192,11 +192,11 @@
         return { bg: 'rgba(255, 193, 7, 0.95)', emoji: '⭐' } // Dourado com estrela
       }
 
-      // Cor por distância
+      // Cor por distância (INVERTIDO: vermelho = perto, verde = longe)
       if (distanciaMetros === null) return { bg: 'rgba(158, 158, 158, 0.95)', emoji: '🚤' }
-      if (distanciaMetros <= 300) return { bg: 'rgba(76, 175, 80, 0.95)', emoji: '🚤' } // Verde
-      if (distanciaMetros <= 1000) return { bg: 'rgba(255, 193, 7, 0.95)', emoji: '🚤' } // Amarelo
-      return { bg: 'rgba(244, 67, 54, 0.95)', emoji: '🚤' } // Vermelho
+      if (distanciaMetros <= 300) return { bg: 'rgba(244, 67, 54, 0.95)', emoji: '🚤' } // Vermelho (perto)
+      if (distanciaMetros <= 1000) return { bg: 'rgba(255, 193, 7, 0.95)', emoji: '🚤' } // Amarelo (médio)
+      return { bg: 'rgba(76, 175, 80, 0.95)', emoji: '🚤' } // Verde (longe)
     }
 
     // Função para criar ícone de barco customizado com legenda e direção

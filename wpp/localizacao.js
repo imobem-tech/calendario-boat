@@ -125,19 +125,70 @@ function formatarDistancia(metros) {
 }
 
 // ============================================================
-// EMOJI POR DISTÂNCIA
+// EMOJI POR DISTÂNCIA (INVERTIDO: vermelho = perto)
 // ============================================================
 function emojiPorDistancia(metros) {
   if (metros === null) return '⚪'
-  if (metros <= 300) return '🟢'
-  if (metros <= 1000) return '🟡'
-  return '🔴'
+  if (metros <= 300) return '🔴' // Vermelho = PERTO
+  if (metros <= 1000) return '🟡' // Amarelo = MÉDIO
+  return '🟢' // Verde = LONGE
 }
 
 // ============================================================
-// MONTAR MENSAGEM DE RANKING
+// CALCULAR VELOCIDADE E ETA
 // ============================================================
-function montarMensagemRanking(ranking) {
+function calcularVelocidadeETA(item, pool) {
+  // Buscar as duas últimas posições para calcular velocidade
+  // Será implementado na próxima etapa
+  return { velocidadeKmh: 0, etaMinutos: 0 }
+}
+
+// ============================================================
+// MONTAR MENSAGEM DE RANKING SINTÉTICA (GRUPOS)
+// ============================================================
+function montarMensagemRankingSintetica(ranking) {
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const hora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
+
+  let msg = `*🏁 RETORNO — ${hora}*\n\n`
+
+  if (ranking.length === 0) {
+    msg += `ℹ️ Nenhuma embarcação\nem retorno.\n\n`
+  } else {
+    ranking.forEach((item, index) => {
+      const posicao = index + 1
+      const emoji = emojiPorDistancia(item.distancia_porto_m)
+      const emb = `*${item.pb}-${item.cota || '?'}*`
+
+      if (item.distancia_porto_m !== null) {
+        // Formato: 151-11 0120m 022km/h 015m
+        const distMetros = String(item.distancia_porto_m).padStart(4, '0') + 'm'
+        const velKmh = '000km/h' // TODO: calcular velocidade
+        const etaMin = '000m' // TODO: calcular ETA
+
+        msg += `${posicao}º ${emoji} ${emb}\n`
+        msg += `${distMetros} ${velKmh} ${etaMin}\n\n`
+      } else {
+        msg += `${posicao}º ${emoji} ${emb}\nSem localização\n\n`
+      }
+    })
+  }
+
+  msg += `🔴 até 300m | 🟡 até 1km\n`
+  msg += `🟢 > 1km | ⚪ sem localização\n\n`
+  msg += `📍 Compartilhe localização em\n`
+  msg += `tempo real para atualizar\n\n`
+  msg += `🗺️ Ver mapa ao vivo:\n`
+  msg += `https://calendario-boat-production.up.railway.app/rastrear.html\n\n`
+  msg += `${VERSAO_LOCALIZACAO}`
+
+  return msg
+}
+
+// ============================================================
+// MONTAR MENSAGEM DE RANKING COMPLETA (ESPELHO)
+// ============================================================
+function montarMensagemRankingCompleta(ranking) {
   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
   const hora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
 
@@ -179,8 +230,8 @@ function montarMensagemRanking(ranking) {
     })
   }
 
-  msg += `🟢 até 300m | 🟡 até 1km\n`
-  msg += `🔴 > 1km | ⚪ sem localização\n\n`
+  msg += `🔴 até 300m | 🟡 até 1km\n`
+  msg += `🟢 > 1km | ⚪ sem localização\n\n`
   msg += `📍 Compartilhe localização em\n`
   msg += `tempo real para atualizar\n\n`
   msg += `🗺️ Ver mapa ao vivo:\n`
@@ -209,10 +260,15 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
 
   for (const [grupoId, dadosGrupo] of gruposDestino) {
     try {
-      // Montar mensagem de ranking com link personalizado para o grupo
-      let mensagemRanking = montarMensagemRanking(ranking)
+      // Determinar se é grupo espelho ou grupo de embarcação
+      const isGrupoEspelho = grupoId === GRUPO_ESPELHO_RETORNO_ID
 
-      // Se tem pb/cota, adicionar parâmetros no link
+      // Montar mensagem apropriada
+      let mensagemRanking = isGrupoEspelho
+        ? montarMensagemRankingCompleta(ranking)
+        : montarMensagemRankingSintetica(ranking)
+
+      // Se tem pb/cota (não é espelho), adicionar parâmetros no link
       if (dadosGrupo.pb) {
         const urlBase = 'https://calendario-boat-production.up.railway.app/rastrear.html'
         const urlPersonalizada = `${urlBase}?pb=${dadosGrupo.pb}&cota=${dadosGrupo.cota || ''}`
@@ -525,8 +581,8 @@ parou de ser compartilhada.
 
 Você saiu do *Ranking de Retorno*.
 
-Para voltar, compartilhe
-localização em tempo real novamente.
+📍 *Renove a localização atual
+para reabrir a entrada na marina.*
 
 ${VERSAO_LOCALIZACAO}`
 
