@@ -412,6 +412,7 @@ ${VERSAO_LOCALIZACAO}`
 // ============================================================
 export async function verificarPosicoesExpiradas(sock, pool) {
   const TEMPO_EXPIRACAO_MS = 30 * 60 * 1000 // 30 minutos
+  const JANELA_AVISO_MS = 2 * 60 * 1000 // 2 minutos de janela para avisar
 
   try {
     // Buscar todos com posição recente (em processo de retorno)
@@ -455,15 +456,21 @@ export async function verificarPosicoesExpiradas(sock, pool) {
 
     console.log(`⏰ [EXPIRAÇÃO] ${rsAtivos.rowCount} embarcação(ões) com localização expirada`)
 
-    // Para cada expirado: avisar no grupo específico
+    // Para cada expirado: avisar no grupo específico APENAS SE RECÉM-EXPIROU
     for (const exp of rsAtivos.rows) {
       if (!exp.grupowppid) continue
 
-      const embId = `${exp.pb}-${exp.cota || '?'}`
-      const nomeEmb = exp.nome_embarcacao || 'Embarcação'
-      const minutosAtras = Math.round(exp.ms_desde_ultima_posicao / 60000)
+      const msDesdePosicao = parseFloat(exp.ms_desde_ultima_posicao)
+      const recemExpirou = msDesdePosicao >= TEMPO_EXPIRACAO_MS &&
+                          msDesdePosicao < (TEMPO_EXPIRACAO_MS + JANELA_AVISO_MS)
 
-      const msgExpiracao = `
+      // Só avisa se acabou de expirar (entre 30 e 32 minutos)
+      if (recemExpirou) {
+        const embId = `${exp.pb}-${exp.cota || '?'}`
+        const nomeEmb = exp.nome_embarcacao || 'Embarcação'
+        const minutosAtras = Math.round(msDesdePosicao / 60000)
+
+        const msgExpiracao = `
 ⚠️ *LOCALIZAÇÃO EXPIRADA*
 
 🚤 ${embId} ${nomeEmb}
@@ -480,11 +487,14 @@ localização em tempo real novamente.
 
 ${VERSAO_LOCALIZACAO}`
 
-      try {
-        await sock.sendMessage(exp.grupowppid, { text: msgExpiracao })
-        console.log(`   📤 Aviso enviado para grupo ${exp.grupowppid}`)
-      } catch (err) {
-        console.error(`   ❌ Erro ao enviar aviso para ${exp.grupowppid}:`, err.message)
+        try {
+          await sock.sendMessage(exp.grupowppid, { text: msgExpiracao })
+          console.log(`   📤 Aviso enviado para grupo ${exp.grupowppid} (recém-expirado)`)
+        } catch (err) {
+          console.error(`   ❌ Erro ao enviar aviso para ${exp.grupowppid}:`, err.message)
+        }
+      } else {
+        console.log(`   ⏭️ Grupo ${exp.grupowppid} já foi avisado (${Math.round(msDesdePosicao / 60000)} min)`)
       }
     }
 
