@@ -17,6 +17,7 @@ if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 import QRCode from 'qrcode'
 import P from 'pino'
 import pkg from 'pg'
@@ -380,7 +381,6 @@ app.get('/grupos', async (req, res) => {
 
 // Rota de debug para verificar arquivos na pasta public
 app.get('/debug-files', (req, res) => {
-  const fs = require('fs')
   const publicPath = path.join(__dirname, '..', 'public')
 
   try {
