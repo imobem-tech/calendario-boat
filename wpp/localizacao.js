@@ -337,7 +337,7 @@ export async function handleLocalizacao(sock, pool, grupoId, msg) {
     // ============================================================
     // REGISTRAR RETORNO AUTOMÁTICO SE CHEGOU NO PIER
     // ============================================================
-    const RAIO_CHEGADA_METROS = 150 // Ajustar conforme necessário
+    const RAIO_CHEGADA_METROS = 50 // 50 metros da marina
 
     if (distanciaPorto <= RAIO_CHEGADA_METROS && !agendamento['Dt_Retorno']) {
       // Chegou no pier - registrar retorno automático
