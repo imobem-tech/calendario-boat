@@ -126,7 +126,7 @@
 
   <footer>
     <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
-    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021649</p>
+    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021653</p>
   </footer>
 
   <div class="loading" id="loading">
@@ -142,8 +142,15 @@
     const INTERVALO_ATUALIZACAO = 5000 // 5 segundos
     const API_URL = 'https://calendario-boat-production.up.railway.app/rastrear'
 
+    // Detectar parâmetros da URL (pb e cota do próprio barco)
+    const urlParams = new URLSearchParams(window.location.search)
+    const MEU_PB = urlParams.get('pb')
+    const MINHA_COTA = urlParams.get('cota')
+
     let map = null
     let markers = {}
+    let trails = {} // Rastros dos barcos
+    let lastPositions = {} // Última posição para calcular direção
     let portoMarker = null
 
     // Inicializar mapa (OpenStreetMap - GRATUITO)
@@ -178,17 +185,47 @@
       shadowSize: [41, 41]
     })
 
-    // Função para criar ícone de barco customizado com legenda
-    function criarIconeBarco(embId, nomeEmb) {
+    // Função para obter cor baseada em distância ou se é próprio barco
+    function obterCor(pb, cota, distanciaMetros) {
+      // Se é o próprio barco (do link personalizado)
+      if (MEU_PB && pb == MEU_PB && (cota || '') == (MINHA_COTA || '')) {
+        return { bg: 'rgba(255, 193, 7, 0.95)', emoji: '⭐' } // Dourado com estrela
+      }
+
+      // Cor por distância
+      if (distanciaMetros === null) return { bg: 'rgba(158, 158, 158, 0.95)', emoji: '🚤' }
+      if (distanciaMetros <= 300) return { bg: 'rgba(76, 175, 80, 0.95)', emoji: '🚤' } // Verde
+      if (distanciaMetros <= 1000) return { bg: 'rgba(255, 193, 7, 0.95)', emoji: '🚤' } // Amarelo
+      return { bg: 'rgba(244, 67, 54, 0.95)', emoji: '🚤' } // Vermelho
+    }
+
+    // Função para criar ícone de barco customizado com legenda e direção
+    function criarIconeBarco(embId, nomeEmb, pb, cota, distanciaMetros, direcao = null) {
+      const cor = obterCor(pb, cota, distanciaMetros)
+
+      // Seta de direção se houver movimento
+      let setaDirecao = ''
+      if (direcao !== null) {
+        setaDirecao = `<div style="
+          position: absolute;
+          top: -8px;
+          left: 50%;
+          transform: translateX(-50%) rotate(${direcao}deg);
+          font-size: 20px;
+          text-shadow: 0 0 3px white;
+        ">⬆</div>`
+      }
+
       return L.divIcon({
         className: 'custom-boat-icon',
         html: `
-          <div style="text-align: center;">
+          <div style="text-align: center; position: relative;">
+            ${setaDirecao}
             <div style="font-size: 32px; line-height: 1; text-shadow: 0 0 3px white, 0 0 3px white;">
-              🚤
+              ${cor.emoji}
             </div>
             <div style="
-              background: rgba(102, 126, 234, 0.95);
+              background: ${cor.bg};
               color: white;
               padding: 2px 6px;
               border-radius: 4px;
@@ -206,6 +243,14 @@
         iconAnchor: [30, 50],
         popupAnchor: [0, -50]
       })
+    }
+
+    // Calcular ângulo de direção entre dois pontos
+    function calcularDirecao(lat1, lon1, lat2, lon2) {
+      const dy = lat2 - lat1
+      const dx = lon2 - lon1
+      let angulo = Math.atan2(dx, dy) * (180 / Math.PI)
+      return angulo
     }
 
     // Marker da marina
@@ -270,14 +315,53 @@
             </div>
           `
 
+          // Calcular direção se já existe posição anterior
+          let direcao = null
+          if (lastPositions[id]) {
+            const lastLat = lastPositions[id].lat
+            const lastLon = lastPositions[id].lon
+            if (lastLat !== emb.latitude || lastLon !== emb.longitude) {
+              direcao = calcularDirecao(lastLat, lastLon, emb.latitude, emb.longitude)
+            }
+          }
+
+          // Atualizar posição anterior
+          lastPositions[id] = { lat: emb.latitude, lon: emb.longitude }
+
+          // Adicionar ponto ao rastro
+          if (!trails[id]) {
+            trails[id] = L.polyline([], {
+              color: MEU_PB && emb.pb == MEU_PB && (emb.cota || '') == (MINHA_COTA || '')
+                ? '#ffc107'
+                : '#667eea',
+              weight: 3,
+              opacity: 0.6,
+              smoothFactor: 1
+            }).addTo(map)
+          }
+          trails[id].addLatLng([emb.latitude, emb.longitude])
+          // Limitar rastro a 50 pontos
+          const latlngs = trails[id].getLatLngs()
+          if (latlngs.length > 50) {
+            trails[id].setLatLngs(latlngs.slice(-50))
+          }
+
           if (markers[id]) {
-            markers[id].setLatLng([emb.latitude, emb.longitude])
+            // Animar movimento suave
+            const currentLatLng = markers[id].getLatLng()
+            const newLatLng = L.latLng(emb.latitude, emb.longitude)
+
+            // Se mudou de posição, animar
+            if (currentLatLng.lat !== newLatLng.lat || currentLatLng.lng !== newLatLng.lng) {
+              markers[id].setLatLng(newLatLng)
+            }
+
             markers[id].setPopupContent(popupContent)
-            // Atualizar ícone (caso nome tenha mudado)
-            markers[id].setIcon(criarIconeBarco(embId, nomeEmb))
+            // Atualizar ícone com direção
+            markers[id].setIcon(criarIconeBarco(embId, nomeEmb, emb.pb, emb.cota, emb.distancia_porto_m, direcao))
           } else {
             markers[id] = L.marker([emb.latitude, emb.longitude], {
-              icon: criarIconeBarco(embId, nomeEmb)
+              icon: criarIconeBarco(embId, nomeEmb, emb.pb, emb.cota, emb.distancia_porto_m, direcao)
             })
               .addTo(map)
               .bindPopup(popupContent)
@@ -288,6 +372,15 @@
           if (!idsAtuais.has(parseInt(id))) {
             map.removeLayer(markers[id])
             delete markers[id]
+
+            // Remover rastro também
+            if (trails[id]) {
+              map.removeLayer(trails[id])
+              delete trails[id]
+            }
+
+            // Remover posição anterior
+            delete lastPositions[id]
           }
         })
 
@@ -308,4 +401,4 @@
 </body>
 </html>
 
-<!-- V.2606021649 -->
+<!-- V.2606021653 -->

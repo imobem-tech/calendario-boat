@@ -195,19 +195,33 @@ function montarMensagemRanking(ranking) {
 // Renova mensagem a cada 12min (antes do limite de 15min do WhatsApp)
 // ============================================================
 async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
-  const mensagemRanking = montarMensagemRanking(ranking)
   const TEMPO_RENOVACAO_MS = 14 * 60 * 1000 // 14 minutos (limite seguro antes dos 15min do WhatsApp)
 
   // Grupos que devem receber: todos com localização enviada + espelho
-  const gruposDestino = new Set([GRUPO_ESPELHO_RETORNO_ID])
+  const gruposDestino = new Map() // Usar Map para guardar pb e cota de cada grupo
+  gruposDestino.set(GRUPO_ESPELHO_RETORNO_ID, { pb: null, cota: null }) // Espelho sem filtro
+
   ranking.forEach(item => {
     if (item.grupo_id && item.latitude) {
-      gruposDestino.add(item.grupo_id)
+      gruposDestino.set(item.grupo_id, { pb: item.pb, cota: item.cota })
     }
   })
 
-  for (const grupoId of gruposDestino) {
+  for (const [grupoId, dadosGrupo] of gruposDestino) {
     try {
+      // Montar mensagem de ranking com link personalizado para o grupo
+      let mensagemRanking = montarMensagemRanking(ranking)
+
+      // Se tem pb/cota, adicionar parâmetros no link
+      if (dadosGrupo.pb) {
+        const urlBase = 'https://calendario-boat-production.up.railway.app/rastrear.html'
+        const urlPersonalizada = `${urlBase}?pb=${dadosGrupo.pb}&cota=${dadosGrupo.cota || ''}`
+        mensagemRanking = mensagemRanking.replace(
+          'https://calendario-boat-production.up.railway.app/rastrear.html',
+          urlPersonalizada
+        )
+      }
+
       // Buscar messageKey e tempo desde última renovação
       const rsMsg = await pool.query(
         `SELECT message_key,
