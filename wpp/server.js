@@ -63,8 +63,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
-// public/ está dentro de wpp/ (mesmo diretório que server.js)
-const publicPath = path.join(__dirname, 'public')
+// public/ está na raiz do projeto (um nível acima de wpp/)
+const publicPath = path.join(__dirname, '..', 'public')
 console.log('📁 Working directory:', process.cwd())
 console.log('📁 __dirname:', __dirname)
 console.log('📁 Servindo arquivos estáticos de:', publicPath)
@@ -383,7 +383,7 @@ app.get('/grupos', async (req, res) => {
 
 // Rota de debug para verificar arquivos na pasta public
 app.get('/debug-files', (req, res) => {
-  const publicPath = path.join(__dirname, 'public')
+  const publicPath = path.join(__dirname, '..', 'public')
 
   try {
     const files = fs.readdirSync(publicPath)
@@ -395,15 +395,17 @@ app.get('/debug-files', (req, res) => {
       rastrearExists: fs.existsSync(path.join(publicPath, 'rastrear.html'))
     })
   } catch (err) {
-    // Se falhou, listar o que TEM no __dirname
+    // Se falhou, listar o que TEM no diretório pai
     try {
-      const dirFiles = fs.readdirSync(__dirname)
+      const parentDir = path.join(__dirname, '..')
+      const dirFiles = fs.readdirSync(parentDir)
       res.status(500).json({
         error: err.message,
         cwd: process.cwd(),
         __dirname,
+        parentDir,
         publicPath,
-        filesInDir: dirFiles
+        filesInParent: dirFiles
       })
     } catch (err2) {
       res.status(500).json({
