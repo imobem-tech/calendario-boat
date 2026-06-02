@@ -55,6 +55,9 @@ console.log('VERSAO SERVER:', VERSAO_WPP)
 const app = express()
 const PORT = process.env.PORT || 8080
 
+// Servir arquivos estáticos da pasta public (mapa de rastreamento)
+app.use(express.static('public'))
+
 app.use(express.json())
 app.use('/msg_externa', retornoRoutes)
 
