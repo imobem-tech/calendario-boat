@@ -63,7 +63,9 @@ const __dirname = path.dirname(__filename)
 
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
 // Pasta public está um nível acima de wpp/
-app.use(express.static(path.join(__dirname, '..', 'public')))
+const publicPath = path.join(__dirname, '..', 'public')
+console.log('📁 Servindo arquivos estáticos de:', publicPath)
+app.use(express.static(publicPath))
 
 app.use(express.json())
 app.use('/msg_externa', retornoRoutes)
@@ -373,6 +375,23 @@ app.get('/grupos', async (req, res) => {
     res.json(lista)
   } catch (err) {
     res.status(500).json({ erro: err.message })
+  }
+})
+
+// Rota de debug para verificar arquivos na pasta public
+app.get('/debug-files', (req, res) => {
+  const fs = require('fs')
+  const publicPath = path.join(__dirname, '..', 'public')
+
+  try {
+    const files = fs.readdirSync(publicPath)
+    res.json({
+      publicPath,
+      filesExist: files,
+      rastrearExists: fs.existsSync(path.join(publicPath, 'rastrear.html'))
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
 })
 
