@@ -7,7 +7,7 @@
 
 import { buscarGrupoInfo } from './db.js'
 
-const VERSAO_LOCALIZACAO = 'V.2606021250'
+const VERSAO_LOCALIZACAO = 'V.2606022026'
 
 // ============================================================
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
@@ -87,15 +87,36 @@ async function buscarRankingAtual(pool) {
       FROM public.wpp_localizacao_emb
       WHERE agendamento_id IN (SELECT agendamento_id FROM saidas_hoje)
       ORDER BY agendamento_id, criado_em DESC
+    ),
+    penultimas_posicoes AS (
+      SELECT DISTINCT ON (agendamento_id)
+        agendamento_id,
+        latitude as latitude_anterior,
+        longitude as longitude_anterior,
+        distancia_porto_m as distancia_anterior,
+        criado_em as criado_em_anterior
+      FROM public.wpp_localizacao_emb
+      WHERE agendamento_id IN (SELECT agendamento_id FROM saidas_hoje)
+        AND criado_em < (
+          SELECT MAX(criado_em)
+          FROM public.wpp_localizacao_emb l2
+          WHERE l2.agendamento_id = wpp_localizacao_emb.agendamento_id
+        )
+      ORDER BY agendamento_id, criado_em DESC
     )
     SELECT
       s.*,
       p.latitude,
       p.longitude,
       p.distancia_porto_m,
-      p.criado_em as ultima_atualizacao
+      p.criado_em as ultima_atualizacao,
+      pp.latitude_anterior,
+      pp.longitude_anterior,
+      pp.distancia_anterior,
+      pp.criado_em_anterior
     FROM saidas_hoje s
     LEFT JOIN ultimas_posicoes p ON p.agendamento_id = s.agendamento_id
+    LEFT JOIN penultimas_posicoes pp ON pp.agendamento_id = s.agendamento_id
     ORDER BY
       CASE WHEN p.distancia_porto_m IS NULL THEN 1 ELSE 0 END,
       p.distancia_porto_m ASC
@@ -137,10 +158,55 @@ function emojiPorDistancia(metros) {
 // ============================================================
 // CALCULAR VELOCIDADE E ETA
 // ============================================================
-function calcularVelocidadeETA(item, pool) {
-  // Buscar as duas últimas posições para calcular velocidade
-  // Será implementado na próxima etapa
-  return { velocidadeKmh: 0, etaMinutos: 0 }
+function calcularVelocidadeETA(item) {
+  // Se não tem posição anterior, não pode calcular velocidade
+  if (!item.latitude_anterior || !item.latitude || item.distancia_porto_m === null) {
+    return { velocidadeKmh: 0, etaMinutos: 0 }
+  }
+
+  // Calcular tempo decorrido entre posições (em segundos)
+  const tempoMs = new Date(item.ultima_atualizacao) - new Date(item.criado_em_anterior)
+  const tempoSeg = tempoMs / 1000
+
+  // Se muito pouco tempo, não calcular (evitar divisão por zero)
+  if (tempoSeg < 5) {
+    return { velocidadeKmh: 0, etaMinutos: 0 }
+  }
+
+  // Calcular distância percorrida entre as duas posições (fórmula de Haversine)
+  const R = 6371e3 // Raio da Terra em metros
+  const φ1 = item.latitude_anterior * Math.PI / 180
+  const φ2 = item.latitude * Math.PI / 180
+  const Δφ = (item.latitude - item.latitude_anterior) * Math.PI / 180
+  const Δλ = (item.longitude - item.longitude_anterior) * Math.PI / 180
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const distanciaPercorridaMetros = R * c
+
+  // Calcular velocidade em km/h
+  const velocidadeMs = distanciaPercorridaMetros / tempoSeg
+  const velocidadeKmh = Math.round(velocidadeMs * 3.6)
+
+  // Calcular ETA (tempo estimado de chegada a 100m da marina)
+  let etaMinutos = 0
+  if (velocidadeKmh > 0) {
+    // Distância que falta para chegar a 100m
+    const distanciaRestante = Math.max(0, item.distancia_porto_m - 100)
+
+    // Tempo em horas
+    const tempoHoras = distanciaRestante / 1000 / velocidadeKmh
+
+    // Converter para minutos
+    etaMinutos = Math.round(tempoHoras * 60)
+  }
+
+  return {
+    velocidadeKmh: Math.max(0, velocidadeKmh),
+    etaMinutos: Math.max(0, etaMinutos)
+  }
 }
 
 // ============================================================
@@ -161,10 +227,13 @@ function montarMensagemRankingSintetica(ranking) {
       const emb = `*${item.pb}-${item.cota || '?'}*`
 
       if (item.distancia_porto_m !== null) {
+        // Calcular velocidade e ETA
+        const { velocidadeKmh, etaMinutos } = calcularVelocidadeETA(item)
+
         // Formato: 151-11 0120m 022km/h 015m
         const distMetros = String(item.distancia_porto_m).padStart(4, '0') + 'm'
-        const velKmh = '000km/h' // TODO: calcular velocidade
-        const etaMin = '000m' // TODO: calcular ETA
+        const velKmh = String(velocidadeKmh).padStart(3, '0') + 'km/h'
+        const etaMin = String(etaMinutos).padStart(3, '0') + 'm'
 
         msg += `${posicao}º ${emoji} ${emb}\n`
         msg += `${distMetros} ${velKmh} ${etaMin}\n\n`
