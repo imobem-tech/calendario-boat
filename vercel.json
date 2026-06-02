@@ -1,6 +1,7 @@
 {
-
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "echo 'No build needed'",
+  "outputDirectory": "wpp/public",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/agendar", "destination": "/agendar.html" },
