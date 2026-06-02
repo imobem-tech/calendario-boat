@@ -1,8 +1,8 @@
 // ============================================================
-// wpp/server.js — V.2606021240
+// wpp/server.js — V.2606021250
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
-// + Localização em tempo real dispara retorno automático
+// + Localização em tempo real: retorno automático + ranking
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -45,10 +45,11 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
+import { handleLocalizacao } from './localizacao.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2606021240'
+const VERSAO_WPP = 'Allmax®2606021250'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -164,14 +165,9 @@ async function iniciarBot() {
           const remetente = msg.key.participant || msg.key.remoteJid
 
           // ============================================================
-          // LOCALIZAÇÃO EM TEMPO REAL → Dispara retorno automaticamente
+          // LOCALIZAÇÃO EM TEMPO REAL → Retorno automático + Ranking
           // ============================================================
-          const liveLocation = msg.message?.liveLocationMessage
-          if (liveLocation) {
-            console.log(`📍 Localização em tempo real recebida no grupo ${grupoId} — disparando retorno automático`)
-            await handleRetorno(sock, pool, grupoId, remetente)
-            continue
-          }
+          if (await handleLocalizacao(sock, pool, grupoId, msg)) continue
 
           const texto = (
             msg.message?.conversation ||
@@ -365,6 +361,56 @@ app.get('/grupos', async (req, res) => {
       nome: g.subject, id: g.id, participantes: g.participants?.length || 0
     }))
     res.json(lista)
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+app.get('/rastrear', async (req, res) => {
+  try {
+    const rs = await pool.query(`
+      WITH saidas_hoje AS (
+        SELECT
+          s."ID" as agendamento_id,
+          s."Cod_Emb_PB" as pb,
+          s."Grupo_Comp_letra" as cota,
+          c."Cliente_Nome" as nome_autorizado
+        FROM public."P_BOAT_z_10_Saida_Emb" s
+        LEFT JOIN public."Cliente" c ON c."Codigo" = s."Cod_Autorizado"
+        WHERE DATE(s."Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') =
+              (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+          AND s."Dt_Saída" IS NOT NULL
+          AND s."Dt_Retorno" IS NULL
+          AND s."Dt_Desistencia" IS NULL
+          AND s."Dt_Cancela_saida" IS NULL
+      ),
+      ultimas_posicoes AS (
+        SELECT DISTINCT ON (agendamento_id)
+          agendamento_id,
+          latitude,
+          longitude,
+          distancia_porto_m,
+          criado_em
+        FROM public.wpp_localizacao_emb
+        WHERE agendamento_id IN (SELECT agendamento_id FROM saidas_hoje)
+        ORDER BY agendamento_id, criado_em DESC
+      )
+      SELECT
+        s.*,
+        p.latitude,
+        p.longitude,
+        p.distancia_porto_m,
+        p.criado_em as ultima_atualizacao
+      FROM saidas_hoje s
+      LEFT JOIN ultimas_posicoes p ON p.agendamento_id = s.agendamento_id
+      WHERE p.latitude IS NOT NULL
+    `)
+
+    res.json({
+      sucesso: true,
+      embarcacoes: rs.rows,
+      timestamp: new Date().toISOString()
+    })
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }

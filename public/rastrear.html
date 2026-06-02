@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rastreamento de Embarcações | Allmax</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+    }
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    header h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    header p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    #map {
+      height: calc(100vh - 140px);
+      width: 100%;
+    }
+    footer {
+      background: white;
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #666;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+    .atualizado {
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      text-align: center;
+      z-index: 9999;
+    }
+    .loading.hidden { display: none; }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🚤 Rastreamento de Embarcações</h1>
+    <p class="atualizado" id="ultima-atualizacao">Carregando...</p>
+  </header>
+
+  <div id="map"></div>
+
+  <footer>
+    <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
+    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021250</p>
+  </footer>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Carregando posições...</p>
+  </div>
+
+  <script>
+    // ATENÇÃO: Substitua YOUR_GOOGLE_MAPS_API_KEY pela sua chave real
+    // Como obter: https://console.cloud.google.com/google/maps-apis
+    const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY'
+
+    const PORTO_LAT = -10.1832  // ← AJUSTAR coordenadas reais do pier
+    const PORTO_LON = -48.3336  // ← AJUSTAR coordenadas reais do pier
+    const INTERVALO_ATUALIZACAO = 5000 // 5 segundos
+    const API_URL = 'https://calendario-boat-production.up.railway.app/rastrear'
+
+    let map = null
+    let markers = {}
+    let portoMarker = null
+
+    // Carregar Google Maps API
+    function loadGoogleMapsAPI() {
+      return new Promise((resolve, reject) => {
+        if (window.google && window.google.maps) {
+          resolve()
+          return
+        }
+
+        const script = document.createElement('script')
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`
+        script.async = true
+        script.defer = true
+        script.onload = resolve
+        script.onerror = reject
+        document.head.appendChild(script)
+      })
+    }
+
+    // Inicializar mapa
+    async function inicializarMapa() {
+      try {
+        await loadGoogleMapsAPI()
+
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: { lat: PORTO_LAT, lng: PORTO_LON },
+          zoom: 14,
+          mapTypeId: 'satellite',
+          mapTypeControl: true,
+          mapTypeControlOptions: {
+            mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+          },
+          streetViewControl: false,
+          fullscreenControl: true
+        })
+
+        // Marker do porto/pier
+        portoMarker = new google.maps.Marker({
+          position: { lat: PORTO_LAT, lng: PORTO_LON },
+          map: map,
+          title: 'Porto Allmax',
+          icon: {
+            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+          }
+        })
+
+        const portoInfo = new google.maps.InfoWindow({
+          content: `<div style="text-align:center; padding:10px;">
+                      <h3 style="margin:0 0 5px 0;">⚓ Porto Allmax</h3>
+                      <p style="margin:0; font-size:0.9rem;">Pier/Marina</p>
+                    </div>`
+        })
+
+        portoMarker.addListener('click', () => {
+          portoInfo.open(map, portoMarker)
+        })
+
+        // Primeira atualização
+        atualizarEmbarcacoes()
+
+        // Atualizar periodicamente
+        setInterval(atualizarEmbarcacoes, INTERVALO_ATUALIZACAO)
+
+      } catch (err) {
+        console.error('Erro ao carregar Google Maps:', err)
+        document.getElementById('loading').innerHTML = `
+          <p style="color: red;">❌ Erro ao carregar mapa</p>
+          <p style="font-size:0.8rem; margin-top:10px;">
+            Verifique se a API Key do Google Maps está configurada
+          </p>
+        `
+      }
+    }
+
+    // Função para formatar distância
+    function formatarDistancia(metros) {
+      if (metros >= 1000) {
+        return `${(metros / 1000).toFixed(1)} km`
+      }
+      return `${metros} m`
+    }
+
+    // Função para atualizar embarcações
+    async function atualizarEmbarcacoes() {
+      try {
+        const response = await fetch(API_URL)
+        const data = await response.json()
+
+        if (!data.sucesso) throw new Error('Erro na resposta da API')
+
+        // Atualizar timestamp
+        const agora = new Date()
+        document.getElementById('ultima-atualizacao').textContent =
+          `Última atualização: ${agora.toLocaleTimeString('pt-BR')}`
+
+        // IDs atuais
+        const idsAtuais = new Set()
+
+        // Atualizar/criar markers
+        data.embarcacoes.forEach(emb => {
+          const id = emb.agendamento_id
+          idsAtuais.add(id)
+
+          const distancia = formatarDistancia(emb.distancia_porto_m)
+          const nomeEmb = emb.nome_embarcacao || 'Embarcação'
+          const embId = `${emb.pb}-${emb.cota || '?'}`
+
+          const infoContent = `
+            <div style="text-align:center; padding:10px; min-width:200px;">
+              <h3 style="margin:0 0 10px 0; color:#667eea;">🚤 ${embId}</h3>
+              <p style="margin:5px 0;"><strong>${nomeEmb}</strong></p>
+              <p style="margin:5px 0; font-size:1.1rem; color:#764ba2; font-weight:bold;">
+                📍 ${distancia}
+              </p>
+              <p style="margin:5px 0; font-size:0.8rem; opacity:0.7;">
+                ${new Date(emb.ultima_atualizacao).toLocaleTimeString('pt-BR')}
+              </p>
+            </div>
+          `
+
+          if (markers[id]) {
+            // Atualizar posição existente
+            markers[id].marker.setPosition({
+              lat: emb.latitude,
+              lng: emb.longitude
+            })
+            markers[id].infoWindow.setContent(infoContent)
+          } else {
+            // Criar novo marker
+            const marker = new google.maps.Marker({
+              position: { lat: emb.latitude, lng: emb.longitude },
+              map: map,
+              title: embId,
+              icon: {
+                url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+              }
+            })
+
+            const infoWindow = new google.maps.InfoWindow({
+              content: infoContent
+            })
+
+            marker.addListener('click', () => {
+              // Fechar todos os outros infoWindows
+              Object.values(markers).forEach(m => m.infoWindow.close())
+              infoWindow.open(map, marker)
+            })
+
+            markers[id] = { marker, infoWindow }
+          }
+        })
+
+        // Remover markers que não estão mais na lista
+        Object.keys(markers).forEach(id => {
+          if (!idsAtuais.has(parseInt(id))) {
+            markers[id].marker.setMap(null)
+            delete markers[id]
+          }
+        })
+
+        // Ocultar loading
+        document.getElementById('loading').classList.add('hidden')
+
+      } catch (err) {
+        console.error('Erro ao atualizar embarcações:', err)
+        document.getElementById('ultima-atualizacao').textContent =
+          'Erro ao carregar dados'
+      }
+    }
+
+    // Iniciar quando carregar
+    window.addEventListener('load', inicializarMapa)
+  </script>
+</body>
+</html>
+
+<!-- V.2606021250 -->
