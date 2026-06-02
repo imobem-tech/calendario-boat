@@ -4,6 +4,8 @@
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/rastrear", "destination": "/rastrear.html" },
+    { "source": "/rastrear.html", "destination": "/rastrear.html" },
     { "source": "/agendar", "destination": "/agendar.html" },
     { "source": "/agendar.html", "destination": "/agendar.html" },
     { "source": "/(.*)", "destination": "/index.html" }

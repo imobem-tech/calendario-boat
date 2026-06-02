@@ -184,7 +184,7 @@ function montarMensagemRanking(ranking) {
   msg += `📍 Compartilhe localização em\n`
   msg += `tempo real para atualizar\n\n`
   msg += `🗺️ Ver mapa ao vivo:\n`
-  msg += `https://allmaxcalendar.vercel.app/rastrear\n\n`
+  msg += `https://calendario-boat-production.up.railway.app/rastrear.html\n\n`
   msg += `${VERSAO_LOCALIZACAO}`
 
   return msg
