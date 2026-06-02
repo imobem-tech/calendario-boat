@@ -250,9 +250,12 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
       } else {
         // Editar mensagem existente
         try {
+          // messageKey já vem como objeto do JSONB, não precisa parse
+          const keyParaEditar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
+
           await sock.sendMessage(grupoId, {
             text: mensagemRanking,
-            edit: JSON.parse(messageKey)
+            edit: keyParaEditar
           })
 
           // IMPORTANTE: NÃO atualizar timestamp ao editar
