@@ -196,7 +196,7 @@ function montarMensagemRanking(ranking) {
 // ============================================================
 async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
   const mensagemRanking = montarMensagemRanking(ranking)
-  const TEMPO_RENOVACAO_MS = 12 * 60 * 1000 // 12 minutos
+  const TEMPO_RENOVACAO_MS = 14 * 60 * 1000 // 14 minutos (limite seguro antes dos 15min do WhatsApp)
 
   // Grupos que devem receber: todos com localização enviada + espelho
   const gruposDestino = new Set([GRUPO_ESPELHO_RETORNO_ID])
@@ -231,7 +231,18 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
       }
 
       if (precisaRenovar || !messageKey) {
-        // Enviar nova mensagem (renovação ou primeira vez)
+        // RENOVAÇÃO: Deletar mensagem antiga + Criar nova
+        if (precisaRenovar && messageKey) {
+          try {
+            const keyParaDeletar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
+            await sock.sendMessage(grupoId, { delete: keyParaDeletar })
+            console.log(`🗑️ Mensagem antiga deletada no grupo ${grupoId}`)
+          } catch (errDel) {
+            console.warn(`⚠️ Não conseguiu deletar mensagem antiga: ${errDel.message}`)
+          }
+        }
+
+        // Criar nova mensagem
         const sentMsg = await sock.sendMessage(grupoId, { text: mensagemRanking })
 
         // Salvar nova messageKey com timestamp de renovação
@@ -243,12 +254,12 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
         )
 
         if (precisaRenovar) {
-          console.log(`🔄 Ranking RENOVADO no grupo ${grupoId} (12min expirados)`)
+          console.log(`🔄 Ranking RENOVADO no grupo ${grupoId} (14min expirados - deletou + criou nova)`)
         } else {
           console.log(`📤 Ranking CRIADO no grupo ${grupoId}`)
         }
       } else {
-        // Editar mensagem existente
+        // Editar mensagem existente (0-14 minutos)
         try {
           // messageKey já vem como objeto do JSONB, não precisa parse
           const keyParaEditar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
@@ -264,8 +275,16 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
 
           console.log(`📝 Ranking editado no grupo ${grupoId}`)
         } catch (errEdit) {
-          // Se falhar edição, cria nova (renovação forçada)
-          console.warn(`⚠️ Falha ao editar ranking, criando nova: ${errEdit.message}`)
+          // Se falhar edição, deleta a antiga e cria nova (renovação forçada)
+          console.warn(`⚠️ Falha ao editar, deletando antiga e criando nova: ${errEdit.message}`)
+
+          try {
+            const keyParaDeletar = typeof messageKey === 'string' ? JSON.parse(messageKey) : messageKey
+            await sock.sendMessage(grupoId, { delete: keyParaDeletar })
+          } catch (errDel) {
+            console.warn(`   ⚠️ Não conseguiu deletar: ${errDel.message}`)
+          }
+
           const sentMsg = await sock.sendMessage(grupoId, { text: mensagemRanking })
 
           await pool.query(
