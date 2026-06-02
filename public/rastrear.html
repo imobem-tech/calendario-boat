@@ -97,6 +97,16 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    /* Ícone customizado de barco */
+    .custom-boat-icon {
+      background: transparent !important;
+      border: none !important;
+      cursor: pointer;
+    }
+    .custom-boat-icon:hover {
+      transform: scale(1.1);
+      transition: transform 0.2s ease;
+    }
   </style>
 </head>
 <body>
@@ -116,7 +126,7 @@
 
   <footer>
     <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
-    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021250</p>
+    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021649</p>
   </footer>
 
   <div class="loading" id="loading">
@@ -168,14 +178,35 @@
       shadowSize: [41, 41]
     })
 
-    const boatIcon = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    })
+    // Função para criar ícone de barco customizado com legenda
+    function criarIconeBarco(embId, nomeEmb) {
+      return L.divIcon({
+        className: 'custom-boat-icon',
+        html: `
+          <div style="text-align: center;">
+            <div style="font-size: 32px; line-height: 1; text-shadow: 0 0 3px white, 0 0 3px white;">
+              🚤
+            </div>
+            <div style="
+              background: rgba(102, 126, 234, 0.95);
+              color: white;
+              padding: 2px 6px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: bold;
+              white-space: nowrap;
+              margin-top: -2px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">
+              ${embId}
+            </div>
+          </div>
+        `,
+        iconSize: [60, 50],
+        iconAnchor: [30, 50],
+        popupAnchor: [0, -50]
+      })
+    }
 
     // Marker da marina
     portoMarker = L.marker([PORTO_LAT, PORTO_LON], { icon: portoIcon })
@@ -242,8 +273,12 @@
           if (markers[id]) {
             markers[id].setLatLng([emb.latitude, emb.longitude])
             markers[id].setPopupContent(popupContent)
+            // Atualizar ícone (caso nome tenha mudado)
+            markers[id].setIcon(criarIconeBarco(embId, nomeEmb))
           } else {
-            markers[id] = L.marker([emb.latitude, emb.longitude], { icon: boatIcon })
+            markers[id] = L.marker([emb.latitude, emb.longitude], {
+              icon: criarIconeBarco(embId, nomeEmb)
+            })
               .addTo(map)
               .bindPopup(popupContent)
           }
@@ -273,4 +308,4 @@
 </body>
 </html>
 
-<!-- V.2606021250 -->
+<!-- V.2606021649 -->
