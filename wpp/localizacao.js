@@ -13,8 +13,8 @@ const VERSAO_LOCALIZACAO = 'V.2606021250'
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
 // ============================================================
 const PORTO = {
-  latitude: -10.1832,      // ← AJUSTAR: latitude real do porto
-  longitude: -48.3336      // ← AJUSTAR: longitude real do porto
+  latitude: -10.21101,     // Marina Palmas-TO
+  longitude: -48.36912     // Marina Palmas-TO
 }
 
 const GRUPO_ESPELHO_RETORNO_ID = '120363426928542914@g.us'

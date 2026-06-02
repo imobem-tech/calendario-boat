@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rastreamento de Embarcações | Allmax</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -26,8 +27,37 @@
       opacity: 0.9;
     }
     #map {
-      height: calc(100vh - 140px);
+      height: calc(100vh - 180px);
       width: 100%;
+    }
+    .controls {
+      background: white;
+      padding: 0.75rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn:hover {
+      background: #5568d3;
+    }
+    .btn-google {
+      background: #4285f4;
+    }
+    .btn-google:hover {
+      background: #3367d6;
     }
     footer {
       background: white;
@@ -77,6 +107,13 @@
 
   <div id="map"></div>
 
+  <div class="controls">
+    <button class="btn" onclick="centralizarMapa()">🎯 Centralizar Marina</button>
+    <a class="btn btn-google" id="btn-google-maps" href="#" target="_blank">
+      🗺️ Abrir no Google Maps
+    </a>
+  </div>
+
   <footer>
     <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
     <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021250</p>
@@ -87,13 +124,11 @@
     <p>Carregando posições...</p>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // ATENÇÃO: Substitua YOUR_GOOGLE_MAPS_API_KEY pela sua chave real
-    // Como obter: https://console.cloud.google.com/google/maps-apis
-    const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY'
-
-    const PORTO_LAT = -10.1832  // ← AJUSTAR coordenadas reais do pier
-    const PORTO_LON = -48.3336  // ← AJUSTAR coordenadas reais do pier
+    // Configuração - Marina Palmas-TO
+    const PORTO_LAT = -10.21101
+    const PORTO_LON = -48.36912
     const INTERVALO_ATUALIZACAO = 5000 // 5 segundos
     const API_URL = 'https://calendario-boat-production.up.railway.app/rastrear'
 
@@ -101,80 +136,62 @@
     let markers = {}
     let portoMarker = null
 
-    // Carregar Google Maps API
-    function loadGoogleMapsAPI() {
-      return new Promise((resolve, reject) => {
-        if (window.google && window.google.maps) {
-          resolve()
-          return
-        }
+    // Inicializar mapa (OpenStreetMap - GRATUITO)
+    map = L.map('map').setView([PORTO_LAT, PORTO_LON], 15)
 
-        const script = document.createElement('script')
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`
-        script.async = true
-        script.defer = true
-        script.onload = resolve
-        script.onerror = reject
-        document.head.appendChild(script)
-      })
+    // Camada satélite (ESRI World Imagery - GRATUITO)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19
+    }).addTo(map)
+
+    // Camada de ruas para referência (pode ligar/desligar)
+    const streetsLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19
+    })
+
+    // Controle de camadas
+    L.control.layers({
+      'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')
+    }, {
+      'Nomes das ruas': streetsLayer
+    }).addTo(map)
+
+    // Ícones
+    const portoIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    })
+
+    const boatIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    })
+
+    // Marker da marina
+    portoMarker = L.marker([PORTO_LAT, PORTO_LON], { icon: portoIcon })
+      .addTo(map)
+      .bindPopup('<div style="text-align:center;"><h3>⚓ Marina Allmax</h3><p>Palmas-TO</p></div>')
+
+    // Atualizar link do Google Maps
+    document.getElementById('btn-google-maps').href =
+      `https://www.google.com/maps/search/?api=1&query=${PORTO_LAT},${PORTO_LON}`
+
+    // Função centralizar
+    function centralizarMapa() {
+      map.setView([PORTO_LAT, PORTO_LON], 15)
     }
 
-    // Inicializar mapa
-    async function inicializarMapa() {
-      try {
-        await loadGoogleMapsAPI()
-
-        map = new google.maps.Map(document.getElementById('map'), {
-          center: { lat: PORTO_LAT, lng: PORTO_LON },
-          zoom: 14,
-          mapTypeId: 'satellite',
-          mapTypeControl: true,
-          mapTypeControlOptions: {
-            mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
-          },
-          streetViewControl: false,
-          fullscreenControl: true
-        })
-
-        // Marker do porto/pier
-        portoMarker = new google.maps.Marker({
-          position: { lat: PORTO_LAT, lng: PORTO_LON },
-          map: map,
-          title: 'Porto Allmax',
-          icon: {
-            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
-          }
-        })
-
-        const portoInfo = new google.maps.InfoWindow({
-          content: `<div style="text-align:center; padding:10px;">
-                      <h3 style="margin:0 0 5px 0;">⚓ Porto Allmax</h3>
-                      <p style="margin:0; font-size:0.9rem;">Pier/Marina</p>
-                    </div>`
-        })
-
-        portoMarker.addListener('click', () => {
-          portoInfo.open(map, portoMarker)
-        })
-
-        // Primeira atualização
-        atualizarEmbarcacoes()
-
-        // Atualizar periodicamente
-        setInterval(atualizarEmbarcacoes, INTERVALO_ATUALIZACAO)
-
-      } catch (err) {
-        console.error('Erro ao carregar Google Maps:', err)
-        document.getElementById('loading').innerHTML = `
-          <p style="color: red;">❌ Erro ao carregar mapa</p>
-          <p style="font-size:0.8rem; margin-top:10px;">
-            Verifique se a API Key do Google Maps está configurada
-          </p>
-        `
-      }
-    }
-
-    // Função para formatar distância
+    // Formatar distância
     function formatarDistancia(metros) {
       if (metros >= 1000) {
         return `${(metros / 1000).toFixed(1)} km`
@@ -182,7 +199,7 @@
       return `${metros} m`
     }
 
-    // Função para atualizar embarcações
+    // Atualizar embarcações
     async function atualizarEmbarcacoes() {
       try {
         const response = await fetch(API_URL)
@@ -190,15 +207,12 @@
 
         if (!data.sucesso) throw new Error('Erro na resposta da API')
 
-        // Atualizar timestamp
         const agora = new Date()
         document.getElementById('ultima-atualizacao').textContent =
           `Última atualização: ${agora.toLocaleTimeString('pt-BR')}`
 
-        // IDs atuais
         const idsAtuais = new Set()
 
-        // Atualizar/criar markers
         data.embarcacoes.forEach(emb => {
           const id = emb.agendamento_id
           idsAtuais.add(id)
@@ -207,71 +221,54 @@
           const nomeEmb = emb.nome_embarcacao || 'Embarcação'
           const embId = `${emb.pb}-${emb.cota || '?'}`
 
-          const infoContent = `
-            <div style="text-align:center; padding:10px; min-width:200px;">
-              <h3 style="margin:0 0 10px 0; color:#667eea;">🚤 ${embId}</h3>
+          const popupContent = `
+            <div style="text-align:center; min-width:200px;">
+              <h3 style="color:#667eea; margin-bottom:10px;">🚤 ${embId}</h3>
               <p style="margin:5px 0;"><strong>${nomeEmb}</strong></p>
-              <p style="margin:5px 0; font-size:1.1rem; color:#764ba2; font-weight:bold;">
-                📍 ${distancia}
+              <p style="margin:10px 0; font-size:1.1rem; color:#764ba2; font-weight:bold;">
+                📍 ${distancia} da marina
               </p>
               <p style="margin:5px 0; font-size:0.8rem; opacity:0.7;">
                 ${new Date(emb.ultima_atualizacao).toLocaleTimeString('pt-BR')}
               </p>
+              <a href="https://www.google.com/maps/search/?api=1&query=${emb.latitude},${emb.longitude}"
+                 target="_blank"
+                 style="display:inline-block; margin-top:10px; padding:5px 10px; background:#4285f4; color:white; text-decoration:none; border-radius:3px; font-size:0.85rem;">
+                🗺️ Abrir no Google Maps
+              </a>
             </div>
           `
 
           if (markers[id]) {
-            // Atualizar posição existente
-            markers[id].marker.setPosition({
-              lat: emb.latitude,
-              lng: emb.longitude
-            })
-            markers[id].infoWindow.setContent(infoContent)
+            markers[id].setLatLng([emb.latitude, emb.longitude])
+            markers[id].setPopupContent(popupContent)
           } else {
-            // Criar novo marker
-            const marker = new google.maps.Marker({
-              position: { lat: emb.latitude, lng: emb.longitude },
-              map: map,
-              title: embId,
-              icon: {
-                url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-              }
-            })
-
-            const infoWindow = new google.maps.InfoWindow({
-              content: infoContent
-            })
-
-            marker.addListener('click', () => {
-              // Fechar todos os outros infoWindows
-              Object.values(markers).forEach(m => m.infoWindow.close())
-              infoWindow.open(map, marker)
-            })
-
-            markers[id] = { marker, infoWindow }
+            markers[id] = L.marker([emb.latitude, emb.longitude], { icon: boatIcon })
+              .addTo(map)
+              .bindPopup(popupContent)
           }
         })
 
-        // Remover markers que não estão mais na lista
         Object.keys(markers).forEach(id => {
           if (!idsAtuais.has(parseInt(id))) {
-            markers[id].marker.setMap(null)
+            map.removeLayer(markers[id])
             delete markers[id]
           }
         })
 
-        // Ocultar loading
         document.getElementById('loading').classList.add('hidden')
 
       } catch (err) {
         console.error('Erro ao atualizar embarcações:', err)
-        document.getElementById('ultima-atualizacao').textContent =
-          'Erro ao carregar dados'
+        document.getElementById('ultima-atualizacao').textContent = 'Erro ao carregar dados'
       }
     }
 
-    // Iniciar quando carregar
-    window.addEventListener('load', inicializarMapa)
+    // Primeira atualização
+    atualizarEmbarcacoes()
+
+    // Atualizar periodicamente
+    setInterval(atualizarEmbarcacoes, INTERVALO_ATUALIZACAO)
   </script>
 </body>
 </html>
