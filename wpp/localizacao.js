@@ -224,6 +224,10 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
         const msSinceUpdate = parseFloat(rsMsg.rows[0].ms_desde_atualizacao) || 0
         messageKey = rsMsg.rows[0].message_key
         precisaRenovar = msSinceUpdate >= TEMPO_RENOVACAO_MS
+
+        console.log(`[DEBUG] Grupo ${grupoId}: ${Math.round(msSinceUpdate / 60000)}min desde última msg | Precisa renovar: ${precisaRenovar}`)
+      } else {
+        console.log(`[DEBUG] Grupo ${grupoId}: Sem registro no banco, criando primeira mensagem`)
       }
 
       if (precisaRenovar || !messageKey) {
@@ -250,9 +254,14 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
             text: mensagemRanking,
             edit: JSON.parse(messageKey)
           })
+
+          // IMPORTANTE: NÃO atualizar timestamp ao editar
+          // O timestamp só muda quando RENOVAMOS (nova mensagem)
+          // Edição não conta como renovação
+
           console.log(`📝 Ranking editado no grupo ${grupoId}`)
         } catch (errEdit) {
-          // Se falhar edição, cria nova
+          // Se falhar edição, cria nova (renovação forçada)
           console.warn(`⚠️ Falha ao editar ranking, criando nova: ${errEdit.message}`)
           const sentMsg = await sock.sendMessage(grupoId, { text: mensagemRanking })
 
