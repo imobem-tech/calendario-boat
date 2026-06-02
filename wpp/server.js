@@ -393,11 +393,22 @@ app.get('/debug-files', (req, res) => {
       rastrearExists: fs.existsSync(path.join(publicPath, 'rastrear.html'))
     })
   } catch (err) {
-    res.status(500).json({
-      error: err.message,
-      cwd: process.cwd(),
-      publicPath: path.join(process.cwd(), 'public')
-    })
+    // Se falhou, listar o que TEM no diretório atual
+    try {
+      const cwdFiles = fs.readdirSync(process.cwd())
+      res.status(500).json({
+        error: err.message,
+        cwd: process.cwd(),
+        publicPath: path.join(process.cwd(), 'public'),
+        filesInCwd: cwdFiles
+      })
+    } catch (err2) {
+      res.status(500).json({
+        error: err.message,
+        error2: err2.message,
+        cwd: process.cwd()
+      })
+    }
   }
 })
 
