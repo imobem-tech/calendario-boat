@@ -63,9 +63,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
-// No Railway, o working dir é a raiz do projeto, então public/ fica em ./public
-const publicPath = path.join(process.cwd(), 'public')
+// public/ está dentro de wpp/ (mesmo diretório que server.js)
+const publicPath = path.join(__dirname, 'public')
 console.log('📁 Working directory:', process.cwd())
+console.log('📁 __dirname:', __dirname)
 console.log('📁 Servindo arquivos estáticos de:', publicPath)
 app.use(express.static(publicPath))
 
@@ -382,31 +383,34 @@ app.get('/grupos', async (req, res) => {
 
 // Rota de debug para verificar arquivos na pasta public
 app.get('/debug-files', (req, res) => {
-  const publicPath = path.join(process.cwd(), 'public')
+  const publicPath = path.join(__dirname, 'public')
 
   try {
     const files = fs.readdirSync(publicPath)
     res.json({
       cwd: process.cwd(),
+      __dirname,
       publicPath,
       filesExist: files,
       rastrearExists: fs.existsSync(path.join(publicPath, 'rastrear.html'))
     })
   } catch (err) {
-    // Se falhou, listar o que TEM no diretório atual
+    // Se falhou, listar o que TEM no __dirname
     try {
-      const cwdFiles = fs.readdirSync(process.cwd())
+      const dirFiles = fs.readdirSync(__dirname)
       res.status(500).json({
         error: err.message,
         cwd: process.cwd(),
-        publicPath: path.join(process.cwd(), 'public'),
-        filesInCwd: cwdFiles
+        __dirname,
+        publicPath,
+        filesInDir: dirFiles
       })
     } catch (err2) {
       res.status(500).json({
         error: err.message,
         error2: err2.message,
-        cwd: process.cwd()
+        cwd: process.cwd(),
+        __dirname
       })
     }
   }
