@@ -495,6 +495,24 @@ export async function handleLocalizacao(sock, pool, grupoId, msg) {
 
     if (rsAg.rowCount === 0) {
       console.log(`⚠️ Nenhum agendamento aberto hoje para ${pb}-${cota}`)
+
+      // Enviar mensagem de erro no grupo
+      const msgErro = `❌ *LOCALIZAÇÃO RECUSADA*
+
+🚤 ${pb}-${cota || '?'}
+
+Não há saída pendente de retorno.
+
+Verifique:
+• Saída registrada hoje?
+• Retorno já confirmado?
+
+${VERSAO_LOCALIZACAO}`
+
+      await sock.sendMessage(grupoId, { text: msgErro }).catch(err => {
+        console.error('Erro ao enviar mensagem de recusa:', err)
+      })
+
       return true
     }
 
