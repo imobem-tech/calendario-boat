@@ -485,17 +485,22 @@ app.get('/simular-fila', async (req, res) => {
 
     const barcosCriados = []
 
-    // Criar 20 barcos - DISTÂNCIAS 100m a 1000m distribuídas uniformemente
+    // Criar 20 barcos - NO LAGO (LESTE), não na terra!
     for (let i = 0; i < 20; i++) {
       const pb = 100 + i
       const cota = i % 2 === 0 ? `X${i + 1}` : null
-      // Distribuir uniformemente: 100m, 147m, 194m... até 1000m
-      const dist = 100 + Math.floor((900 / 19) * i) // Espaçamento uniforme
-      const bearing = Math.random() * 360 // Direção aleatória
 
-      // Calcular lat/lon (fórmula corrigida para metros)
-      const lat = -10.21101 + (dist * Math.cos(bearing * Math.PI / 180)) / 111320.0
-      const lon = -48.36912 + (dist * Math.sin(bearing * Math.PI / 180)) / (111320.0 * Math.cos(-10.21101 * Math.PI / 180))
+      // Distância: 20m a 100m (dentro da área navegável)
+      const dist = 20 + Math.floor((80 / 19) * i) // 20, 24, 28... até 100m
+
+      // Bearing: APENAS LESTE (90° a 270°) = semicírculo do lago
+      // Evita OESTE (270° a 90°) que é terra
+      const bearing = 90 + Math.random() * 180 // 90° = Norte-Leste, 270° = Sul-Leste
+
+      // Calcular lat/lon
+      const bearingRad = bearing * Math.PI / 180
+      const lat = -10.21101 + (dist * Math.cos(bearingRad)) / 111320.0
+      const lon = -48.36912 + (dist * Math.sin(bearingRad)) / (111320.0 * Math.cos(-10.21101 * Math.PI / 180))
 
       // Criar agendamento
       const rsAg = await pool.query(`
