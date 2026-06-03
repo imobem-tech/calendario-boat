@@ -126,7 +126,7 @@
 
   <footer>
     <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
-    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606021653</p>
+    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606022212</p>
   </footer>
 
   <div class="loading" id="loading">
@@ -139,6 +139,11 @@
     // Configuração - Marina Palmas-TO
     const PORTO_LAT = -10.21101
     const PORTO_LON = -48.36912
+
+    // Limite Oeste (base do mapa)
+    const LIMITE_OESTE_LAT = -10.21004
+    const LIMITE_OESTE_LON = -48.38665
+
     const INTERVALO_ATUALIZACAO = 5000 // 5 segundos
     const API_URL = 'https://calendario-boat-production.up.railway.app/rastrear'
 
@@ -153,8 +158,29 @@
     let lastPositions = {} // Última posição para calcular direção
     let portoMarker = null
 
-    // Inicializar mapa (OpenStreetMap - GRATUITO)
-    map = L.map('map').setView([PORTO_LAT, PORTO_LON], 15)
+    // Calcular centro entre Marina (Leste/topo) e Limite (Oeste/base)
+    const centerLat = (PORTO_LAT + LIMITE_OESTE_LAT) / 2
+    const centerLon = (PORTO_LON + LIMITE_OESTE_LON) / 2
+
+    // Inicializar mapa focado na área de navegação
+    map = L.map('map', {
+      center: [centerLat, centerLon],
+      zoom: 14,
+      minZoom: 13,
+      maxZoom: 18,
+      zoomControl: true
+    })
+
+    // Definir bounds fixos
+    // Leste (Marina) no topo, Oeste (Limite) na base
+    const bounds = L.latLngBounds(
+      [LIMITE_OESTE_LAT, LIMITE_OESTE_LON],  // Sudoeste
+      [PORTO_LAT, PORTO_LON]                  // Nordeste
+    )
+
+    // Aplicar bounds como limite máximo de visualização
+    map.setMaxBounds(bounds.pad(0.1))  // 10% de padding
+    map.fitBounds(bounds)
 
     // Camada satélite (ESRI World Imagery - GRATUITO)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -401,4 +427,4 @@
 </body>
 </html>
 
-<!-- V.2606021653 -->
+<!-- V.2606022212 -->
