@@ -485,17 +485,36 @@ app.get('/simular-fila', async (req, res) => {
 
     const barcosCriados = []
 
-    // Criar 20 barcos - NO LAGO (LESTE), não na terra!
+    // Criar 20 barcos com distribuição específica
     for (let i = 0; i < 20; i++) {
       const pb = 100 + i
       const cota = i % 2 === 0 ? `X${i + 1}` : null
 
-      // Distância: 20m a 100m (dentro da área navegável)
-      const dist = 20 + Math.floor((80 / 19) * i) // 20, 24, 28... até 100m
+      let dist, bearing
 
-      // Bearing: APENAS LESTE (90° a 270°) = semicírculo do lago
-      // Evita OESTE (270° a 90°) que é terra
-      const bearing = 90 + Math.random() * 180 // 90° = Norte-Leste, 270° = Sul-Leste
+      // 2 primeiros barcos: 100m fixo
+      if (i < 2) {
+        dist = 100
+        bearing = i === 0 ? 45 : 135 // Primeiro NE, segundo SE
+      }
+      // Restantes 18 barcos: 200-1500m distribuídos em 3 setores
+      else {
+        // Distância uniforme entre 200-1500m
+        dist = 200 + Math.floor((1300 / 17) * (i - 2))
+
+        // Distribuir em 3 setores: Nordeste (45°), Leste (90°), Sudeste (135°)
+        const setor = (i - 2) % 3
+        if (setor === 0) {
+          // Nordeste: 30° a 60° (±15° de variação)
+          bearing = 45 + (Math.random() * 30 - 15)
+        } else if (setor === 1) {
+          // Leste: 75° a 105° (±15° de variação)
+          bearing = 90 + (Math.random() * 30 - 15)
+        } else {
+          // Sudeste: 120° a 150° (±15° de variação)
+          bearing = 135 + (Math.random() * 30 - 15)
+        }
+      }
 
       // Calcular lat/lon
       const bearingRad = bearing * Math.PI / 180
