@@ -490,14 +490,13 @@ app.get('/simular-fila', async (req, res) => {
       const pb = 100 + i
       const cota = i % 2 === 0 ? `X${i + 1}` : null
       const dist = 20 + Math.floor(Math.random() * 80) // 20-100m
-      const vel = 10 + (Math.random() * 30) // 10-40 km/h
       const bearing = Math.random() * 360
 
-      // Calcular lat/lon
+      // Calcular lat/lon (fórmula corrigida para metros)
       const lat = -10.21101 + (dist * Math.cos(bearing * Math.PI / 180)) / 111320.0
       const lon = -48.36912 + (dist * Math.sin(bearing * Math.PI / 180)) / (111320.0 * Math.cos(-10.21101 * Math.PI / 180))
 
-      // Criar agendamento com Cod_Autorizado válido
+      // Criar agendamento
       const rsAg = await pool.query(`
         INSERT INTO public."P_BOAT_z_10_Saida_Emb" (
           "Cod_Emb_PB",
@@ -511,15 +510,28 @@ app.get('/simular-fila', async (req, res) => {
 
       const agId = rsAg.rows[0].ID
 
-      // Inserir localização (tabela NÃO tem velocidade_kmh)
+      // Inserir localização - ESTRUTURA CORRETA DA TABELA
+      // Campos: id(auto), agendamento_id, pb, cota, latitude, longitude, distancia_porto_m, criado_em(auto)
       await pool.query(`
         INSERT INTO public.wpp_localizacao_emb (
-          agendamento_id, pb, cota, latitude, longitude, distancia_porto_m
+          agendamento_id,
+          pb,
+          cota,
+          latitude,
+          longitude,
+          distancia_porto_m
         ) VALUES ($1, $2, $3, $4, $5, $6)
-      `, [agId, pb, cota, lat, lon, dist])
+      `, [agId, pb, cota, lat, lon, Math.round(dist)])
 
-      barcosCriados.push({ pb, cota, distancia: Math.round(dist), velocidade: Math.round(vel) })
-      console.log(`   ✅ ${pb}-${cota || '?'}: ${Math.round(dist)}m (${Math.round(vel)}km/h)`)
+      barcosCriados.push({
+        pb,
+        cota,
+        distancia: Math.round(dist),
+        latitude: lat.toFixed(6),
+        longitude: lon.toFixed(6)
+      })
+
+      console.log(`   ✅ ${pb}-${cota || '?'}: ${Math.round(dist)}m (${lat.toFixed(6)}, ${lon.toFixed(6)})`)
     }
 
     console.log('🎉 [SIMULAÇÃO] 20 barcos criados!')
