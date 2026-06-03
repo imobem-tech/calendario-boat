@@ -29,20 +29,6 @@
     #map {
       height: calc(100vh - 180px);
       width: 100%;
-      /* Rotação de 90° anti-horário */
-      transform: rotate(-90deg);
-      transform-origin: center center;
-    }
-    /* Contra-rotacionar marcadores e controles para ficarem legíveis */
-    .leaflet-marker-icon,
-    .leaflet-popup,
-    .leaflet-control {
-      transform: rotate(90deg);
-    }
-    /* Ajustar dimensões porque ao girar o mapa inverte width/height */
-    .leaflet-container {
-      width: 100% !important;
-      height: 100% !important;
     }
     .controls {
       background: white;
