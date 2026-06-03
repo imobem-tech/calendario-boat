@@ -494,12 +494,12 @@ app.get('/simular-fila', async (req, res) => {
 
       const agId = rsAg.rows[0].ID
 
-      // Inserir localização
+      // Inserir localização (tabela NÃO tem velocidade_kmh)
       await pool.query(`
         INSERT INTO public.wpp_localizacao_emb (
-          agendamento_id, pb, cota, latitude, longitude, velocidade_kmh, distancia_porto_m, criado_em
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() AT TIME ZONE 'America/Sao_Paulo')
-      `, [agId, pb, cota, lat, lon, vel, dist])
+          agendamento_id, pb, cota, latitude, longitude, distancia_porto_m
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+      `, [agId, pb, cota, lat, lon, dist])
 
       barcosCriados.push({ pb, cota, distancia: Math.round(dist), velocidade: Math.round(vel) })
       console.log(`   ✅ ${pb}-${cota || '?'}: ${Math.round(dist)}m (${Math.round(vel)}km/h)`)
