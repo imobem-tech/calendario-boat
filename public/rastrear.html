@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rastreamento de Embarcações | Allmax</title>
+
+  <!-- Desabilitar cache (força refresh sempre) -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- iOS Safari: força revalidação -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -138,7 +147,7 @@
   </div>
 
   <footer>
-    <p>Allmax Gestão de Cotas | Atualização automática a cada 2 segundos | V.2606022330</p>
+    <p>Allmax Gestão de Cotas | Atualização automática a cada 2 segundos | V.2606022335</p>
     <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606022223</p>
   </footer>
 
@@ -320,7 +329,15 @@
     // Atualizar embarcações
     async function atualizarEmbarcacoes() {
       try {
-        const response = await fetch(API_URL)
+        // Adiciona timestamp para evitar cache (iOS/Android)
+        const timestampUrl = `${API_URL}?_t=${Date.now()}`
+        const response = await fetch(timestampUrl, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        })
         const data = await response.json()
 
         if (!data.sucesso) throw new Error('Erro na resposta da API')
@@ -435,10 +452,45 @@
     }
 
     // Primeira atualização
+    // ============================================================
+    // GARANTIR REFRESH EM TODOS OS DISPOSITIVOS
+    // ============================================================
+
+    // Limpar service workers (podem cachear)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.unregister())
+      })
+    }
+
+    // Limpar cache do navegador ao carregar
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name))
+      })
+    }
+
+    // Primeira atualização
     atualizarEmbarcacoes()
 
-    // Atualizar periodicamente
+    // Atualizar periodicamente (2 segundos)
     setInterval(atualizarEmbarcacoes, INTERVALO_ATUALIZACAO)
+
+    // Forçar atualização quando voltar para a aba (mobile)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        console.log('🔄 Aba ativa novamente - atualizando...')
+        atualizarEmbarcacoes()
+      }
+    })
+
+    // Atualizar ao voltar do background (iOS Safari)
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        console.log('🔄 Voltou do cache - atualizando...')
+        atualizarEmbarcacoes()
+      }
+    })
   </script>
 </body>
 </html>

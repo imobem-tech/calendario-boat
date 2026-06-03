@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agendar</title>
+
+  <!-- Desabilitar cache (força refresh sempre) -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- iOS Safari: força revalidação -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <style>
     :root{
       --bg: #f3f5f9;
@@ -561,6 +570,32 @@ if(!resp.ok){
     });
 
     aplicarAssinatura();
+
+    // ============================================================
+    // GARANTIR REFRESH EM TODOS OS DISPOSITIVOS
+    // ============================================================
+
+    // Limpar service workers (podem cachear)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.unregister())
+      })
+    }
+
+    // Limpar cache do navegador ao carregar
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name))
+      })
+    }
+
+    // Atualizar ao voltar do background (iOS Safari)
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        console.log('🔄 Voltou do cache - recarregando...')
+        window.location.reload(true)
+      }
+    })
   </script>
 </body>
 </html>
