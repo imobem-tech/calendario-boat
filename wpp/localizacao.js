@@ -7,7 +7,7 @@
 
 import { buscarGrupoInfo } from './db.js'
 
-const VERSAO_LOCALIZACAO = 'V.2606022026'
+const VERSAO_LOCALIZACAO = 'V.2606022239'
 
 // ============================================================
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
@@ -212,35 +212,66 @@ function calcularVelocidadeETA(item) {
 // ============================================================
 // MONTAR MENSAGEM DE RANKING SINTÉTICA (GRUPOS)
 // ============================================================
-function montarMensagemRankingSintetica(ranking) {
+function montarMensagemRankingSintetica(ranking, pbFiltro, cotaFiltro) {
   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
   const hora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
 
   let msg = `*🏁 RETORNO — ${hora}*\n\n`
 
-  if (ranking.length === 0) {
+  // Separar barcos com e sem localização
+  const comLoc = ranking.filter(i => i.distancia_porto_m !== null)
+  const semLoc = ranking.filter(i => i.distancia_porto_m === null)
+
+  if (comLoc.length === 0 && semLoc.length === 0) {
     msg += `ℹ️ Nenhuma embarcação\nem retorno.\n\n`
   } else {
-    ranking.forEach((item, index) => {
+    let meuETA = null
+
+    // Barcos com localização
+    comLoc.forEach((item, index) => {
       const posicao = index + 1
       const emoji = emojiPorDistancia(item.distancia_porto_m)
-      const emb = `*${item.pb}-${item.cota || '?'}*`
+      const ehMeuBarco = (pbFiltro && item.pb == pbFiltro && (item.cota || '') == (cotaFiltro || ''))
+      const emb = ehMeuBarco ? `*${item.pb}-${item.cota || '?'}*` : `${item.pb}-${item.cota || '?'}`
 
-      if (item.distancia_porto_m !== null) {
-        // Calcular velocidade e ETA
-        const { velocidadeKmh, etaMinutos } = calcularVelocidadeETA(item)
+      // Calcular velocidade e ETA
+      const { velocidadeKmh, etaMinutos } = calcularVelocidadeETA(item)
 
-        // Formato: 151-11 0120m 022km/h 015m
-        const distMetros = String(item.distancia_porto_m).padStart(4, '0') + 'm'
-        const velKmh = String(velocidadeKmh).padStart(3, '0') + 'km/h'
-        const etaMin = String(etaMinutos).padStart(3, '0') + 'm'
+      // Calcular horário de chegada
+      const horaChegada = new Date(agora.getTime() + etaMinutos * 60000)
+      const hhMM = `${String(horaChegada.getHours()).padStart(2, '0')}:${String(horaChegada.getMinutes()).padStart(2, '0')}`
 
-        msg += `${posicao}º ${emoji} ${emb}\n`
-        msg += `${distMetros} ${velKmh} ${etaMin}\n\n`
-      } else {
-        msg += `${posicao}º ${emoji} ${emb}\nSem localização\n\n`
+      if (ehMeuBarco) {
+        meuETA = hhMM
       }
+
+      // Formato: 0120m 022km/h 20:45
+      const distMetros = String(item.distancia_porto_m).padStart(4, '0') + 'm'
+      const velKmh = String(velocidadeKmh).padStart(3, '0') + 'km/h'
+
+      msg += `${posicao}º ${emoji} ${emb}\n`
+      msg += `${distMetros} ${velKmh} ${hhMM}\n`
+      msg += `--------------------\n`
     })
+
+    // Barcos sem localização (no final)
+    semLoc.forEach((item, index) => {
+      const posicao = comLoc.length + index + 1
+      const emoji = emojiPorDistancia(null)
+      const ehMeuBarco = (pbFiltro && item.pb == pbFiltro && (item.cota || '') == (cotaFiltro || ''))
+      const emb = ehMeuBarco ? `*${item.pb}-${item.cota || '?'}*` : `${item.pb}-${item.cota || '?'}`
+
+      msg += `${posicao}º ${emoji} ${emb}\n`
+      msg += `xxxx xxxx --:--\n`
+      msg += `--------------------\n`
+    })
+
+    // Prob_ apenas do próprio barco
+    if (meuETA) {
+      msg += `\nProb_${meuETA}\n`
+    }
+
+    msg += `\n`
   }
 
   msg += `🔴 até 300m | 🟡 até 1km\n`
@@ -263,16 +294,21 @@ function montarMensagemRankingCompleta(ranking) {
 
   let msg = `*🏁 RANKING DE RETORNO — ${hora}*\n\n`
 
-  if (ranking.length === 0) {
+  // Separar com e sem localização
+  const comLoc = ranking.filter(i => i.distancia_porto_m !== null)
+  const semLoc = ranking.filter(i => i.distancia_porto_m === null)
+
+  if (comLoc.length === 0 && semLoc.length === 0) {
     msg += `ℹ️ Nenhuma embarcação em\nprocesso de retorno no momento.\n\n`
   } else {
-    ranking.forEach((item, index) => {
+    // Com localização
+    comLoc.forEach((item, index) => {
       const posicao = index + 1
       const emoji = emojiPorDistancia(item.distancia_porto_m)
       const emb = `*${item.pb}-${item.cota || '?'}*`
       const nomeEmb = item.nome_embarcacao || 'Embarcação'
 
-      // Marca + Modelo truncado para 25 caracteres
+      // Marca + Modelo
       let marcaModelo = ''
       if (item.marca_embarcacao && item.tipo_embarcacao) {
         marcaModelo = `${item.marca_embarcacao} ${item.tipo_embarcacao}`
@@ -285,21 +321,37 @@ function montarMensagemRankingCompleta(ranking) {
       }
       marcaModelo = truncar(marcaModelo, 25)
 
-      const dist = item.distancia_porto_m !== null
-        ? formatarDistancia(item.distancia_porto_m)
-        : 'S/LOC'
+      // Calcular velocidade e ETA
+      const { velocidadeKmh, etaMinutos } = calcularVelocidadeETA(item)
+      const horaChegada = new Date(agora.getTime() + etaMinutos * 60000)
+      const hhMM = `${String(horaChegada.getHours()).padStart(2, '0')}:${String(horaChegada.getMinutes()).padStart(2, '0')}`
 
-      const descDist = item.distancia_porto_m !== null
-        ? truncar(marcaModelo, 25)
-        : 'Sem localização'
+      const distMetros = String(item.distancia_porto_m).padStart(4, '0') + 'm'
+      const velKmh = String(velocidadeKmh).padStart(3, '0') + 'km/h'
 
       msg += `${posicao}º ${emoji} ${emb} ${nomeEmb}\n`
-      msg += `${dist} ${descDist}\n`
-      msg += `-------------------------\n\n`
+      msg += `${distMetros} ${marcaModelo}\n`
+      msg += `Prob_${hhMM}\n`
+      msg += `${distMetros} ${velKmh} ${hhMM}\n`
+      msg += `-------------------------\n`
+    })
+
+    // Sem localização (final)
+    semLoc.forEach((item, index) => {
+      const posicao = comLoc.length + index + 1
+      const emoji = emojiPorDistancia(null)
+      const emb = `*${item.pb}-${item.cota || '?'}*`
+      const nomeEmb = item.nome_embarcacao || 'Embarcação'
+
+      msg += `${posicao}º ${emoji} ${emb} ${nomeEmb}\n`
+      msg += `Sem localização\n`
+      msg += `Prob_--:--\n`
+      msg += `xxxx xxxx --:--\n`
+      msg += `-------------------------\n`
     })
   }
 
-  msg += `🔴 até 300m | 🟡 até 1km\n`
+  msg += `\n🔴 até 300m | 🟡 até 1km\n`
   msg += `🟢 > 1km | ⚪ sem localização\n\n`
   msg += `📍 Compartilhe localização em\n`
   msg += `tempo real para atualizar\n\n`
@@ -309,6 +361,7 @@ function montarMensagemRankingCompleta(ranking) {
 
   return msg
 }
+
 
 // ============================================================
 // EDITAR/ENVIAR MENSAGEM DE RANKING EM TODOS OS GRUPOS
@@ -335,7 +388,7 @@ async function atualizarRankingEmTodosGrupos(sock, pool, ranking) {
       // Montar mensagem apropriada
       let mensagemRanking = isGrupoEspelho
         ? montarMensagemRankingCompleta(ranking)
-        : montarMensagemRankingSintetica(ranking)
+        : montarMensagemRankingSintetica(ranking, dadosGrupo.pb, dadosGrupo.cota)
 
       // Se tem pb/cota (não é espelho), adicionar parâmetros no link
       if (dadosGrupo.pb) {
