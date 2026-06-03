@@ -452,6 +452,23 @@ app.get('/reset-sessao', async (req, res) => {
 })
 
 // ============================================================
+// ENDPOINT: Mostrar estrutura da tabela
+// ============================================================
+app.get('/schema-localizacao', async (req, res) => {
+  try {
+    const rs = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_name = 'wpp_localizacao_emb'
+      ORDER BY ordinal_position
+    `)
+    res.json({ sucesso: true, colunas: rs.rows })
+  } catch (erro) {
+    res.status(500).json({ sucesso: false, erro: erro.message })
+  }
+})
+
+// ============================================================
 // ENDPOINT: Executar simulação de 20 barcos
 // ============================================================
 app.get('/simular-fila', async (req, res) => {
