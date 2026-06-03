@@ -451,6 +451,67 @@ app.get('/reset-sessao', async (req, res) => {
 })
 
 // ============================================================
+// ENDPOINT: Executar simulação de 20 barcos
+// ============================================================
+app.get('/simular-fila', async (req, res) => {
+  try {
+    console.log('🎬 [SIMULAÇÃO] Criando 20 barcos...')
+
+    // Limpar simulações anteriores
+    await pool.query(`DELETE FROM public.wpp_localizacao_emb WHERE pb >= 100 AND pb < 120`)
+    await pool.query(`DELETE FROM public."P_BOAT_z_10_Saida_Emb" WHERE "Cod_Emb_PB" >= 100 AND "Cod_Emb_PB" < 120`)
+
+    const barcosCriados = []
+
+    // Criar 20 barcos
+    for (let i = 0; i < 20; i++) {
+      const pb = 100 + i
+      const cota = i % 2 === 0 ? `X${i + 1}` : null
+      const dist = 20 + Math.floor(Math.random() * 80) // 20-100m
+      const vel = 10 + (Math.random() * 30) // 10-40 km/h
+      const bearing = Math.random() * 360
+
+      // Calcular lat/lon
+      const lat = -10.21101 + (dist * Math.cos(bearing * Math.PI / 180)) / 111320.0
+      const lon = -48.36912 + (dist * Math.sin(bearing * Math.PI / 180)) / (111320.0 * Math.cos(-10.21101 * Math.PI / 180))
+
+      // Criar agendamento
+      const rsAg = await pool.query(`
+        INSERT INTO public."P_BOAT_z_10_Saida_Emb" (
+          "Cod_Emb_PB", "Grupo_Comp_letra", "Dt_Agendamento", "Dt_Saída", "Cod_Autorizado", "Nome_Embarcacao"
+        ) VALUES ($1, $2, NOW() AT TIME ZONE 'America/Sao_Paulo', NOW() AT TIME ZONE 'America/Sao_Paulo', 1, $3)
+        RETURNING "ID"
+      `, [pb, cota, `SIMUL-${pb}${cota || ''}`])
+
+      const agId = rsAg.rows[0].ID
+
+      // Inserir localização
+      await pool.query(`
+        INSERT INTO public.wpp_localizacao_emb (
+          agendamento_id, pb, cota, latitude, longitude, velocidade_kmh, distancia_porto_m, criado_em
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() AT TIME ZONE 'America/Sao_Paulo')
+      `, [agId, pb, cota, lat, lon, vel, dist])
+
+      barcosCriados.push({ pb, cota, distancia: Math.round(dist), velocidade: Math.round(vel) })
+      console.log(`   ✅ ${pb}-${cota || '?'}: ${Math.round(dist)}m (${Math.round(vel)}km/h)`)
+    }
+
+    console.log('🎉 [SIMULAÇÃO] 20 barcos criados!')
+
+    res.json({
+      sucesso: true,
+      mensagem: '20 barcos simulados criados!',
+      barcos: barcosCriados,
+      proximoPasso: 'Acesse /testar-ranking para enviar ao WhatsApp'
+    })
+
+  } catch (erro) {
+    console.error('❌ [SIMULAÇÃO] Erro:', erro)
+    res.status(500).json({ sucesso: false, erro: erro.message })
+  }
+})
+
+// ============================================================
 // ENDPOINT DE TESTE: Forçar envio de ranking manualmente
 // ============================================================
 app.get('/testar-ranking', async (req, res) => {
