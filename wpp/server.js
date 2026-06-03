@@ -512,9 +512,14 @@ app.get('/simular-fila', async (req, res) => {
     const rsAuth = await pool.query(`SELECT "Codigo" FROM public."Cliente" LIMIT 1`)
     const codAutorizado = rsAuth.rows[0]?.Codigo || 1
 
+    console.log('🧹 Limpando barcos simulados antigos...')
+
     // Limpar simulações anteriores
-    await pool.query(`DELETE FROM public.wpp_localizacao_emb WHERE pb >= 100 AND pb < 120`)
-    await pool.query(`DELETE FROM public."P_BOAT_z_10_Saida_Emb" WHERE "Cod_Emb_PB" >= 100 AND "Cod_Emb_PB" < 120`)
+    const rsDelLoc = await pool.query(`DELETE FROM public.wpp_localizacao_emb WHERE pb >= 100 AND pb < 120`)
+    const rsDelAg = await pool.query(`DELETE FROM public."P_BOAT_z_10_Saida_Emb" WHERE "Cod_Emb_PB" >= 100 AND "Cod_Emb_PB" < 120`)
+
+    console.log(`   🗑️  ${rsDelLoc.rowCount} localizações removidas`)
+    console.log(`   🗑️  ${rsDelAg.rowCount} agendamentos removidos`)
 
     const barcosCriados = []
 
