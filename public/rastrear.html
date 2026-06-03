@@ -29,6 +29,20 @@
     #map {
       height: calc(100vh - 180px);
       width: 100%;
+      /* Rotação de 90° anti-horário */
+      transform: rotate(-90deg);
+      transform-origin: center center;
+    }
+    /* Contra-rotacionar marcadores e controles para ficarem legíveis */
+    .leaflet-marker-icon,
+    .leaflet-popup,
+    .leaflet-control {
+      transform: rotate(90deg);
+    }
+    /* Ajustar dimensões porque ao girar o mapa inverte width/height */
+    .leaflet-container {
+      width: 100% !important;
+      height: 100% !important;
     }
     .controls {
       background: white;
@@ -126,7 +140,7 @@
 
   <footer>
     <p>Allmax Gestão de Cotas | Atualização automática a cada 5 segundos</p>
-    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606022212</p>
+    <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606022216</p>
   </footer>
 
   <div class="loading" id="loading">
@@ -427,4 +441,4 @@
 </body>
 </html>
 
-<!-- V.2606022212 -->
+<!-- V.2606022216 -->
