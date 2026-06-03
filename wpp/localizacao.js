@@ -1,13 +1,14 @@
 // ============================================================
-// wpp/localizacao.js — V.2606021250
+// wpp/localizacao.js — V.2606022300
 // Allmax Gestão de Cotas — Marujo⚓
 // Localização em tempo real → Tracking + Ranking dinâmico
-// NOTA: Retorno (Dt_Retorno) é registrado SOMENTE via comando rrr
+// + Sistema 70m: ÚNICA forma de retorno via localização (<70m)
+// NOTA: Retorno (Dt_Retorno) pode ser via: RRR manual OU Sistema 70m (<70m + autorização colaborador)
 // ============================================================
 
 import { buscarGrupoInfo } from './db.js'
 
-const VERSAO_LOCALIZACAO = 'V.2606022239'
+const VERSAO_LOCALIZACAO = 'V.2606022300'
 
 // ============================================================
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
@@ -18,6 +19,11 @@ const PORTO = {
 }
 
 const GRUPO_ESPELHO_RETORNO_ID = '120363426928542914@g.us'
+
+// ============================================================
+// SISTEMA 70m: Raio de detecção
+// ============================================================
+const RAIO_CONFIRMACAO_METROS = 70     // Pede confirmação S/N (inclui até 0m)
 
 // ============================================================
 // CALCULAR DISTÂNCIA ENTRE DOIS PONTOS (Haversine)
@@ -586,51 +592,9 @@ ${VERSAO_LOCALIZACAO}`
     await gravarPosicao(pool, agendamentoId, pb, cota, latitude, longitude, distanciaPorto)
 
     // ============================================================
-    // REGISTRAR RETORNO AUTOMÁTICO SE CHEGOU NO PIER
+    // Sistema 70m gerencia TODOS os retornos via confirmação
+    // REMOVIDO: VIA GEO automático (agora apenas com autorização)
     // ============================================================
-    const RAIO_CHEGADA_METROS = 50 // 50 metros da marina
-
-    if (distanciaPorto <= RAIO_CHEGADA_METROS && !agendamento['Dt_Retorno']) {
-      // Chegou no pier - registrar retorno automático
-      const agoraRetorno = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-
-      await pool.query(
-        `UPDATE public."P_BOAT_z_10_Saida_Emb"
-            SET "Dt_Retorno" = $1
-          WHERE "ID" = $2`,
-        [agoraRetorno, agendamentoId]
-      )
-
-      console.log(`✅ Retorno VIA GEO registrado — agendamento ${agendamentoId} — Emb ${pb}-${cota}`)
-
-      // Enviar mensagem de confirmação VIA GEO no grupo
-      const dd = String(agoraRetorno.getDate()).padStart(2, '0')
-      const mm = String(agoraRetorno.getMonth() + 1).padStart(2, '0')
-      const hh = String(agoraRetorno.getHours()).padStart(2, '0')
-      const min = String(agoraRetorno.getMinutes()).padStart(2, '0')
-
-      const sufixo = `${dd}${hh}${min}`
-      const dataHora = `${dd}/${mm} ${hh}:${min}`
-
-      const msgRetornoGeo =
-`\`\`\`Olá, sou o seu
-Assistente Virtual\`\`\` *Marujo⚓*
-\`\`\`--------------------------\`\`\`
-
-✅ *RETORNO_${sufixo} VIA GEO*
-${dataHora}
-Emb ${pb}-${cota}
-
-🌍 Localização detectada
-no raio do pier (${distanciaPorto}m)
-
-Retorno registrado
-automaticamente.
-
-${VERSAO_LOCALIZACAO}`
-
-      await sock.sendMessage(grupoId, { text: msgRetornoGeo })
-    }
 
     // Buscar ranking atualizado
     const ranking = await buscarRankingAtual(pool)
@@ -779,5 +743,131 @@ ${VERSAO_LOCALIZACAO}`
 }
 
 // ============================================================
-// V.2606021250
+// SISTEMA 70m: Enviar pergunta de confirmação
+// ============================================================
+export async function enviarPerguntaConfirmacao70m(sock, aguardandoConfirmacao70m, grupoId, agendamentoId, pb, cota, distanciaPorto, nomeEmb) {
+  const distMetros = Math.round(distanciaPorto)
+
+  const mensagem = `⚓ *CONFIRMAÇÃO DE RETORNO*
+
+🚤 *${pb}-${cota}* ${nomeEmb || ''}
+
+Embarcação a ${distMetros}m da marina.
+
+Confirmar retorno?
+Digite *S* para SIM ou *N* para NÃO
+
+(Apenas colaboradores)
+
+${VERSAO_LOCALIZACAO}`
+
+  await sock.sendMessage(grupoId, { text: mensagem })
+
+  aguardandoConfirmacao70m.set(grupoId, {
+    agendamentoId,
+    pb,
+    cota,
+    ultimaPergunta: new Date(),
+    tentativas: 1
+  })
+
+  console.log(`⚓ Sistema 70m: Pergunta enviada para ${pb}-${cota} (${distMetros}m)`)
+}
+
+// ============================================================
+// SISTEMA 70m: Verificação periódica (chamada a cada 5 min)
+// ============================================================
+export async function verificarPosicoes70Metros(sock, pool, aguardandoConfirmacao70m) {
+  try {
+    console.log('🔍 [70m] Verificando barcos na zona de confirmação...')
+
+    // Buscar todas posições < 70m e > 50m, sem retorno
+    const rsPosicoes = await pool.query(`
+      WITH ultimas_posicoes AS (
+        SELECT DISTINCT ON (l.agendamento_id)
+          l.agendamento_id,
+          l.pb,
+          l.cota,
+          l.distancia_porto_m,
+          g.grupowppid,
+          s."Dt_Retorno",
+          s."Nome_Embarcacao",
+          l.criado_em
+        FROM public.wpp_localizacao_emb l
+        JOIN public.wpp_grupos_agenda g
+          ON g.pb = l.pb
+          AND UPPER(COALESCE(g.cota, '')) = UPPER(COALESCE(l.cota, ''))
+        JOIN public."P_BOAT_z_10_Saida_Emb" s
+          ON s."ID" = l.agendamento_id
+        WHERE DATE(s."Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') =
+              (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+          AND s."Dt_Saída" IS NOT NULL
+          AND s."Dt_Retorno" IS NULL
+          AND l.distancia_porto_m < 70
+          AND (EXTRACT(EPOCH FROM (NOW() - l.criado_em)) * 1000) < 600000
+        ORDER BY l.agendamento_id, l.criado_em DESC
+      )
+      SELECT * FROM ultimas_posicoes
+    `)
+
+    if (rsPosicoes.rowCount === 0) {
+      console.log('   ✅ Nenhum barco na zona 70m')
+      return
+    }
+
+    console.log(`   📍 ${rsPosicoes.rowCount} barco(s) na zona 70m`)
+
+    const agora = new Date()
+
+    for (const pos of rsPosicoes.rows) {
+      const estado = aguardandoConfirmacao70m.get(pos.grupowppid)
+      const tempoDecorrido = estado ? (agora - estado.ultimaPergunta) : Infinity
+
+      if (!estado) {
+        // Primeira vez: enviar pergunta
+        console.log(`   🆕 Primeira confirmação: ${pos.pb}-${pos.cota}`)
+        await enviarPerguntaConfirmacao70m(
+          sock, aguardandoConfirmacao70m,
+          pos.grupowppid,
+          pos.agendamento_id,
+          pos.pb,
+          pos.cota,
+          pos.distancia_porto_m,
+          pos.Nome_Embarcacao
+        )
+      } else if (tempoDecorrido >= 5 * 60 * 1000) {
+        // Passou 5min: re-enviar
+        console.log(`   🔁 Re-enviando confirmação: ${pos.pb}-${pos.cota} (${Math.round(tempoDecorrido / 60000)}min)`)
+        await enviarPerguntaConfirmacao70m(
+          sock, aguardandoConfirmacao70m,
+          pos.grupowppid,
+          pos.agendamento_id,
+          pos.pb,
+          pos.cota,
+          pos.distancia_porto_m,
+          pos.Nome_Embarcacao
+        )
+      } else {
+        console.log(`   ⏳ Aguardando resposta: ${pos.pb}-${pos.cota} (${Math.round(tempoDecorrido / 60000)}min)`)
+      }
+    }
+
+    // Limpar estados de barcos que saíram da zona (>70m ou já retornou)
+    const gruposAtivos = new Set(rsPosicoes.rows.map(r => r.grupowppid))
+    for (const [grupoId] of aguardandoConfirmacao70m) {
+      if (!gruposAtivos.has(grupoId)) {
+        console.log(`   🧹 Removendo estado de grupo ${grupoId} (saiu da zona ou retornou)`)
+        aguardandoConfirmacao70m.delete(grupoId)
+      }
+    }
+
+    console.log(`✅ [70m] Verificação completa`)
+
+  } catch (erro) {
+    console.error('❌ [70m] Erro na verificação:', erro)
+  }
+}
+
+// ============================================================
+// V.2606022300
 // ============================================================

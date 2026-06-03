@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/server.js — V.2606021250
+// wpp/server.js — V.2606022300
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
-// + Localização em tempo real: retorno automático + ranking
+// + Localização em tempo real: tracking + ranking
+// + Sistema 70m: ÚNICA forma de retorno via geo (<70m + autorização)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -48,15 +49,22 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
-import { handleLocalizacao, verificarPosicoesExpiradas } from './localizacao.js'
+import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m } from './localizacao.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2606021250'
+const VERSAO_WPP = 'Allmax®2606022300'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
 const PORT = process.env.PORT || 8080
+
+// ============================================================
+// SISTEMA 70m: Estado em memória para confirmações pendentes
+// ============================================================
+const aguardandoConfirmacao70m = new Map()
+// Chave: grupoId
+// Valor: { agendamentoId, pb, cota, ultimaPergunta, tentativas }
 
 // Resolver caminho absoluto para ESM
 const __filename = fileURLToPath(import.meta.url)
@@ -96,6 +104,88 @@ const iniciadoEm = new Date()
 async function limparSessao() {
   await rm('/data/auth_info', { recursive: true, force: true })
   console.log('🧹 Sessão apagada.')
+}
+
+// ============================================================
+// SISTEMA 70m: Handler de confirmação S/N
+// ============================================================
+async function handleConfirmacao70m(sock, pool, grupoId, texto, remetente) {
+  const estado = aguardandoConfirmacao70m.get(grupoId)
+  if (!estado) return false
+
+  // Validar se é colaborador
+  const colaborador = await buscarColaborador(pool, remetente)
+  if (!colaborador) {
+    console.log(`⚠️ Resposta S/N ignorada: ${remetente} não é colaborador`)
+    return true // Consumiu mensagem mas ignorou
+  }
+
+  const textoNorm = texto.trim().toLowerCase()
+
+  // ============================================================
+  // Resposta: S (SIM - Confirmar retorno)
+  // ============================================================
+  if (/^s$/i.test(textoNorm)) {
+    try {
+      // Registrar retorno
+      await pool.query(
+        `UPDATE public."P_BOAT_z_10_Saida_Emb"
+         SET "Dt_Retorno" = NOW() AT TIME ZONE 'America/Sao_Paulo'
+         WHERE "ID" = $1`,
+        [estado.agendamentoId]
+      )
+
+      const agora = new Date()
+      const dataRetorno = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      const horaRetorno = agora.toLocaleTimeString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+
+      const timestamp = agora.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+
+      const mensagem = `✅ *RETORNO CONFIRMADO*
+
+RETORNO_${timestamp}
+${dataRetorno} ${horaRetorno}
+${colaborador.nome}
+Emb ${estado.pb}-${estado.cota}
+
+Sistema 70m
+
+${VERSAO_WPP}`
+
+      await sock.sendMessage(grupoId, { text: mensagem })
+      aguardandoConfirmacao70m.delete(grupoId)
+
+      console.log(`✅ Retorno 70m confirmado: ${estado.pb}-${estado.cota}`)
+      return true
+
+    } catch (erro) {
+      console.error('❌ Erro ao registrar retorno 70m:', erro)
+      await sock.sendMessage(grupoId, {
+        text: `❌ Erro ao registrar retorno. Tente novamente ou use RRR.\n\n${VERSAO_WPP}`
+      })
+      aguardandoConfirmacao70m.delete(grupoId)
+      return true
+    }
+  }
+
+  // ============================================================
+  // Resposta: N (NÃO - Aguardar 5 minutos)
+  // ============================================================
+  if (/^n$/i.test(textoNorm)) {
+    await sock.sendMessage(grupoId, {
+      text: `❌ Retorno não confirmado\n\nNova confirmação em 5 minutos.\n\n${VERSAO_WPP}`
+    })
+    aguardandoConfirmacao70m.delete(grupoId)
+    console.log(`❌ Retorno 70m negado: ${estado.pb}-${estado.cota}`)
+    return true
+  }
+
+  // Não é S nem N: ignora
+  return false
 }
 
 async function iniciarBot() {
@@ -211,6 +301,14 @@ if (horaMotorTratado) continue
           const saidaTratada = await tratarComandoSaida(sock, pool, grupoId, remetente, texto)
           if (saidaTratada) {
             continue
+          }
+
+          // ============================================================
+          // Sistema 70m: Confirmação S/N de retorno semi-automático
+          // ============================================================
+          if (aguardandoConfirmacao70m.has(grupoId)) {
+            const respondeu = await handleConfirmacao70m(sock, pool, grupoId, texto, remetente)
+            if (respondeu) continue
           }
 
           // Aguardando confirmação de retorno
@@ -652,7 +750,19 @@ setInterval(async () => {
   }
 }, 60000)
 
-  
+  // ============================================================
+  // Sistema 70m: Verificação periódica a cada 5 minutos
+  // ============================================================
+  setInterval(async () => {
+    if (!conectado || !sock) return
+    try {
+      await verificarPosicoes70Metros(sock, pool, aguardandoConfirmacao70m)
+    } catch (erro) {
+      console.error('❌ Erro na verificação 70m:', erro)
+    }
+  }, 5 * 60 * 1000) // 5 minutos
+
+
   // Previsão diária às 8h — controla data para não enviar mais de uma vez por dia
   let previsaoDiariaUltimaData = ''
   setInterval(async () => {
