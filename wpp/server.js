@@ -485,12 +485,13 @@ app.get('/simular-fila', async (req, res) => {
 
     const barcosCriados = []
 
-    // Criar 20 barcos
+    // Criar 20 barcos - DISTÂNCIAS 100m a 1000m distribuídas uniformemente
     for (let i = 0; i < 20; i++) {
       const pb = 100 + i
       const cota = i % 2 === 0 ? `X${i + 1}` : null
-      const dist = 20 + Math.floor(Math.random() * 80) // 20-100m
-      const bearing = Math.random() * 360
+      // Distribuir uniformemente: 100m, 147m, 194m... até 1000m
+      const dist = 100 + Math.floor((900 / 19) * i) // Espaçamento uniforme
+      const bearing = Math.random() * 360 // Direção aleatória
 
       // Calcular lat/lon (fórmula corrigida para metros)
       const lat = -10.21101 + (dist * Math.cos(bearing * Math.PI / 180)) / 111320.0
@@ -536,12 +537,32 @@ app.get('/simular-fila', async (req, res) => {
 
     console.log('🎉 [SIMULAÇÃO] 20 barcos criados!')
 
-    res.json({
-      sucesso: true,
-      mensagem: '20 barcos simulados criados!',
-      barcos: barcosCriados,
-      proximoPasso: 'Acesse /testar-ranking para enviar ao WhatsApp'
-    })
+    // Enviar ranking automaticamente no grupo espelho
+    if (conectado && sock) {
+      console.log('📤 [SIMULAÇÃO] Enviando ranking no grupo espelho...')
+
+      const ranking = await buscarRankingAtual(pool)
+      await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+
+      console.log('✅ [SIMULAÇÃO] Ranking enviado no WhatsApp!')
+
+      res.json({
+        sucesso: true,
+        mensagem: '20 barcos simulados criados!',
+        barcos: barcosCriados,
+        rankingEnviado: true,
+        totalBarcos: ranking.length,
+        grupoEspelho: 'Ranking enviado automaticamente'
+      })
+    } else {
+      res.json({
+        sucesso: true,
+        mensagem: '20 barcos simulados criados!',
+        barcos: barcosCriados,
+        rankingEnviado: false,
+        aviso: 'WhatsApp não conectado - ranking não enviado'
+      })
+    }
 
   } catch (erro) {
     console.error('❌ [SIMULAÇÃO] Erro:', erro)
