@@ -561,32 +561,15 @@ app.get('/simular-fila', async (req, res) => {
 
     console.log('🎉 [SIMULAÇÃO] 20 barcos criados!')
 
-    // Enviar ranking automaticamente no grupo espelho
-    if (conectado && sock) {
-      console.log('📤 [SIMULAÇÃO] Enviando ranking no grupo espelho...')
-
-      const ranking = await buscarRankingAtual(pool)
-      await atualizarRankingEmTodosGrupos(sock, pool, ranking)
-
-      console.log('✅ [SIMULAÇÃO] Ranking enviado no WhatsApp!')
-
-      res.json({
-        sucesso: true,
-        mensagem: '20 barcos simulados criados!',
-        barcos: barcosCriados,
-        rankingEnviado: true,
-        totalBarcos: ranking.length,
-        grupoEspelho: 'Ranking enviado automaticamente'
-      })
-    } else {
-      res.json({
-        sucesso: true,
-        mensagem: '20 barcos simulados criados!',
-        barcos: barcosCriados,
-        rankingEnviado: false,
-        aviso: 'WhatsApp não conectado - ranking não enviado'
-      })
-    }
+    // MODO TESTE: NÃO envia no WhatsApp automaticamente
+    // Para enviar manualmente: acesse /testar-ranking
+    res.json({
+      sucesso: true,
+      mensagem: '20 barcos simulados criados (MODO TESTE - WhatsApp DESABILITADO)',
+      barcos: barcosCriados,
+      rankingEnviado: false,
+      aviso: '⚠️ WhatsApp DESABILITADO durante testes. Use /testar-ranking para enviar manualmente.'
+    })
 
   } catch (erro) {
     console.error('❌ [SIMULAÇÃO] Erro:', erro)

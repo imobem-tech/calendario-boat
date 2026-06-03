@@ -8,7 +8,7 @@
 
 import { buscarGrupoInfo } from './db.js'
 
-const VERSAO_LOCALIZACAO = 'V.2606022345'
+const VERSAO_LOCALIZACAO = 'V.2606030000' // MODO TESTE - WhatsApp DESABILITADO
 
 // ============================================================
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
@@ -599,8 +599,9 @@ ${VERSAO_LOCALIZACAO}`
     // Buscar ranking atualizado
     const ranking = await buscarRankingAtual(pool)
 
-    // Atualizar mensagem de ranking em todos os grupos
-    await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+    // MODO TESTE: Desabilita envio automático no WhatsApp
+    // await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+    console.log('⚠️ [MODO TESTE] Ranking NÃO enviado no WhatsApp (atualização desabilitada)')
 
   } catch (err) {
     console.error('❌ Erro ao processar localização:', err.message)
@@ -704,10 +705,10 @@ ${VERSAO_LOCALIZACAO}`
     // Buscar ranking atualizado (sem os expirados)
     const ranking = await buscarRankingAtual(pool)
 
-    // Atualizar ranking em todos os grupos
-    await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+    // MODO TESTE: Desabilita envio automático no WhatsApp
+    // await atualizarRankingEmTodosGrupos(sock, pool, ranking)
 
-    console.log(`✅ [EXPIRAÇÃO] Ranking atualizado em todos os grupos (${rsAtivos.rowCount} removidos)`)
+    console.log(`⚠️ [MODO TESTE] Ranking NÃO enviado (${rsAtivos.rowCount} expirados removidos)`)
 
     // Verificar se ainda tem fila ativa
     const rsVerificaFila = await pool.query(`
