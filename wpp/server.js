@@ -452,6 +452,39 @@ app.get('/reset-sessao', async (req, res) => {
 })
 
 // ============================================================
+// ENDPOINT DEBUG: Verificar barcos simulados no banco
+// ============================================================
+app.get('/debug-simulados', async (req, res) => {
+  try {
+    const rsAgendamentos = await pool.query(`
+      SELECT "ID", "Cod_Emb_PB", "Grupo_Comp_letra",
+             "Dt_Agendamento", "Dt_Saída", "Dt_Retorno"
+      FROM public."P_BOAT_z_10_Saida_Emb"
+      WHERE "Cod_Emb_PB" >= 100 AND "Cod_Emb_PB" < 120
+      ORDER BY "Cod_Emb_PB"
+    `)
+
+    const rsLocalizacoes = await pool.query(`
+      SELECT id, agendamento_id, pb, cota,
+             latitude, longitude, distancia_porto_m, criado_em
+      FROM public.wpp_localizacao_emb
+      WHERE pb >= 100 AND pb < 120
+      ORDER BY pb
+    `)
+
+    res.json({
+      sucesso: true,
+      agendamentos: rsAgendamentos.rows,
+      localizacoes: rsLocalizacoes.rows,
+      totalAgendamentos: rsAgendamentos.rowCount,
+      totalLocalizacoes: rsLocalizacoes.rowCount
+    })
+  } catch (erro) {
+    res.status(500).json({ sucesso: false, erro: erro.message })
+  }
+})
+
+// ============================================================
 // ENDPOINT: Mostrar estrutura da tabela
 // ============================================================
 app.get('/schema-localizacao', async (req, res) => {
