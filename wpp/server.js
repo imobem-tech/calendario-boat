@@ -49,11 +49,11 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
-import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m } from './localizacao.js'
+import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2606022300'
+const VERSAO_WPP = 'Allmax®2606022345'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -447,6 +447,43 @@ app.get('/reset-sessao', async (req, res) => {
     res.json({ sucesso: true, mensagem: 'Sessão apagada. Aguarde alguns segundos e gere um novo QR.' })
   } catch (err) {
     res.status(500).json({ sucesso: false, erro: err.message })
+  }
+})
+
+// ============================================================
+// ENDPOINT DE TESTE: Forçar envio de ranking manualmente
+// ============================================================
+app.get('/testar-ranking', async (req, res) => {
+  try {
+    if (!conectado || !sock) {
+      return res.status(503).json({
+        sucesso: false,
+        erro: 'WhatsApp não conectado'
+      })
+    }
+
+    console.log('🧪 [TESTE] Forçando envio de ranking...')
+
+    // Buscar ranking atual
+    const ranking = await buscarRankingAtual(pool)
+
+    // Enviar para todos os grupos
+    await atualizarRankingEmTodosGrupos(sock, pool, ranking)
+
+    console.log('✅ [TESTE] Ranking enviado para todos os grupos!')
+
+    res.json({
+      sucesso: true,
+      mensagem: 'Ranking enviado para todos os grupos!',
+      totalBarcos: ranking.length
+    })
+
+  } catch (erro) {
+    console.error('❌ [TESTE] Erro ao enviar ranking:', erro)
+    res.status(500).json({
+      sucesso: false,
+      erro: erro.message
+    })
   }
 })
 

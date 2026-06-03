@@ -8,7 +8,7 @@
 
 import { buscarGrupoInfo } from './db.js'
 
-const VERSAO_LOCALIZACAO = 'V.2606022300'
+const VERSAO_LOCALIZACAO = 'V.2606022345'
 
 // ============================================================
 // CONFIGURAÇÃO DO PORTO E GRUPO ESPELHO
@@ -869,5 +869,10 @@ export async function verificarPosicoes70Metros(sock, pool, aguardandoConfirmaca
 }
 
 // ============================================================
-// V.2606022300
+// EXPORTAR FUNÇÕES PARA ENDPOINT DE TESTE
+// ============================================================
+export { buscarRankingAtual, atualizarRankingEmTodosGrupos }
+
+// ============================================================
+// V.2606022345
 // ============================================================
