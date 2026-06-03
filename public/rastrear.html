@@ -35,20 +35,9 @@
       font-size: 0.9rem;
       opacity: 0.9;
     }
-    #map-container {
+    #map {
       height: calc(100vh - 180px);
       width: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-    #map {
-      height: 100vw;
-      width: calc(100vh - 180px);
-      transform: rotate(-90deg) translateX(-100%);
-      transform-origin: top left;
-      position: absolute;
-      top: 0;
-      left: calc(100vh - 180px);
     }
     .controls {
       background: white;
@@ -135,9 +124,7 @@
     <p class="atualizado" id="ultima-atualizacao">Carregando...</p>
   </header>
 
-  <div id="map-container">
-    <div id="map"></div>
-  </div>
+  <div id="map"></div>
 
   <div class="controls">
     <button class="btn" onclick="centralizarMapa()">🎯 Centralizar Marina</button>
@@ -147,7 +134,7 @@
   </div>
 
   <footer>
-    <p>Allmax Gestão de Cotas | Atualização automática a cada 2 segundos | V.2606022335</p>
+    <p>Allmax Gestão de Cotas | Atualização automática a cada 2 segundos | V.2606022350</p>
     <p style="font-size: 0.75rem; margin-top: 0.5rem;">V.2606022223</p>
   </footer>
 
