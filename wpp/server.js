@@ -458,6 +458,10 @@ app.get('/simular-fila', async (req, res) => {
   try {
     console.log('🎬 [SIMULAÇÃO] Criando 20 barcos...')
 
+    // Buscar um Cod_Autorizado válido do banco
+    const rsAuth = await pool.query(`SELECT "Codigo" FROM public."Cliente" LIMIT 1`)
+    const codAutorizado = rsAuth.rows[0]?.Codigo || 1
+
     // Limpar simulações anteriores
     await pool.query(`DELETE FROM public.wpp_localizacao_emb WHERE pb >= 100 AND pb < 120`)
     await pool.query(`DELETE FROM public."P_BOAT_z_10_Saida_Emb" WHERE "Cod_Emb_PB" >= 100 AND "Cod_Emb_PB" < 120`)
@@ -476,13 +480,17 @@ app.get('/simular-fila', async (req, res) => {
       const lat = -10.21101 + (dist * Math.cos(bearing * Math.PI / 180)) / 111320.0
       const lon = -48.36912 + (dist * Math.sin(bearing * Math.PI / 180)) / (111320.0 * Math.cos(-10.21101 * Math.PI / 180))
 
-      // Criar agendamento
+      // Criar agendamento com Cod_Autorizado válido
       const rsAg = await pool.query(`
         INSERT INTO public."P_BOAT_z_10_Saida_Emb" (
-          "Cod_Emb_PB", "Grupo_Comp_letra", "Dt_Agendamento", "Dt_Saída", "Cod_Autorizado", "Nome_Embarcacao"
-        ) VALUES ($1, $2, NOW() AT TIME ZONE 'America/Sao_Paulo', NOW() AT TIME ZONE 'America/Sao_Paulo', 1, $3)
+          "Cod_Emb_PB",
+          "Grupo_Comp_letra",
+          "Dt_Agendamento",
+          "Dt_Saída",
+          "Cod_Autorizado"
+        ) VALUES ($1, $2, NOW() AT TIME ZONE 'America/Sao_Paulo', NOW() AT TIME ZONE 'America/Sao_Paulo', $3)
         RETURNING "ID"
-      `, [pb, cota, `SIMUL-${pb}${cota || ''}`])
+      `, [pb, cota, codAutorizado])
 
       const agId = rsAg.rows[0].ID
 
