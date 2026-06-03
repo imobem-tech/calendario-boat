@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/server.js — V.2606022300
+// wpp/server.js — V.2606022405
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
 // + Sistema 70m: ÚNICA forma de retorno via geo (<70m + autorização)
+// REBUILD: Forçando deploy limpo (Railway cache fix)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -53,7 +54,7 @@ import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metro
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2606022345'
+const VERSAO_WPP = 'Allmax®2606022405'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
