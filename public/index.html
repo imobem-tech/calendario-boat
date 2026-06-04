@@ -753,10 +753,20 @@
 
       const pb = decodificarDigitosCodificados(embCod);
 
-      const grupoLetra = grupoLetraCod.toUpperCase();
+      // Decodificar letra do grupo
+      // Se a-j: é número (0-9), senão é letra real (K-Z, etc)
+      let grupoLetra;
+      if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+        // É dígito codificado (grupo totalmente numérico como "11", "22")
+        grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
+      } else {
+        // É letra real do grupo (E1, T4, etc)
+        grupoLetra = grupoLetraCod.toUpperCase();
+      }
+
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
 
-      // Monta grupo final: letra já está uppercase
+      // Monta grupo final
       const grupoFinal = `${grupoLetra}${grupoNum}`;
 
       const codAutorizado = decodificarDigitosCodificados(autorizadoCod);

@@ -53,7 +53,19 @@ function decodeToken(token) {
   if (!m) return null;
 
   const pb = decodificar(m[1]);
-  const grupoLetra = m[2].toUpperCase();
+
+  // Decodificar letra do grupo
+  // Se a-j: é número (0-9), senão é letra real (K-Z, etc)
+  const grupoLetraCod = m[2];
+  let grupoLetra;
+  if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+    // É dígito codificado (grupo totalmente numérico como "11", "22")
+    grupoLetra = decodificar(grupoLetraCod);
+  } else {
+    // É letra real do grupo (E1, T4, etc)
+    grupoLetra = grupoLetraCod.toUpperCase();
+  }
+
   const grupoNum = decodificar(m[3]);
   const autorizado = decodificar(m[4]);
   const mmdd = decodificar(m[5]).padStart(4, "0");
@@ -72,7 +84,7 @@ function decodeToken(token) {
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
-  // Monta grupo final: letra já está uppercase em grupoLetra (linha 56)
+  // Monta grupo final
   const grupoFinal = `${grupoLetra}${grupoNum}`;
 
   return {
