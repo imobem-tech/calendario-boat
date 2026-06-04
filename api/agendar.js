@@ -1,12 +1,12 @@
 // ============================================================
-// /api/agendar — V.2606041250
+// /api/agendar — V.2606041258
 // Allmax Gestão de Cotas — Marujo⚓
-// FIX: Cod_Proprietário agora busca do autorizado ativo, não mais fixo 4255
+// FIX: Cod_Proprietário agora busca da tabela embarcações (Cod_Cliente), não mais fixo 4255
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2606041250";
+const VERSAO_API = "Allmax®2606041258";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -317,23 +317,20 @@ export default async function handler(req, res) {
     const proximoCodigo = rsCodigo.rows[0].proximo_codigo;
 
     // ============================================================
-    // BUSCAR PROPRIETÁRIO CORRETO (cod_autorizado = Cod_Pessoa da tabela P_BOAT_4_Autorizados)
+    // BUSCAR PROPRIETÁRIO CORRETO da tabela de embarcações (campo Cod_Cliente)
     // ============================================================
     const rsProprietario = await client.query(
-      `SELECT "Cod_Pessoa"
-         FROM public."P_BOAT_4_Autorizados"
-        WHERE "Cod_Embarcacao" = $1
-          AND "Cod_Pessoa" = $2
-          AND "Dt_Desautorizacao" IS NULL
-          AND "Dt_Cancelamento" IS NULL
+      `SELECT "Cod_Cliente"
+         FROM public."P_BOAT_1_Embarcacao"
+        WHERE "Num_PB" = $1
         LIMIT 1`,
-      [codEmbPB, codAutorizado]
+      [codEmbPB]
     );
 
-    // Se encontrou o autorizado ativo, usa ele como proprietário
+    // Se encontrou embarcação, usa o Cod_Cliente como proprietário
     // Senão, usa 4255 (Allmax) como fallback
     const codProprietario = rsProprietario.rows.length > 0
-      ? rsProprietario.rows[0].Cod_Pessoa
+      ? rsProprietario.rows[0].Cod_Cliente
       : 4255;
 
     await client.query(
