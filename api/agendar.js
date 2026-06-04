@@ -1,12 +1,12 @@
 // ============================================================
-// /api/agendar — V.2606041258
+// /api/agendar — V.2606041310
 // Allmax Gestão de Cotas — Marujo⚓
-// FIX: Cod_Proprietário agora busca da tabela embarcações (Cod_Cliente), não mais fixo 4255
+// FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2606041258";
+const VERSAO_API = "Allmax®2606041310";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -72,15 +72,15 @@ function decodeToken(token) {
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
- const primeiroGrupo = decodificar(m[2]);
-const grupoFinal = primeiroGrupo ? `${primeiroGrupo}${grupoNum}` : `${grupoLetra}${grupoNum}`;
+  // Monta grupo final: letra já está uppercase em grupoLetra (linha 56)
+  const grupoFinal = `${grupoLetra}${grupoNum}`;
 
-return {
-  pb,
-  grupo: grupoFinal,
-  codAutorizado: autorizado,
-  token: t
-};
+  return {
+    pb,
+    grupo: grupoFinal,
+    codAutorizado: autorizado,
+    token: t
+  };
 }
 
 function extrairLimiteDoGrupo(grupo) {
