@@ -616,10 +616,13 @@ if(!resp.ok){
 
       try {
         // Calcular dias à frente baseado na data selecionada
-        const dataSelecionada = new Date(data + 'T12:00:00');
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        dataSelecionada.setHours(0, 0, 0, 0);
+        // Usar timezone GMT-3 (America/Sao_Paulo)
+        const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+
+        // Data selecionada no formato YYYY-MM-DD
+        const [ano, mes, dia] = data.split('-').map(Number);
+        const dataSelecionada = new Date(ano, mes - 1, dia);
 
         const diasAFrente = Math.floor((dataSelecionada - hoje) / (1000 * 60 * 60 * 24));
 
