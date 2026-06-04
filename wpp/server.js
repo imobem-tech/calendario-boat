@@ -908,6 +908,27 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
   handleCriarOuAtualizarGrupo(req, res, () => sock, () => conectado)
 })
 
+// ============================================================
+// ENDPOINT: Previsão do tempo para WEB
+// V.2606041440
+// ============================================================
+app.post('/previsao', async (req, res) => {
+  try {
+    const { diasAFrente = 0 } = req.body
+
+    // Validar dias à frente (0 a 15)
+    if (typeof diasAFrente !== 'number' || diasAFrente < 0 || diasAFrente > 15) {
+      return res.status(400).json({ erro: 'diasAFrente deve estar entre 0 e 15' })
+    }
+
+    const previsao = await obterPrevisaoNavegacao(diasAFrente, diasAFrente === 0)
+    res.json({ sucesso: true, previsao })
+  } catch (err) {
+    console.error('[PREVISAO_WEB] Erro:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
 app.post('/previsao/teste', async (req, res) => {
   try {
     if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
