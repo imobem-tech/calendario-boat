@@ -242,10 +242,7 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0, forcarManha = fals
     resposta += montarBloco(blocoNivel, hIni, hFim, minT, maxT, maxProb, maxMm, maxVento, maxRajada)
   }
 
-  resposta +=
-    `🌇 Pôr do sol: ${sunset}h\n\n` +
-    `\`\`\`https://instagram.com/allmax.cotas\n` +
-    `https://instagram.com/summernautica\`\`\``
+  resposta += `🌇 Pôr do sol: ${sunset}h`
 
   return resposta
 }

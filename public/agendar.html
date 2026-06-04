@@ -626,6 +626,30 @@ if(!resp.ok){
 
         const diasAFrente = Math.floor((dataSelecionada - hoje) / (1000 * 60 * 60 * 24));
 
+        // Validar limite de 15 dias
+        if (diasAFrente < 0) {
+          loading.style.display = "none";
+          conteudo.innerHTML = `<div style="text-align: center; padding: 30px;">
+            <p style="font-size: 48px; margin: 0;">⚠️</p>
+            <h3 style="color: #f57c00; margin: 16px 0;">Data no Passado</h3>
+            <p style="color: #666;">A previsão só está disponível para datas futuras.</p>
+            <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600;">Fechar</button>
+          </div>`;
+          return;
+        }
+
+        if (diasAFrente > 15) {
+          loading.style.display = "none";
+          conteudo.innerHTML = `<div style="text-align: center; padding: 30px;">
+            <p style="font-size: 48px; margin: 0;">📅</p>
+            <h3 style="color: #f57c00; margin: 16px 0;">Previsão Máxima: 15 Dias</h3>
+            <p style="color: #666;">A previsão meteorológica está disponível apenas para os próximos 15 dias.</p>
+            <p style="color: #999; font-size: 14px; margin-top: 12px;">Data selecionada: ${diasAFrente} dias à frente</p>
+            <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600;">Fechar</button>
+          </div>`;
+          return;
+        }
+
         // Buscar previsão via API
         const apiUrl = window.location.hostname === 'localhost'
           ? 'http://localhost:3000'
@@ -645,11 +669,17 @@ if(!resp.ok){
 
         // Mostrar previsão formatada
         loading.style.display = "none";
-        conteudo.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace; font-size: 14px; line-height: 1.6;">${resultado.previsao || resultado.mensagem || 'Previsão não disponível'}</pre>`;
+        conteudo.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">${resultado.previsao || resultado.mensagem || 'Previsão não disponível'}</pre>
+        <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600; display: block; margin: 0 auto;">Fechar</button>`;
 
       } catch (erro) {
         loading.style.display = "none";
-        conteudo.innerHTML = `<p style="color: #d32f2f; text-align: center; padding: 20px;">❌ Erro ao carregar previsão:<br><br><strong>${erro.message}</strong><br><br><small>URL: ${apiUrl}/previsao<br>Dias à frente: ${diasAFrente}</small></p>`;
+        conteudo.innerHTML = `<div style="text-align: center; padding: 20px;">
+          <p style="color: #d32f2f;">❌ Erro ao carregar previsão:</p>
+          <p><strong>${erro.message}</strong></p>
+          <p style="font-size: 12px; color: #999; margin-top: 12px;">URL: ${apiUrl}/previsao<br>Dias à frente: ${diasAFrente}</p>
+          <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600;">Fechar</button>
+        </div>`;
         console.error('Erro detalhado:', erro);
       }
     });
@@ -669,7 +699,7 @@ if(!resp.ok){
   <!-- Modal Previsão do Tempo -->
   <div id="modalPrevisao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: white; border-radius: 12px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-      <button id="fecharPrevisao" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666; line-height: 1;">×</button>
+      <button id="fecharPrevisao" style="position: absolute; top: 12px; right: 12px; background: #f5f5f5; border: none; font-size: 28px; cursor: pointer; color: #666; line-height: 1; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f5f5f5'">×</button>
       <h2 style="margin: 0 0 20px 0; color: #1976d2; font-size: 20px;">🌤️ Previsão de Navegação</h2>
       <div id="previsaoLoading" style="text-align: center; padding: 40px 0;">
         <div style="border: 4px solid #f3f3f3; border-top: 4px solid #1976d2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
