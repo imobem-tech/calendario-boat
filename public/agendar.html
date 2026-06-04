@@ -634,9 +634,11 @@ if(!resp.ok){
           body: JSON.stringify({ diasAFrente })
         });
 
-        if (!response.ok) throw new Error('Erro ao buscar previsão');
-
         const resultado = await response.json();
+
+        if (!response.ok || resultado.erro) {
+          throw new Error(resultado.erro || `HTTP ${response.status}`);
+        }
 
         // Mostrar previsão formatada
         loading.style.display = "none";
@@ -644,7 +646,8 @@ if(!resp.ok){
 
       } catch (erro) {
         loading.style.display = "none";
-        conteudo.innerHTML = `<p style="color: #d32f2f; text-align: center;">❌ Erro ao carregar previsão: ${erro.message}</p>`;
+        conteudo.innerHTML = `<p style="color: #d32f2f; text-align: center; padding: 20px;">❌ Erro ao carregar previsão:<br><br><strong>${erro.message}</strong><br><br><small>URL: ${apiUrl}/previsao<br>Dias à frente: ${diasAFrente}</small></p>`;
+        console.error('Erro detalhado:', erro);
       }
     });
 

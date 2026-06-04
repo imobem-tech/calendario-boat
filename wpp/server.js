@@ -930,17 +930,24 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
 // ============================================================
 app.post('/previsao', async (req, res) => {
   try {
+    console.log('[PREVISAO_WEB] Requisição recebida:', req.body)
+
     const { diasAFrente = 0 } = req.body
 
     // Validar dias à frente (0 a 15)
     if (typeof diasAFrente !== 'number' || diasAFrente < 0 || diasAFrente > 15) {
+      console.log('[PREVISAO_WEB] Validação falhou:', diasAFrente)
       return res.status(400).json({ erro: 'diasAFrente deve estar entre 0 e 15' })
     }
 
+    console.log('[PREVISAO_WEB] Buscando previsão para diasAFrente:', diasAFrente)
     const previsao = await obterPrevisaoNavegacao(diasAFrente, diasAFrente === 0)
+
+    console.log('[PREVISAO_WEB] Previsão obtida, tamanho:', previsao?.length || 0)
     res.json({ sucesso: true, previsao })
   } catch (err) {
-    console.error('[PREVISAO_WEB] Erro:', err)
+    console.error('[PREVISAO_WEB] Erro:', err.message)
+    console.error('[PREVISAO_WEB] Stack:', err.stack)
     res.status(500).json({ erro: err.message })
   }
 })
