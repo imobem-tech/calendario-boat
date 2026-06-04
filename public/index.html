@@ -753,12 +753,11 @@
 
       const pb = decodificarDigitosCodificados(embCod);
 
-      const primeiroGrupo = decodificarDigitosCodificados(grupoLetraCod);
+      const grupoLetra = grupoLetraCod.toUpperCase();
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
 
-      const grupoFinal = primeiroGrupo
-        ? `${primeiroGrupo}${grupoNum}`
-        : `${grupoLetraCod.toUpperCase()}${grupoNum}`;
+      // Monta grupo final: letra já está uppercase
+      const grupoFinal = `${grupoLetra}${grupoNum}`;
 
       const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
       const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
