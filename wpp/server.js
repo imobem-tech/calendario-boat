@@ -924,87 +924,96 @@ app.post('/previsao/teste', async (req, res) => {
 // INICIALIZAÇÃO
 // ============================================================
 
+// Detectar ambiente Railway
+const AMBIENTE = process.env.RAILWAY_ENVIRONMENT || 'development'
+const IS_PRODUCTION = AMBIENTE === 'production'
+
+console.log(`🔧 Ambiente detectado: ${AMBIENTE}`)
+console.log(`📋 Cron jobs: ${IS_PRODUCTION ? 'ATIVADOS' : 'DESATIVADOS (apenas em production)'}`)
+
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
   iniciarBot()
 
-  setInterval(async () => {
-    processandoFila = true
-    await processarFila(pool, sock, conectado, {
-      onEnviado: () => { ultimaMensagemEnviadaEm = new Date().toISOString() },
-      onErro: (msg) => { ultimaFalhaEnvioEm = new Date().toISOString(); erroUltimoEnvio = msg }
-    }).catch(console.error)
-    processandoFila = false
-  }, 10000)
+  // ============================================================
+  // CRON JOBS - APENAS EM PRODUCTION
+  // ============================================================
+  if (IS_PRODUCTION) {
+    // Processamento de fila a cada 10 segundos
+    setInterval(async () => {
+      processandoFila = true
+      await processarFila(pool, sock, conectado, {
+        onEnviado: () => { ultimaMensagemEnviadaEm = new Date().toISOString() },
+        onErro: (msg) => { ultimaFalhaEnvioEm = new Date().toISOString(); erroUltimoEnvio = msg }
+      }).catch(console.error)
+      processandoFila = false
+    }, 10000)
 
+    // Alerta HM às 11h
+    let alertaHMUltimaData = ''
+    setInterval(async () => {
+      const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+      const hora  = agora.getHours()
+      const hoje  = agora.toISOString().slice(0, 10)
 
-let alertaHMUltimaData = ''
+      if (hora === 11 && alertaHMUltimaData !== hoje) {
+        alertaHMUltimaData = hoje
+        console.log('[HM_PENDENTE] Iniciando verificação diária das 11h...')
+        await enviarAlertasHMRetornoPendente(pool, sock, conectado).catch(console.error)
+      }
+    }, 60000)
 
-setInterval(async () => {
-  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-  const hora  = agora.getHours()
-  const hoje  = agora.toISOString().slice(0, 10)
+    // Sistema 70m: Verificação periódica a cada 5 minutos
+    setInterval(async () => {
+      if (!conectado || !sock) return
+      try {
+        await verificarPosicoes70Metros(sock, pool, aguardandoConfirmacao70m)
+      } catch (erro) {
+        console.error('❌ Erro na verificação 70m:', erro)
+      }
+    }, 5 * 60 * 1000) // 5 minutos
 
-  if (hora === 11 && alertaHMUltimaData !== hoje) {
-    alertaHMUltimaData = hoje
-    console.log('[HM_PENDENTE] Iniciando verificação diária das 11h...')
-    await enviarAlertasHMRetornoPendente(pool, sock, conectado).catch(console.error)
+    // Previsão diária às 8h
+    let previsaoDiariaUltimaData = ''
+    setInterval(async () => {
+      const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+      const hora  = agora.getHours()
+      const hoje  = agora.toISOString().slice(0, 10)
+      if (hora === 8 && previsaoDiariaUltimaData !== hoje) {
+        previsaoDiariaUltimaData = hoje
+        console.log('[PREVISAO] Iniciando envio diário das 8h...')
+        await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
+      }
+    }, 60000)
+
+    // Verificação de posições expiradas (localização)
+    let intervaloPosicoes = null
+
+    async function verificarEAgendar() {
+      if (!conectado || !sock) return
+
+      const resultado = await verificarPosicoesExpiradas(sock, pool).catch(err => {
+        console.error('[EXPIRAÇÃO] Erro na verificação:', err.message)
+        return { temFilaAtiva: true, expirados: 0 }
+      })
+
+      if (!resultado.temFilaAtiva && intervaloPosicoes) {
+        // Fila vazia - dorme
+        console.log('[EXPIRAÇÃO] Fila vazia - pausando verificações')
+        clearInterval(intervaloPosicoes)
+        intervaloPosicoes = null
+      } else if (resultado.temFilaAtiva && !intervaloPosicoes) {
+        // Fila ativa mas intervalo não está rodando - reativar
+        console.log('[EXPIRAÇÃO] Fila ativa - ativando verificações a cada 1 min')
+        intervaloPosicoes = setInterval(verificarEAgendar, 60000) // 1 minuto
+      }
+    }
+
+    // Primeira verificação após 1 minuto de boot
+    setTimeout(verificarEAgendar, 60000)
+
+    console.log('✅ Cron jobs iniciados (production)')
+  } else {
+    console.log('⚠️ Cron jobs desabilitados (ambiente: ' + AMBIENTE + ')')
   }
-}, 60000)
-
-  // ============================================================
-  // Sistema 70m: Verificação periódica a cada 5 minutos
-  // ============================================================
-  setInterval(async () => {
-    if (!conectado || !sock) return
-    try {
-      await verificarPosicoes70Metros(sock, pool, aguardandoConfirmacao70m)
-    } catch (erro) {
-      console.error('❌ Erro na verificação 70m:', erro)
-    }
-  }, 5 * 60 * 1000) // 5 minutos
-
-
-  // Previsão diária às 8h — controla data para não enviar mais de uma vez por dia
-  let previsaoDiariaUltimaData = ''
-  setInterval(async () => {
-    const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-    const hora  = agora.getHours()
-    const hoje  = agora.toISOString().slice(0, 10)
-    if (hora === 8 && previsaoDiariaUltimaData !== hoje) {
-      previsaoDiariaUltimaData = hoje
-      console.log('[PREVISAO] Iniciando envio diário das 8h...')
-      await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
-    }
-  }, 60000)
-
-  // ============================================================
-  // VERIFICAÇÃO DE POSIÇÕES EXPIRADAS
-  // A cada 1 minuto SE tiver fila ativa
-  // Dorme se não houver ninguém compartilhando localização
-  // ============================================================
-  let intervaloPosicoes = null
-
-  async function verificarEAgendar() {
-    if (!conectado || !sock) return
-
-    const resultado = await verificarPosicoesExpiradas(sock, pool).catch(err => {
-      console.error('[EXPIRAÇÃO] Erro na verificação:', err.message)
-      return { temFilaAtiva: true, expirados: 0 }
-    })
-
-    if (!resultado.temFilaAtiva && intervaloPosicoes) {
-      // Fila vazia - dorme
-      console.log('[EXPIRAÇÃO] Fila vazia - pausando verificações')
-      clearInterval(intervaloPosicoes)
-      intervaloPosicoes = null
-    } else if (resultado.temFilaAtiva && !intervaloPosicoes) {
-      // Fila ativa mas intervalo não está rodando - reativar
-      console.log('[EXPIRAÇÃO] Fila ativa - ativando verificações a cada 1 min')
-      intervaloPosicoes = setInterval(verificarEAgendar, 60000) // 1 minuto
-    }
-  }
-
-  // Primeira verificação após 1 minuto de boot
-  setTimeout(verificarEAgendar, 60000)
 })
