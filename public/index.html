@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Calendário Boat</title>
-  <!-- V.2606051320 - Force cache bust -->
 
 <meta property="og:title" content="Agenda Allmax Cotas" />
 <meta property="og:description" content="Clique para acessar" />
@@ -737,7 +736,10 @@
       return String(soma).padStart(2, "0");
     }
 
-    function decodificarToken(token){
+    // Cache de grupos por PB (em memória do navegador)
+    const cacheGruposPorPB = new Map();
+
+    async function decodificarToken(token){
       const t = String(token || "").trim().toLowerCase();
 
       // Formato novo com MMDD:
@@ -754,12 +756,51 @@
 
       const pb = decodificarDigitosCodificados(embCod);
 
-      const primeiroGrupo = decodificarDigitosCodificados(grupoLetraCod);
+      // Buscar padrão do grupo via cache/API (baseado no proprietário)
+      let padrao = cacheGruposPorPB.get(pb);
+
+      if (!padrao) {
+        // Cache miss - buscar da API
+        try {
+          const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000'
+            : 'https://zucchini-achievement-production.up.railway.app';
+
+          const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
+          if (response.ok) {
+            const data = await response.json();
+            padrao = data.padrao;
+            cacheGruposPorPB.set(pb, padrao);
+            console.log(`[TOKEN] Cache miss PB ${pb}, padrão: ${padrao} (proprietário ${data.proprietario})`);
+          }
+        } catch (err) {
+          console.error('[TOKEN] Erro ao buscar padrão:', err);
+        }
+      } else {
+        console.log(`[TOKEN] Cache hit PB ${pb}: ${padrao}`);
+      }
+
+      // Decodificar letra do grupo baseado no padrão do proprietário
+      let grupoLetra;
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
 
-      const grupoFinal = primeiroGrupo
-        ? `${primeiroGrupo}${grupoNum}`
-        : `${grupoLetraCod.toUpperCase()}${grupoNum}`;
+      if (padrao === 'numerico') {
+        // Proprietário usa grupos numéricos (11, 22, 33)
+        grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
+      } else if (padrao === 'letra') {
+        // Proprietário usa grupos com letra (E1, K2, A1)
+        grupoLetra = grupoLetraCod.toUpperCase();
+      } else {
+        // Fallback: heurística se API falhar
+        if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+          grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
+        } else {
+          grupoLetra = grupoLetraCod.toUpperCase();
+        }
+      }
+
+      // Monta grupo final
+      const grupoFinal = `${grupoLetra}${grupoNum}`;
 
       const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
       const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
@@ -806,8 +847,8 @@
     }
 
     const tokenUrl = obterTokenDaUrl();
-    console.log('[INIT] 🚀 Token da URL:', tokenUrl);
 
+    // Elementos do DOM
     const tituloEmb = document.getElementById("tituloEmb");
     const subTitulo = document.getElementById("subTitulo");
     const tituloMes = document.getElementById("tituloMes");
@@ -920,7 +961,7 @@
     }
 
     btnConfirmarCancelamento.addEventListener("click", async () => {
-      if(!agendamentoParaCancelar || !acesso) return;
+      if(!agendamentoParaCancelar || !window.acessoAtual) return;
 
       btnConfirmarCancelamento.disabled = true;
       cancelSpinner.style.display = "block";
@@ -977,18 +1018,15 @@
     // ----------------------------------------------------------
     // Controle de sessão — WPP disparado apenas uma vez por sessão
     // ----------------------------------------------------------
-    function getChaveWppSessao() {
-      const acesso = window.acessoAtual;
-      return `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
-    }
+    const chaveWppSessao = `inadim_wpp_${window.acessoAtual ? window.acessoAtual.codAutorizado : "x"}`;
 
     function wppJaDisparadoNaSessao(){
-      try{ return !!sessionStorage.getItem(getChaveWppSessao()); }
+      try{ return !!sessionStorage.getItem(chaveWppSessao); }
       catch(e){ return false; }
     }
 
     function marcarWppDisparado(){
-      try{ sessionStorage.setItem(getChaveWppSessao(), "1"); }
+      try{ sessionStorage.setItem(chaveWppSessao, "1"); }
       catch(e){}
     }
 
@@ -999,7 +1037,7 @@
     // Navegar para agendamento com verificação de inadimplência
     // ----------------------------------------------------------
     async function navegarParaAgendamento(data){
-      if(!acesso || !acesso.dvOk) return;
+      if(!window.acessoAtual || !window.acessoAtual.dvOk) return;
       if(verificandoInadimplencia) return;
 
       verificandoInadimplencia = true;
@@ -1008,7 +1046,7 @@
       try{
         // Consulta silenciosa — sem abrir modal ainda
         const dispararWpp = !wppJaDisparadoNaSessao();
-        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(window.acessoAtual.codAutorizado)}&pb=${encodeURIComponent(window.acessoAtual.pb)}&grupo=${encodeURIComponent(window.acessoAtual.grupo)}&dispararWpp=${dispararWpp}`;
         const resp = await fetch(url, { cache: "no-store" });
         const json = await resp.json();
 
@@ -1160,7 +1198,7 @@
       const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
       const start = isoDate(inicio);
 
-      const url = `/api/availability?pb=${encodeURIComponent(acesso.pb)}&start=${encodeURIComponent(start)}&months=1`;
+      const url = `/api/availability?pb=${encodeURIComponent(window.acessoAtual.pb)}&start=${encodeURIComponent(start)}&months=1`;
       const resp = await fetch(url, { cache: "no-store" });
 
       if(!resp.ok){
@@ -1226,13 +1264,10 @@
     });
 
     // Inicialização assíncrona
-    (async function() {
-      console.log('[INIT] 🔄 Decodificando token...');
+    (async function init() {
       const acesso = await decodificarToken(tokenUrl);
-      console.log('[INIT] ✅ Token decodificado:', acesso);
 
       if(!acesso || !acesso.dvOk){
-        console.log('[INIT] ❌ Token inválido');
         tituloEmb.textContent = "LINK INVÁLIDO";
         subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
         mostrarErro("Link inválido. Verifique o endereço enviado.");
@@ -1242,7 +1277,7 @@
         abrirLegenda.style.pointerEvents = "none";
         abrirLegenda.style.opacity = "0.6";
       }else{
-        console.log('[INIT] ✅ Token válido - PB:', acesso.pb, 'Grupo:', acesso.grupo);
+        // Tornar acesso global para outras funções
         window.acessoAtual = acesso;
         tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
         subTitulo.textContent = `ID_${acesso.codAutorizado}`;
