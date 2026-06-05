@@ -977,15 +977,18 @@
     // ----------------------------------------------------------
     // Controle de sessão — WPP disparado apenas uma vez por sessão
     // ----------------------------------------------------------
-    const chaveWppSessao = `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
+    function getChaveWppSessao() {
+      const acesso = window.acessoAtual;
+      return `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
+    }
 
     function wppJaDisparadoNaSessao(){
-      try{ return !!sessionStorage.getItem(chaveWppSessao); }
+      try{ return !!sessionStorage.getItem(getChaveWppSessao()); }
       catch(e){ return false; }
     }
 
     function marcarWppDisparado(){
-      try{ sessionStorage.setItem(chaveWppSessao, "1"); }
+      try{ sessionStorage.setItem(getChaveWppSessao(), "1"); }
       catch(e){}
     }
 
