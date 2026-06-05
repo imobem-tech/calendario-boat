@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2606022405
+// wpp/server.js — V.2606051345 REBUILD
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
