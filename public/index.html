@@ -993,7 +993,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            token: acesso.token,
+            token: window.acessoAtual.token,
             agendamentoId: agendamentoParaCancelar.id
           })
         });
@@ -1083,12 +1083,12 @@
         }
 
         // Adimplente — navega direto, sem abrir nada
-        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+        window.location.href = `/agendar?t=${encodeURIComponent(window.acessoAtual.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){
         // Falha de rede: libera o acesso sem bloquear o cotista
         console.warn("[inadimplencia_cliente] Falha na consulta, liberando acesso:", err.message);
-        window.location.href = `/agendar?t=${encodeURIComponent(acesso.token)}&data=${encodeURIComponent(dataStr)}`;
+        window.location.href = `/agendar?t=${encodeURIComponent(window.acessoAtual.token)}&data=${encodeURIComponent(dataStr)}`;
       } finally {
         verificandoInadimplencia = false;
       }
@@ -1125,9 +1125,9 @@
         el.addEventListener("click", () => {
           // Verifica se o agendamento é do próprio cotista
           const codAutorizadoAg = Number(info.codAutorizado);
-          const codAutorizadoMeu = Number(acesso?.codAutorizado || 0);
+          const codAutorizadoMeu = Number(window.acessoAtual?.codAutorizado || 0);
           const grupoAg  = String(info.grupo || "").toUpperCase();
-          const grupoMeu = String(acesso?.grupo || "").toUpperCase();
+          const grupoMeu = String(window.acessoAtual?.grupo || "").toUpperCase();
 
           const ehMeu = codAutorizadoAg === codAutorizadoMeu && grupoAg === grupoMeu;
 
