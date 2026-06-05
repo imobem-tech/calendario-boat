@@ -1017,18 +1017,20 @@ app.listen(PORT, () => {
       }
     }, 5 * 60 * 1000) // 5 minutos
 
+    // ⚠️ TEMPORARIAMENTE DESABILITADO - Enviando duplicatas (05/06/2026)
     // Previsão diária às 8h
-    let previsaoDiariaUltimaData = ''
-    setInterval(async () => {
-      const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-      const hora  = agora.getHours()
-      const hoje  = agora.toISOString().slice(0, 10)
-      if (hora === 8 && previsaoDiariaUltimaData !== hoje) {
-        previsaoDiariaUltimaData = hoje
-        console.log('[PREVISAO] Iniciando envio diário das 8h...')
-        await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
-      }
-    }, 60000)
+    // let previsaoDiariaUltimaData = ''
+    // setInterval(async () => {
+    //   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+    //   const hora  = agora.getHours()
+    //   const hoje  = agora.toISOString().slice(0, 10)
+    //   if (hora === 8 && previsaoDiariaUltimaData !== hoje) {
+    //     previsaoDiariaUltimaData = hoje
+    //     console.log('[PREVISAO] Iniciando envio diário das 8h...')
+    //     await enviarPrevisaoDiaria(pool, sock, conectado).catch(console.error)
+    //   }
+    // }, 60000)
+    console.log('⚠️ [PREVISAO] Envio automático DESABILITADO temporariamente - investigando duplicatas')
 
     // Verificação de posições expiradas (localização)
     let intervaloPosicoes = null
