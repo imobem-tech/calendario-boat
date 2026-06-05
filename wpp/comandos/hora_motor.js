@@ -1,13 +1,17 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2606010950
+// wpp/comandos/hora_motor.js — V.2606051920
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
 // Comando: hhh / hhhh / HHH / misto (3+ h's)
 //
 // Fluxo:
-//   Pré-validações → Etapa 1 (Hora Motor Saída) → Etapa 2 (Hora Motor Retorno)
+//   Pré-validações → Verifica pendência de outros grupos
+//   → Etapa 1 (Hora Motor Saída) → Etapa 2 (Hora Motor Retorno)
 //   → Ao confirmar Retorno: calcula horas usadas × tarifa → gera CR + Asaas
+//
+// FIX: Valida pendência de HM_Retorno em OUTROS grupos da mesma embarcação
+//      antes de permitir registro. Envia alerta em ambos os grupos.
 // ============================================================
 
 import { gerarCobrancaCompleta } from '../asaas.js'
@@ -16,7 +20,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2606010950'
+const VERSAO_HM = 'V.2606051920'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -145,6 +149,26 @@ async function buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra) {
      ORDER BY "Dt_Saída" DESC
      LIMIT 1
   `, [codEmbPb, grupoCompLetra])
+
+  return rs.rows[0] || null
+}
+
+async function buscarPendenciaHMPorEmbarcacao(pool, codEmbPb) {
+  // Busca pendência de HM_Retorno da EMBARCAÇÃO (independente do grupo)
+  // APENAS para embarcações da ALLMAX (Cod_Proprietário = 4255)
+  const rs = await pool.query(`
+    SELECT *,
+           DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') as data_agendamento
+      FROM public."P_BOAT_z_10_Saida_Emb"
+     WHERE "Cod_Emb_PB" = $1
+       AND "Cod_Proprietário" = 4255
+       AND "Dt_Saída" IS NOT NULL
+       AND "Hora_Motor_Retorno" IS NULL
+       AND "Dt_Desistencia" IS NULL
+       AND "Dt_Cancela_saida" IS NULL
+     ORDER BY "Dt_Saída" DESC
+     LIMIT 1
+  `, [codEmbPb])
 
   return rs.rows[0] || null
 }
@@ -789,7 +813,58 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
     return true
   }
 
+  // ============================================================
+  // VALIDAÇÃO CRÍTICA: Verifica pendência de HM em OUTROS grupos
+  // ============================================================
+  const pendenciaEmbarcacao = await buscarPendenciaHMPorEmbarcacao(pool, codEmbPb)
+
+  if (pendenciaEmbarcacao) {
+    const grupoPendente = String(pendenciaEmbarcacao.Grupo_Comp_letra || '').trim().toUpperCase()
+
+    // Se a pendência é de OUTRO grupo (não o atual)
+    if (grupoPendente !== grupoCompLetra) {
+      const dtPendente = new Date(pendenciaEmbarcacao.data_agendamento).toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+      })
+
+      const mensagem =
+        `⚠️ *Pendência de Hora Motor*\n\n` +
+        `Ainda não registrado a Hora Motor de retorno no grupo *${codEmbPb}-${grupoPendente}*\n\n` +
+        `Data: ${dtPendente}\n\n` +
+        `Por favor, registre primeiro a pendência do grupo ${grupoPendente}.\n${VERSAO_HM}`
+
+      // Enviar mensagem no grupo ATUAL (onde digitou hhh)
+      await enviar(sock, grupoId, mensagem)
+
+      // Buscar grupo do WhatsApp com a pendência e enviar lá também
+      try {
+        const rsGrupoPendente = await pool.query(`
+          SELECT grupowppid
+            FROM public.wpp_grupos_agenda
+           WHERE pb = $1
+             AND UPPER(COALESCE(cota, '')) = UPPER($2)
+           LIMIT 1
+        `, [codEmbPb, grupoPendente])
+
+        if (rsGrupoPendente.rows.length > 0) {
+          const grupoIdPendente = rsGrupoPendente.rows[0].grupowppid
+          await enviar(sock, grupoIdPendente, mensagem)
+        }
+      } catch (errGrupoPendente) {
+        console.warn('[HM] Erro ao enviar mensagem no grupo pendente:', errGrupoPendente.message)
+      }
+
+      return true // BLOQUEIA o registro
+    }
+  }
+
+  // ============================================================
   // Busca agendamento de hoje
+  // ============================================================
   let agendamento = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
   let ehPendente = false
   let dataPendente = null
