@@ -806,7 +806,7 @@
     }
 
     const tokenUrl = obterTokenDaUrl();
-    const acesso = decodificarToken(tokenUrl);
+    console.log('[INIT] 🚀 Token da URL:', tokenUrl);
 
     const tituloEmb = document.getElementById("tituloEmb");
     const subTitulo = document.getElementById("subTitulo");
@@ -1222,20 +1222,30 @@
       carregarMes();
     });
 
-    if(!acesso || !acesso.dvOk){
-      tituloEmb.textContent = "LINK INVÁLIDO";
-      subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
-      mostrarErro("Link inválido. Verifique o endereço enviado.");
-      btnPrev.disabled = true;
-      btnNext.disabled = true;
-      btnHoje.disabled = true;
-      abrirLegenda.style.pointerEvents = "none";
-      abrirLegenda.style.opacity = "0.6";
-    }else{
-      tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
-      subTitulo.textContent = `ID_${acesso.codAutorizado}`;
-      carregarMes();
-    }
+    // Inicialização assíncrona
+    (async function() {
+      console.log('[INIT] 🔄 Decodificando token...');
+      const acesso = await decodificarToken(tokenUrl);
+      console.log('[INIT] ✅ Token decodificado:', acesso);
+
+      if(!acesso || !acesso.dvOk){
+        console.log('[INIT] ❌ Token inválido');
+        tituloEmb.textContent = "LINK INVÁLIDO";
+        subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
+        mostrarErro("Link inválido. Verifique o endereço enviado.");
+        btnPrev.disabled = true;
+        btnNext.disabled = true;
+        btnHoje.disabled = true;
+        abrirLegenda.style.pointerEvents = "none";
+        abrirLegenda.style.opacity = "0.6";
+      }else{
+        console.log('[INIT] ✅ Token válido - PB:', acesso.pb, 'Grupo:', acesso.grupo);
+        window.acessoAtual = acesso;
+        tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
+        subTitulo.textContent = `ID_${acesso.codAutorizado}`;
+        carregarMes();
+      }
+    })();
   </script>
 </body>
 </html>
