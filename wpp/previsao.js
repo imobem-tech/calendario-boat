@@ -251,6 +251,10 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0, forcarManha = fals
 // ENVIO AUTOMÁTICO DIÁRIO — 8h
 // Chama de server.js no setInterval
 // ============================================================
+
+// Cache para evitar envio duplicado no mesmo dia
+const gruposEnviados = new Map() // key: "grupowppid-YYYY-MM-DD"
+
 export async function enviarPrevisaoDiaria(pool, sock, conectado) {
   if (!conectado || !sock) return
 
@@ -258,7 +262,7 @@ export async function enviarPrevisaoDiaria(pool, sock, conectado) {
     const hoje = dtStr(agoraSP())
 
     const rs = await pool.query(`
-      SELECT DISTINCT g.grupowppid
+      SELECT DISTINCT g.grupowppid, s."Cod_Emb_PB", s."Grupo_Comp_letra"
         FROM public."P_BOAT_z_10_Saida_Emb" s
         JOIN public.wpp_grupos_agenda g
           ON g.pb = s."Cod_Emb_PB"
@@ -273,15 +277,39 @@ export async function enviarPrevisaoDiaria(pool, sock, conectado) {
       return
     }
 
+    console.log(`[PREVISAO] ${rs.rowCount} grupo(s) com agendamento para ${hoje}:`)
+    rs.rows.forEach((r, i) => {
+      console.log(`  ${i + 1}. PB ${r.Cod_Emb_PB} - Grupo ${r.Grupo_Comp_letra} → ${r.grupowppid}`)
+    })
+
     const previsao = await obterPrevisaoNavegacao(0)
 
     for (const row of rs.rows) {
       try {
+        const chaveCache = `${row.grupowppid}-${hoje}`
+
+        // Verificar se já foi enviado hoje
+        if (gruposEnviados.has(chaveCache)) {
+          console.log(`[PREVISAO] ⚠️ Pulando ${row.grupowppid} - já enviado hoje às ${gruposEnviados.get(chaveCache)}`)
+          continue
+        }
+
         await sock.sendMessage(row.grupowppid, { text: previsao })
-        console.log(`[PREVISAO] Enviada para ${row.grupowppid}`)
+
+        const horaEnvio = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        gruposEnviados.set(chaveCache, horaEnvio)
+
+        console.log(`[PREVISAO] ✅ Enviada para ${row.grupowppid} às ${horaEnvio}`)
         await new Promise(r => setTimeout(r, 2000))
       } catch (err) {
-        console.error(`[PREVISAO] Falha ao enviar para ${row.grupowppid}:`, err.message)
+        console.error(`[PREVISAO] ❌ Falha ao enviar para ${row.grupowppid}:`, err.message)
+      }
+    }
+
+    // Limpar cache de dias anteriores (manter apenas hoje)
+    for (const [chave] of gruposEnviados) {
+      if (!chave.endsWith(`-${hoje}`)) {
+        gruposEnviados.delete(chave)
       }
     }
   } catch (err) {
