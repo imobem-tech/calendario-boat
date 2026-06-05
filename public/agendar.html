@@ -622,6 +622,9 @@ if(!resp.ok){
 
         const diasAFrente = Math.floor((dataSelecionada - hoje) / (1000 * 60 * 60 * 24));
 
+        console.log('[PREVISAO] Data selecionada:', data);
+        console.log('[PREVISAO] Dias à frente:', diasAFrente);
+
         // Validar limite de 15 dias
         if (diasAFrente < 0) {
           loading.style.display = "none";
@@ -651,15 +654,26 @@ if(!resp.ok){
           ? 'http://localhost:3000'
           : 'https://zucchini-achievement-production.up.railway.app';
 
+        console.log('[PREVISAO] Fazendo fetch para:', `${apiUrl}/previsao`);
+        console.log('[PREVISAO] Body:', JSON.stringify({ diasAFrente }));
+
         const response = await fetch(`${apiUrl}/previsao`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ diasAFrente })
         });
 
-        if (!response.ok) throw new Error('Erro ao buscar previsão');
+        console.log('[PREVISAO] Response status:', response.status);
+        console.log('[PREVISAO] Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[PREVISAO] Error response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
 
         const resultado = await response.json();
+        console.log('[PREVISAO] Resultado:', resultado);
 
         // Mostrar previsão formatada
         loading.style.display = "none";
