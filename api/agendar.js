@@ -1,8 +1,9 @@
 // ============================================================
-// /api/agendar — V.2606052012
+// /api/agendar — V.2606052100
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
+// FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -21,7 +22,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606052012";
+const VERSAO_API = "Allmax®2606052100";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -296,6 +297,26 @@ export default async function handler(req, res) {
     );
 
     if (rsInadim.rows[0]?.inadimplente === true) {
+      // ============================================================
+      // ENVIA NOTIFICAÇÃO DE INADIMPLÊNCIA
+      // - WhatsApp privado do cliente
+      // - Grupo ESPELHO FINANCEIRO
+      // ============================================================
+      try {
+        const apiUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'https://allmaxcalendar.vercel.app';
+
+        const urlInadim = `${apiUrl}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
+
+        await fetch(urlInadim).catch(err => {
+          console.error('[AGENDAR] Falha ao notificar inadimplência:', err.message);
+        });
+      } catch (errInadim) {
+        // Não bloqueia o retorno 403 se falhar
+        console.error('[AGENDAR] Erro ao chamar inadimplencia_cliente:', errInadim.message);
+      }
+
       return res.status(403).json({
         error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
         versao: VERSAO_API
