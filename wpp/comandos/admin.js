@@ -1,18 +1,25 @@
 // ============================================================
-// wpp/comandos/admin.js — V.2605310001
+// wpp/comandos/admin.js — V.2606051940
 // Allmax Gestão de Cotas — Marujo⚓
 //
 // Módulo administrativo — só funciona no grupo ADM
 // Exige Administrador = S na wpp_colaboradores
 //
 // Comandos:
-//   ver_saida_151          — últimas 5 saídas da emb 151
-//   ver_saida_151_11       — últimas 5 saídas da emb 151 grupo 11
+//   ver_saida_151          — últimas 5 saídas retroativas da emb 151
+//   ver_saida_151_11       — últimas 5 saídas retroativas da emb 151 grupo 11
+//   lista_saida_151_10     — últimas 10 saídas retroativas da emb 151
+//   lista_saida_151_11_15  — últimas 15 saídas retroativas da emb 151 grupo 11
 //   ver_colab              — lista colaboradores ativos
 //   ver_emb_151            — dados da embarcação 151
 //   corrigir_4521_S        — corrige HM Saída do ID 4521
 //   corrigir_4521_R        — corrige HM Retorno do ID 4521
 //   help                   — lista todos os comandos
+//
+// FIX V.2606051940:
+// - ver_saida agora filtra apenas saídas retroativas (≤ hoje)
+// - Exclui canceladas (Dt_Cancela_saida) e desistidas (Dt_Desistencia)
+// - Novo comando lista_saida com quantidade parametrizada (máx 50)
 // ============================================================
 
 import { gerarCobrancaCompleta } from '../asaas.js'
@@ -28,7 +35,7 @@ Assistente Virtual\`\`\` *Marujo⚓*
 // chave: remetente | valor: { tipo (S|R), idSaida, etapa, valorAtual, nomeColab, emb, grupo }
 const estadosCorrecao = new Map()
 
-const VERSAO_ADM = 'V.2606010935'
+const VERSAO_ADM = 'V.2606051940'
 
 // ============================================================
 // HELPERS
@@ -101,7 +108,7 @@ async function validarAdmin(pool, remetente) {
 // COMANDOS DE CONSULTA
 // ============================================================
 
-async function cmdVerSaida(sock, pool, emb, grupo) {
+async function cmdVerSaida(sock, pool, emb, grupo, limite = 5) {
   const params = [Number(emb)]
   let filtroGrupo = ''
   if (grupo) {
@@ -124,17 +131,21 @@ async function cmdVerSaida(sock, pool, emb, grupo) {
       FROM public."P_BOAT_z_10_Saida_Emb" s
       LEFT JOIN public."Cliente" c ON c."Codigo" = s."Cod_Autorizado"
      WHERE s."Cod_Emb_PB" = $1
+       AND DATE(s."Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') <= CURRENT_DATE
+       AND s."Dt_Desistencia" IS NULL
+       AND s."Dt_Cancela_saida" IS NULL
        ${filtroGrupo}
      ORDER BY s."Dt_Agendamento" DESC
-     LIMIT 5
-  `, params)
+     LIMIT $${grupo ? 3 : 2}
+  `, [...params, Number(limite)])
 
   if (!rows.length) {
-    await enviar(sock, `${CABECALHO}\n📋 Nenhuma saída encontrada para Emb ${emb}${grupo ? ' / Grupo ' + grupo : ''}.`)
+    await enviar(sock, `${CABECALHO}\n📋 Nenhuma saída encontrada para Emb ${emb}${grupo ? ' / Grupo ' + grupo : ''} (retroativas, sem cancelamento).`)
     return
   }
 
-  let msg = `${CABECALHO}\n📋 *Últimas saídas — Emb ${emb}${grupo ? ' / Grupo ' + grupo : ''}*\n`
+  let msg = `${CABECALHO}\n📋 *Últimas ${limite} saídas — Emb ${emb}${grupo ? ' / Grupo ' + grupo : ''}*\n`
+  msg += `(Retroativas, sem cancelamento/desistência)\n`
   msg += `${'─'.repeat(30)}\n`
 
   for (const r of rows) {
@@ -430,8 +441,10 @@ async function cmdHelp(sock) {
     `📖 *Comandos disponíveis — Marujo ADM*\n` +
     `${'─'.repeat(30)}\n\n` +
     `📋 *CONSULTA*\n` +
-    `ver_saida_151 — últimas 5 saídas emb 151\n` +
-    `ver_saida_151_11 — últimas 5 saídas emb 151 grupo 11\n` +
+    `ver_saida_151 — últimas 5 saídas retroativas emb 151\n` +
+    `ver_saida_151_11 — últimas 5 saídas retroativas emb 151 grupo 11\n` +
+    `lista_saida_151_10 — últimas 10 saídas emb 151\n` +
+    `lista_saida_151_11_15 — últimas 15 saídas emb 151 grupo 11\n` +
     `ver_colab — lista colaboradores ativos\n` +
     `ver_emb_151 — dados da embarcação 151\n\n` +
     `🔧 *CORREÇÃO*\n` +
@@ -439,6 +452,8 @@ async function cmdHelp(sock) {
     `corrigir_4521_R — corrige HM Retorno do ID 4521\n\n` +
     `❓ *AJUDA*\n` +
     `help — este menu\n\n` +
+    `ℹ️ *Saídas retroativas:* apenas ≤ hoje, sem cancelamento/desistência\n` +
+    `ℹ️ *lista_saida:* máximo 50 registros\n\n` +
     `${VERSAO_ADM}`
   )
 }
@@ -470,12 +485,26 @@ export async function tratarComandoAdmin(sock, pool, grupoId, remetente, texto) 
     return true
   }
 
-  // ver_saida_151 ou ver_saida_151_11
+  // ver_saida_151 ou ver_saida_151_11 (limite padrão 5)
   const mVerSaida = txt.match(/^ver_saida_(\d+)(?:_([a-z0-9]+))?$/)
   if (mVerSaida) {
     const admin = await validarAdmin(pool, remetente)
     if (!admin) { await enviar(sock, `⛔ Sem permissão.`); return true }
-    await cmdVerSaida(sock, pool, mVerSaida[1], mVerSaida[2] || null)
+    await cmdVerSaida(sock, pool, mVerSaida[1], mVerSaida[2] || null, 5)
+    return true
+  }
+
+  // lista_saida_151_10 ou lista_saida_151_11_10 (limite parametrizado)
+  const mListaSaida = txt.match(/^lista_saida_(\d+)(?:_([a-z0-9]+))?_(\d+)$/)
+  if (mListaSaida) {
+    const admin = await validarAdmin(pool, remetente)
+    if (!admin) { await enviar(sock, `⛔ Sem permissão.`); return true }
+    const limite = Number(mListaSaida[3])
+    if (limite > 50) {
+      await enviar(sock, `⚠️ Limite máximo: 50 registros`)
+      return true
+    }
+    await cmdVerSaida(sock, pool, mListaSaida[1], mListaSaida[2] || null, limite)
     return true
   }
 
