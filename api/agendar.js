@@ -53,7 +53,29 @@ function decodeToken(token) {
   if (!m) return null;
 
   const pb = decodificar(m[1]);
-  const grupoLetra = m[2].toUpperCase();
+
+  // FALLBACK HARDCODED: PBs conhecidos (mesmo do index.html e agendar.html)
+  const PB_ALLMAX_LETRA = [573, 462, 390, 292, 151]; // ALLMAX → grupos com letra (E1, K2, etc)
+  const PB_SUMMER_NUMERICO = [605, 576, 565]; // SUMMER → grupos numéricos (11, 22, etc)
+
+  const grupoLetraCod = m[2];
+  let grupoLetra;
+
+  if (PB_ALLMAX_LETRA.includes(parseInt(pb))) {
+    // ALLMAX → sempre letra
+    grupoLetra = grupoLetraCod.toUpperCase();
+  } else if (PB_SUMMER_NUMERICO.includes(parseInt(pb))) {
+    // SUMMER → sempre numérico
+    grupoLetra = decodificar(grupoLetraCod);
+  } else {
+    // Fallback heurístico para PBs desconhecidos
+    if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+      grupoLetra = decodificar(grupoLetraCod);
+    } else {
+      grupoLetra = grupoLetraCod.toUpperCase();
+    }
+  }
+
   const grupoNum = decodificar(m[3]);
   const autorizado = decodificar(m[4]);
   const mmdd = decodificar(m[5]).padStart(4, "0");
@@ -72,7 +94,7 @@ function decodeToken(token) {
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
-  // Monta grupo final: letra já está uppercase em grupoLetra (linha 56)
+  // Monta grupo final
   const grupoFinal = `${grupoLetra}${grupoNum}`;
 
   return {
