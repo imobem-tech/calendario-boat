@@ -925,6 +925,62 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
 })
 
 // ============================================================
+// ENDPOINT: Buscar grupo de uma embarcação (para decodificação de token)
+// V.2606051230
+// ============================================================
+const cacheGruposPorPB = new Map()
+
+app.get('/api/grupo-pb/:pb', async (req, res) => {
+  try {
+    const pb = parseInt(req.params.pb)
+
+    if (isNaN(pb)) {
+      return res.status(400).json({ erro: 'PB inválido' })
+    }
+
+    // 1. Verificar cache
+    if (cacheGruposPorPB.has(pb)) {
+      console.log(`[CACHE] Hit para PB ${pb}: ${cacheGruposPorPB.get(pb)}`)
+      return res.json({
+        sucesso: true,
+        grupo: cacheGruposPorPB.get(pb),
+        cache: true
+      })
+    }
+
+    // 2. Buscar no banco (query barata)
+    console.log(`[CACHE] Miss para PB ${pb}, consultando banco...`)
+    const rs = await pool.query(`
+      SELECT cota
+      FROM wpp_grupos_agenda
+      WHERE pb = $1
+      LIMIT 1
+    `, [pb])
+
+    if (rs.rowCount === 0) {
+      console.log(`[CACHE] PB ${pb} não encontrado no banco`)
+      return res.status(404).json({ erro: 'Embarcação não encontrada' })
+    }
+
+    const grupo = rs.rows[0].cota
+
+    // 3. Armazenar em cache
+    cacheGruposPorPB.set(pb, grupo)
+    console.log(`[CACHE] Armazenado PB ${pb} → ${grupo}`)
+
+    res.json({
+      sucesso: true,
+      grupo,
+      cache: false
+    })
+
+  } catch (err) {
+    console.error('[API] Erro ao buscar grupo:', err)
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// ============================================================
 // ENDPOINT: Previsão do tempo para WEB
 // V.2606041440
 // ============================================================
