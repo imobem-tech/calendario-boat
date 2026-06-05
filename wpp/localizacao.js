@@ -792,7 +792,7 @@ export async function verificarPosicoes70Metros(sock, pool, aguardandoConfirmaca
           l.distancia_porto_m,
           g.grupowppid,
           s."Dt_Retorno",
-          s."Nome_Embarcacao",
+          -- s."Nome_Embarcacao", -- TEMPORÁRIO: Coluna não existe, comentada para não crashar
           l.criado_em
         FROM public.wpp_localizacao_emb l
         JOIN public.wpp_grupos_agenda g
