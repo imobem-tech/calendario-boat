@@ -937,6 +937,22 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
 })
 
 // ============================================================
+// ENDPOINT: Health check
+// V.2606051350
+// ============================================================
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: 'V.2606051350',
+    timestamp: new Date().toISOString(),
+    rotas: [
+      '/api/health',
+      '/api/grupo-padrao/:pb'
+    ]
+  })
+})
+
+// ============================================================
 // ENDPOINT: Buscar padrão de grupo (numérico ou letra) por proprietário
 // V.2606051250
 // ============================================================
