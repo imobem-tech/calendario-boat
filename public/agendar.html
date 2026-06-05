@@ -603,15 +603,24 @@ if(!resp.ok){
     // BOTÃO PREVISÃO DO TEMPO
     // V.2606051130
     // ============================================================
-    document.getElementById("btnPrevisao").addEventListener("click", async () => {
+    // Aguardar DOM carregar
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById("btnPrevisao").addEventListener("click", async () => {
       const modal = document.getElementById("modalPrevisao");
       const conteudo = document.getElementById("previsaoConteudo");
       const loading = document.getElementById("previsaoLoading");
+
+      // API URL definida fora do try para usar no catch
+      const apiUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://zucchini-achievement-production.up.railway.app';
 
       // Mostrar modal com loading
       modal.style.display = "flex";
       loading.style.display = "block";
       conteudo.innerHTML = "";
+
+      let diasAFrente = 0; // Inicializar para uso no catch
 
       try {
         // Calcular dias à frente baseado na data selecionada
@@ -620,7 +629,7 @@ if(!resp.ok){
         hoje.setHours(0, 0, 0, 0);
         dataSelecionada.setHours(0, 0, 0, 0);
 
-        const diasAFrente = Math.floor((dataSelecionada - hoje) / (1000 * 60 * 60 * 24));
+        diasAFrente = Math.floor((dataSelecionada - hoje) / (1000 * 60 * 60 * 24));
 
         // Validar limite de 15 dias
         if (diasAFrente < 0) {
@@ -647,10 +656,6 @@ if(!resp.ok){
         }
 
         // Buscar previsão via API
-        const apiUrl = window.location.hostname === 'localhost'
-          ? 'http://localhost:3000'
-          : 'https://zucchini-achievement-production.up.railway.app';
-
         const response = await fetch(`${apiUrl}/previsao`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -691,6 +696,7 @@ if(!resp.ok){
         document.getElementById("modalPrevisao").style.display = "none";
       }
     });
+    }); // Fim DOMContentLoaded
   </script>
 
   <!-- Modal Previsão do Tempo -->
