@@ -1,0 +1,6 @@
+V.2606051355-FORCE-REBUILD
+Build timestamp: 2026-06-05T13:55:00-03:00
+Git commit: Force deploy with new routes
+Includes:
+- /api/health
+- /api/grupo-padrao/:pb with CORS
