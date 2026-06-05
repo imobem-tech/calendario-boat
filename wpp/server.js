@@ -944,24 +944,28 @@ const cachePadraoPorPB = new Map()
 
 app.get('/api/grupo-padrao/:pb', async (req, res) => {
   try {
+    console.log(`[API] 🔍 Requisição GET /api/grupo-padrao/${req.params.pb}`)
     const pb = parseInt(req.params.pb)
 
     if (isNaN(pb)) {
+      console.log(`[API] ❌ PB inválido: ${req.params.pb}`)
       return res.status(400).json({ erro: 'PB inválido' })
     }
 
     // 1. Verificar cache
     if (cachePadraoPorPB.has(pb)) {
-      console.log(`[CACHE] Hit para PB ${pb}: ${cachePadraoPorPB.get(pb)}`)
+      const padrao = cachePadraoPorPB.get(pb)
+      console.log(`[CACHE] ✅ Hit para PB ${pb}: ${padrao}`)
       return res.json({
         sucesso: true,
-        padrao: cachePadraoPorPB.get(pb),
+        padrao: padrao,
+        proprietario: null,
         cache: true
       })
     }
 
     // 2. Buscar proprietário no banco (fonte da verdade)
-    console.log(`[CACHE] Miss para PB ${pb}, consultando proprietário...`)
+    console.log(`[CACHE] ⏳ Miss para PB ${pb}, consultando proprietário...`)
     const rs = await pool.query(`
       SELECT "Cod_Proprietario"
       FROM embarcacoes
@@ -969,26 +973,31 @@ app.get('/api/grupo-padrao/:pb', async (req, res) => {
       LIMIT 1
     `, [pb])
 
+    console.log(`[QUERY] 📊 Resultado: ${rs.rowCount} linha(s) encontrada(s)`)
+
     if (rs.rowCount === 0) {
-      console.log(`[CACHE] PB ${pb} não encontrado no banco`)
+      console.log(`[CACHE] ❌ PB ${pb} não encontrado no banco`)
       return res.status(404).json({ erro: 'Embarcação não encontrada' })
     }
 
     const codProprietario = rs.rows[0].Cod_Proprietario
+    console.log(`[QUERY] 👤 Proprietário encontrado: ${codProprietario}`)
 
     // 3. Definir padrão baseado no proprietário
     let padrao
     if (codProprietario === 4255) {
       // ALLMAX → grupos com letra (E1, K2, A1, etc)
       padrao = 'letra'
+      console.log(`[PADRÃO] ✅ ALLMAX detectado (4255) → padrão: LETRA`)
     } else {
       // SUMMER e outros → grupos numéricos (11, 22, 33, etc)
       padrao = 'numerico'
+      console.log(`[PADRÃO] ✅ SUMMER ou outro (${codProprietario}) → padrão: NUMÉRICO`)
     }
 
     // 4. Armazenar em cache
     cachePadraoPorPB.set(pb, padrao)
-    console.log(`[CACHE] Armazenado PB ${pb} → proprietário ${codProprietario} → padrão "${padrao}"`)
+    console.log(`[CACHE] 💾 Armazenado PB ${pb} → padrão "${padrao}"`)
 
     res.json({
       sucesso: true,
