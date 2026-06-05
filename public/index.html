@@ -736,10 +736,7 @@
       return String(soma).padStart(2, "0");
     }
 
-    // Cache de grupos por PB (em memória do navegador)
-    const cacheGruposPorPB = new Map();
-
-    async function decodificarToken(token){
+    function decodificarToken(token){
       const t = String(token || "").trim().toLowerCase();
 
       // Formato novo com MMDD:
@@ -756,57 +753,12 @@
 
       const pb = decodificarDigitosCodificados(embCod);
 
-      // Buscar padrão do grupo via cache/API (baseado no proprietário)
-      let padrao = cacheGruposPorPB.get(pb);
-
-      if (!padrao) {
-        // Cache miss - buscar da API
-        try {
-          const apiUrl = window.location.hostname === 'localhost'
-            ? 'http://localhost:3000'
-            : 'https://zucchini-achievement-production.up.railway.app';
-
-          console.log(`[TOKEN] Buscando padrão para PB ${pb} em ${apiUrl}/api/grupo-padrao/${pb}`);
-          const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
-          console.log(`[TOKEN] Response status: ${response.status}`);
-
-          if (response.ok) {
-            const data = await response.json();
-            padrao = data.padrao;
-            cacheGruposPorPB.set(pb, padrao);
-            console.log(`[TOKEN] ✅ Cache miss PB ${pb}, padrão: ${padrao} (proprietário ${data.proprietario})`);
-          } else {
-            console.warn(`[TOKEN] ⚠️ API retornou status ${response.status}, usando fallback`);
-          }
-        } catch (err) {
-          console.error('[TOKEN] ❌ Erro ao buscar padrão:', err);
-          console.warn('[TOKEN] ⚠️ Usando fallback heurístico');
-        }
-      } else {
-        console.log(`[TOKEN] ✅ Cache hit PB ${pb}: ${padrao}`);
-      }
-
-      // Decodificar letra do grupo baseado no padrão do proprietário
-      let grupoLetra;
+      const primeiroGrupo = decodificarDigitosCodificados(grupoLetraCod);
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
 
-      if (padrao === 'numerico') {
-        // Proprietário usa grupos numéricos (11, 22, 33)
-        grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
-      } else if (padrao === 'letra') {
-        // Proprietário usa grupos com letra (E1, K2, A1)
-        grupoLetra = grupoLetraCod.toUpperCase();
-      } else {
-        // Fallback: heurística se API falhar
-        if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
-          grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
-        } else {
-          grupoLetra = grupoLetraCod.toUpperCase();
-        }
-      }
-
-      // Monta grupo final
-      const grupoFinal = `${grupoLetra}${grupoNum}`;
+      const grupoFinal = primeiroGrupo
+        ? `${primeiroGrupo}${grupoNum}`
+        : `${grupoLetraCod.toUpperCase()}${grupoNum}`;
 
       const codAutorizado = decodificarDigitosCodificados(autorizadoCod);
       const mmdd = decodificarDigitosCodificados(mmddCod).padStart(4, "0");
@@ -853,8 +805,8 @@
     }
 
     const tokenUrl = obterTokenDaUrl();
+    const acesso = decodificarToken(tokenUrl);
 
-    // Elementos do DOM
     const tituloEmb = document.getElementById("tituloEmb");
     const subTitulo = document.getElementById("subTitulo");
     const tituloMes = document.getElementById("tituloMes");
@@ -967,7 +919,7 @@
     }
 
     btnConfirmarCancelamento.addEventListener("click", async () => {
-      if(!agendamentoParaCancelar || !window.acessoAtual) return;
+      if(!agendamentoParaCancelar || !acesso) return;
 
       btnConfirmarCancelamento.disabled = true;
       cancelSpinner.style.display = "block";
@@ -1024,7 +976,7 @@
     // ----------------------------------------------------------
     // Controle de sessão — WPP disparado apenas uma vez por sessão
     // ----------------------------------------------------------
-    const chaveWppSessao = `inadim_wpp_${window.acessoAtual ? window.acessoAtual.codAutorizado : "x"}`;
+    const chaveWppSessao = `inadim_wpp_${acesso ? acesso.codAutorizado : "x"}`;
 
     function wppJaDisparadoNaSessao(){
       try{ return !!sessionStorage.getItem(chaveWppSessao); }
@@ -1043,7 +995,7 @@
     // Navegar para agendamento com verificação de inadimplência
     // ----------------------------------------------------------
     async function navegarParaAgendamento(data){
-      if(!window.acessoAtual || !window.acessoAtual.dvOk) return;
+      if(!acesso || !acesso.dvOk) return;
       if(verificandoInadimplencia) return;
 
       verificandoInadimplencia = true;
@@ -1052,7 +1004,7 @@
       try{
         // Consulta silenciosa — sem abrir modal ainda
         const dispararWpp = !wppJaDisparadoNaSessao();
-        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(window.acessoAtual.codAutorizado)}&pb=${encodeURIComponent(window.acessoAtual.pb)}&grupo=${encodeURIComponent(window.acessoAtual.grupo)}&dispararWpp=${dispararWpp}`;
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(acesso.codAutorizado)}&pb=${encodeURIComponent(acesso.pb)}&grupo=${encodeURIComponent(acesso.grupo)}&dispararWpp=${dispararWpp}`;
         const resp = await fetch(url, { cache: "no-store" });
         const json = await resp.json();
 
@@ -1204,7 +1156,7 @@
       const inicio = new Date(dataMes.getFullYear(), dataMes.getMonth(), 1);
       const start = isoDate(inicio);
 
-      const url = `/api/availability?pb=${encodeURIComponent(window.acessoAtual.pb)}&start=${encodeURIComponent(start)}&months=1`;
+      const url = `/api/availability?pb=${encodeURIComponent(acesso.pb)}&start=${encodeURIComponent(start)}&months=1`;
       const resp = await fetch(url, { cache: "no-store" });
 
       if(!resp.ok){
@@ -1269,27 +1221,20 @@
       carregarMes();
     });
 
-    // Inicialização assíncrona
-    (async function init() {
-      const acesso = await decodificarToken(tokenUrl);
-
-      if(!acesso || !acesso.dvOk){
-        tituloEmb.textContent = "LINK INVÁLIDO";
-        subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
-        mostrarErro("Link inválido. Verifique o endereço enviado.");
-        btnPrev.disabled = true;
-        btnNext.disabled = true;
-        btnHoje.disabled = true;
-        abrirLegenda.style.pointerEvents = "none";
-        abrirLegenda.style.opacity = "0.6";
-      }else{
-        // Tornar acesso global para outras funções
-        window.acessoAtual = acesso;
-        tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
-        subTitulo.textContent = `ID_${acesso.codAutorizado}`;
-        carregarMes();
-      }
-    })();
+    if(!acesso || !acesso.dvOk){
+      tituloEmb.textContent = "LINK INVÁLIDO";
+      subTitulo.textContent = "Não foi possível validar embarcação, grupo e autorizado.";
+      mostrarErro("Link inválido. Verifique o endereço enviado.");
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      btnHoje.disabled = true;
+      abrirLegenda.style.pointerEvents = "none";
+      abrirLegenda.style.opacity = "0.6";
+    }else{
+      tituloEmb.textContent = `Emb ${acesso.pb} - ${acesso.grupo}`;
+      subTitulo.textContent = `ID_${acesso.codAutorizado}`;
+      carregarMes();
+    }
   </script>
 </body>
 </html>
