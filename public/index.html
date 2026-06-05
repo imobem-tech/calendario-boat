@@ -766,18 +766,24 @@
             ? 'http://localhost:3000'
             : 'https://zucchini-achievement-production.up.railway.app';
 
+          console.log(`[TOKEN] Buscando padrão para PB ${pb} em ${apiUrl}/api/grupo-padrao/${pb}`);
           const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
+          console.log(`[TOKEN] Response status: ${response.status}`);
+
           if (response.ok) {
             const data = await response.json();
             padrao = data.padrao;
             cacheGruposPorPB.set(pb, padrao);
-            console.log(`[TOKEN] Cache miss PB ${pb}, padrão: ${padrao} (proprietário ${data.proprietario})`);
+            console.log(`[TOKEN] ✅ Cache miss PB ${pb}, padrão: ${padrao} (proprietário ${data.proprietario})`);
+          } else {
+            console.warn(`[TOKEN] ⚠️ API retornou status ${response.status}, usando fallback`);
           }
         } catch (err) {
-          console.error('[TOKEN] Erro ao buscar padrão:', err);
+          console.error('[TOKEN] ❌ Erro ao buscar padrão:', err);
+          console.warn('[TOKEN] ⚠️ Usando fallback heurístico');
         }
       } else {
-        console.log(`[TOKEN] Cache hit PB ${pb}: ${padrao}`);
+        console.log(`[TOKEN] ✅ Cache hit PB ${pb}: ${padrao}`);
       }
 
       // Decodificar letra do grupo baseado no padrão do proprietário
