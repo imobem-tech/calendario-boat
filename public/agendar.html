@@ -675,14 +675,82 @@ if(!resp.ok){
         <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600; display: block; margin: 0 auto;">Fechar</button>`;
 
       } catch (erro) {
-        loading.style.display = "none";
-        conteudo.innerHTML = `<div style="text-align: center; padding: 20px;">
-          <p style="color: #d32f2f;">❌ Erro ao carregar previsão:</p>
-          <p><strong>${erro.message}</strong></p>
-          <p style="font-size: 12px; color: #999; margin-top: 12px;">URL: ${apiUrl}/previsao<br>Dias à frente: ${diasAFrente}</p>
-          <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600;">Fechar</button>
-        </div>`;
-        console.error('Erro detalhado:', erro);
+        console.error('❌ Erro ao buscar previsão do Railway:', erro);
+
+        // FALLBACK: Chamar API open-meteo diretamente
+        try {
+          console.log('🔄 Tentando fallback: open-meteo direto...');
+
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          const dataAlvo = new Date(hoje);
+          dataAlvo.setDate(hoje.getDate() + diasAFrente);
+
+          const dataStr = dataAlvo.toISOString().split('T')[0];
+
+          const LAT = '-10.212911';
+          const LON = '-48.392500';
+          const TIMEZONE = 'America/Araguaina';
+
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m&daily=sunrise,sunset&timezone=${TIMEZONE}&start_date=${dataStr}&end_date=${dataStr}`;
+
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`API open-meteo retornou ${response.status}`);
+
+          const data = await response.json();
+
+          // Formatar previsão simplificada
+          const dia = dataAlvo.getDate();
+          const mes = dataAlvo.getMonth() + 1;
+          const ano = dataAlvo.getFullYear();
+          const nomeDia = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][dataAlvo.getDay()];
+
+          let previsaoHTML = `<div style="font-family: monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap;">`;
+          previsaoHTML += `🌤️ PREVISÃO DE NAVEGAÇÃO\n`;
+          previsaoHTML += `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano} ${nomeDia}\n`;
+          previsaoHTML += `Lago de Palmas 🗺️\n\n`;
+
+          // Período 11h às 18h
+          const horas = data.hourly.time;
+          const temps = data.hourly.temperature_2m;
+          const probs = data.hourly.precipitation_probability;
+          const precips = data.hourly.precipitation;
+          const rajadas = data.hourly.wind_gusts_10m;
+
+          previsaoHTML += `📊 PERÍODO DE NAVEGAÇÃO (11h-18h):\n\n`;
+
+          for (let i = 0; i < horas.length; i++) {
+            const hora = new Date(horas[i]).getHours();
+            if (hora >= 11 && hora <= 18) {
+              const temp = temps[i].toFixed(1).replace('.', ',');
+              const prob = probs[i] || 0;
+              const mm = (precips[i] || 0).toFixed(1).replace('.', ',');
+              const raj = rajadas[i].toFixed(0);
+
+              previsaoHTML += `${String(hora).padStart(2,'0')}h: ${temp}°C | Chuva ${prob}% (${mm}mm) | Rajada ${raj}km/h\n`;
+            }
+          }
+
+          previsaoHTML += `\n🌅 Nascer: ${data.daily.sunrise[0].split('T')[1].substring(0,5)}h`;
+          previsaoHTML += `\n🌇 Pôr: ${data.daily.sunset[0].split('T')[1].substring(0,5)}h`;
+          previsaoHTML += `\n\n⚠️ Modo fallback (Railway offline)`;
+          previsaoHTML += `</div>`;
+
+          loading.style.display = "none";
+          conteudo.innerHTML = previsaoHTML + `<button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600; display: block; margin: 20px auto 0;">Fechar</button>`;
+
+        } catch (erroFallback) {
+          // Se fallback também falhar
+          loading.style.display = "none";
+          conteudo.innerHTML = `<div style="text-align: center; padding: 20px;">
+            <p style="color: #d32f2f;">❌ Erro ao carregar previsão:</p>
+            <p><strong>${erro.message}</strong></p>
+            <p style="font-size: 12px; color: #999; margin-top: 12px;">Railway: ${apiUrl}/previsao<br>Dias à frente: ${diasAFrente}</p>
+            <p style="font-size: 12px; color: #d32f2f; margin-top: 8px;">Fallback também falhou: ${erroFallback.message}</p>
+            <button onclick="document.getElementById('modalPrevisao').style.display='none'" style="margin-top: 20px; background: #1976d2; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 16px; cursor: pointer; font-weight: 600;">Fechar</button>
+          </div>`;
+          console.error('❌ Erro no fallback:', erroFallback);
+        }
       }
     });
 
