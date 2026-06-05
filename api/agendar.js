@@ -54,21 +54,39 @@ function decodeToken(token) {
 
   const pb = decodificar(m[1]);
 
-  // FALLBACK HARDCODED: PBs conhecidos (mesmo do index.html e agendar.html)
-  const PB_ALLMAX_LETRA = [573, 462, 390, 292, 151]; // ALLMAX → grupos com letra (E1, K2, etc)
-  const PB_SUMMER_NUMERICO = [605, 576, 565]; // SUMMER → grupos numéricos (11, 22, etc)
-
-  const grupoLetraCod = m[2];
+  // CONSULTAR PROPRIETÁRIO NO BANCO (fonte da verdade)
   let grupoLetra;
+  const grupoLetraCod = m[2];
 
-  if (PB_ALLMAX_LETRA.includes(parseInt(pb))) {
-    // ALLMAX → sempre letra
-    grupoLetra = grupoLetraCod.toUpperCase();
-  } else if (PB_SUMMER_NUMERICO.includes(parseInt(pb))) {
-    // SUMMER → sempre numérico
-    grupoLetra = decodificar(grupoLetraCod);
-  } else {
-    // Fallback heurístico para PBs desconhecidos
+  try {
+    const rsProprietario = await pool.query(`
+      SELECT "Cod_Cliente"
+      FROM "P_BOAT_1_Embarcacao"
+      WHERE "Num_PB" = $1
+      LIMIT 1
+    `, [parseInt(pb)]);
+
+    if (rsProprietario.rowCount > 0) {
+      const codCliente = rsProprietario.rows[0].Cod_Cliente;
+
+      if (codCliente === 4255) {
+        // ALLMAX → letra (E1, K2, X4, etc)
+        grupoLetra = grupoLetraCod.toUpperCase();
+      } else {
+        // SUMMER → numérico (11, 22, 33, etc)
+        grupoLetra = decodificar(grupoLetraCod);
+      }
+    } else {
+      // Fallback heurístico se PB não encontrado
+      if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+        grupoLetra = decodificar(grupoLetraCod);
+      } else {
+        grupoLetra = grupoLetraCod.toUpperCase();
+      }
+    }
+  } catch (err) {
+    console.error('[TOKEN_DECODE] Erro ao consultar proprietário:', err.message);
+    // Fallback heurístico em caso de erro
     if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
       grupoLetra = decodificar(grupoLetraCod);
     } else {

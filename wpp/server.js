@@ -983,9 +983,9 @@ app.get('/api/grupo-padrao/:pb', async (req, res) => {
     // 2. Buscar proprietário no banco (fonte da verdade)
     console.log(`[CACHE] ⏳ Miss para PB ${pb}, consultando proprietário...`)
     const rs = await pool.query(`
-      SELECT "Cod_Proprietario"
-      FROM embarcacoes
-      WHERE "Cod_Emb_PB" = $1
+      SELECT "Cod_Cliente"
+      FROM "P_BOAT_1_Embarcacao"
+      WHERE "Num_PB" = $1
       LIMIT 1
     `, [pb])
 
@@ -996,7 +996,7 @@ app.get('/api/grupo-padrao/:pb', async (req, res) => {
       return res.status(404).json({ erro: 'Embarcação não encontrada' })
     }
 
-    const codProprietario = rs.rows[0].Cod_Proprietario
+    const codProprietario = rs.rows[0].Cod_Cliente
     console.log(`[QUERY] 👤 Proprietário encontrado: ${codProprietario}`)
 
     // 3. Definir padrão baseado no proprietário

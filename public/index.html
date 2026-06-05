@@ -760,43 +760,27 @@
       let padrao = cacheGruposPorPB.get(pb);
 
       if (!padrao) {
-        // FALLBACK HARDCODED: PBs conhecidos (enquanto Railway não deploya)
-        const PB_ALLMAX_LETRA = [573, 462, 390, 292, 151]; // ALLMAX → grupos com letra (E1, K2, etc)
-        const PB_SUMMER_NUMERICO = [605, 576]; // SUMMER → grupos numéricos (11, 22, etc)
+        // Buscar da API (fonte da verdade: banco de dados)
+        try {
+          const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000'
+            : 'https://calendario-boat-production.up.railway.app';
 
-        if (PB_ALLMAX_LETRA.includes(parseInt(pb))) {
-          padrao = 'letra';
-          console.log(`[TOKEN] 🔧 FALLBACK: PB ${pb} é ALLMAX → padrão LETRA`);
-        } else if (PB_SUMMER_NUMERICO.includes(parseInt(pb))) {
-          padrao = 'numerico';
-          console.log(`[TOKEN] 🔧 FALLBACK: PB ${pb} é SUMMER → padrão NUMÉRICO`);
-        } else {
-          // Tentar buscar da API
-          try {
-            const apiUrl = window.location.hostname === 'localhost'
-              ? 'http://localhost:3000'
-              : 'https://zucchini-achievement-production.up.railway.app';
+          console.log(`[TOKEN] Buscando padrão para PB ${pb} em ${apiUrl}/api/grupo-padrao/${pb}`);
+          const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
+          console.log(`[TOKEN] Response status: ${response.status}`);
 
-            console.log(`[TOKEN] Buscando padrão para PB ${pb} em ${apiUrl}/api/grupo-padrao/${pb}`);
-            const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
-            console.log(`[TOKEN] Response status: ${response.status}`);
-
-            if (response.ok) {
-              const data = await response.json();
-              padrao = data.padrao;
-              cacheGruposPorPB.set(pb, padrao);
-              console.log(`[TOKEN] ✅ API funcionou! Padrão: ${padrao} (proprietário ${data.proprietario})`);
-            } else {
-              console.warn(`[TOKEN] ⚠️ API retornou status ${response.status}, usando fallback heurístico`);
-            }
-          } catch (err) {
-            console.error('[TOKEN] ❌ Erro ao buscar padrão:', err);
-            console.warn('[TOKEN] ⚠️ Usando fallback heurístico');
+          if (response.ok) {
+            const data = await response.json();
+            padrao = data.padrao;
+            cacheGruposPorPB.set(pb, padrao);
+            console.log(`[TOKEN] ✅ Padrão: ${padrao} (proprietário ${data.proprietario || 'cached'})`);
+          } else {
+            console.warn(`[TOKEN] ⚠️ API retornou status ${response.status}, usando fallback heurístico`);
           }
-        }
-
-        if (padrao) {
-          cacheGruposPorPB.set(pb, padrao);
+        } catch (err) {
+          console.error('[TOKEN] ❌ Erro ao buscar padrão:', err);
+          console.warn('[TOKEN] ⚠️ Usando fallback heurístico');
         }
       } else {
         console.log(`[TOKEN] ✅ Cache hit PB ${pb}: ${padrao}`);
