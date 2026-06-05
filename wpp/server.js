@@ -925,12 +925,12 @@ app.post('/criar-ou-atualizar-grupo', (req, res) => {
 })
 
 // ============================================================
-// ENDPOINT: Buscar grupo de uma embarcação (para decodificação de token)
-// V.2606051230
+// ENDPOINT: Buscar padrão de grupo (numérico ou letra) por proprietário
+// V.2606051250
 // ============================================================
-const cacheGruposPorPB = new Map()
+const cachePadraoPorPB = new Map()
 
-app.get('/api/grupo-pb/:pb', async (req, res) => {
+app.get('/api/grupo-padrao/:pb', async (req, res) => {
   try {
     const pb = parseInt(req.params.pb)
 
@@ -939,21 +939,21 @@ app.get('/api/grupo-pb/:pb', async (req, res) => {
     }
 
     // 1. Verificar cache
-    if (cacheGruposPorPB.has(pb)) {
-      console.log(`[CACHE] Hit para PB ${pb}: ${cacheGruposPorPB.get(pb)}`)
+    if (cachePadraoPorPB.has(pb)) {
+      console.log(`[CACHE] Hit para PB ${pb}: ${cachePadraoPorPB.get(pb)}`)
       return res.json({
         sucesso: true,
-        grupo: cacheGruposPorPB.get(pb),
+        padrao: cachePadraoPorPB.get(pb),
         cache: true
       })
     }
 
-    // 2. Buscar no banco (query barata)
-    console.log(`[CACHE] Miss para PB ${pb}, consultando banco...`)
+    // 2. Buscar proprietário no banco (fonte da verdade)
+    console.log(`[CACHE] Miss para PB ${pb}, consultando proprietário...`)
     const rs = await pool.query(`
-      SELECT cota
-      FROM wpp_grupos_agenda
-      WHERE pb = $1
+      SELECT "Cod_Proprietario"
+      FROM embarcacoes
+      WHERE "Cod_Emb_PB" = $1
       LIMIT 1
     `, [pb])
 
@@ -962,20 +962,31 @@ app.get('/api/grupo-pb/:pb', async (req, res) => {
       return res.status(404).json({ erro: 'Embarcação não encontrada' })
     }
 
-    const grupo = rs.rows[0].cota
+    const codProprietario = rs.rows[0].Cod_Proprietario
 
-    // 3. Armazenar em cache
-    cacheGruposPorPB.set(pb, grupo)
-    console.log(`[CACHE] Armazenado PB ${pb} → ${grupo}`)
+    // 3. Definir padrão baseado no proprietário
+    let padrao
+    if (codProprietario === 4255) {
+      // ALLMAX → grupos com letra (E1, K2, A1, etc)
+      padrao = 'letra'
+    } else {
+      // SUMMER e outros → grupos numéricos (11, 22, 33, etc)
+      padrao = 'numerico'
+    }
+
+    // 4. Armazenar em cache
+    cachePadraoPorPB.set(pb, padrao)
+    console.log(`[CACHE] Armazenado PB ${pb} → proprietário ${codProprietario} → padrão "${padrao}"`)
 
     res.json({
       sucesso: true,
-      grupo,
+      padrao,
+      proprietario: codProprietario,
       cache: false
     })
 
   } catch (err) {
-    console.error('[API] Erro ao buscar grupo:', err)
+    console.error('[API] Erro ao buscar padrão:', err)
     res.status(500).json({ erro: err.message })
   }
 })

@@ -756,44 +756,40 @@
 
       const pb = decodificarDigitosCodificados(embCod);
 
-      // Buscar grupo real via cache/API
-      let grupoReal = cacheGruposPorPB.get(pb);
+      // Buscar padrão do grupo via cache/API (baseado no proprietário)
+      let padrao = cacheGruposPorPB.get(pb);
 
-      if (!grupoReal) {
+      if (!padrao) {
         // Cache miss - buscar da API
         try {
           const apiUrl = window.location.hostname === 'localhost'
             ? 'http://localhost:3000'
             : 'https://zucchini-achievement-production.up.railway.app';
 
-          const response = await fetch(`${apiUrl}/api/grupo-pb/${pb}`);
+          const response = await fetch(`${apiUrl}/api/grupo-padrao/${pb}`);
           if (response.ok) {
             const data = await response.json();
-            grupoReal = data.grupo;
-            cacheGruposPorPB.set(pb, grupoReal);
-            console.log(`[TOKEN] Cache miss PB ${pb}, buscado: ${grupoReal}`);
+            padrao = data.padrao;
+            cacheGruposPorPB.set(pb, padrao);
+            console.log(`[TOKEN] Cache miss PB ${pb}, padrão: ${padrao} (proprietário ${data.proprietario})`);
           }
         } catch (err) {
-          console.error('[TOKEN] Erro ao buscar grupo:', err);
+          console.error('[TOKEN] Erro ao buscar padrão:', err);
         }
       } else {
-        console.log(`[TOKEN] Cache hit PB ${pb}: ${grupoReal}`);
+        console.log(`[TOKEN] Cache hit PB ${pb}: ${padrao}`);
       }
 
-      // Decodificar letra do grupo baseado no grupo real
+      // Decodificar letra do grupo baseado no padrão do proprietário
       let grupoLetra;
       const grupoNum = decodificarDigitosCodificados(grupoNumCod);
 
-      if (grupoReal) {
-        // Usar primeiro caractere do grupo real como referência
-        const primeiroChar = grupoReal[0];
-        if (/[0-9]/.test(primeiroChar)) {
-          // Grupo numérico (11, 22, etc)
-          grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
-        } else {
-          // Grupo com letra (E1, A1, etc)
-          grupoLetra = grupoLetraCod.toUpperCase();
-        }
+      if (padrao === 'numerico') {
+        // Proprietário usa grupos numéricos (11, 22, 33)
+        grupoLetra = decodificarDigitosCodificados(grupoLetraCod);
+      } else if (padrao === 'letra') {
+        // Proprietário usa grupos com letra (E1, K2, A1)
+        grupoLetra = grupoLetraCod.toUpperCase();
       } else {
         // Fallback: heurística se API falhar
         if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
