@@ -1,12 +1,27 @@
 // ============================================================
-// /api/agendar — V.2606041310
+// /api/agendar — V.2606052012
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
+// FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2606041310";
+// ============================================================
+// IMPORT DINÂMICO DE PREVISÃO (apenas se no Railway)
+// ============================================================
+let enviarPrevisaoPosAgendamento = null
+if (process.env.RAILWAY_ENVIRONMENT) {
+  try {
+    const previsaoModule = await import('../wpp/previsao.js')
+    enviarPrevisaoPosAgendamento = previsaoModule.enviarPrevisaoPosAgendamento
+    console.log('✅ [AGENDAR] Módulo previsao.js carregado (Railway)')
+  } catch (err) {
+    console.warn('⚠️ [AGENDAR] Não foi possível carregar previsao.js:', err.message)
+  }
+}
+
+const VERSAO_API = "Allmax®2606052012";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -435,6 +450,7 @@ ${VERSAO_WPP}`;
     console.error(`Nenhum grupo WhatsApp encontrado para PB ${codEmbPB} / Cota ${grupo}`);
   } else {
     for (const grupoWpp of gruposWpp) {
+      // Enfileira mensagem de confirmação de agendamento
       await client.query(
         `INSERT INTO public.wpp_fila_agenda
          (grupo_id, mensagem, status)
@@ -443,6 +459,27 @@ ${VERSAO_WPP}`;
       );
 
       console.log(`Mensagem enfileirada para ${grupoWpp.nomegrupowpp}`);
+
+      // ============================================================
+      // ENVIA PREVISÃO SE AGENDAMENTO FOR PARA HOJE
+      // ============================================================
+      if (enviarPrevisaoPosAgendamento) {
+        try {
+          const previsao = await enviarPrevisaoPosAgendamento(pool, dataHoraAgendamento, grupoWpp.grupowppid);
+
+          if (previsao) {
+            await client.query(
+              `INSERT INTO public.wpp_fila_agenda
+               (grupo_id, mensagem, status)
+               VALUES ($1, $2, 'pendente')`,
+              [grupoWpp.grupowppid, previsao]
+            );
+            console.log(`[AGENDAR] Previsão enfileirada para ${grupoWpp.nomegrupowpp} (agendamento hoje)`);
+          }
+        } catch (prevErr) {
+          console.error(`[AGENDAR] Erro ao enfileirar previsão:`, prevErr.message);
+        }
+      }
     }
   }
 } catch (filaErr) {

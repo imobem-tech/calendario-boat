@@ -1,7 +1,11 @@
 // ============================================================
-// wpp/previsao.js — V.2606010927
+// wpp/previsao.js — V.2606052005
 // Allmax Gestão de Cotas — Marujo⚓
 // Previsão de navegação via open-meteo.com
+//
+// FIX V.2606052005:
+// - Removido emoji 🎉 do cabeçalho feliz
+// - Nova função: enviarPrevisaoPosAgendamento() para agendamentos do mesmo dia
 // ============================================================
 
 const LAT      = '-10.212911'
@@ -190,7 +194,7 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0, forcarManha = fals
       `Assistente Virtual Marujo ⚓\n` +
       `— — — — — — — — — — —\n` +
       `Vou atualizar a previsão do tempo para o nosso lago de Palmas 🗺️\n` +
-      `tenha um ótimo dia de recreação 🎉 🩴⛱️\n\n`
+      `tenha um ótimo dia de recreação 🩴⛱️\n\n`
   }
 
   resposta += `*PREVISÃO NAVEGAÇÃO* ⚓\n${dd}/${mm} ${diaSem} (meteo.com)\n\n`
@@ -314,5 +318,36 @@ export async function enviarPrevisaoDiaria(pool, sock, conectado) {
     }
   } catch (err) {
     console.error('[PREVISAO] Erro geral:', err.message)
+  }
+}
+
+// ============================================================
+// ENVIO APÓS AGENDAMENTO DO MESMO DIA
+// Chamado de api/agendar.js quando agendamento é para HOJE
+// ============================================================
+export async function enviarPrevisaoPosAgendamento(pool, dataAgendamento, grupowppid) {
+  try {
+    const hoje = dtStr(agoraSP())
+    const dataAgendada = String(dataAgendamento || '').slice(0, 10)
+
+    // Só envia se agendamento for para HOJE
+    if (dataAgendada !== hoje) {
+      console.log('[PREVISAO_POS_AGD] Agendamento não é para hoje, pulando envio')
+      return null
+    }
+
+    const previsao = await obterPrevisaoNavegacao(0, true) // força cabeçalho feliz
+
+    if (!previsao || previsao.startsWith('⚠️')) {
+      console.log('[PREVISAO_POS_AGD] Não foi possível obter previsão')
+      return null
+    }
+
+    console.log(`[PREVISAO_POS_AGD] Previsão gerada para ${grupowppid}`)
+    return previsao
+
+  } catch (err) {
+    console.error('[PREVISAO_POS_AGD] Erro:', err.message)
+    return null
   }
 }
