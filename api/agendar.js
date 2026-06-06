@@ -1,11 +1,11 @@
 // ============================================================
-// /api/agendar — V.2606060021
+// /api/agendar — V.2606060028
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
-// FIX V.2606060021: URL completa no fetch (URL relativa falha no Vercel)
+// FIX V.2606060028: DESABILITADO notificação temporariamente (debug erro 500)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -24,7 +24,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060021";
+const VERSAO_API = "Allmax®2606060028";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -300,36 +300,12 @@ export default async function handler(req, res) {
 
     if (rsInadim.rows[0]?.inadimplente === true) {
       // ============================================================
-      // ENVIA NOTIFICAÇÃO DE INADIMPLÊNCIA (Fire and Forget)
-      // - WhatsApp privado do cliente
-      // - Grupo ESPELHO FINANCEIRO
-      // Não aguarda resposta (evita timeout)
+      // INADIMPLENTE DETECTADO
+      // TODO: Implementar notificação após corrigir erro 500
       // ============================================================
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'https://allmaxcalendar.vercel.app';
+      console.log('[AGENDAR] Cliente inadimplente detectado:', codAutorizado);
 
-      const urlInadim = `${baseUrl}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
-
-      console.log('[AGENDAR] Disparando notificação inadimplência (fire-and-forget):', urlInadim);
-
-      // Fire and forget - não aguarda resposta
-      fetch(urlInadim, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }).then(resp => {
-        if (resp.ok) {
-          resp.json().then(data => {
-            console.log('[AGENDAR] ✅ Notificação enviada:', data);
-          }).catch(() => {});
-        } else {
-          console.warn('[AGENDAR] ⚠️ Notificação falhou:', resp.status);
-        }
-      }).catch(err => {
-        console.error('[AGENDAR] ❌ Erro ao notificar:', err.message);
-      });
-
-      // Retorna imediatamente sem aguardar
+      // Retorna erro 403 sem tentar enviar notificação (por enquanto)
       return res.status(403).json({
         error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
         versao: VERSAO_API
