@@ -301,6 +301,7 @@ export default async function handler(req, res) {
       // ENVIA NOTIFICAÇÃO DE INADIMPLÊNCIA
       // - WhatsApp privado do cliente
       // - Grupo ESPELHO FINANCEIRO
+      // Não bloqueia se falhar (apenas loga)
       // ============================================================
       try {
         const apiUrl = process.env.VERCEL_URL
@@ -309,9 +310,22 @@ export default async function handler(req, res) {
 
         const urlInadim = `${apiUrl}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
 
-        await fetch(urlInadim).catch(err => {
-          console.error('[AGENDAR] Falha ao notificar inadimplência:', err.message);
+        console.log('[AGENDAR] Chamando inadimplencia_cliente:', urlInadim);
+
+        const respInadim = await fetch(urlInadim, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        }).catch(err => {
+          console.error('[AGENDAR] Fetch falhou:', err.message);
+          return null;
         });
+
+        if (respInadim && respInadim.ok) {
+          const dataInadim = await respInadim.json().catch(() => null);
+          console.log('[AGENDAR] Notificação inadimplência:', dataInadim);
+        } else if (respInadim) {
+          console.warn('[AGENDAR] API inadimplência retornou:', respInadim.status);
+        }
       } catch (errInadim) {
         // Não bloqueia o retorno 403 se falhar
         console.error('[AGENDAR] Erro ao chamar inadimplencia_cliente:', errInadim.message);

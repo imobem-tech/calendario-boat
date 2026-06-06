@@ -535,7 +535,15 @@ function criarBotoesHorario() {
           body: JSON.stringify({ token, data, hora: horaSelecionada })
         });
 
-        const json = await resp.json();
+        // Verificar se resposta é JSON válido
+        let json;
+        try {
+          json = await resp.json();
+        } catch (jsonErr) {
+          // Se não conseguir fazer parse, resposta não é JSON
+          const textoResposta = await resp.text().catch(() => "Erro desconhecido");
+          throw new Error(`Erro do servidor: ${textoResposta.substring(0, 100)}`);
+        }
 
 if(!resp.ok){
   const textoErro = json.error || "Falha ao agendar.";
