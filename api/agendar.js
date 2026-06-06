@@ -1,12 +1,12 @@
 // ============================================================
-// /api/agendar — V.2606060040
+// /api/agendar — V.2606060051
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
 // FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
-// DEBUG V.2606060040: Logs detalhados grupo/limite para investigar múltiplos agendamentos
+// FIX V.2606060051: Timezone GMT-3 em contingência + console.error para logs Vercel
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -25,7 +25,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060040";
+const VERSAO_API = "Allmax®2606060051";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -217,11 +217,13 @@ function montarMensagemLimite(limiteGrupo, rows) {
 }
 
 function ehDiaContingenciaHoje(dataIso) {
-  const hoje = new Date();
+  // USAR TIMEZONE BRASIL (GMT-3)
+  const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   const [ano, mes, dia] = String(dataIso).split("-").map(Number);
 
   const dataInformada = new Date(ano, mes - 1, dia);
 
+  // Contingência: agendamento para o PRÓPRIO DIA em Ter/Qua/Qui
   const mesmaData =
     dataInformada.getFullYear() === hoje.getFullYear() &&
     dataInformada.getMonth() === hoje.getMonth() &&
@@ -230,7 +232,7 @@ function ehDiaContingenciaHoje(dataIso) {
   if (!mesmaData) return false;
 
   const diaSemana = hoje.getDay();
-  return diaSemana >= 2 && diaSemana <= 4;
+  return diaSemana >= 2 && diaSemana <= 4;  // Terça(2), Quarta(3), Quinta(4)
 }
 
 export default async function handler(req, res) {
@@ -359,16 +361,15 @@ export default async function handler(req, res) {
 
       const totalEmAberto = emAberto.rows[0]?.total || 0;
 
-      console.log('[AGENDAR] Verificação de limite:', {
-        pb: codEmbPB,
-        autorizado: codAutorizado,
-        grupo,
-        limiteGrupo,
-        totalEmAberto,
-        bloqueado: totalEmAberto >= limiteGrupo
-      });
-
+      // ERRO FORÇADO para aparecer nos logs Vercel
       if (totalEmAberto >= limiteGrupo) {
+        console.error('[AGENDAR] ❌ LIMITE ATINGIDO:', {
+          pb: codEmbPB,
+          autorizado: codAutorizado,
+          grupo,
+          limiteGrupo,
+          totalEmAberto
+        });
         const datasFuturas = await client.query(
           `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
              FROM public."P_BOAT_z_10_Saida_Emb"
