@@ -1,18 +1,21 @@
 // ============================================================
-// /api/agendar — V.2606052115
+// /api/agendar — V.2606060002
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
+// FIX V.2606060002: Chamar função direta ao invés de HTTP (evita timeout/CORS)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
 // ============================================================
-// IMPORT DINÂMICO DE PREVISÃO (apenas se no Railway)
+// IMPORT DINÂMICO (Vercel não permite importar ../wpp/)
 // ============================================================
 let enviarPrevisaoPosAgendamento = null
+let notificarInadimplencia = null
+
 if (process.env.RAILWAY_ENVIRONMENT) {
   try {
     const previsaoModule = await import('../wpp/previsao.js')
@@ -21,9 +24,18 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   } catch (err) {
     console.warn('⚠️ [AGENDAR] Não foi possível carregar previsao.js:', err.message)
   }
+} else {
+  // Vercel: Importar handler de inadimplência diretamente
+  try {
+    const inadimModule = await import('./inadimplencia_cliente.js')
+    notificarInadimplencia = inadimModule.default
+    console.log('✅ [AGENDAR] Módulo inadimplencia_cliente.js carregado (Vercel)')
+  } catch (err) {
+    console.warn('⚠️ [AGENDAR] Não foi possível carregar inadimplencia_cliente.js:', err.message)
+  }
 }
 
-const VERSAO_API = "Allmax®2606052115";
+const VERSAO_API = "Allmax®2606060002";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -304,32 +316,36 @@ export default async function handler(req, res) {
       // - Grupo ESPELHO FINANCEIRO
       // Não bloqueia se falhar (apenas loga)
       // ============================================================
-      try {
-        const apiUrl = process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : 'https://allmaxcalendar.vercel.app';
+      if (notificarInadimplencia) {
+        try {
+          console.log('[AGENDAR] Chamando notificarInadimplencia diretamente');
 
-        const urlInadim = `${apiUrl}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
+          // Criar mock de req/res para chamar a função
+          const mockReq = {
+            method: 'GET',
+            query: {
+              codAutorizado: String(codAutorizado),
+              pb: String(codEmbPB),
+              grupo: String(grupo),
+              dispararWpp: 'true'
+            }
+          };
 
-        console.log('[AGENDAR] Chamando inadimplencia_cliente:', urlInadim);
+          const mockRes = {
+            status: (code) => ({
+              json: (data) => {
+                console.log('[AGENDAR] Notificação inadimplência:', data);
+                return data;
+              }
+            })
+          };
 
-        const respInadim = await fetch(urlInadim, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        }).catch(err => {
-          console.error('[AGENDAR] Fetch falhou:', err.message);
-          return null;
-        });
-
-        if (respInadim && respInadim.ok) {
-          const dataInadim = await respInadim.json().catch(() => null);
-          console.log('[AGENDAR] Notificação inadimplência:', dataInadim);
-        } else if (respInadim) {
-          console.warn('[AGENDAR] API inadimplência retornou:', respInadim.status);
+          await notificarInadimplencia(mockReq, mockRes);
+        } catch (errInadim) {
+          console.error('[AGENDAR] Erro ao notificar inadimplência:', errInadim.message);
         }
-      } catch (errInadim) {
-        // Não bloqueia o retorno 403 se falhar
-        console.error('[AGENDAR] Erro ao chamar inadimplencia_cliente:', errInadim.message);
+      } else {
+        console.warn('[AGENDAR] ⚠️ Módulo inadimplencia_cliente não carregado');
       }
 
       return res.status(403).json({
