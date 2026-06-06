@@ -1,5 +1,5 @@
 // ============================================================
-// /api/agendar — V.2606060051
+// /api/agendar — V.2606060054
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
@@ -7,6 +7,7 @@
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
 // FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
 // FIX V.2606060051: Timezone GMT-3 em contingência + console.error para logs Vercel
+// FIX V.2606060054: CRÍTICO - extrair ÚLTIMO dígito, não todos ("11" → 1 não 11)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -25,7 +26,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060051";
+const VERSAO_API = "Allmax®2606060054";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -143,7 +144,9 @@ async function decodeToken(token) {
 }
 
 function extrairLimiteDoGrupo(grupo) {
-  const m = String(grupo || "").match(/(\d+)$/);
+  // Extrai apenas o ÚLTIMO dígito (não todos os dígitos)
+  // "11" → 1, "A1" → 1, "E2" → 2, "A11" → 1 (último char)
+  const m = String(grupo || "").match(/(\d)$/);
   return m ? Number(m[1]) : 0;
 }
 
