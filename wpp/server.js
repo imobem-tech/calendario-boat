@@ -370,6 +370,39 @@ if (horaMotorTratado) continue
             continue
           }
 
+          // Comando ??? (Ajuda/Instruções)
+          if (/^\?{3,}$/.test(texto.trim())) {
+            const mensagemAjuda = `📱*CALENDÁRIO ONLINE*
+
+✅ Consultar datas
+✅ Agendar suas saídas
+✅ Cancelar agendamentos
+✅ Acompanhar as reservas
+
+⚓*MARUJO*
+🤖ASSISTENTE VIRTUAL
+
+Seu marinheiro digital está sempre de prontidão! 🛟
+
+Basta enviar uma das opções abaixo neste grupo:
+
+📅 *ccc* → Receber o link de acesso ao *Calendário* Online
+
+🔄 *rrr* → Solicitar automaticamente o *R*etorno da Embarcação
+
+🌤️ *ppp* → Receber a *P*revisão do Tempo para o dia atual
+
+📆 *ppp DD* → Receber a *P*revisão do Tempo para uma data (DD) futura, até 15 dias
+
+
+O *MARUJO* 🤖 responderá automaticamente com as informações solicitadas
+
+💡quando quiser rever essas instruções, digite 3x interrogação, assim *???*`
+
+            await sock.sendMessage(grupoId, { text: mensagemAjuda })
+            continue
+          }
+
          } catch (err) {
           console.error('Erro ao processar mensagem:', err.message)
           try {
@@ -892,6 +925,33 @@ app.post('/enviar-jid', async (req, res) => {
     const sentMsg = await sock.sendMessage(jidFinal, { text: mensagem })
     res.json({ sucesso: true, destino: jidFinal, messageKey: sentMsg.key })
   } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// Endpoint para enviar sticker/figurinha
+app.post('/enviar-sticker', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    const { jid, stickerBase64 } = req.body
+
+    if (!jid || !stickerBase64) {
+      return res.status(400).json({ erro: 'jid e stickerBase64 são obrigatórios' })
+    }
+
+    // Converter base64 para buffer
+    const stickerBuffer = Buffer.from(stickerBase64, 'base64')
+
+    // Enviar sticker
+    const sentMsg = await sock.sendMessage(jid, {
+      sticker: stickerBuffer
+    })
+
+    console.log(`[enviar-sticker] Sticker enviado para ${jid}`)
+    res.json({ sucesso: true, destino: jid, messageKey: sentMsg.key })
+
+  } catch (err) {
+    console.error(`[enviar-sticker] Erro: ${err.message}`)
     res.status(500).json({ erro: err.message })
   }
 })

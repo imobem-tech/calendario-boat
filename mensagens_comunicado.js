@@ -23,7 +23,7 @@ Atenciosamente,
 *Summer Náutica*
 *Allmax Gestão de Cotas*`;
 
-export const STICKER_PATH = 'C:\\Users\\NOTEBOOK\\projetos\\calendario_allmax\\WhatsAppStickerSUMMER.31';
+export const STICKER_PATH = 'C:\\Users\\NOTEBOOK\\projetos\\calendario_allmax\\WhatsAppSticker.webp';
 
 export const MENSAGEM_2_GUIA_FIXAR = `📱*CALENDÁRIO ONLINE*
 
@@ -41,16 +41,16 @@ Basta enviar uma das opções abaixo neste grupo:
 
 📅 *ccc* → Receber o link de acesso ao *Calendário* Online
 
-🔄 *rrr* → Solicitar automaticamente o *Retorno* da Embarcação
+🔄 *rrr* → Solicitar automaticamente o *R*etorno da Embarcação
 
-🌤️ *ppp* → Receber a *Previsão* do Tempo para o dia atual
+🌤️ *ppp* → Receber a *P*revisão do Tempo para o dia atual
 
-📆 *ppp DD* → Receber a *Previsão* do Tempo para uma data (DD) futura, até 15 dias
+📆 *ppp DD* → Receber a *P*revisão do Tempo para uma data (DD) futura, até 15 dias
 
 
-⚡ O MARUJO 🤖 responderá automaticamente com as informações solicitadas
+O *MARUJO* 🤖 responderá automaticamente com as informações solicitadas
 
-🚤 Tecnologia a serviço da sua experiência náutica!`;
+💡quando quiser rever essas instruções, digite 3x interrogação, assim *???*`;
 
 // Configuração de envio
 export const CONFIG_ENVIO = {
