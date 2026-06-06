@@ -1,11 +1,11 @@
 // ============================================================
-// /api/agendar — V.2606060028
+// /api/agendar — V.2606060029
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
-// FIX V.2606060028: DESABILITADO notificação temporariamente (debug erro 500)
+// FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -24,7 +24,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060028";
+const VERSAO_API = "Allmax®2606060029";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
