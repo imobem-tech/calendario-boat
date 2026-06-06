@@ -889,9 +889,38 @@ app.post('/enviar-jid', async (req, res) => {
       }
     }
 
-    await sock.sendMessage(jidFinal, { text: mensagem })
-    res.json({ sucesso: true, destino: jidFinal })
+    const sentMsg = await sock.sendMessage(jidFinal, { text: mensagem })
+    res.json({ sucesso: true, destino: jidFinal, messageKey: sentMsg.key })
   } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// Endpoint para fixar mensagem em grupo
+app.post('/fixar-mensagem', async (req, res) => {
+  try {
+    if (!conectado || !sock) return res.status(503).json({ erro: 'WhatsApp não conectado' })
+    const { jid, messageKey } = req.body
+
+    if (!jid) return res.status(400).json({ erro: 'jid é obrigatório' })
+    if (!jid.endsWith('@g.us')) return res.status(400).json({ erro: 'Apenas grupos podem ter mensagens fixadas' })
+
+    // Se messageKey foi passado, usar ele; senão precisamos do id da mensagem
+    let key = messageKey
+    if (!key) {
+      return res.status(400).json({ erro: 'messageKey é obrigatório (objeto com remoteJid, fromMe, id)' })
+    }
+
+    // Fixar a mensagem
+    await sock.sendMessage(jid, {
+      pin: key
+    })
+
+    console.log(`[fixar-mensagem] Mensagem fixada no grupo ${jid}`)
+    res.json({ sucesso: true, grupoId: jid })
+
+  } catch (err) {
+    console.error(`[fixar-mensagem] Erro: ${err.message}`)
     res.status(500).json({ erro: err.message })
   }
 })
