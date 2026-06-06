@@ -60,7 +60,7 @@ function calcularDV(pb, grupoNum, autorizado) {
   return String(soma).padStart(2, "0");
 }
 
-function decodeToken(token) {
+async function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
 
   // Novo formato com MMDD: [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
@@ -252,7 +252,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const acesso = decodeToken(token);
+    const acesso = await decodeToken(token);
 
     if (!acesso) {
       return res.status(400).json({
