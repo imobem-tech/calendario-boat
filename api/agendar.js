@@ -1,11 +1,11 @@
 // ============================================================
-// /api/agendar — V.2606060016
+// /api/agendar — V.2606060021
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
-// FIX V.2606060016: REMOVIDO import (causava erro 500), volta para fetch assíncrono
+// FIX V.2606060021: URL completa no fetch (URL relativa falha no Vercel)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -24,7 +24,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060016";
+const VERSAO_API = "Allmax®2606060021";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -305,7 +305,11 @@ export default async function handler(req, res) {
       // - Grupo ESPELHO FINANCEIRO
       // Não aguarda resposta (evita timeout)
       // ============================================================
-      const urlInadim = `/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://allmaxcalendar.vercel.app';
+
+      const urlInadim = `${baseUrl}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${encodeURIComponent(grupo)}&dispararWpp=true`;
 
       console.log('[AGENDAR] Disparando notificação inadimplência (fire-and-forget):', urlInadim);
 
