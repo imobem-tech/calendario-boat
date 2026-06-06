@@ -1,11 +1,12 @@
 // ============================================================
-// /api/agendar — V.2606060029
+// /api/agendar — V.2606060040
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
 // FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
 // FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
 // FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
+// DEBUG V.2606060040: Logs detalhados grupo/limite para investigar múltiplos agendamentos
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -24,7 +25,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606060029";
+const VERSAO_API = "Allmax®2606060040";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 
 const CABECALHO_MARUJO =
@@ -266,6 +267,13 @@ export default async function handler(req, res) {
     const grupo = acesso.grupo;
     const limiteGrupo = extrairLimiteDoGrupo(grupo);
 
+    console.log('[AGENDAR] Token decodificado:', {
+      pb: codEmbPB,
+      autorizado: codAutorizado,
+      grupo,
+      limiteGrupo
+    });
+
     if (!codEmbPB || !codAutorizado || !grupo || !limiteGrupo) {
       return res.status(400).json({
         error: "Dados do token inválidos.",
@@ -350,6 +358,15 @@ export default async function handler(req, res) {
       );
 
       const totalEmAberto = emAberto.rows[0]?.total || 0;
+
+      console.log('[AGENDAR] Verificação de limite:', {
+        pb: codEmbPB,
+        autorizado: codAutorizado,
+        grupo,
+        limiteGrupo,
+        totalEmAberto,
+        bloqueado: totalEmAberto >= limiteGrupo
+      });
 
       if (totalEmAberto >= limiteGrupo) {
         const datasFuturas = await client.query(
