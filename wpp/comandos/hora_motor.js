@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2606051920
+// wpp/comandos/hora_motor.js — V.2606141309
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
@@ -9,6 +9,7 @@
 //   Pré-validações → Verifica pendência de outros grupos
 //   → Etapa 1 (Hora Motor Saída) → Etapa 2 (Hora Motor Retorno)
 //   → Ao confirmar Retorno: calcula horas usadas × tarifa → gera CR + Asaas
+//   → Exceção: Cliente 4138 (ALLMAX) não gera cobrança
 //
 // FIX: Valida pendência de HM_Retorno em OUTROS grupos da mesma embarcação
 //      antes de permitir registro. Envia alerta em ambos os grupos.
@@ -20,7 +21,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2606051920'
+const VERSAO_HM = 'V.2606141309'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -439,6 +440,20 @@ async function gerarCobrancaHoraMotor(sock, pool, grupoId, agendamento) {
     if (!codCliente) {
       console.warn('[HM_COBRANÇA] Cod_Autorizado ausente ou zero', { agendamentoId: agendamento['ID'] })
       await enviar(sock, grupoId, `⚠️ HM registrado. Cobrança não gerada: cliente não identificado no agendamento (ID ${agendamento['ID']}).`)
+      return
+    }
+
+    // EXCEÇÃO: Cliente 4138 (ALLMAX) não gera cobrança
+    if (codCliente === 4138) {
+      console.log('[HM_COBRANÇA] Cliente ALLMAX (4138), cobrança não gerada')
+      await enviar(sock, grupoId,
+        `${CABECALHO_HM}\n` +
+        `*HORA_MOTOR_REGISTRADA*\n\n` +
+        `Horímetro - *Saída*: ${String(hmSaida).replace('.', ',')}  *Retorno*: ${String(hmRetorno).replace('.', ',')}\n` +
+        `Horas usadas: ${horasUsadas.toFixed(1).replace('.', ',')}h\n\n` +
+        `Não gerado Conta a Receber, cliente ALLMAX\n\n` +
+        `${VERSAO_HM}`
+      )
       return
     }
 
