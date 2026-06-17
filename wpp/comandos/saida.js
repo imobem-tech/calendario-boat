@@ -2,7 +2,7 @@
 // COMANDO SSS — REGISTRO DE SAÍDA
 // Allmax Gestão de Cotas
 // Compatível com pg Pool
-// V.2606010918 - Bloqueio inadimplência REMOVIDO (só bloqueia no agendamento web)
+// V.2606170920 - Filtro de canceladas/desistidas na query buscarSaidaDoDia
 //
 // Comandos:
 //   sss / ssss / SSS  => inicia registro de saída
@@ -12,7 +12,7 @@
 // ============================================================
 
 const estadosSaida = new Map()
-const VERSAO_SAIDA = 'V.2606010918'
+const VERSAO_SAIDA = 'V.2606170920'
 
 // ============================================================
 // HELPERS
@@ -311,6 +311,7 @@ function normalizarGrupoCompLetra(cota, nomeGrupo) {
 
 // ============================================================
 // BUSCA SAÍDA DO DIA
+// Retorna apenas saídas VÁLIDAS (não canceladas/desistidas)
 // ============================================================
 
 async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
@@ -322,6 +323,8 @@ async function buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra) {
      WHERE "Cod_Emb_PB" = $1
        AND UPPER(COALESCE("Grupo_Comp_letra", '')) = UPPER($2)
        AND DATE("Dt_Agendamento" AT TIME ZONE 'America/Sao_Paulo') = $3::date
+       AND "Dt_Desistencia" IS NULL
+       AND "Dt_Cancela_saida" IS NULL
   `, [codEmbPb, grupoCompLetra, hoje])
 
   return rs.rows || []
@@ -404,26 +407,16 @@ async function iniciarFluxoSaida(sock, pool, grupoId, remetente) {
   const saidas = await buscarSaidaDoDia(pool, codEmbPb, grupoCompLetra)
 
   if (!saidas.length) {
-    await enviar(sock, grupoId, 'Não encontrei agendamento de saída para esta embarcação/grupo hoje.')
+    await enviar(sock, grupoId, 'Não encontrei agendamento de saída válido para esta embarcação/grupo hoje.')
     return true
   }
 
   if (saidas.length > 1) {
-    await enviar(sock, grupoId, 'Encontrei mais de uma saída para hoje. Não consegui registrar automaticamente.')
+    await enviar(sock, grupoId, 'Encontrei mais de uma saída válida para hoje. Não consegui registrar automaticamente.')
     return true
   }
 
   const saida = saidas[0]
-
-  if (saida.Dt_Desistencia) {
-    await enviar(sock, grupoId, 'Esta saída consta como desistência. Não é possível registrar a saída.')
-    return true
-  }
-
-  if (saida.Dt_Cancela_saida) {
-    await enviar(sock, grupoId, 'Esta saída consta como cancelada. Não é possível registrar a saída.')
-    return true
-  }
 
   if (saida['Dt_Saída']) {
     await enviar(sock, grupoId, 'Esta embarcação já teve a saída registrada hoje.')
