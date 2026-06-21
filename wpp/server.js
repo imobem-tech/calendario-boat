@@ -1068,6 +1068,25 @@ app.post('/previsao/teste', async (req, res) => {
     res.status(500).json({ erro: err.message })
   }
 })
+
+// ============================================================
+// ROTAS SUMMERMAX - ORÇAMENTOS
+// V.2606210835
+// ============================================================
+import {
+  listarEmbarcacoes,
+  buscarCotistas,
+  buscarEmbarcacaoCompleta,
+  listarOrcamentos,
+  criarOrcamento
+} from '../api/orcamentos.js'
+
+app.get('/api/orcamentos/embarcacoes', listarEmbarcacoes)
+app.get('/api/orcamentos/embarcacao/:num_pb/cotistas', buscarCotistas)
+app.get('/api/orcamentos/embarcacao/:num_pb/completa', buscarEmbarcacaoCompleta)
+app.get('/api/orcamentos', listarOrcamentos)
+app.post('/api/orcamentos', criarOrcamento)
+
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
