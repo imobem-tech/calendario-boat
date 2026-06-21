@@ -8,6 +8,7 @@
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "latest",
     "pg": "latest",
     "pino": "latest",

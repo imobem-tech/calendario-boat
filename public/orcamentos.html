@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orçamentos - SUMMERMAX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .cotistas-list {
+            margin-top: 20px;
+        }
+
+        .cotista-item {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cotista-info {
+            flex: 1;
+        }
+
+        .cotista-nome {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .cotista-cotas {
+            color: #667eea;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚤 Orçamentos - SUMMERMAX</h1>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="card">
+            <h2>Novo Orçamento</h2>
+            <form id="formOrcamento">
+                <div class="form-group">
+                    <label for="embarcacao">Embarcação *</label>
+                    <select id="embarcacao" required>
+                        <option value="">Carregando embarcações...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="descricao">Descrição do Serviço *</label>
+                    <textarea id="descricao" rows="3" required placeholder="Ex: Manutenção preventiva do motor"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="valor">Valor Total (R$) *</label>
+                    <input type="number" id="valor" step="0.01" min="0" required placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="observacao">Observações</label>
+                    <textarea id="observacao" rows="2" placeholder="Informações adicionais..."></textarea>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="ratearCotistas">
+                    <label for="ratearCotistas" style="margin-bottom: 0;">Ratear valor entre cotistas automaticamente</label>
+                </div>
+
+                <div id="cotistasContainer" style="display: none;">
+                    <h3 style="margin-top: 20px; margin-bottom: 10px;">Cotistas da Embarcação</h3>
+                    <div id="cotistasList" class="cotistas-list">
+                        <div class="loading">Selecione uma embarcação para ver os cotistas</div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" style="margin-top: 20px;">Criar Orçamento</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let embarcacoes = [];
+        let cotistasAtual = [];
+
+        // Mostrar alerta
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            const container = document.getElementById('alertContainer');
+            container.innerHTML = '';
+            container.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // Carregar embarcações
+        async function carregarEmbarcacoes() {
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos/embarcacoes`);
+                const data = await response.json();
+
+                if (data.success) {
+                    embarcacoes = data.embarcacoes;
+                    const select = document.getElementById('embarcacao');
+
+                    select.innerHTML = '<option value="">Selecione uma embarcação</option>';
+
+                    embarcacoes.forEach(emb => {
+                        const option = document.createElement('option');
+                        option.value = emb.numero_pb;
+                        option.textContent = `${emb.numero_pb} - ${emb.nome} (${emb.marca} ${emb.modelo})`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    showAlert('Erro ao carregar embarcações', 'error');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showAlert('Erro ao conectar com o servidor', 'error');
+            }
+        }
+
+        // Carregar cotistas
+        async function carregarCotistas(num_pb) {
+            const container = document.getElementById('cotistasList');
+            container.innerHTML = '<div class="loading">Carregando cotistas...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos/embarcacao/${num_pb}/cotistas`);
+                const data = await response.json();
+
+                if (data.success) {
+                    cotistasAtual = data.cotistas;
+
+                    if (cotistasAtual.length === 0) {
+                        container.innerHTML = '<div class="alert alert-info">Esta embarcação não possui cotistas cadastrados.</div>';
+                        return;
+                    }
+
+                    container.innerHTML = '';
+                    const totalCotas = cotistasAtual.reduce((sum, c) => sum + parseFloat(c.qtd_cotas), 0);
+
+                    cotistasAtual.forEach(cotista => {
+                        const percentual = ((parseFloat(cotista.qtd_cotas) / totalCotas) * 100).toFixed(2);
+
+                        const div = document.createElement('div');
+                        div.className = 'cotista-item';
+                        div.innerHTML = `
+                            <div class="cotista-info">
+                                <span class="cotista-nome">${cotista.nome}</span>
+                                <span class="cotista-cotas">${cotista.qtd_cotas} cotas (${percentual}%)</span>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else {
+                    container.innerHTML = '<div class="alert alert-error">Erro ao carregar cotistas</div>';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                container.innerHTML = '<div class="alert alert-error">Erro ao conectar com o servidor</div>';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('embarcacao').addEventListener('change', (e) => {
+            const num_pb = e.target.value;
+            if (num_pb) {
+                document.getElementById('cotistasContainer').style.display = 'block';
+                carregarCotistas(num_pb);
+            } else {
+                document.getElementById('cotistasContainer').style.display = 'none';
+            }
+        });
+
+        document.getElementById('formOrcamento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                id_embarcacao: document.getElementById('embarcacao').value,
+                descricao: document.getElementById('descricao').value,
+                valor_total: parseFloat(document.getElementById('valor').value),
+                observacao: document.getElementById('observacao').value,
+                ratear_cotistas: document.getElementById('ratearCotistas').checked
+            };
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Criando orçamento...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`✅ Orçamento #${data.id_orcamento} criado com sucesso!`, 'success');
+                    e.target.reset();
+                    document.getElementById('cotistasContainer').style.display = 'none';
+                    carregarEmbarcacoes();
+                } else {
+                    showAlert(`Erro: ${data.message || 'Erro ao criar orçamento'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showAlert('Erro ao conectar com o servidor', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Criar Orçamento';
+            }
+        });
+
+        // Inicializar
+        carregarEmbarcacoes();
+    </script>
+</body>
+</html>
+<!-- V.2606210825 -->
