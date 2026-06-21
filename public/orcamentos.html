@@ -11,11 +11,69 @@
             box-sizing: border-box;
         }
 
+        /* ============================================================
+           BARRA DE VERSÃO - SEMPRE VISÍVEL NO TOPO
+           ============================================================ */
+        .version-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+
+        .version-bar .file-info {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .version-bar .timestamp {
+            background: rgba(255,255,255,0.2);
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .version-bar .api-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .version-bar .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .version-bar .status-dot.error {
+            background: #f87171;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            padding-top: 60px !important; /* Espaço para a barra de versão */
         }
 
         .container {
@@ -160,6 +218,21 @@
     </style>
 </head>
 <body>
+    <!-- ============================================================
+         BARRA DE VERSÃO - V.2606210905
+         ⚠️ ATUALIZE: VERSAO_CONFIG.versao sempre que modificar!
+         ============================================================ -->
+    <div class="version-bar">
+        <div class="file-info">
+            <span id="fileName">orcamentos.html</span>
+            <span class="timestamp" id="fileVersion">V.2606210905</span>
+        </div>
+        <div class="api-status">
+            <span id="apiInfo">Verificando API...</span>
+            <div class="status-dot" id="statusDot"></div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>🚤 Orçamentos - SUMMERMAX</h1>
@@ -210,9 +283,57 @@
     </div>
 
     <script>
-        const API_URL = window.location.origin;
+        // ============================================================
+        // CONFIGURAÇÃO DE VERSÃO
+        // ⚠️ ATUALIZE versao (yymmddhhnn) SEMPRE QUE MODIFICAR!
+        // ============================================================
+        const VERSAO_CONFIG = {
+            nomeArquivo: 'orcamentos.html',
+            versao: '2606210905',  // ← yymmddhhnn
+            apiUrl: window.location.origin
+        };
+
+        const API_URL = VERSAO_CONFIG.apiUrl;
         let embarcacoes = [];
         let cotistasAtual = [];
+
+        // ============================================================
+        // Atualizar UI da barra de versão
+        // ============================================================
+        document.getElementById('fileName').textContent = VERSAO_CONFIG.nomeArquivo;
+        document.getElementById('fileVersion').textContent = `V.${VERSAO_CONFIG.versao}`;
+
+        // ============================================================
+        // Verificar status da API
+        // ============================================================
+        async function verificarStatusAPI() {
+            const statusDot = document.getElementById('statusDot');
+            const apiInfo = document.getElementById('apiInfo');
+
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos/embarcacoes`);
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDot.classList.remove('error');
+                    apiInfo.textContent = `API OK • ${data.total || 0} embarcações`;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                statusDot.classList.add('error');
+                apiInfo.textContent = `API Error: ${error.message}`;
+                console.error('❌ Erro ao verificar API:', error);
+            }
+        }
+
+        // Verificar API ao carregar
+        verificarStatusAPI();
+        setInterval(verificarStatusAPI, 30000);
+
+        // Log de debug
+        console.log('%c🚀 SUMMERMAX', 'color: #667eea; font-size: 20px; font-weight: bold');
+        console.log(`📄 ${VERSAO_CONFIG.nomeArquivo} • V.${VERSAO_CONFIG.versao}`);
+        console.log(`🌐 API: ${VERSAO_CONFIG.apiUrl}`);
 
         // Mostrar alerta
         function showAlert(message, type = 'info') {
@@ -261,15 +382,33 @@
             const container = document.getElementById('cotistasList');
             container.innerHTML = '<div class="loading">Carregando cotistas...</div>';
 
+            console.log(`🔍 Buscando cotistas para embarcação Num_PB: ${num_pb}`);
+
             try {
-                const response = await fetch(`${API_URL}/api/orcamentos/embarcacao/${num_pb}/cotistas`);
+                const url = `${API_URL}/api/orcamentos/embarcacao/${num_pb}/cotistas`;
+                console.log(`📡 URL da requisição: ${url}`);
+
+                const response = await fetch(url);
+                console.log(`📥 Response status: ${response.status}`);
+
                 const data = await response.json();
+                console.log('📦 Dados recebidos:', data);
 
                 if (data.success) {
                     cotistasAtual = data.cotistas;
+                    console.log(`✅ ${cotistasAtual.length} cotistas encontrados`);
 
                     if (cotistasAtual.length === 0) {
-                        container.innerHTML = '<div class="alert alert-info">Esta embarcação não possui cotistas cadastrados.</div>';
+                        container.innerHTML = `
+                            <div class="alert alert-info">
+                                ⚠️ <strong>Nenhum cotista encontrado</strong><br><br>
+                                <strong>Debug Info:</strong><br>
+                                • Embarcação Num_PB: ${num_pb}<br>
+                                • URL: ${url}<br>
+                                • Versão: V.${VERSAO_CONFIG.versao}<br>
+                                • Verifique o console (F12) para mais detalhes
+                            </div>
+                        `;
                         return;
                     }
 
