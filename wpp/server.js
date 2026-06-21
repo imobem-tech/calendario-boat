@@ -1248,22 +1248,32 @@ app.listen(PORT, () => {
     let intervaloPosicoes = null
 
     async function verificarEAgendar() {
-      if (!conectado || !sock) return
+      try {
+        if (!conectado || !sock) return
 
-      const resultado = await verificarPosicoesExpiradas(sock, pool).catch(err => {
-        console.error('[EXPIRAÇÃO] Erro na verificação:', err.message)
-        return { temFilaAtiva: true, expirados: 0 }
-      })
+        const resultado = await verificarPosicoesExpiradas(sock, pool).catch(err => {
+          console.error('[EXPIRAÇÃO] Erro na verificação:', err.message)
+          return { temFilaAtiva: true, expirados: 0 }
+        })
 
-      if (!resultado.temFilaAtiva && intervaloPosicoes) {
-        // Fila vazia - dorme
-        console.log('[EXPIRAÇÃO] Fila vazia - pausando verificações')
-        clearInterval(intervaloPosicoes)
-        intervaloPosicoes = null
-      } else if (resultado.temFilaAtiva && !intervaloPosicoes) {
-        // Fila ativa mas intervalo não está rodando - reativar
-        console.log('[EXPIRAÇÃO] Fila ativa - ativando verificações a cada 1 min')
-        intervaloPosicoes = setInterval(verificarEAgendar, 60000) // 1 minuto
+        if (!resultado) {
+          console.error('[EXPIRAÇÃO] Resultado undefined - ignorando')
+          return
+        }
+
+        if (!resultado.temFilaAtiva && intervaloPosicoes) {
+          // Fila vazia - dorme
+          console.log('[EXPIRAÇÃO] Fila vazia - pausando verificações')
+          clearInterval(intervaloPosicoes)
+          intervaloPosicoes = null
+        } else if (resultado.temFilaAtiva && !intervaloPosicoes) {
+          // Fila ativa mas intervalo não está rodando - reativar
+          console.log('[EXPIRAÇÃO] Fila ativa - ativando verificações a cada 1 min')
+          intervaloPosicoes = setInterval(verificarEAgendar, 60000) // 1 minuto
+        }
+      } catch (error) {
+        console.error('[EXPIRAÇÃO] Erro crítico:', error.message)
+        console.error('[EXPIRAÇÃO] Stack:', error.stack)
       }
     }
 
