@@ -1,33 +1,15 @@
 // ============================================================
-// /api/agendar — V.2606060054
+// /api/agendar — V.260624145000
 // Allmax Gestão de Cotas — Marujo⚓
-// FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
-// FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
-// FIX V.2606052100: Notificação de inadimplência via WhatsApp privado + ESPELHO
-// FIX V.2606052115: Melhor tratamento de erro JSON + logs detalhados
-// FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
-// FIX V.2606060051: Timezone GMT-3 em contingência + console.error para logs Vercel
-// FIX V.2606060054: CRÍTICO - extrair ÚLTIMO dígito, não todos ("11" → 1 não 11)
+// MERGE: Main + OneDrive (validação inadimplência + cabeçalho)
+// + Horários dinâmicos ALLMAX/SUMMER
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-// ============================================================
-// IMPORT DINÂMICO DE PREVISÃO (apenas Railway)
-// ============================================================
-let enviarPrevisaoPosAgendamento = null
-if (process.env.RAILWAY_ENVIRONMENT) {
-  try {
-    const previsaoModule = await import('../wpp/previsao.js')
-    enviarPrevisaoPosAgendamento = previsaoModule.enviarPrevisaoPosAgendamento
-    console.log('✅ [AGENDAR] Módulo previsao.js carregado (Railway)')
-  } catch (err) {
-    console.warn('⚠️ [AGENDAR] Não foi possível carregar previsao.js:', err.message)
-  }
-}
-
-const VERSAO_API = "Allmax®2606060054";
+const VERSAO_API = "Allmax®260624145000";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
+const COD_PROPRIETARIO_ALLMAX = 4255;
 
 const CABECALHO_MARUJO =
 `\`\`\`Olá, sou o seu
@@ -62,7 +44,7 @@ function calcularDV(pb, grupoNum, autorizado) {
   return String(soma).padStart(2, "0");
 }
 
-async function decodeToken(token) {
+function decodeToken(token) {
   const t = String(token || "").trim().toLowerCase();
 
   // Novo formato com MMDD: [pb][letra][grupoNum][autorizado4][mmdd4][dv2]
@@ -73,47 +55,7 @@ async function decodeToken(token) {
   if (!m) return null;
 
   const pb = decodificar(m[1]);
-
-  // CONSULTAR PROPRIETÁRIO NO BANCO (fonte da verdade)
-  let grupoLetra;
-  const grupoLetraCod = m[2];
-
-  try {
-    const rsProprietario = await pool.query(`
-      SELECT "Cod_Cliente"
-      FROM "P_BOAT_1_Embarcacao"
-      WHERE "Num_PB" = $1
-      LIMIT 1
-    `, [parseInt(pb)]);
-
-    if (rsProprietario.rowCount > 0) {
-      const codCliente = rsProprietario.rows[0].Cod_Cliente;
-
-      if (codCliente === 4255) {
-        // ALLMAX → letra (E1, K2, X4, etc)
-        grupoLetra = grupoLetraCod.toUpperCase();
-      } else {
-        // SUMMER → numérico (11, 22, 33, etc)
-        grupoLetra = decodificar(grupoLetraCod);
-      }
-    } else {
-      // Fallback heurístico se PB não encontrado
-      if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
-        grupoLetra = decodificar(grupoLetraCod);
-      } else {
-        grupoLetra = grupoLetraCod.toUpperCase();
-      }
-    }
-  } catch (err) {
-    console.error('[TOKEN_DECODE] Erro ao consultar proprietário:', err.message);
-    // Fallback heurístico em caso de erro
-    if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
-      grupoLetra = decodificar(grupoLetraCod);
-    } else {
-      grupoLetra = grupoLetraCod.toUpperCase();
-    }
-  }
-
+  const grupoLetra = m[2].toUpperCase();
   const grupoNum = decodificar(m[3]);
   const autorizado = decodificar(m[4]);
   const mmdd = decodificar(m[5]).padStart(4, "0");
@@ -132,21 +74,19 @@ async function decodeToken(token) {
   const dvCalc = calcularDV(pb, grupoNum, autorizado);
   if (dv !== dvCalc) return null;
 
-  // Monta grupo final
-  const grupoFinal = `${grupoLetra}${grupoNum}`;
+ const primeiroGrupo = decodificar(m[2]);
+const grupoFinal = primeiroGrupo ? `${primeiroGrupo}${grupoNum}` : `${grupoLetra}${grupoNum}`;
 
-  return {
-    pb,
-    grupo: grupoFinal,
-    codAutorizado: autorizado,
-    token: t
-  };
+return {
+  pb,
+  grupo: grupoFinal,
+  codAutorizado: autorizado,
+  token: t
+};
 }
 
 function extrairLimiteDoGrupo(grupo) {
-  // Extrai apenas o ÚLTIMO dígito (não todos os dígitos)
-  // "11" → 1, "A1" → 1, "E2" → 2, "A11" → 1 (último char)
-  const m = String(grupo || "").match(/(\d)$/);
+  const m = String(grupo || "").match(/(\d+)$/);
   return m ? Number(m[1]) : 0;
 }
 
@@ -220,13 +160,11 @@ function montarMensagemLimite(limiteGrupo, rows) {
 }
 
 function ehDiaContingenciaHoje(dataIso) {
-  // USAR TIMEZONE BRASIL (GMT-3)
-  const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const hoje = new Date();
   const [ano, mes, dia] = String(dataIso).split("-").map(Number);
 
   const dataInformada = new Date(ano, mes - 1, dia);
 
-  // Contingência: agendamento para o PRÓPRIO DIA em Ter/Qua/Qui
   const mesmaData =
     dataInformada.getFullYear() === hoje.getFullYear() &&
     dataInformada.getMonth() === hoje.getMonth() &&
@@ -235,7 +173,7 @@ function ehDiaContingenciaHoje(dataIso) {
   if (!mesmaData) return false;
 
   const diaSemana = hoje.getDay();
-  return diaSemana >= 2 && diaSemana <= 4;  // Terça(2), Quarta(3), Quinta(4)
+  return diaSemana >= 2 && diaSemana <= 4;
 }
 
 export default async function handler(req, res) {
@@ -258,7 +196,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const acesso = await decodeToken(token);
+    const acesso = decodeToken(token);
 
     if (!acesso) {
       return res.status(400).json({
@@ -271,13 +209,6 @@ export default async function handler(req, res) {
     const codAutorizado = Number(acesso.codAutorizado);
     const grupo = acesso.grupo;
     const limiteGrupo = extrairLimiteDoGrupo(grupo);
-
-    console.log('[AGENDAR] Token decodificado:', {
-      pb: codEmbPB,
-      autorizado: codAutorizado,
-      grupo,
-      limiteGrupo
-    });
 
     if (!codEmbPB || !codAutorizado || !grupo || !limiteGrupo) {
       return res.status(400).json({
@@ -312,13 +243,6 @@ export default async function handler(req, res) {
     );
 
     if (rsInadim.rows[0]?.inadimplente === true) {
-      // ============================================================
-      // INADIMPLENTE DETECTADO
-      // TODO: Implementar notificação após corrigir erro 500
-      // ============================================================
-      console.log('[AGENDAR] Cliente inadimplente detectado:', codAutorizado);
-
-      // Retorna erro 403 sem tentar enviar notificação (por enquanto)
       return res.status(403).json({
         error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
         versao: VERSAO_API
@@ -328,6 +252,65 @@ export default async function handler(req, res) {
     await client.query("BEGIN");
 
     await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
+
+    // Validação de horário baseado em tipo de cliente (ALLMAX/SUMMER)
+    const rsEmb = await client.query(
+      `SELECT "Cod_Cliente"
+       FROM public."P_BOAT_1_Embarcacao"
+       WHERE "Num_PB" = $1`,
+      [codEmbPB]
+    );
+
+    const codProprietario = rsEmb.rows[0]?.Cod_Cliente;
+    const ehAllmax = codProprietario === COD_PROPRIETARIO_ALLMAX;
+
+    // Extrair hora do agendamento
+    const horaAgendamento = parseInt(horaNormalizada.split(":")[0]);
+
+    // ALLMAX: horário sempre a partir de 11:00
+    if (ehAllmax && horaAgendamento < 11) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: `Cliente ALLMAX: horário deve ser a partir de 11:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
+        versao: VERSAO_API
+      });
+    }
+
+    // SUMMER: validação dinâmica baseada em antecedência
+    if (!ehAllmax) {
+      // Calcular antecedência em horas
+      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const dataAgendamento = new Date(`${data}T${horaNormalizada}-03:00`);
+      const diferencaMs = dataAgendamento - agora;
+      const antecedenciaHoras = diferencaMs / (1000 * 60 * 60);
+
+      // Se antecedência < 17h, horário deve ser a partir de 11:00
+      if (antecedenciaHoras < 17 && horaAgendamento < 11) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: `Cliente SUMMER: agendamentos com menos de 17h de antecedência devem ser a partir de 11:00. Antecedência: ${Math.floor(antecedenciaHoras * 10) / 10}h`,
+          versao: VERSAO_API
+        });
+      }
+
+      // Se antecedência >= 17h, horário pode ser a partir de 09:00
+      if (antecedenciaHoras >= 17 && horaAgendamento < 9) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: `Cliente SUMMER: horário mínimo é 09:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
+          versao: VERSAO_API
+        });
+      }
+    }
+
+    // Validação de horário máximo (17:00 para todos)
+    if (horaAgendamento > 17) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: `Horário máximo é 17:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
+        versao: VERSAO_API
+      });
+    }
 
     const conflitoDia = await client.query(
       `SELECT 1
@@ -364,15 +347,7 @@ export default async function handler(req, res) {
 
       const totalEmAberto = emAberto.rows[0]?.total || 0;
 
-      // ERRO FORÇADO para aparecer nos logs Vercel
       if (totalEmAberto >= limiteGrupo) {
-        console.error('[AGENDAR] ❌ LIMITE ATINGIDO:', {
-          pb: codEmbPB,
-          autorizado: codAutorizado,
-          grupo,
-          limiteGrupo,
-          totalEmAberto
-        });
         const datasFuturas = await client.query(
           `SELECT DISTINCT TO_CHAR("Dt_Agendamento"::date, 'YYYY-MM-DD') AS data_agendada
              FROM public."P_BOAT_z_10_Saida_Emb"
@@ -402,23 +377,6 @@ export default async function handler(req, res) {
 
     const proximoCodigo = rsCodigo.rows[0].proximo_codigo;
 
-    // ============================================================
-    // BUSCAR PROPRIETÁRIO CORRETO da tabela de embarcações (campo Cod_Cliente)
-    // ============================================================
-    const rsProprietario = await client.query(
-      `SELECT "Cod_Cliente"
-         FROM public."P_BOAT_1_Embarcacao"
-        WHERE "Num_PB" = $1
-        LIMIT 1`,
-      [codEmbPB]
-    );
-
-    // Se encontrou embarcação, usa o Cod_Cliente como proprietário
-    // Senão, usa 4255 (Allmax) como fallback
-    const codProprietario = rsProprietario.rows.length > 0
-      ? rsProprietario.rows[0].Cod_Cliente
-      : 4255;
-
     await client.query(
       `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
        (
@@ -445,7 +403,7 @@ export default async function handler(req, res) {
       [
         proximoCodigo,
         codEmbPB,
-        codProprietario,  // ← CORRIGIDO: agora usa o proprietário correto
+        4255,
         codAutorizado,
         dataHoraAgendamento,
         grupo
@@ -481,7 +439,6 @@ ${VERSAO_WPP}`;
     console.error(`Nenhum grupo WhatsApp encontrado para PB ${codEmbPB} / Cota ${grupo}`);
   } else {
     for (const grupoWpp of gruposWpp) {
-      // Enfileira mensagem de confirmação de agendamento
       await client.query(
         `INSERT INTO public.wpp_fila_agenda
          (grupo_id, mensagem, status)
@@ -490,27 +447,6 @@ ${VERSAO_WPP}`;
       );
 
       console.log(`Mensagem enfileirada para ${grupoWpp.nomegrupowpp}`);
-
-      // ============================================================
-      // ENVIA PREVISÃO SE AGENDAMENTO FOR PARA HOJE
-      // ============================================================
-      if (enviarPrevisaoPosAgendamento) {
-        try {
-          const previsao = await enviarPrevisaoPosAgendamento(pool, dataHoraAgendamento, grupoWpp.grupowppid);
-
-          if (previsao) {
-            await client.query(
-              `INSERT INTO public.wpp_fila_agenda
-               (grupo_id, mensagem, status)
-               VALUES ($1, $2, 'pendente')`,
-              [grupoWpp.grupowppid, previsao]
-            );
-            console.log(`[AGENDAR] Previsão enfileirada para ${grupoWpp.nomegrupowpp} (agendamento hoje)`);
-          }
-        } catch (prevErr) {
-          console.error(`[AGENDAR] Erro ao enfileirar previsão:`, prevErr.message);
-        }
-      }
     }
   }
 } catch (filaErr) {
