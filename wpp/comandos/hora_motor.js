@@ -1,18 +1,19 @@
 // ============================================================
-// wpp/comandos/hora_motor.js — V.2606141309
+// wpp/comandos/hora_motor.js — V.2606251045
 // Allmax Gestão de Cotas — Marujo⚓
 // Compatível com pg Pool
 //
 // Comando: hhh / hhhh / HHH / misto (3+ h's)
 //
 // Fluxo:
-//   Pré-validações → Verifica pendência de outros grupos
+//   Pré-validações → Verifica pendência de outros grupos E do próprio grupo
 //   → Etapa 1 (Hora Motor Saída) → Etapa 2 (Hora Motor Retorno)
 //   → Ao confirmar Retorno: calcula horas usadas × tarifa → gera CR + Asaas
 //   → Exceção: Cliente 4138 (ALLMAX) não gera cobrança
 //
-// FIX: Valida pendência de HM_Retorno em OUTROS grupos da mesma embarcação
-//      antes de permitir registro. Envia alerta em ambos os grupos.
+// FIX V.2606141309: Valida pendência de HM_Retorno em OUTROS grupos
+// FIX V.2606251045: SEMPRE força resolver pendência do PRÓPRIO grupo antes
+//                   de permitir novo registro, mesmo que tenha agendamento hoje
 // ============================================================
 
 import { gerarCobrancaCompleta } from '../asaas.js'
@@ -21,7 +22,7 @@ import { alertarAdm } from './admin.js'
 const GRUPO_ADM = '556332258473-1556910161@g.us'
 
 const estadosHoraMotor = new Map()
-const VERSAO_HM = 'V.2606141309'
+const VERSAO_HM = 'V.2606251045'
 
 const CABECALHO_HM =
 `\`\`\`Olá, sou o seu
@@ -878,23 +879,35 @@ async function iniciarFluxoHoraMotor(sock, pool, grupoId, remetente, colaborador
   }
 
   // ============================================================
-  // Busca agendamento de hoje
+  // Busca agendamento de hoje E pendências
+  // FIX V.2606251045: SEMPRE prioriza pendências antes de agendamento atual
   // ============================================================
-  let agendamento = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
+
+  // PRIMEIRO: Busca pendências de HM_Retorno (qualquer dia anterior)
+  let agendamentoPendente = await buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra)
+
+  // SEGUNDO: Busca agendamento de hoje
+  let agendamentoHoje = await buscarAgendamentoHoje(pool, codEmbPb, grupoCompLetra)
+
+  let agendamento = null
   let ehPendente = false
   let dataPendente = null
 
-  // Se não encontrou hoje, busca pendências de HM_Retorno de dias anteriores
-  if (!agendamento) {
-    agendamento = await buscarAgendamentoPendenteHM(pool, codEmbPb, grupoCompLetra)
-
-    if (!agendamento) {
-      await enviar(sock, grupoId, `Não há agendamento ativo para hoje nem pendências de Hora Motor.\n${VERSAO_HM}`)
-      return true
-    }
-
+  // PRIORIDADE 1: Se tem pendência, FORÇA resolver ela PRIMEIRO
+  if (agendamentoPendente) {
+    agendamento = agendamentoPendente
     ehPendente = true
-    dataPendente = agendamento.data_agendamento
+    dataPendente = agendamentoPendente.data_agendamento
+  }
+  // PRIORIDADE 2: Se não tem pendência, usa agendamento de hoje
+  else if (agendamentoHoje) {
+    agendamento = agendamentoHoje
+    ehPendente = false
+  }
+  // Nenhum dos dois: não há o que registrar
+  else {
+    await enviar(sock, grupoId, `Não há agendamento ativo para hoje nem pendências de Hora Motor.\n${VERSAO_HM}`)
+    return true
   }
 
   // Verifica Cod_Proprietário
