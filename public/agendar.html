@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- V.2606251301 -->
+<!-- V.2606251500 -->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -261,12 +261,14 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
       const pb = decodificar(m[1]);
 
-      // No HTML não existe consulta ao banco ainda.
-      // Mantém a letra literal por padrão para ALLMAX (E1, E2, X4 etc).
-      // Se a API /api/config_horarios confirmar que NÃO é ALLMAX, o display
-      // é ajustado depois para o padrão numérico da SUMMER (11, 22 etc).
+      // Decodificar grupo letra: fallback heurístico simples
+      // (Backend validará contra banco de dados ao gravar)
       const grupoLetraCod = m[2];
-      let grupoLetra = grupoLetraCod.toUpperCase();
+      let grupoLetra;
+
+      // Exibição local: manter a letra literal do grupo.
+      // O backend valida contra o banco e trata SUMMER quando aplicável.
+      grupoLetra = grupoLetraCod.toUpperCase();
 
       const grupoNum = decodificar(m[3]);
       const autorizado = decodificar(m[4]);
@@ -292,8 +294,6 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
       return {
         pb,
         grupo: grupoFinal,
-        grupoLetraCod,
-        grupoNum,
         codAutorizado: autorizado,
         token: t
       };
@@ -326,7 +326,7 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
     }
 
    
-    const VERSAO_HTML = "V.2606251301";
+    const VERSAO_HTML = "V.2606251500";
 
     let configHorarios = null; // Cache da configuração de horários
 
@@ -334,29 +334,6 @@ function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
   if (el) {
     el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
-  }
-}
-
-function atualizarExibicaoGrupoPorConfig(){
-  if (!acesso || !configHorarios) return;
-
-  let grupoExibicao;
-
-  if (configHorarios.ehAllmax === true) {
-    // ALLMAX: mantém letra literal: E1, E2, X4 etc.
-    grupoExibicao = `${String(acesso.grupoLetraCod || "").toUpperCase()}${acesso.grupoNum}`;
-  } else if (configHorarios.ehAllmax === false) {
-    // SUMMER: decodifica a primeira posição para número: a+a => 11, b+b => 22 etc.
-    grupoExibicao = `${decodificar(acesso.grupoLetraCod)}${acesso.grupoNum}`;
-  } else {
-    grupoExibicao = acesso.grupo;
-  }
-
-  acesso.grupo = grupoExibicao;
-
-  const el = document.getElementById("embGrupo");
-  if (el) {
-    el.textContent = `${acesso.pb} ${grupoExibicao}`;
   }
 }
 
@@ -492,6 +469,34 @@ function arredondarParaProximo15(hora, minuto) {
   return total;
 }
 
+function isoAmanhaSaoPaulo() {
+  const agora = agoraSaoPaulo();
+  const [ano, mes, dia] = agora.iso.split("-").map(Number);
+  const dt = new Date(ano, mes - 1, dia);
+  dt.setDate(dt.getDate() + 1);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function obterInicioPadraoPorRegra() {
+  // Regra sempre calculada no horário do Brasil (America/Sao_Paulo / Brasília).
+  // ALLMAX: sempre 11h.
+  // SUMMER: 09h, exceto amanhã quando acessado a partir de 15h → 11h.
+  if (!configHorarios) return 11;
+
+  const ehAllmax = configHorarios.ehAllmax === true;
+  if (ehAllmax) return 11;
+
+  const agora = agoraSaoPaulo();
+  const amanhaIso = isoAmanhaSaoPaulo();
+  const solicitouApos15h = agora.hora >= 15;
+
+  if (data === amanhaIso && solicitouApos15h) return 11;
+  return 9;
+}
+
 async function criarBotoesHorario() {
   slotsEl.innerHTML = "";
 
@@ -501,7 +506,6 @@ async function criarBotoesHorario() {
       const resp = await fetch(`/api/config_horarios?pb=${acesso.pb}&data=${data}`);
       if (resp.ok) {
         configHorarios = await resp.json();
-        atualizarExibicaoGrupoPorConfig();
         console.log('[HORARIOS] Configuração carregada:', configHorarios);
       } else {
         console.warn('[HORARIOS] Erro ao buscar configuração, usando padrão 11:00');
@@ -511,7 +515,7 @@ async function criarBotoesHorario() {
     }
   }
 
-  const inicioPadrao = (configHorarios?.horarioInicio || 11) * 60;
+  const inicioPadrao = obterInicioPadraoPorRegra() * 60;
   const fimDia = 17 * 60; // 17:00
 
   let inicioMinutos = inicioPadrao;
@@ -548,7 +552,9 @@ async function criarBotoesHorario() {
   if (configHorarios) {
     const icone = configHorarios.ehAllmax ? '🔵' : '🟡';
     const tipo = configHorarios.tipoCliente;
-    const regra = configHorarios.regra;
+    const regra = configHorarios.ehAllmax
+      ? 'horários a partir de 11:00'
+      : `horários a partir de ${String(inicioPadrao / 60).padStart(2, '0')}:00`;
 
     const avisoInfo = `${icone} ${tipo}: ${regra}`;
     console.log('[HORARIOS]', avisoInfo);
