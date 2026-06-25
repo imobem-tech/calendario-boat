@@ -1,5 +1,5 @@
 // ============================================================
-// /api/agendar — V.2606060054
+// /api/agendar — V.2606061111
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
