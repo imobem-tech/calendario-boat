@@ -86,24 +86,25 @@ async function decodeToken(token) {
       LIMIT 1
     `, [parseInt(pb)]);
 
-    if (rsProprietario.rowCount > 0) {
-      const codCliente = rsProprietario.rows[0].Cod_Cliente;
+  if (rsProprietario.rowCount > 0) {
+  const codCliente = rsProprietario.rows[0].Cod_Cliente;
 
-      if (codCliente === 4255) {
-        // ALLMAX → letra (E1, K2, X4, etc)
-        grupoLetra = grupoLetraCod.toUpperCase();
-      } else {
-        // SUMMER → numérico (11, 22, 33, etc)
-        grupoLetra = decodificar(grupoLetraCod);
-      }
-    } else {
-      // Fallback heurístico se PB não encontrado
-      if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
-        grupoLetra = decodificar(grupoLetraCod);
-      } else {
-        grupoLetra = grupoLetraCod.toUpperCase();
-      }
-    }
+  if (Number(codCliente) === 4255) {
+    // ALLMAX → letra (E1, E2, X4, etc)
+    grupoLetra = grupoLetraCod.toUpperCase();
+  } else {
+    // SUMMER → numérico (11, 22, 33, etc)
+    grupoLetra = decodificar(grupoLetraCod);
+  }
+
+} else {
+  // Fallback heurístico se PB não encontrado
+  if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
+    grupoLetra = decodificar(grupoLetraCod);
+  } else {
+    grupoLetra = grupoLetraCod.toUpperCase();
+  }
+}
   } catch (err) {
     console.error('[TOKEN_DECODE] Erro ao consultar proprietário:', err.message);
     // Fallback heurístico em caso de erro
