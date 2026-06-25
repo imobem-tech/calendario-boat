@@ -313,11 +313,17 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
       let grupoLetra;
 
-      if (configHorarios && configHorarios.ehAllmax === false) {
+      if (!configHorarios) {
+        // Não exibir fallback com letra antes de saber se é SUMMER ou ALLMAX.
+        // Evita abrir como A1/E2 e depois trocar para 11/22.
+        return "-";
+      }
+
+      if (configHorarios.ehAllmax === false) {
         // SUMMER → grupo numérico: 11, 22, 33, etc.
         grupoLetra = decodificar(grupoLetraCod);
       } else {
-        // ALLMAX ou configuração ainda não carregada → mantém letra: A1, E2, X4, etc.
+        // ALLMAX → mantém letra: A1, E2, X4, etc.
         grupoLetra = grupoLetraCod.toUpperCase();
       }
 
@@ -357,7 +363,7 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
     }
 
    
-    const VERSAO_HTML = "V.2606251530";
+    const VERSAO_HTML = "V.2606251600";
 
     let configHorarios = null; // Cache da configuração de horários
 
@@ -667,7 +673,9 @@ if(!resp.ok){
       setMsg("Link de agendamento inválido.", "error", true);
       btnConfirmar.disabled = true;
     }else{
-      atualizarEmbGrupoComConfig();
+      // Aguarda /api/config_horarios antes de exibir o grupo.
+      // Assim SUMMER já abre como 11/22/33, sem piscar A1/E2 antes.
+      embGrupoEl.textContent = "-";
       dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
 
       // Inicialização assíncrona
