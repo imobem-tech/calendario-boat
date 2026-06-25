@@ -1,5 +1,5 @@
 // ============================================================
-// /api/agendar — V.2606251301
+// /api/agendar — V.2606251300
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
@@ -8,8 +8,7 @@
 // FIX V.2606060029: CRÍTICO - async function decodeToken (corrige erro 500)
 // FIX V.2606060051: Timezone GMT-3 em contingência + console.error para logs Vercel
 // FIX V.2606060054: CRÍTICO - extrair ÚLTIMO dígito, não todos ("11" → 1 não 11)
-// NEW V.2606251300: Horários diferenciados ALLMAX (11h fixo) vs SUMMER (09h se ≥17h antec.)
-// FIX V.2606251301: decode ALLMAX/SUMMER com Number() e fallback cod_cliente
+// NEW V.2606251500: Horários ALLMAX/SUMMER com corte SUMMER às 15h BR para amanhã
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -28,7 +27,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606251301";
+const VERSAO_API = "Allmax®2606251500";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 const COD_PROPRIETARIO_ALLMAX = 4255;
 
@@ -90,10 +89,10 @@ async function decodeToken(token) {
     `, [parseInt(pb)]);
 
     if (rsProprietario.rowCount > 0) {
-      const codCliente = rsProprietario.rows[0].Cod_Cliente ?? rsProprietario.rows[0].cod_cliente;
+      const codCliente = rsProprietario.rows[0].Cod_Cliente;
 
-      if (Number(codCliente) === COD_PROPRIETARIO_ALLMAX) {
-        // ALLMAX → letra (E1, E2, X4, etc)
+      if (Number(codCliente) === 4255) {
+        // ALLMAX → letra (E1, K2, X4, etc)
         grupoLetra = grupoLetraCod.toUpperCase();
       } else {
         // SUMMER → numérico (11, 22, 33, etc)
@@ -314,45 +313,50 @@ export default async function handler(req, res) {
     );
 
     if (rsEmb.rowCount === 0) {
-      await client.end();
+      client.release();
+      client = null;
       return res.status(404).json({
         error: `Embarcação PB ${codEmbPB} não encontrada`,
         versao: VERSAO_API
       });
     }
 
-    const codProprietario = rsEmb.rows[0].Cod_Cliente ?? rsEmb.rows[0].cod_cliente;
+    const codProprietario = rsEmb.rows[0].Cod_Cliente;
     const ehAllmax = Number(codProprietario) === COD_PROPRIETARIO_ALLMAX;
 
     // ALLMAX: horário sempre ≥ 11:00
     if (ehAllmax && horaAgendamento < 11) {
-      await client.end();
+      client.release();
+      client = null;
       return res.status(400).json({
         error: "Cliente ALLMAX: horário deve ser a partir de 11:00.",
         versao: VERSAO_API
       });
     }
 
-    // SUMMER: validação baseada em antecedência
+    // SUMMER: regra em horário do Brasil (America/Sao_Paulo / Brasília)
+    // - Amanhã + solicitação até 14:59 → a partir de 09:00
+    // - Amanhã + solicitação a partir de 15:00 → a partir de 11:00
+    // - Demais datas SUMMER → a partir de 09:00
     if (!ehAllmax) {
-      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-      const dataAgendamento = new Date(data + 'T00:00:00');
-      const antecedenciaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
+      const agoraBr = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const hojeBr = new Date(agoraBr.getFullYear(), agoraBr.getMonth(), agoraBr.getDate());
+      const amanhaBr = new Date(hojeBr);
+      amanhaBr.setDate(hojeBr.getDate() + 1);
 
-      // <17h antecedência → horário ≥ 11:00
-      if (antecedenciaHoras < 17 && horaAgendamento < 11) {
-        await client.end();
-        return res.status(400).json({
-          error: "SUMMER com menos de 17h de antecedência: horário deve ser a partir de 11:00.",
-          versao: VERSAO_API
-        });
-      }
+      const yyyy = amanhaBr.getFullYear();
+      const mm = String(amanhaBr.getMonth() + 1).padStart(2, "0");
+      const dd = String(amanhaBr.getDate()).padStart(2, "0");
+      const amanhaIsoBr = `${yyyy}-${mm}-${dd}`;
 
-      // ≥17h antecedência → horário ≥ 09:00
-      if (antecedenciaHoras >= 17 && horaAgendamento < 9) {
-        await client.end();
+      const solicitouApos15hBr = agoraBr.getHours() >= 15;
+      const horarioMinimoSummer = (data === amanhaIsoBr && solicitouApos15hBr) ? 11 : 9;
+
+      if (horaAgendamento < horarioMinimoSummer) {
+        client.release();
+        client = null;
         return res.status(400).json({
-          error: "Horário deve ser a partir de 09:00.",
+          error: `Cliente SUMMER: horário deve ser a partir de ${String(horarioMinimoSummer).padStart(2, "0")}:00.`,
           versao: VERSAO_API
         });
       }
@@ -476,9 +480,9 @@ export default async function handler(req, res) {
 
     // Se encontrou embarcação, usa o Cod_Cliente como proprietário
     // Senão, usa 4255 (Allmax) como fallback
-    const codProprietarioGravacao = rsProprietario.rows.length > 0
-      ? (rsProprietario.rows[0].Cod_Cliente ?? rsProprietario.rows[0].cod_cliente)
-      : COD_PROPRIETARIO_ALLMAX;
+    const codProprietarioInsert = rsProprietario.rows.length > 0
+      ? rsProprietario.rows[0].Cod_Cliente
+      : 4255;
 
     await client.query(
       `INSERT INTO public."P_BOAT_z_10_Saida_Emb"
@@ -506,7 +510,7 @@ export default async function handler(req, res) {
       [
         proximoCodigo,
         codEmbPB,
-        codProprietarioGravacao,  // ← CORRIGIDO: agora usa o proprietário correto
+        codProprietarioInsert,  // ← CORRIGIDO: agora usa o proprietário correto
         codAutorizado,
         dataHoraAgendamento,
         grupo
