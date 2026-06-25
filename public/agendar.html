@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- V.2606060011 -->
+<!-- V.2606251301 -->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -261,11 +261,12 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
       const pb = decodificar(m[1]);
 
-      // Decodificar grupo letra
-      // ALLMAX → mantém a letra literal do grupo (E1, E2, X4, etc.)
-      // O número do grupo continua sendo decodificado em grupoNum logo abaixo.
+      // No HTML não existe consulta ao banco ainda.
+      // Mantém a letra literal por padrão para ALLMAX (E1, E2, X4 etc).
+      // Se a API /api/config_horarios confirmar que NÃO é ALLMAX, o display
+      // é ajustado depois para o padrão numérico da SUMMER (11, 22 etc).
       const grupoLetraCod = m[2];
-      const grupoLetra = grupoLetraCod.toUpperCase();
+      let grupoLetra = grupoLetraCod.toUpperCase();
 
       const grupoNum = decodificar(m[3]);
       const autorizado = decodificar(m[4]);
@@ -291,6 +292,8 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
       return {
         pb,
         grupo: grupoFinal,
+        grupoLetraCod,
+        grupoNum,
         codAutorizado: autorizado,
         token: t
       };
@@ -323,12 +326,37 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
     }
 
    
-    const VERSAO_HTML = "V.2606060040";
+    const VERSAO_HTML = "V.2606251301";
+
+    let configHorarios = null; // Cache da configuração de horários
 
 function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
   if (el) {
     el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
+  }
+}
+
+function atualizarExibicaoGrupoPorConfig(){
+  if (!acesso || !configHorarios) return;
+
+  let grupoExibicao;
+
+  if (configHorarios.ehAllmax === true) {
+    // ALLMAX: mantém letra literal: E1, E2, X4 etc.
+    grupoExibicao = `${String(acesso.grupoLetraCod || "").toUpperCase()}${acesso.grupoNum}`;
+  } else if (configHorarios.ehAllmax === false) {
+    // SUMMER: decodifica a primeira posição para número: a+a => 11, b+b => 22 etc.
+    grupoExibicao = `${decodificar(acesso.grupoLetraCod)}${acesso.grupoNum}`;
+  } else {
+    grupoExibicao = acesso.grupo;
+  }
+
+  acesso.grupo = grupoExibicao;
+
+  const el = document.getElementById("embGrupo");
+  if (el) {
+    el.textContent = `${acesso.pb} ${grupoExibicao}`;
   }
 }
 
@@ -464,11 +492,27 @@ function arredondarParaProximo15(hora, minuto) {
   return total;
 }
 
-function criarBotoesHorario() {
+async function criarBotoesHorario() {
   slotsEl.innerHTML = "";
 
-  const inicioPadrao = 11 * 60; // 11:00
-  const fimDia = 17 * 60;       // 17:00
+  // Buscar configuração de horários da API (ALLMAX vs SUMMER)
+  if (!configHorarios && acesso) {
+    try {
+      const resp = await fetch(`/api/config_horarios?pb=${acesso.pb}&data=${data}`);
+      if (resp.ok) {
+        configHorarios = await resp.json();
+        atualizarExibicaoGrupoPorConfig();
+        console.log('[HORARIOS] Configuração carregada:', configHorarios);
+      } else {
+        console.warn('[HORARIOS] Erro ao buscar configuração, usando padrão 11:00');
+      }
+    } catch (err) {
+      console.warn('[HORARIOS] Erro na requisição, usando padrão 11:00:', err);
+    }
+  }
+
+  const inicioPadrao = (configHorarios?.horarioInicio || 11) * 60;
+  const fimDia = 17 * 60; // 17:00
 
   let inicioMinutos = inicioPadrao;
   const agora = agoraSaoPaulo();
@@ -498,6 +542,22 @@ function criarBotoesHorario() {
     btn.addEventListener("click", () => selecionarHora(hora));
 
     slotsEl.appendChild(btn);
+  }
+
+  // Mostrar indicador de tipo de cliente
+  if (configHorarios) {
+    const icone = configHorarios.ehAllmax ? '🔵' : '🟡';
+    const tipo = configHorarios.tipoCliente;
+    const regra = configHorarios.regra;
+
+    const avisoInfo = `${icone} ${tipo}: ${regra}`;
+    console.log('[HORARIOS]', avisoInfo);
+
+    // Adicionar aviso visual discreto
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'margin-top: 12px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; font-size: 13px; color: #0369a1; font-weight: 700;';
+    infoDiv.textContent = avisoInfo;
+    slotsEl.parentElement.insertBefore(infoDiv, slotsEl.nextSibling);
   }
 
   if (!slotsEl.children.length) {
@@ -571,9 +631,14 @@ if(!resp.ok){
     }else{
       embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
       dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
-      criarBotoesHorario();
-      avaliarContingencia();
-      atualizarBotao();
+
+      // Inicialização assíncrona
+      (async () => {
+        await criarBotoesHorario();
+        avaliarContingencia();
+        atualizarBotao();
+      })();
+
       btnConfirmar.addEventListener("click", agendar);
     }
 
