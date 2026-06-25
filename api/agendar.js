@@ -1,3 +1,4 @@
+// ============================================================
 // /api/agendar — V.2606010905
 // Allmax Gestão de Cotas — Marujo⚓
 // MERGE: Main + OneDrive (validação inadimplência + cabeçalho)
