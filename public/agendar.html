@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- V.2606060040 -->
+<!-- V.2606060011 -->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -261,18 +261,11 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
 
       const pb = decodificar(m[1]);
 
-      // Decodificar grupo letra: fallback heurístico simples
-      // (Backend validará contra banco de dados ao gravar)
+      // Decodificar grupo letra
+      // ALLMAX → mantém a letra literal do grupo (E1, E2, X4, etc.)
+      // O número do grupo continua sendo decodificado em grupoNum logo abaixo.
       const grupoLetraCod = m[2];
-      let grupoLetra;
-
-      if (grupoLetraCod >= 'a' && grupoLetraCod <= 'j') {
-        // Dígito codificado (1-0)
-        grupoLetra = decodificar(grupoLetraCod);
-      } else {
-        // Letra literal (A-Z)
-        grupoLetra = grupoLetraCod.toUpperCase();
-      }
+      const grupoLetra = grupoLetraCod.toUpperCase();
 
       const grupoNum = decodificar(m[3]);
       const autorizado = decodificar(m[4]);
