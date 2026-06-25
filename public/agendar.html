@@ -288,7 +288,8 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
       const dvCalc = calcularDV(pb, grupoNum, autorizado, mmdd);
       if(dv !== dvCalc) return null;
 
-      // Monta grupo final
+      // Monta grupo inicial (sem consultar a configuração do cliente)
+      // A exibição final será ajustada após carregar /api/config_horarios.
       const grupoFinal = `${grupoLetra}${grupoNum}`;
 
       return {
@@ -297,6 +298,36 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
         codAutorizado: autorizado,
         token: t
       };
+    }
+
+    function montarEmbGrupoExibicao(acesso){
+      if(!acesso) return "-";
+
+      const t = String(acesso.token || "").trim().toLowerCase();
+      const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
+
+      if(!m) return `${acesso.pb} ${acesso.grupo}`;
+
+      const grupoLetraCod = m[2];
+      const grupoNum = decodificar(m[3]);
+
+      let grupoLetra;
+
+      if (configHorarios && configHorarios.ehAllmax === false) {
+        // SUMMER → grupo numérico: 11, 22, 33, etc.
+        grupoLetra = decodificar(grupoLetraCod);
+      } else {
+        // ALLMAX ou configuração ainda não carregada → mantém letra: A1, E2, X4, etc.
+        grupoLetra = grupoLetraCod.toUpperCase();
+      }
+
+      return `${acesso.pb} ${grupoLetra}${grupoNum}`;
+    }
+
+    function atualizarEmbGrupoComConfig(){
+      if (embGrupoEl) {
+        embGrupoEl.textContent = montarEmbGrupoExibicao(acesso);
+      }
     }
 
     function formatarDataBR(iso){
@@ -326,7 +357,7 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
     }
 
    
-    const VERSAO_HTML = "V.2606251500";
+    const VERSAO_HTML = "V.2606251530";
 
     let configHorarios = null; // Cache da configuração de horários
 
@@ -507,6 +538,7 @@ async function criarBotoesHorario() {
       if (resp.ok) {
         configHorarios = await resp.json();
         console.log('[HORARIOS] Configuração carregada:', configHorarios);
+        atualizarEmbGrupoComConfig();
       } else {
         console.warn('[HORARIOS] Erro ao buscar configuração, usando padrão 11:00');
       }
@@ -635,7 +667,7 @@ if(!resp.ok){
       setMsg("Link de agendamento inválido.", "error", true);
       btnConfirmar.disabled = true;
     }else{
-      embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
+      atualizarEmbGrupoComConfig();
       dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
 
       // Inicialização assíncrona
