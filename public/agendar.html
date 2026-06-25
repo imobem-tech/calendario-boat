@@ -330,7 +330,9 @@ const m = t.match(/^([a-j]+)([a-z0-9])([a-j]+)([a-j]{4})([a-j]{4})([a-j]{2})$/);
     }
 
    
-    const VERSAO_HTML = "V.2606060040";
+    const VERSAO_HTML = "V.2606251300";
+
+    let configHorarios = null; // Cache da configuração de horários
 
 function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
@@ -471,11 +473,26 @@ function arredondarParaProximo15(hora, minuto) {
   return total;
 }
 
-function criarBotoesHorario() {
+async function criarBotoesHorario() {
   slotsEl.innerHTML = "";
 
-  const inicioPadrao = 11 * 60; // 11:00
-  const fimDia = 17 * 60;       // 17:00
+  // Buscar configuração de horários da API (ALLMAX vs SUMMER)
+  if (!configHorarios && acesso) {
+    try {
+      const resp = await fetch(`/api/config_horarios?pb=${acesso.pb}&data=${data}`);
+      if (resp.ok) {
+        configHorarios = await resp.json();
+        console.log('[HORARIOS] Configuração carregada:', configHorarios);
+      } else {
+        console.warn('[HORARIOS] Erro ao buscar configuração, usando padrão 11:00');
+      }
+    } catch (err) {
+      console.warn('[HORARIOS] Erro na requisição, usando padrão 11:00:', err);
+    }
+  }
+
+  const inicioPadrao = (configHorarios?.horarioInicio || 11) * 60;
+  const fimDia = 17 * 60; // 17:00
 
   let inicioMinutos = inicioPadrao;
   const agora = agoraSaoPaulo();
@@ -505,6 +522,22 @@ function criarBotoesHorario() {
     btn.addEventListener("click", () => selecionarHora(hora));
 
     slotsEl.appendChild(btn);
+  }
+
+  // Mostrar indicador de tipo de cliente
+  if (configHorarios) {
+    const icone = configHorarios.ehAllmax ? '🔵' : '🟡';
+    const tipo = configHorarios.tipoCliente;
+    const regra = configHorarios.regra;
+
+    const avisoInfo = `${icone} ${tipo}: ${regra}`;
+    console.log('[HORARIOS]', avisoInfo);
+
+    // Adicionar aviso visual discreto
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'margin-top: 12px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; font-size: 13px; color: #0369a1; font-weight: 700;';
+    infoDiv.textContent = avisoInfo;
+    slotsEl.parentElement.insertBefore(infoDiv, slotsEl.nextSibling);
   }
 
   if (!slotsEl.children.length) {
@@ -578,9 +611,14 @@ if(!resp.ok){
     }else{
       embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
       dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
-      criarBotoesHorario();
-      avaliarContingencia();
-      atualizarBotao();
+
+      // Inicialização assíncrona
+      (async () => {
+        await criarBotoesHorario();
+        avaliarContingencia();
+        atualizarBotao();
+      })();
+
       btnConfirmar.addEventListener("click", agendar);
     }
 
