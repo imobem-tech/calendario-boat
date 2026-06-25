@@ -1,15 +1,12 @@
-// ============================================================
-// /api/agendar — V.260624145000
+// /api/agendar — V.2606010905
 // Allmax Gestão de Cotas — Marujo⚓
 // MERGE: Main + OneDrive (validação inadimplência + cabeçalho)
-// + Horários dinâmicos ALLMAX/SUMMER
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®260624145000";
+const VERSAO_API = "Allmax®2606010905";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
-const COD_PROPRIETARIO_ALLMAX = 4255;
 
 const CABECALHO_MARUJO =
 `\`\`\`Olá, sou o seu
@@ -252,65 +249,6 @@ export default async function handler(req, res) {
     await client.query("BEGIN");
 
     await client.query(`LOCK TABLE public."P_BOAT_z_10_Saida_Emb" IN EXCLUSIVE MODE`);
-
-    // Validação de horário baseado em tipo de cliente (ALLMAX/SUMMER)
-    const rsEmb = await client.query(
-      `SELECT "Cod_Cliente"
-       FROM public."P_BOAT_1_Embarcacao"
-       WHERE "Num_PB" = $1`,
-      [codEmbPB]
-    );
-
-    const codProprietario = rsEmb.rows[0]?.Cod_Cliente;
-    const ehAllmax = codProprietario === COD_PROPRIETARIO_ALLMAX;
-
-    // Extrair hora do agendamento
-    const horaAgendamento = parseInt(horaNormalizada.split(":")[0]);
-
-    // ALLMAX: horário sempre a partir de 11:00
-    if (ehAllmax && horaAgendamento < 11) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: `Cliente ALLMAX: horário deve ser a partir de 11:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
-        versao: VERSAO_API
-      });
-    }
-
-    // SUMMER: validação dinâmica baseada em antecedência
-    if (!ehAllmax) {
-      // Calcular antecedência em horas
-      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-      const dataAgendamento = new Date(`${data}T${horaNormalizada}-03:00`);
-      const diferencaMs = dataAgendamento - agora;
-      const antecedenciaHoras = diferencaMs / (1000 * 60 * 60);
-
-      // Se antecedência < 17h, horário deve ser a partir de 11:00
-      if (antecedenciaHoras < 17 && horaAgendamento < 11) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          error: `Cliente SUMMER: agendamentos com menos de 17h de antecedência devem ser a partir de 11:00. Antecedência: ${Math.floor(antecedenciaHoras * 10) / 10}h`,
-          versao: VERSAO_API
-        });
-      }
-
-      // Se antecedência >= 17h, horário pode ser a partir de 09:00
-      if (antecedenciaHoras >= 17 && horaAgendamento < 9) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          error: `Cliente SUMMER: horário mínimo é 09:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
-          versao: VERSAO_API
-        });
-      }
-    }
-
-    // Validação de horário máximo (17:00 para todos)
-    if (horaAgendamento > 17) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: `Horário máximo é 17:00. Horário informado: ${horaNormalizada.slice(0, 5)}`,
-        versao: VERSAO_API
-      });
-    }
 
     const conflitoDia = await client.query(
       `SELECT 1

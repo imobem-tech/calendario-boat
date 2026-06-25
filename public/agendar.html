@@ -304,8 +304,8 @@ return {
       return new Date(y, m - 1, d).getDay();
     }
 
-
-    const VERSAO_HTML = "V.260624145000";
+   
+    const VERSAO_HTML = "V.2605252320";
 
 function aplicarAssinatura(){
   const el = document.getElementById("brandFooter");
@@ -313,9 +313,6 @@ function aplicarAssinatura(){
     el.textContent = `Powered by Allmax Gestão de Cotas® ${VERSAO_HTML}`;
   }
 }
-
-// Variável global para configuração de horários
-let configHorarios = null;
 
     const qs = new URLSearchParams(window.location.search);
     const token = qs.get("t") || qs.get("token") || "";
@@ -449,36 +446,11 @@ function arredondarParaProximo15(hora, minuto) {
   return total;
 }
 
-async function criarBotoesHorario() {
+function criarBotoesHorario() {
   slotsEl.innerHTML = "";
 
-  // Se ainda não temos configuração, buscar
-  if (!configHorarios && acesso) {
-    try {
-      const resp = await fetch(`/api/config_horarios?pb=${encodeURIComponent(acesso.pb)}&data=${encodeURIComponent(data)}`);
-      if (resp.ok) {
-        configHorarios = await resp.json();
-      } else {
-        // Fallback: usar configuração padrão ALLMAX (11:00)
-        configHorarios = {
-          horarioInicio: 11,
-          horarioFim: 17,
-          antecedenciaMinima: 2
-        };
-      }
-    } catch (err) {
-      console.error("Erro ao buscar config_horarios:", err);
-      // Fallback: usar configuração padrão
-      configHorarios = {
-        horarioInicio: 11,
-        horarioFim: 17,
-        antecedenciaMinima: 2
-      };
-    }
-  }
-
-  const inicioPadrao = (configHorarios?.horarioInicio || 11) * 60;
-  const fimDia = (configHorarios?.horarioFim || 17) * 60;
+  const inicioPadrao = 11 * 60; // 11:00
+  const fimDia = 17 * 60;       // 17:00
 
   let inicioMinutos = inicioPadrao;
   const agora = agoraSaoPaulo();
@@ -512,28 +484,6 @@ async function criarBotoesHorario() {
 
   if (!slotsEl.children.length) {
     setWarning("Não há mais horários disponíveis para hoje respeitando o prazo mínimo de 2 horas.", true);
-  }
-
-  // Adicionar indicador visual do tipo de cliente
-  if (configHorarios && configHorarios.tipoCliente) {
-    const indicador = document.createElement("div");
-    indicador.style.cssText = "margin-top: 12px; padding: 10px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; text-align: center;";
-
-    if (configHorarios.ehAllmax) {
-      indicador.style.background = "#dbeafe";
-      indicador.style.color = "#1e40af";
-      indicador.textContent = `🔵 Cliente ALLMAX • Horários: ${configHorarios.horarioInicioLabel} - 17:00 • Antecedência: 2h`;
-    } else {
-      indicador.style.background = "#fef3c7";
-      indicador.style.color = "#92400e";
-      indicador.textContent = `🟡 Cliente SUMMER • Horários: ${configHorarios.horarioInicioLabel} - 17:00 • Antecedência: 2h`;
-
-      if (configHorarios.regra && configHorarios.regra.includes("≥ 17h")) {
-        indicador.textContent += " • ✅ Antecedência ≥17h";
-      }
-    }
-
-    slotsEl.parentElement.insertBefore(indicador, slotsEl.nextSibling);
   }
 }
     function avaliarContingencia(){
@@ -587,33 +537,30 @@ if(!resp.ok){
       }
     }
 
-    // Inicialização assíncrona
-    (async function inicializar() {
-      if(!acesso || !data){
-        embGrupoEl.textContent = "-";
-        dataDiaEl.textContent = "-";
-        setMsg("Link de agendamento inválido.", "error", true);
-        btnConfirmar.disabled = true;
-      }else{
-        embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
-        dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
-        await criarBotoesHorario();
-        avaliarContingencia();
-        atualizarBotao();
-        btnConfirmar.addEventListener("click", agendar);
-      }
+    if(!acesso || !data){
+      embGrupoEl.textContent = "-";
+      dataDiaEl.textContent = "-";
+      setMsg("Link de agendamento inválido.", "error", true);
+      btnConfirmar.disabled = true;
+    }else{
+      embGrupoEl.textContent = `${acesso.pb} ${acesso.grupo}`;
+      dataDiaEl.textContent = `${formatarDataBR(data)} ${nomeDiaSemana(data)}`;
+      criarBotoesHorario();
+      avaliarContingencia();
+      atualizarBotao();
+      btnConfirmar.addEventListener("click", agendar);
+    }
 
-      // Botão Voltar — retorna ao calendário preservando o mês
-      document.getElementById("btnVoltar").addEventListener("click", () => {
-        const ym = data ? data.slice(0, 7) : "";
-        const url = token
-          ? `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`
-          : "/";
-        window.location.href = url;
-      });
+    // Botão Voltar — retorna ao calendário preservando o mês
+    document.getElementById("btnVoltar").addEventListener("click", () => {
+      const ym = data ? data.slice(0, 7) : "";
+      const url = token
+        ? `/${encodeURIComponent(token)}?ym=${encodeURIComponent(ym)}`
+        : "/";
+      window.location.href = url;
+    });
 
-      aplicarAssinatura();
-    })();
+    aplicarAssinatura();
   </script>
 </body>
 </html>
