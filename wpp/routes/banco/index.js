@@ -5,7 +5,7 @@
 // ============================================================
 
 import express from 'express';
-import { handleAsaasWebhook } from './asaas-webhook.js';
+import { handleAsaasWebhook, setSockWhatsApp } from './asaas-webhook.js';
 import { sincronizarSicredi } from './sicredi-sync.js';
 import {
   iniciarSincronizacaoAutomatica,
@@ -84,8 +84,14 @@ export async function triggerSincronizacaoWhatsApp(banco = 'SICREDI') {
 /**
  * Inicializa sistema de sincronização automática
  * Chamado pelo server.js ao iniciar
+ * @param {Object} sock - Socket WhatsApp para notificações
  */
-export function inicializarSistemaBancario() {
+export function inicializarSistemaBancario(sock) {
+  // Configurar WhatsApp para webhooks
+  if (sock) {
+    setSockWhatsApp(sock);
+  }
+
   console.log('\n' + '='.repeat(80));
   console.log('💰 SISTEMA BANCÁRIO - INICIALIZADO');
   console.log('='.repeat(80));

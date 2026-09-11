@@ -1,19 +1,31 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260912000000
+// wpp/routes/banco/asaas-webhook.js — V.260912003000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA POR EMPRESA (categorias filtradas)
 // PROCESSAMENTO COMPLETO: cliente + cobrança + status
-// NOTIFICAÇÃO WHATSAPP PARA LANÇAMENTOS PENDENTES
-// BUSCA CPF/CNPJ REAL DO CUSTOMER NA API ASAAS
+// NOTIFICAÇÃO WHATSAPP AUTOMÁTICA PARA LANÇAMENTOS PENDENTES
+// BUSCA CPF/CNPJ: PIX (prioridade) → Customer (fallback)
 // ============================================================
 
 import pkg from 'pg';
 const { Pool } = pkg;
+import { GRUPOS_FINANCEIROS } from '../../config/grupos-financeiros.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
+
+// Socket WhatsApp (configurado via setSockWhatsApp)
+let sockWhatsApp = null;
+
+/**
+ * Configura socket WhatsApp para envio de notificações
+ */
+export function setSockWhatsApp(sock) {
+  sockWhatsApp = sock;
+  console.log('✅ WhatsApp Socket configurado para webhooks bancários');
+}
 
 // Mapa de empresas → código banco Asaas
 const EMPRESAS_ASAAS = {
@@ -24,15 +36,14 @@ const EMPRESAS_ASAAS = {
 };
 
 /**
- * Busca CPF/CNPJ do customer na API Asaas
+ * Busca CPF/CNPJ da transação PIX na API Asaas (mais confiável!)
  */
-async function buscarCpfCnpjCustomer(customerId, empresa) {
-  if (!customerId || !customerId.startsWith('cus_')) {
+async function buscarCpfCnpjPix(pixTransactionId, empresa) {
+  if (!pixTransactionId) {
     return null;
   }
 
   try {
-    // Buscar API key da empresa
     const apiKeys = {
       'ALLMAX': process.env.ASAAS_API_KEY_ALLMAX,
       'IMOBEM': process.env.ASAAS_API_KEY_IMOBEM,
@@ -46,7 +57,56 @@ async function buscarCpfCnpjCustomer(customerId, empresa) {
       return null;
     }
 
-    // Buscar customer na API Asaas
+    // Buscar transação PIX na API Asaas
+    const response = await fetch(`https://www.asaas.com/api/v3/pix/transactions/${pixTransactionId}`, {
+      headers: {
+        'access_token': apiKey
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️ Erro ao buscar PIX ${pixTransactionId}: ${response.status}`);
+      return null;
+    }
+
+    const pixData = await response.json();
+
+    // Pegar CPF/CNPJ do PAGADOR (endToEndIdentifier ou payer)
+    const cpfCnpj = pixData.payer?.cpfCnpj || pixData.originCpfCnpj;
+
+    if (cpfCnpj) {
+      // Remover formatação
+      return cpfCnpj.replace(/[^\d]/g, '');
+    }
+    return null;
+
+  } catch (err) {
+    console.error(`❌ Erro ao buscar CPF/CNPJ do PIX ${pixTransactionId}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Busca CPF/CNPJ do customer na API Asaas (fallback)
+ */
+async function buscarCpfCnpjCustomer(customerId, empresa) {
+  if (!customerId || !customerId.startsWith('cus_')) {
+    return null;
+  }
+
+  try {
+    const apiKeys = {
+      'ALLMAX': process.env.ASAAS_API_KEY_ALLMAX,
+      'IMOBEM': process.env.ASAAS_API_KEY_IMOBEM,
+      'IMOBAN': process.env.ASAAS_API_KEY_IMOBAN,
+      'SUMMER': process.env.ASAAS_API_KEY_SUMMER
+    };
+
+    const apiKey = apiKeys[empresa];
+    if (!apiKey) {
+      return null;
+    }
+
     const response = await fetch(`https://www.asaas.com/api/v3/customers/${customerId}`, {
       headers: {
         'access_token': apiKey
@@ -60,10 +120,8 @@ async function buscarCpfCnpjCustomer(customerId, empresa) {
 
     const customer = await response.json();
 
-    // Retornar CPF ou CNPJ (limpar formatação)
     const cpfCnpj = customer.cpfCnpj;
     if (cpfCnpj) {
-      // Remover pontos, traços e barras
       return cpfCnpj.replace(/[^\d]/g, '');
     }
     return null;
@@ -157,16 +215,30 @@ export async function handleAsaasWebhook(req, res) {
 
     console.log(`🏢 Empresa identificada: ${empresa}`);
 
-    // Buscar CPF/CNPJ real do customer (se for ID Asaas)
+    // Buscar CPF/CNPJ real (PRIORIDADE: PIX → Customer)
     let cpfCnpjOrigem = payment.customer;
-    if (payment.customer && payment.customer.startsWith('cus_')) {
-      console.log(`🔍 Buscando CPF/CNPJ do customer ${payment.customer}...`);
+
+    // TENTATIVA 1: Se for PIX, buscar da transação PIX (mais confiável!)
+    if (payment.pixTransaction) {
+      console.log(`🔍 [PIX] Buscando CPF/CNPJ da transação ${payment.pixTransaction}...`);
+      const cpfCnpj = await buscarCpfCnpjPix(payment.pixTransaction, empresa);
+      if (cpfCnpj) {
+        cpfCnpjOrigem = cpfCnpj;
+        console.log(`✅ [PIX] CPF/CNPJ encontrado: ${cpfCnpj}`);
+      } else {
+        console.log(`⚠️ [PIX] CPF/CNPJ não encontrado na transação`);
+      }
+    }
+
+    // TENTATIVA 2: Se ainda não achou e tem customer ID, buscar do customer
+    if (cpfCnpjOrigem && cpfCnpjOrigem.startsWith('cus_')) {
+      console.log(`🔍 [Customer] Buscando CPF/CNPJ do customer ${payment.customer}...`);
       const cpfCnpj = await buscarCpfCnpjCustomer(payment.customer, empresa);
       if (cpfCnpj) {
         cpfCnpjOrigem = cpfCnpj;
-        console.log(`✅ CPF/CNPJ encontrado: ${cpfCnpj}`);
+        console.log(`✅ [Customer] CPF/CNPJ encontrado: ${cpfCnpj}`);
       } else {
-        console.log(`⚠️ CPF/CNPJ não encontrado, mantendo customer ID`);
+        console.log(`⚠️ [Customer] CPF/CNPJ não encontrado, mantendo customer ID`);
       }
     }
 
@@ -375,31 +447,45 @@ async function processarLancamento(hashUnico, evento, payment) {
 }
 
 /**
- * Notifica grupo ADM sobre lançamento pendente
+ * Notifica grupo financeiro da empresa sobre lançamento pendente
  */
 async function notificarPendente(lanc, semClassificacao, semCliente) {
   try {
+    // Verificar se WhatsApp está configurado
+    if (!sockWhatsApp) {
+      console.log('⚠️ WhatsApp Socket não configurado, notificação não enviada');
+      return;
+    }
+
+    // Buscar grupo financeiro da empresa
+    const grupoId = GRUPOS_FINANCEIROS[lanc.empresa];
+    if (!grupoId) {
+      console.log(`⚠️ Grupo financeiro não configurado para ${lanc.empresa}`);
+      return;
+    }
+
     const motivos = [];
     if (semClassificacao) motivos.push('❌ Classificação não encontrada');
     if (semCliente) motivos.push('❌ Cliente não identificado');
 
+    const valorFormatado = Math.abs(parseFloat(lanc.valor)).toFixed(2);
     const mensagem = `
 ⚠️ *LANÇAMENTO PENDENTE*
 
-📋 *Empresa:* ${lanc.empresa}
-💰 *Valor:* R$ ${Math.abs(lanc.valor).toFixed(2)}
+💰 *Valor:* R$ ${valorFormatado}
 📝 *Descrição:* ${lanc.descricao_original}
 ${lanc.cpf_cnpj_origem ? `👤 *CPF/CNPJ:* ${lanc.cpf_cnpj_origem}` : ''}
 
 *Motivos:*
 ${motivos.join('\n')}
 
-Use o comando *ppp* para classificar lançamentos pendentes.
+━━━━━━━━━━━━━━━━
+Use o comando *ppp* para classificar.
     `.trim();
 
-    console.log('📱 Enviaria WhatsApp:', mensagem);
-    // TODO: Integrar com função de envio WhatsApp
-    // await enviarWhatsAppGrupo('ADM', mensagem);
+    console.log(`📱 Enviando WhatsApp para grupo ${lanc.empresa} (${grupoId})`);
+    await sockWhatsApp.sendMessage(grupoId, { text: mensagem });
+    console.log('✅ Notificação WhatsApp enviada!');
 
   } catch (err) {
     console.error('❌ Erro ao notificar pendente:', err.message);

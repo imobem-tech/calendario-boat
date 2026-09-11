@@ -266,6 +266,9 @@ async function iniciarBot() {
         ultimoEvento = 'CONECTADO'
         ultimaConexaoEm = new Date().toISOString()
         motivoDesconexao = null
+
+        // Inicializar sistema bancário com WhatsApp conectado
+        inicializarSistemaBancario(sock)
       }
 
       if (connection === 'close') {
@@ -1204,8 +1207,8 @@ console.log(`📋 Cron jobs: ${IS_PRODUCTION ? 'ATIVADOS' : 'DESATIVADOS (apenas
 
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
-  inicializarSistemaBancario()
   iniciarBot()
+  // inicializarSistemaBancario(sock) agora é chamado dentro de iniciarBot() após conexão
 
   // ============================================================
   // CRON JOBS - APENAS EM PRODUCTION
