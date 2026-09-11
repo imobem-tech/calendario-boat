@@ -173,7 +173,7 @@ async function inserirLancamento(lanc) {
       hash_unico, campos_extras, importado_em
     ) VALUES (
       $1, $2, $3, $4, $5,
-      $6, TO_CHAR($6::DATE, 'YYYY-MM'), $7, $8, $9, $10,
+      $6, DATE_TRUNC('month', $6::DATE), $7, $8, $9, $10,
       $11, $12, $13,
       $14, $15::jsonb, NOW()
     )
