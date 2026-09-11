@@ -151,7 +151,7 @@ export async function criarCategoria(req, res) {
 export async function atualizarCategoria(req, res) {
   try {
     const { id } = req.params;
-    const { nome, tipo, cor, icone, ordem, ativo } = req.body;
+    const { empresa, nome, tipo, cor, icone, ordem, ativo } = req.body;
 
     // Verificar se existe
     const existe = await pool.query('SELECT id FROM bank_categorias WHERE id = $1', [id]);
@@ -164,6 +164,10 @@ export async function atualizarCategoria(req, res) {
     const valores = [];
     let paramIndex = 1;
 
+    if (empresa !== undefined) {
+      campos.push(`empresa = $${paramIndex++}`);
+      valores.push(empresa);
+    }
     if (nome !== undefined) {
       campos.push(`nome = $${paramIndex++}`);
       valores.push(nome);

@@ -350,6 +350,7 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Empresa</th>
                         <th>Ícone</th>
                         <th>Nome</th>
                         <th>Tipo</th>
@@ -445,7 +446,19 @@
                 tbody.innerHTML = result.categorias.map(cat => `
                     <tr class="${cat.ativo ? '' : 'inativa'}" id="linha-${cat.id}">
                         <td>${cat.id}</td>
-                        <td><span class="icone-preview">${cat.icone}</span></td>
+                        <td>
+                            <select class="edit-select" id="empresa-${cat.id}" data-original="${cat.empresa}">
+                                <option value="ALLMAX" ${cat.empresa === 'ALLMAX' ? 'selected' : ''}>ALLMAX</option>
+                                <option value="IMOBEM" ${cat.empresa === 'IMOBEM' ? 'selected' : ''}>IMOBEM</option>
+                                <option value="IMOBAN" ${cat.empresa === 'IMOBAN' ? 'selected' : ''}>IMOBAN</option>
+                                <option value="SUMMER" ${cat.empresa === 'SUMMER' ? 'selected' : ''}>SUMMER</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" class="edit-input" value="${cat.icone}"
+                                   id="icone-${cat.id}" data-original="${cat.icone}"
+                                   maxlength="2" style="width: 50px; font-size: 20px; text-align: center;">
+                        </td>
                         <td>
                             <input type="text" class="edit-input" value="${cat.nome}"
                                    id="nome-${cat.id}" data-original="${cat.nome}">
@@ -466,8 +479,8 @@
                             <input type="number" class="edit-input" value="${cat.ordem}"
                                    id="ordem-${cat.id}" data-original="${cat.ordem}" min="1" max="999" style="width: 60px;">
                         </td>
-                        <td style="text-align: center;">${cat.vezes_usada || 0}x</td>
-                        <td style="text-align: center;">${cat.ordem_dinamica ? cat.ordem_dinamica.toFixed(1) : cat.ordem}</td>
+                        <td style="text-align: center; font-weight: 600;">${cat.vezes_usada || 0}x</td>
+                        <td style="text-align: center; font-weight: 600; color: #3b82f6;">${cat.ordem_dinamica ? cat.ordem_dinamica.toFixed(1) : cat.ordem}</td>
                         <td>
                             <span class="tipo-badge tipo-${cat.ativo ? 'RECEITA' : 'DESPESA'}">
                                 ${cat.ativo ? 'ATIVA' : 'INATIVA'}
@@ -491,27 +504,39 @@
 
         // Salvar categoria
         async function salvarCategoria(id) {
+            const empresa = document.getElementById(`empresa-${id}`).value;
             const nome = document.getElementById(`nome-${id}`).value;
             const tipo = document.getElementById(`tipo-${id}`).value;
             const cor = document.getElementById(`cor-${id}`).value;
+            const icone = document.getElementById(`icone-${id}`).value;
             const ordem = parseInt(document.getElementById(`ordem-${id}`).value);
 
             // Verificar se mudou
+            const empresaOriginal = document.getElementById(`empresa-${id}`).dataset.original;
             const nomeOriginal = document.getElementById(`nome-${id}`).dataset.original;
             const tipoOriginal = document.getElementById(`tipo-${id}`).dataset.original;
             const corOriginal = document.getElementById(`cor-${id}`).dataset.original;
+            const iconeOriginal = document.getElementById(`icone-${id}`).dataset.original;
             const ordemOriginal = parseInt(document.getElementById(`ordem-${id}`).dataset.original);
 
-            if (nome === nomeOriginal && tipo === tipoOriginal && cor === corOriginal && ordem === ordemOriginal) {
+            if (empresa === empresaOriginal && nome === nomeOriginal && tipo === tipoOriginal &&
+                cor === corOriginal && icone === iconeOriginal && ordem === ordemOriginal) {
                 mostrarMensagem('ℹ️ Nenhuma alteração detectada', 'sucesso');
                 return;
+            }
+
+            // Avisar sobre mudança de empresa
+            if (empresa !== empresaOriginal) {
+                if (!confirm(`⚠️ Mudar empresa de ${empresaOriginal} para ${empresa}?\n\nIsso pode causar conflito se já existir categoria com mesmo nome em ${empresa}.`)) {
+                    return;
+                }
             }
 
             try {
                 const response = await fetch(`${API_URL}/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nome, tipo, cor, ordem })
+                    body: JSON.stringify({ empresa, nome, tipo, cor, icone, ordem })
                 });
 
                 const result = await response.json();
