@@ -368,7 +368,10 @@
                             ${cat.ativo ? '' : '<span style="margin-left: 8px; color: #999; font-size: 12px;">INATIVA</span>'}
                         </div>
                         <div style="margin-top: 8px; font-size: 12px; color: #999;">
-                            Ordem: ${cat.ordem} | Cor: ${cat.cor}
+                            Base: ${cat.ordem} | Usada: ${cat.vezes_usada || 0}x | 📊 Dinâmica: ${cat.ordem_dinamica ? cat.ordem_dinamica.toFixed(1) : cat.ordem}
+                        </div>
+                        <div style="margin-top: 4px; font-size: 11px; color: #999;">
+                            Cor: ${cat.cor}
                         </div>
                         <div class="categoria-acoes">
                             <button class="btn btn-secondary" onclick="editarCategoria(${cat.id})">

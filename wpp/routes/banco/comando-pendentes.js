@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260912000000
+// wpp/routes/banco/comando-pendentes.js — V.260912020000
 // COMANDO WHATSAPP: ppp (LANÇAMENTOS PENDENTES)
 // Fluxo interativo de classificação de lançamentos bancários
 // FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
 // FILTRA PENDENTES POR EMPRESA DO GRUPO
+// ORDEM INTELIGENTE: Base + Boost por uso (Híbrido)
 // ============================================================
 
 import pkg from 'pg';
@@ -195,12 +196,13 @@ async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao)
     return true;
   }
 
-  // Buscar categorias da empresa
+  // Buscar categorias da empresa (ORDEM INTELIGENTE)
   const categorias = await pool.query(`
-    SELECT id, nome, tipo, icone
+    SELECT id, nome, tipo, icone, ordem, vezes_usada,
+           (ordem - (vezes_usada::float / 10)) as ordem_dinamica
     FROM bank_categorias
     WHERE empresa = $1 AND ativo = true
-    ORDER BY ordem, nome
+    ORDER BY ordem_dinamica, nome
   `, [lancamento.empresa]);
 
   if (categorias.rows.length === 0) {
@@ -300,6 +302,7 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   const lanc = sessao.lancamentoEscolhido;
   const categoria = sessao.categoriaEscolhida;
 
+  // Atualizar lançamento
   await pool.query(`
     UPDATE bank_extratos
     SET
@@ -311,6 +314,13 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
       confianca = 1.0
     WHERE id = $1
   `, [lanc.id, categoria.nome, `WhatsApp: ${remetente}`]);
+
+  // INCREMENTAR CONTADOR DE USO (Ordem Inteligente)
+  await pool.query(`
+    UPDATE bank_categorias
+    SET vezes_usada = vezes_usada + 1
+    WHERE id = $1
+  `, [categoria.id]);
 
   // Registrar no histórico
   await pool.query(`

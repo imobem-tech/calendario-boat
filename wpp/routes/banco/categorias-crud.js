@@ -35,10 +35,12 @@ export async function listarCategorias(req, res) {
         cor,
         icone,
         ordem,
-        ativo
+        ativo,
+        vezes_usada,
+        (ordem - (COALESCE(vezes_usada, 0)::float / 10)) as ordem_dinamica
       FROM bank_categorias
       WHERE empresa = $1
-      ORDER BY ordem, nome
+      ORDER BY ordem_dinamica, nome
     `, [empresa]);
 
     res.json({
