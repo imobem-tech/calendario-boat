@@ -394,7 +394,7 @@ export async function baixarBackup(url) {
 
 export function setupBackupRoutes(app) {
   // Executar backup diário manualmente
-  app.post('/api/banco/backup/diario', async (req, res) => {
+  app.post('/backup/diario', async (req, res) => {
     try {
       const resultado = await backupDiario();
       res.json(resultado);
@@ -404,7 +404,7 @@ export function setupBackupRoutes(app) {
   });
 
   // Executar backup semanal manualmente
-  app.post('/api/banco/backup/semanal', async (req, res) => {
+  app.post('/backup/semanal', async (req, res) => {
     try {
       const resultado = await backupSemanal();
       res.json(resultado);
@@ -414,7 +414,7 @@ export function setupBackupRoutes(app) {
   });
 
   // Listar backups (com tipo)
-  app.get('/api/banco/backup/listar/:tipo', async (req, res) => {
+  app.get('/backup/listar/:tipo', async (req, res) => {
     try {
       const tipo = req.params.tipo;
       const backups = await listarBackups(tipo);
@@ -425,7 +425,7 @@ export function setupBackupRoutes(app) {
   });
 
   // Listar backups (sem tipo = diario por padrão)
-  app.get('/api/banco/backup/listar', async (req, res) => {
+  app.get('/backup/listar', async (req, res) => {
     try {
       const backups = await listarBackups('diario');
       res.json({ backups });
@@ -435,7 +435,7 @@ export function setupBackupRoutes(app) {
   });
 
   // Baixar backup
-  app.get('/api/banco/backup/baixar', async (req, res) => {
+  app.get('/backup/baixar', async (req, res) => {
     try {
       const { url } = req.query;
       if (!url) {
