@@ -1,6 +1,7 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260911202000
+// wpp/routes/banco/asaas-webhook.js — V.260911213000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
+// SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // ============================================================
 
 import pkg from 'pg';
@@ -45,14 +46,31 @@ export async function handleAsaasWebhook(req, res) {
 
     const { event, payment } = evento;
 
-    // Processar apenas eventos relevantes
+    // Processar apenas eventos relevantes (14 eventos essenciais)
     const eventosRelevantes = [
-      'PAYMENT_RECEIVED',        // Cobrança recebida
-      'PAYMENT_CONFIRMED',       // Cobrança confirmada
-      'PAYMENT_CREATED',         // Cobrança criada
-      'TRANSFER_CREATED',        // Transferência feita
-      'PAYMENT_REFUNDED',        // Estorno
-      'PAYMENT_UPDATED'          // Atualização
+      // Cobranças (4)
+      'PAYMENT_RECEIVED',                // Cobrança recebida (entrada)
+      'PAYMENT_CONFIRMED',               // Cobrança confirmada
+      'PAYMENT_REFUNDED',                // Estorno (saída)
+      'PAYMENT_RECEIVED_IN_CASH_UNDONE', // Desfez recebimento
+
+      // Transferências (3)
+      'TRANSFER_CREATED',                // Transferência criada (saída)
+      'TRANSFER_DONE',                   // Transferência concluída
+      'TRANSFER_FAILED',                 // Transferência falhou
+
+      // Pague Contas (3)
+      'BILL_CREATED',                    // Conta paga (saída)
+      'BILL_PAID',                       // Pagamento concluído
+      'BILL_FAILED',                     // Pagamento falhou
+
+      // PIX Crédito (2)
+      'PIX_CREDIT_RECEIVED',             // PIX recebido (entrada)
+      'PIX_CREDIT_REFUND_DONE',          // Estorno de PIX (saída)
+
+      // Movimentações Internas (2)
+      'INTERNAL_TRANSFER_CREDIT',        // Transferência interna (entrada)
+      'INTERNAL_TRANSFER_DEBIT'          // Transferência interna (saída)
     ];
 
     if (!eventosRelevantes.includes(event)) {
@@ -60,9 +78,29 @@ export async function handleAsaasWebhook(req, res) {
       return res.status(200).json({ message: 'Evento ignorado' });
     }
 
-    // Determinar empresa (por enquanto vamos usar uma lógica baseada na chave API ou ID do cliente)
-    // TODO: Implementar lógica de identificação da empresa
-    const empresa = 'ALLMAX'; // Padrão por enquanto
+    // Identificar empresa pelo parâmetro ?empresa= na URL
+    const empresa = req.query.empresa || req.body.empresa;
+
+    if (!empresa) {
+      console.error('❌ Empresa não identificada! Use ?empresa=ALLMAX na URL do webhook');
+      return res.status(400).json({
+        error: 'Empresa não especificada',
+        help: 'Configure o webhook com: ?empresa=ALLMAX (ou IMOBEM, IMOBAN, SUMMER)'
+      });
+    }
+
+    // Validar empresa
+    const empresasValidas = ['ALLMAX', 'IMOBEM', 'IMOBAN', 'SUMMER'];
+    if (!empresasValidas.includes(empresa)) {
+      console.error(`❌ Empresa inválida: ${empresa}`);
+      return res.status(400).json({
+        error: 'Empresa inválida',
+        empresa_recebida: empresa,
+        empresas_validas: empresasValidas
+      });
+    }
+
+    console.log(`🏢 Empresa identificada: ${empresa}`);
 
     // Extrair dados do lançamento
     const lancamento = {
