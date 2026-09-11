@@ -413,11 +413,21 @@ export function setupBackupRoutes(app) {
     }
   });
 
-  // Listar backups
-  app.get('/api/banco/backup/listar/:tipo?', async (req, res) => {
+  // Listar backups (com tipo)
+  app.get('/api/banco/backup/listar/:tipo', async (req, res) => {
     try {
-      const tipo = req.params.tipo || 'diario';
+      const tipo = req.params.tipo;
       const backups = await listarBackups(tipo);
+      res.json({ backups });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Listar backups (sem tipo = diario por padrão)
+  app.get('/api/banco/backup/listar', async (req, res) => {
+    try {
+      const backups = await listarBackups('diario');
       res.json({ backups });
     } catch (err) {
       res.status(500).json({ error: err.message });
