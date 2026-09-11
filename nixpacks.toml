@@ -1,5 +1,6 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "postgresql"]
+nixPkgs = ["nodejs_20"]
+aptPkgs = ["postgresql-client"]
 
 [phases.install]
 cmds = ["npm install"]
