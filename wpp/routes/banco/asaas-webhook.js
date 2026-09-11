@@ -1,8 +1,10 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260911220000
+// wpp/routes/banco/asaas-webhook.js — V.260911223000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA POR EMPRESA (categorias filtradas)
+// PROCESSAMENTO COMPLETO: cliente + cobrança + status
+// NOTIFICAÇÃO WHATSAPP PARA LANÇAMENTOS PENDENTES
 // ============================================================
 
 import pkg from 'pg';
@@ -145,8 +147,8 @@ export async function handleAsaasWebhook(req, res) {
     // Inserir no banco (ignorar duplicatas)
     await inserirLancamento(lancamento);
 
-    // Tentar classificar automaticamente
-    await tentarClassificarAutomatico(lancamento.hash_unico);
+    // Processar lançamento (cliente, cobrança, classificação, status)
+    await processarLancamento(lancamento.hash_unico, event, payment);
 
     console.log('✅ Lançamento processado:', lancamento.hash_unico);
 
@@ -189,6 +191,154 @@ async function inserirLancamento(lanc) {
   ];
 
   await pool.query(query, valores);
+}
+
+/**
+ * Processa lançamento completo: cliente, cobrança, classificação, status
+ */
+async function processarLancamento(hashUnico, evento, payment) {
+  try {
+    console.log(`🔄 Processando lançamento: ${hashUnico}`);
+
+    // 1. Buscar lançamento
+    const lancResult = await pool.query(`
+      SELECT id, empresa, cpf_cnpj_origem, id_transacao_banco, descricao_original
+      FROM bank_extratos
+      WHERE hash_unico = $1
+    `, [hashUnico]);
+
+    if (lancResult.rows.length === 0) {
+      console.log('⚠️ Lançamento não encontrado');
+      return;
+    }
+
+    const lanc = lancResult.rows[0];
+    let clienteId = null;
+    let cobrancaId = null;
+    let observacoes = null;
+
+    // 2. BUSCAR CLIENTE por CPF/CNPJ
+    if (lanc.cpf_cnpj_origem) {
+      // Limpar CPF/CNPJ (remover pontos, traços, barras)
+      const cpfCnpjLimpo = lanc.cpf_cnpj_origem.replace(/[^\d]/g, '');
+
+      const clienteResult = await pool.query(`
+        SELECT "ID", "Cliente_Nome"
+        FROM "Cliente"
+        WHERE "Cliente_CPF" = $1
+      `, [cpfCnpjLimpo]);
+
+      if (clienteResult.rows.length > 0) {
+        clienteId = clienteResult.rows[0].ID;
+        console.log(`✅ Cliente encontrado: ${clienteResult.rows[0].Cliente_Nome} (ID: ${clienteId})`);
+      } else {
+        console.log(`⚠️ Cliente não encontrado: ${cpfCnpjLimpo}`);
+      }
+    }
+
+    // 3. BUSCAR COBRANÇA (se for PAYMENT_RECEIVED ou PIX_CREDIT_RECEIVED)
+    if (['PAYMENT_RECEIVED', 'PIX_CREDIT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(evento)) {
+      // Buscar pelo código Asaas
+      const cobrancaResult = await pool.query(`
+        SELECT "ID", "Descrição", "Valor", "Código_Cliente"
+        FROM "Contas_Receber"
+        WHERE "Codigo" = $1
+      `, [lanc.id_transacao_banco]);
+
+      if (cobrancaResult.rows.length > 0) {
+        const cobranca = cobrancaResult.rows[0];
+        cobrancaId = cobranca.ID;
+        observacoes = `Cobrança: ${cobranca.Descrição || 'Sem descrição'} | Valor original: R$ ${cobranca.Valor}`;
+
+        // Se não encontrou cliente antes, pegar da cobrança
+        if (!clienteId && cobranca.Código_Cliente) {
+          clienteId = cobranca.Código_Cliente;
+          console.log(`✅ Cliente obtido da cobrança (ID: ${clienteId})`);
+        }
+
+        console.log(`✅ Cobrança encontrada: ID ${cobrancaId}`);
+      } else {
+        console.log(`⚠️ Cobrança não encontrada para código: ${lanc.id_transacao_banco}`);
+        observacoes = 'Cobrança não identificada no sistema';
+      }
+    }
+
+    // 4. TENTAR CLASSIFICAR AUTOMATICAMENTE
+    await tentarClassificarAutomatico(hashUnico);
+
+    // 5. VERIFICAR SE FOI CLASSIFICADO
+    const classifResult = await pool.query(`
+      SELECT classificacao FROM bank_extratos WHERE hash_unico = $1
+    `, [hashUnico]);
+
+    const foiClassificado = classifResult.rows[0]?.classificacao !== null;
+
+    // 6. DEFINIR STATUS
+    let status = 'PENDENTE';
+
+    if (foiClassificado && clienteId) {
+      // Classificação OK + Cliente conhecido = OK
+      status = 'OK';
+      console.log('✅ Status: OK (classificado + cliente conhecido)');
+    } else if (!foiClassificado) {
+      console.log('⚠️ Status: PENDENTE (classificação não encontrada)');
+    } else if (!clienteId) {
+      console.log('⚠️ Status: PENDENTE (cliente não identificado)');
+    }
+
+    // 7. ATUALIZAR BANCO
+    await pool.query(`
+      UPDATE bank_extratos
+      SET
+        cliente_id = $2,
+        id_cobranca = $3,
+        observacoes = $4,
+        status_classificacao = $5
+      WHERE hash_unico = $1
+    `, [hashUnico, clienteId, cobrancaId, observacoes, status]);
+
+    console.log(`✅ Lançamento atualizado: status=${status}, cliente=${clienteId}, cobranca=${cobrancaId}`);
+
+    // 8. SE PENDENTE, ENVIAR WHATSAPP
+    if (status === 'PENDENTE') {
+      await notificarPendente(lanc, !foiClassificado, !clienteId);
+    }
+
+  } catch (err) {
+    console.error('❌ Erro ao processar lançamento:', err.message);
+  }
+}
+
+/**
+ * Notifica grupo ADM sobre lançamento pendente
+ */
+async function notificarPendente(lanc, semClassificacao, semCliente) {
+  try {
+    const motivos = [];
+    if (semClassificacao) motivos.push('❌ Classificação não encontrada');
+    if (semCliente) motivos.push('❌ Cliente não identificado');
+
+    const mensagem = `
+⚠️ *LANÇAMENTO PENDENTE*
+
+📋 *Empresa:* ${lanc.empresa}
+💰 *Valor:* R$ ${Math.abs(lanc.valor).toFixed(2)}
+📝 *Descrição:* ${lanc.descricao_original}
+${lanc.cpf_cnpj_origem ? `👤 *CPF/CNPJ:* ${lanc.cpf_cnpj_origem}` : ''}
+
+*Motivos:*
+${motivos.join('\n')}
+
+Use o comando *ppp* para classificar lançamentos pendentes.
+    `.trim();
+
+    console.log('📱 Enviaria WhatsApp:', mensagem);
+    // TODO: Integrar com função de envio WhatsApp
+    // await enviarWhatsAppGrupo('ADM', mensagem);
+
+  } catch (err) {
+    console.error('❌ Erro ao notificar pendente:', err.message);
+  }
 }
 
 /**
