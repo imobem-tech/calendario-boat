@@ -33,6 +33,7 @@ import { handleColaboradoresGrupo, handleColaboradoresTodos, handleAdicionarTitu
 import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
 import retornoRoutes from './msg_externa.js'
+import bancoRouter, { inicializarSistemaBancario } from './routes/banco/index.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -54,7 +55,7 @@ import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metro
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®2606022405'
+const VERSAO_WPP = 'Allmax®260911195500'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -109,6 +110,7 @@ app.use((req, res, next) => {
 })
 
 app.use('/msg_externa', retornoRoutes)
+app.use('/api/banco', bancoRouter)
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -1189,6 +1191,7 @@ console.log(`📋 Cron jobs: ${IS_PRODUCTION ? 'ATIVADOS' : 'DESATIVADOS (apenas
 
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
+  inicializarSistemaBancario()
   iniciarBot()
 
   // ============================================================
