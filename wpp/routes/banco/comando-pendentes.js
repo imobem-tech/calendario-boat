@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260911230000
+// wpp/routes/banco/comando-pendentes.js — V.260912000000
 // COMANDO WHATSAPP: ppp (LANÇAMENTOS PENDENTES)
 // Fluxo interativo de classificação de lançamentos bancários
 // FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
+// FILTRA PENDENTES POR EMPRESA DO GRUPO
 // ============================================================
 
 import pkg from 'pg';
@@ -34,25 +35,37 @@ export async function listarPendentes(sock, grupoId) {
       return; // Ignora silenciosamente
     }
 
-    console.log(`📋 Listando pendentes para grupo: ${grupoId}`);
+    // Identificar empresa do grupo
+    const empresa = identificarEmpresaPorGrupo(grupoId);
 
-    // Buscar total de pendentes
+    if (!empresa) {
+      console.log(`⚠️ Grupo financeiro sem empresa identificada: ${grupoId}`);
+      await sock.sendMessage(grupoId, {
+        text: '⚠️ Grupo financeiro não configurado. Contate o administrador.'
+      });
+      return;
+    }
+
+    console.log(`📋 Listando pendentes para ${empresa} (grupo: ${grupoId})`);
+
+    // Buscar total de pendentes DA EMPRESA
     const totalResult = await pool.query(`
       SELECT COUNT(*) as total
       FROM bank_extratos
       WHERE status_classificacao = 'PENDENTE'
-    `);
+        AND empresa = $1
+    `, [empresa]);
 
     const total = parseInt(totalResult.rows[0].total);
 
     if (total === 0) {
       await sock.sendMessage(grupoId, {
-        text: '✅ *NENHUM LANÇAMENTO PENDENTE*\n\nTodos os lançamentos foram classificados!'
+        text: `✅ *NENHUM LANÇAMENTO PENDENTE - ${empresa}*\n\nTodos os lançamentos foram classificados!`
       });
       return;
     }
 
-    // Buscar 3 mais recentes
+    // Buscar 3 mais recentes DA EMPRESA
     const result = await pool.query(`
       SELECT
         id,
@@ -67,9 +80,10 @@ export async function listarPendentes(sock, grupoId) {
         importado_em
       FROM bank_extratos
       WHERE status_classificacao = 'PENDENTE'
+        AND empresa = $1
       ORDER BY importado_em DESC
       LIMIT 3
-    `);
+    `, [empresa]);
 
     const pendentes = result.rows;
     const mostrados = pendentes.length;

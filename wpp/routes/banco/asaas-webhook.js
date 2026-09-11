@@ -1,10 +1,11 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260911223000
+// wpp/routes/banco/asaas-webhook.js — V.260912000000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA POR EMPRESA (categorias filtradas)
 // PROCESSAMENTO COMPLETO: cliente + cobrança + status
 // NOTIFICAÇÃO WHATSAPP PARA LANÇAMENTOS PENDENTES
+// BUSCA CPF/CNPJ REAL DO CUSTOMER NA API ASAAS
 // ============================================================
 
 import pkg from 'pg';
@@ -21,6 +22,57 @@ const EMPRESAS_ASAAS = {
   'IMOBAN': { codigo: 9, conta: 'conta_imoban' },
   'SUMMER': { codigo: 10, conta: 'conta_summer' }
 };
+
+/**
+ * Busca CPF/CNPJ do customer na API Asaas
+ */
+async function buscarCpfCnpjCustomer(customerId, empresa) {
+  if (!customerId || !customerId.startsWith('cus_')) {
+    return null;
+  }
+
+  try {
+    // Buscar API key da empresa
+    const apiKeys = {
+      'ALLMAX': process.env.ASAAS_API_KEY_ALLMAX,
+      'IMOBEM': process.env.ASAAS_API_KEY_IMOBEM,
+      'IMOBAN': process.env.ASAAS_API_KEY_IMOBAN,
+      'SUMMER': process.env.ASAAS_API_KEY_SUMMER
+    };
+
+    const apiKey = apiKeys[empresa];
+    if (!apiKey) {
+      console.log(`⚠️ API Key Asaas não configurada para ${empresa}`);
+      return null;
+    }
+
+    // Buscar customer na API Asaas
+    const response = await fetch(`https://www.asaas.com/api/v3/customers/${customerId}`, {
+      headers: {
+        'access_token': apiKey
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️ Erro ao buscar customer ${customerId}: ${response.status}`);
+      return null;
+    }
+
+    const customer = await response.json();
+
+    // Retornar CPF ou CNPJ (limpar formatação)
+    const cpfCnpj = customer.cpfCnpj;
+    if (cpfCnpj) {
+      // Remover pontos, traços e barras
+      return cpfCnpj.replace(/[^\d]/g, '');
+    }
+    return null;
+
+  } catch (err) {
+    console.error(`❌ Erro ao buscar CPF/CNPJ do customer ${customerId}:`, err.message);
+    return null;
+  }
+}
 
 /**
  * Processa evento de webhook Asaas
@@ -105,6 +157,19 @@ export async function handleAsaasWebhook(req, res) {
 
     console.log(`🏢 Empresa identificada: ${empresa}`);
 
+    // Buscar CPF/CNPJ real do customer (se for ID Asaas)
+    let cpfCnpjOrigem = payment.customer;
+    if (payment.customer && payment.customer.startsWith('cus_')) {
+      console.log(`🔍 Buscando CPF/CNPJ do customer ${payment.customer}...`);
+      const cpfCnpj = await buscarCpfCnpjCustomer(payment.customer, empresa);
+      if (cpfCnpj) {
+        cpfCnpjOrigem = cpfCnpj;
+        console.log(`✅ CPF/CNPJ encontrado: ${cpfCnpj}`);
+      } else {
+        console.log(`⚠️ CPF/CNPJ não encontrado, mantendo customer ID`);
+      }
+    }
+
     // Extrair dados do lançamento
     const lancamento = {
       empresa: empresa,
@@ -122,7 +187,7 @@ export async function handleAsaasWebhook(req, res) {
       tipo: payment.value > 0 ? 'CREDITO' : 'DEBITO',
 
       // Dados específicos
-      cpf_cnpj_origem: payment.customer || null,
+      cpf_cnpj_origem: cpfCnpjOrigem,
       id_transacao_banco: payment.id,
       tipo_importacao: 'WEBHOOK',
 
