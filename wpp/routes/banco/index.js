@@ -1,6 +1,7 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.260911203500
+// wpp/routes/banco/index.js — V.260911192500
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
+// + Sistema de Backup Automático (Railway + Vercel Blob)
 // ============================================================
 
 import express from 'express';
@@ -11,6 +12,8 @@ import {
   dispararSincronizacaoManual,
   statusSincronizacao
 } from './cron-sync.js';
+import { setupBackupRoutes } from './backup-neon.js';
+import { inicializarBackupCron } from './backup-cron.js';
 
 const router = express.Router();
 
@@ -47,6 +50,13 @@ router.post('/sicredi/sync', async (req, res) => {
 router.get('/status', (req, res) => {
   res.json(statusSincronizacao());
 });
+
+// ============================================================
+// BACKUPS AUTOMÁTICOS (Railway + Vercel Blob)
+// ============================================================
+
+// Configurar rotas de backup
+setupBackupRoutes(router);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
@@ -92,14 +102,28 @@ export function inicializarSistemaBancario() {
   console.log('');
   console.log('🏦 Empresas configuradas:');
   console.log('   • ALLMAX  → Asaas + Sicredi');
-  console.log('   • IMOBEM  → Asaas');
-  console.log('   • IMOBAN  → Asaas');
+  console.log('   • IMOBEM  → Asaas + Sicredi');
+  console.log('   • IMOBAN  → Sicredi');
   console.log('   • SUMMER  → Asaas + Sicredi');
+  console.log('');
+  console.log('💾 Backups automáticos:');
+  console.log('   ✓ Diário: Todo dia às 2h (GMT-3)');
+  console.log('   ✓ Semanal: Sábado às 3h (GMT-3)');
+  console.log('   ✓ Armazenamento: Vercel Blob Storage');
+  console.log('');
+  console.log('📦 Endpoints de backup:');
+  console.log('   POST /api/banco/backup/diario         → Backup manual diário');
+  console.log('   POST /api/banco/backup/semanal        → Backup manual semanal');
+  console.log('   GET  /api/banco/backup/listar/:tipo   → Listar backups');
+  console.log('   GET  /api/banco/backup/baixar?url=... → Baixar backup');
   console.log('');
   console.log('='.repeat(80) + '\n');
 
   // Iniciar cron de sincronização
   iniciarSincronizacaoAutomatica();
+
+  // Iniciar cron de backups — V.260911192500
+  inicializarBackupCron();
 }
 
 // ============================================================
