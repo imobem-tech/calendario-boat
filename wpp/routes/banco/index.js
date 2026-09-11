@@ -14,6 +14,13 @@ import {
 } from './cron-sync.js';
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
+import {
+  listarCategorias,
+  buscarCategoria,
+  criarCategoria,
+  atualizarCategoria,
+  deletarCategoria
+} from './categorias-crud.js';
 
 const router = express.Router();
 
@@ -26,6 +33,41 @@ const router = express.Router();
  * Recebe eventos do Asaas em tempo real
  */
 router.post('/asaas/webhook', handleAsaasWebhook);
+
+// ============================================================
+// CRUD DE CATEGORIAS (GERENCIAMENTO)
+// ============================================================
+
+/**
+ * GET /api/banco/categorias?empresa=ALLMAX
+ * Lista categorias de uma empresa
+ */
+router.get('/categorias', listarCategorias);
+
+/**
+ * GET /api/banco/categorias/:id
+ * Busca uma categoria específica
+ */
+router.get('/categorias/:id', buscarCategoria);
+
+/**
+ * POST /api/banco/categorias
+ * Cria nova categoria
+ */
+router.post('/categorias', criarCategoria);
+
+/**
+ * PUT /api/banco/categorias/:id
+ * Atualiza categoria
+ */
+router.put('/categorias/:id', atualizarCategoria);
+
+/**
+ * DELETE /api/banco/categorias/:id
+ * Desativa categoria (soft delete)
+ * ?permanent=true para deletar permanentemente
+ */
+router.delete('/categorias/:id', deletarCategoria);
 
 // ============================================================
 // SINCRONIZAÇÃO MANUAL (POLLING)
