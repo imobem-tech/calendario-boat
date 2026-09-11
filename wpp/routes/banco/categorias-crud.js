@@ -35,8 +35,7 @@ export async function listarCategorias(req, res) {
         cor,
         icone,
         ordem,
-        ativo,
-        created_at
+        ativo
       FROM bank_categorias
       WHERE empresa = $1
       ORDER BY ordem, nome
