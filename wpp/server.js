@@ -52,10 +52,11 @@ import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
+import { ehComandoPendentes, listarPendentes, processarRespostaPendente } from './routes/banco/comando-pendentes.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®260911195500'
+const VERSAO_WPP = 'Allmax®260911233000'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -347,6 +348,18 @@ if (horaMotorTratado) continue
             await handleConfirmacaoRetorno(sock, pool, grupoId, texto)
             continue
           }
+
+          // ============================================================
+          // Comando Lançamentos Pendentes — ppp (grupos financeiros)
+          // ============================================================
+          if (ehComandoPendentes(texto)) {
+            await listarPendentes(sock, grupoId)
+            continue
+          }
+
+          // Processando resposta de classificação de pendentes
+          const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto)
+          if (processouPendente) continue
 
           // Comando Previsão do tempo — ppp / ppp 02
           const cmdPrevisao = parsearComandoPrevisao(texto)
