@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260911213000
+// wpp/routes/banco/asaas-webhook.js — V.260911220000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
+// CLASSIFICAÇÃO AUTOMÁTICA POR EMPRESA (categorias filtradas)
 // ============================================================
 
 import pkg from 'pg';
@@ -195,9 +196,9 @@ async function inserirLancamento(lanc) {
  */
 async function tentarClassificarAutomatico(hashUnico) {
   try {
-    // Buscar lançamento
+    // Buscar lançamento COM EMPRESA
     const lancResult = await pool.query(`
-      SELECT id, descricao_original, valor, cpf_cnpj_origem
+      SELECT id, empresa, descricao_original, valor, cpf_cnpj_origem
       FROM bank_extratos
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
@@ -206,27 +207,28 @@ async function tentarClassificarAutomatico(hashUnico) {
 
     const lanc = lancResult.rows[0];
 
-    // Buscar regra aplicável
+    // Buscar regra aplicável FILTRADA POR EMPRESA
     const regraResult = await pool.query(`
       SELECT id, classificacao, confianca_base, nome_regra
       FROM bank_regras_classificacao
-      WHERE ativa = true
+      WHERE ativo = true
+        AND empresa = $2
         AND (
           banco_especifico IS NULL OR banco_especifico = 'Asaas'
         )
         AND (
-          -- Palavras-chave
-          (palavras_chave IS NOT NULL AND $1 ~* ANY(palavras_chave))
+          -- Palavras-chave (TEXT separado por vírgula)
+          (palavras_chave IS NOT NULL AND $1 ~* ANY(string_to_array(palavras_chave, ',')))
           OR
           -- Regex pattern
           (regex_pattern IS NOT NULL AND $1 ~ regex_pattern)
         )
-      ORDER BY prioridade DESC, taxa_acerto DESC NULLS LAST
+      ORDER BY prioridade DESC NULLS LAST, taxa_acerto DESC NULLS LAST
       LIMIT 1
-    `, [lanc.descricao_original]);
+    `, [lanc.descricao_original, lanc.empresa]);
 
     if (regraResult.rows.length === 0) {
-      console.log(`ℹ️  Nenhuma regra encontrada para: "${lanc.descricao_original}"`);
+      console.log(`ℹ️  Nenhuma regra encontrada para ${lanc.empresa}: "${lanc.descricao_original}"`);
       return;
     }
 
