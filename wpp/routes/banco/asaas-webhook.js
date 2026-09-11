@@ -375,12 +375,16 @@ async function processarLancamento(hashUnico, evento, payment) {
 
     // 3. BUSCAR COBRANÇA (se for PAYMENT_RECEIVED ou PIX_CREDIT_RECEIVED)
     if (['PAYMENT_RECEIVED', 'PIX_CREDIT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(evento)) {
-      // Buscar pelo código Asaas
-      const cobrancaResult = await pool.query(`
-        SELECT "ID", "Descrição", "Valor", "Código_Cliente"
-        FROM "Contas_Receber"
-        WHERE "Codigo" = $1
-      `, [lanc.id_transacao_banco]);
+      // Verificar se id_transacao_banco é numérico (campo Codigo é INTEGER)
+      const codigoNumerico = parseInt(lanc.id_transacao_banco);
+
+      if (!isNaN(codigoNumerico)) {
+        // Buscar pelo código Asaas (apenas se for numérico)
+        const cobrancaResult = await pool.query(`
+          SELECT "ID", "Descrição", "Valor", "Código_Cliente"
+          FROM "Contas_Receber"
+          WHERE "Codigo" = $1
+        `, [codigoNumerico]);
 
       if (cobrancaResult.rows.length > 0) {
         const cobranca = cobrancaResult.rows[0];
@@ -394,9 +398,13 @@ async function processarLancamento(hashUnico, evento, payment) {
         }
 
         console.log(`✅ Cobrança encontrada: ID ${cobrancaId}`);
+        } else {
+          console.log(`⚠️ Cobrança não encontrada para código: ${codigoNumerico}`);
+          observacoes = 'Cobrança não identificada no sistema';
+        }
       } else {
-        console.log(`⚠️ Cobrança não encontrada para código: ${lanc.id_transacao_banco}`);
-        observacoes = 'Cobrança não identificada no sistema';
+        console.log(`⚠️ ID transação não é numérico (${lanc.id_transacao_banco}), não busca em Contas_Receber`);
+        observacoes = 'PIX avulso (sem cobrança prévia)';
       }
     }
 
