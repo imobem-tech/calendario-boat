@@ -304,9 +304,8 @@
                         <label>Tipo *</label>
                         <select id="tipo" required>
                             <option value="">Selecione...</option>
-                            <option value="RECEITA">RECEITA</option>
-                            <option value="DESPESA">DESPESA</option>
-                            <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                            <option value="CREDITO">CREDITO (Entrada)</option>
+                            <option value="DEBITO">DEBITO (Saída)</option>
                         </select>
                     </div>
 
@@ -465,9 +464,8 @@
                         </td>
                         <td>
                             <select class="edit-select" id="tipo-${cat.id}" data-original="${cat.tipo}">
-                                <option value="RECEITA" ${cat.tipo === 'RECEITA' ? 'selected' : ''}>RECEITA</option>
-                                <option value="DESPESA" ${cat.tipo === 'DESPESA' ? 'selected' : ''}>DESPESA</option>
-                                <option value="TRANSFERENCIA" ${cat.tipo === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
+                                <option value="CREDITO" ${cat.tipo === 'CREDITO' ? 'selected' : ''}>💰 CREDITO</option>
+                                <option value="DEBITO" ${cat.tipo === 'DEBITO' ? 'selected' : ''}>💸 DEBITO</option>
                             </select>
                         </td>
                         <td>

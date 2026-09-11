@@ -196,14 +196,16 @@ async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao)
     return true;
   }
 
-  // Buscar categorias da empresa (ORDEM INTELIGENTE)
+  // Buscar categorias da empresa (ORDEM INTELIGENTE + FILTRO POR TIPO)
+  // Se lançamento é CREDITO → só mostra categorias CREDITO
+  // Se lançamento é DEBITO → só mostra categorias DEBITO
   const categorias = await pool.query(`
     SELECT id, nome, tipo, icone, ordem, vezes_usada,
            (ordem - (vezes_usada::float / 10)) as ordem_dinamica
     FROM bank_categorias
-    WHERE empresa = $1 AND ativo = true
+    WHERE empresa = $1 AND ativo = true AND tipo = $2
     ORDER BY ordem_dinamica, nome
-  `, [lancamento.empresa]);
+  `, [lancamento.empresa, lancamento.tipo]);
 
   if (categorias.rows.length === 0) {
     await sock.sendMessage(grupoId, {
