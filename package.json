@@ -6,10 +6,12 @@
     "start": "node wpp/server.js"
   },
   "dependencies": {
+    "@vercel/blob": "^0.19.0",
     "@whiskeysockets/baileys": "latest",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "latest",
+    "node-cron": "^3.0.3",
     "pg": "latest",
     "pino": "latest",
     "qrcode": "latest"
