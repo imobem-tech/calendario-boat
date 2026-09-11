@@ -168,12 +168,12 @@ async function inserirLancamento(lanc) {
   const query = `
     INSERT INTO bank_extratos (
       empresa, banco, codigo_banco, nome_banco, tipo_conta,
-      data, valor, descricao_original, documento, tipo,
+      data, mes_ref, valor, descricao_original, documento, tipo,
       cpf_cnpj_origem, id_transacao_banco, tipo_importacao,
       hash_unico, campos_extras, importado_em
     ) VALUES (
       $1, $2, $3, $4, $5,
-      $6, $7, $8, $9, $10,
+      $6, TO_CHAR($6::DATE, 'YYYY-MM'), $7, $8, $9, $10,
       $11, $12, $13,
       $14, $15::jsonb, NOW()
     )
