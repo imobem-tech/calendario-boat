@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/recibos-api.js — V.260912080000
+// wpp/routes/banco/recibos-api.js — V.260912081500
 // API PARA ACESSAR RECIBOS SALVOS NO VERCEL BLOB
 // Migrado de filesystem (Railway ephemeral) para Vercel Blob (permanente)
 // ============================================================
@@ -29,7 +29,7 @@ router.get('/listar', async (req, res) => {
         empresa,
         data,
         valor,
-        descricao,
+        descricao_original,
         classificacao,
         recibos_urls
       FROM bank_extratos
@@ -72,7 +72,7 @@ router.get('/listar', async (req, res) => {
             url: recibo.url, // URL direta do Vercel Blob
             data: row.data,
             valor: row.valor,
-            descricao: row.descricao,
+            descricao: row.descricao_original,
             classificacao: row.classificacao
           });
         }
