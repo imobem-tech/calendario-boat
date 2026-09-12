@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260912085000
+// wpp/routes/banco/comando-pendentes.js — V.260912090000
 // COMANDO WHATSAPP: lll (LANÇAMENTOS PENDENTES)
 // Fluxo interativo de classificação de lançamentos bancários
 // FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
@@ -529,8 +529,9 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
 
         // Upload para Vercel Blob
         const blob = await put(blobPath, reciboArquivo.buffer, {
-          access: 'public', // Obrigatório para este store
-          addRandomSuffix: false // Manter nome exato
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN, // Token explícito (igual ao backup)
+          addRandomSuffix: false
         });
 
         // Salvar URL retornada
