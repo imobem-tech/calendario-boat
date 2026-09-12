@@ -361,7 +361,7 @@ if (horaMotorTratado) continue
           }
 
           // Processando resposta de classificação de pendentes (passa mensagem completa para receber arquivos)
-          const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto, mensagemCompleta)
+          const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto, msg)
           if (processouPendente) continue
 
           // Comando Previsão do tempo — ppp / ppp 02
