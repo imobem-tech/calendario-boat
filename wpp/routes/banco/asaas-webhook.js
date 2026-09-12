@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260911213000
+// wpp/routes/banco/asaas-webhook.js — V.260912120000
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
+// CLASSIFICAÇÃO AUTOMÁTICA EM 3 PRIORIDADES
+// STATUS: SEMPRE PENDENTE ATÉ ANEXAR RECIBO
 // ============================================================
 
 import pkg from 'pg';
 const { Pool } = pkg;
+import { classificarLancamento } from './classificacao-automatica.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -191,13 +194,20 @@ async function inserirLancamento(lanc) {
 }
 
 /**
- * Tenta classificar lançamento automaticamente usando regras
+ * Tenta classificar lançamento automaticamente usando 3 prioridades
+ * SEMPRE mantém status PENDENTE até anexar recibo
  */
 async function tentarClassificarAutomatico(hashUnico) {
   try {
     // Buscar lançamento
     const lancResult = await pool.query(`
-      SELECT id, descricao_original, valor, cpf_cnpj_origem
+      SELECT
+        id,
+        empresa,
+        descricao_original,
+        valor,
+        tipo,
+        id_transacao_banco
       FROM bank_extratos
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
@@ -206,64 +216,47 @@ async function tentarClassificarAutomatico(hashUnico) {
 
     const lanc = lancResult.rows[0];
 
-    // Buscar regra aplicável
-    const regraResult = await pool.query(`
-      SELECT id, classificacao, confianca_base, nome_regra
-      FROM bank_regras_classificacao
-      WHERE ativa = true
-        AND (
-          banco_especifico IS NULL OR banco_especifico = 'Asaas'
-        )
-        AND (
-          -- Palavras-chave
-          (palavras_chave IS NOT NULL AND $1 ~* ANY(palavras_chave))
-          OR
-          -- Regex pattern
-          (regex_pattern IS NOT NULL AND $1 ~ regex_pattern)
-        )
-      ORDER BY prioridade DESC, taxa_acerto DESC NULLS LAST
-      LIMIT 1
-    `, [lanc.descricao_original]);
+    // Classificar usando sistema inteligente de 3 prioridades
+    const resultado = await classificarLancamento({
+      externalReference: lanc.id_transacao_banco,
+      description: lanc.descricao_original,
+      value: Math.abs(lanc.valor),
+      tipo: lanc.tipo,
+      empresa: lanc.empresa
+    });
 
-    if (regraResult.rows.length === 0) {
+    // Se encontrou classificação
+    if (resultado.categoria_id) {
+      // Atualizar banco de dados
+      await pool.query(`
+        UPDATE bank_extratos
+        SET
+          classificacao = $2,
+          status = $3,
+          classificacao_manual = false,
+          classificado_por = $4,
+          classificado_em = NOW()
+        WHERE id = $1
+      `, [
+        lanc.id,
+        resultado.categoria_id,
+        resultado.status,  // SEMPRE 'PENDENTE'
+        `Sistema - ${resultado.metodo}`
+      ]);
+
+      console.log(`✅ Classificado: ${resultado.categoria_nome} (${resultado.metodo})`);
+      console.log(`   Status: ${resultado.status} (aguarda recibo)`);
+
+    } else {
       console.log(`ℹ️  Nenhuma regra encontrada para: "${lanc.descricao_original}"`);
-      return;
+
+      // Marcar como PENDENTE mesmo sem classificação
+      await pool.query(`
+        UPDATE bank_extratos
+        SET status = 'PENDENTE'
+        WHERE id = $1 AND status IS NULL
+      `, [lanc.id]);
     }
-
-    const regra = regraResult.rows[0];
-
-    // Classificar
-    await pool.query(`
-      UPDATE bank_extratos
-      SET
-        classificacao = $2,
-        classificacao_manual = false,
-        classificado_por = 'Sistema - Webhook Asaas',
-        classificado_em = NOW(),
-        confianca = $3
-      WHERE id = $1
-    `, [lanc.id, regra.classificacao, regra.confianca_base]);
-
-    // Atualizar estatísticas da regra
-    await pool.query(`
-      UPDATE bank_regras_classificacao
-      SET
-        vezes_aplicada = vezes_aplicada + 1,
-        taxa_acerto = CASE
-          WHEN vezes_confirmada > 0 THEN vezes_confirmada::NUMERIC / vezes_aplicada::NUMERIC
-          ELSE NULL
-        END
-      WHERE id = $1
-    `, [regra.id]);
-
-    // Registrar no histórico
-    await pool.query(`
-      INSERT INTO bank_historico_classificacoes
-        (extrato_id, regra_id, classificacao_nova, classificado_por, observacao)
-      VALUES ($1, $2, $3, 'Sistema - Webhook Asaas', $4)
-    `, [lanc.id, regra.id, regra.classificacao, `Regra: ${regra.nome_regra}`]);
-
-    console.log(`✅ Classificado automaticamente: ${regra.classificacao} (confiança: ${regra.confianca_base})`);
 
   } catch (err) {
     console.error('❌ Erro ao classificar automaticamente:', err.message);
