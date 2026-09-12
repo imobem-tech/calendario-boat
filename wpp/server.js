@@ -34,6 +34,7 @@ import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
 import retornoRoutes from './msg_externa.js'
 import bancoRouter, { inicializarSistemaBancario } from './routes/banco/index.js'
+import testTokenRouter from './routes/test-token.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -112,6 +113,7 @@ app.use((req, res, next) => {
 
 app.use('/msg_externa', retornoRoutes)
 app.use('/api/banco', bancoRouter)
+app.use('/api', testTokenRouter)
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
