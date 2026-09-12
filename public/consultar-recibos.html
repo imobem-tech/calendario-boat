@@ -342,8 +342,11 @@
                 </div>
 
                 <div class="filter-group">
-                    <label>Categoria ID</label>
-                    <input type="number" id="filtroCategoria" placeholder="Ex: 001, 015">
+                    <label>Categoria</label>
+                    <select id="filtroCategoria">
+                        <option value="">Todas</option>
+                        <!-- Carregado dinamicamente -->
+                    </select>
                 </div>
 
                 <div class="filter-group">
@@ -548,10 +551,46 @@
             document.getElementById('filtroDataFim').value = '';
         }
 
+        // Carregar categorias
+        async function carregarCategorias() {
+            try {
+                const response = await fetch(`${API_URL}/categorias/todas`);
+                const data = await response.json();
+
+                const select = document.getElementById('filtroCategoria');
+
+                // Limpar opções existentes (exceto "Todas")
+                select.innerHTML = '<option value="">Todas</option>';
+
+                // Agrupar por tipo
+                let tipoAtual = '';
+                data.categorias.forEach(cat => {
+                    // Separador visual entre CREDITO e DEBITO
+                    if (cat.tipo !== tipoAtual) {
+                        tipoAtual = cat.tipo;
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `━━━ ${cat.tipo === 'CREDITO' ? '💰 CRÉDITO' : '💸 DÉBITO'} ━━━`;
+                        select.appendChild(optgroup);
+                    }
+
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = `${cat.icone || '📌'} ${cat.nome}`;
+                    select.appendChild(option);
+                });
+
+            } catch (err) {
+                console.error('Erro ao carregar categorias:', err);
+            }
+        }
+
         // Carregar ao abrir a página
-        window.addEventListener('load', buscarRecibos);
+        window.addEventListener('load', () => {
+            carregarCategorias();
+            buscarRecibos();
+        });
     </script>
 </body>
 </html>
 
-<!-- V.260912080000 -->
+<!-- V.260912095000 -->

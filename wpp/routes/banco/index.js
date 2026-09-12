@@ -16,6 +16,7 @@ import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
 import {
   listarCategorias,
+  listarTodasCategorias,
   buscarCategoria,
   criarCategoria,
   atualizarCategoria,
@@ -38,6 +39,12 @@ router.post('/asaas/webhook', handleAsaasWebhook);
 // ============================================================
 // CRUD DE CATEGORIAS (GERENCIAMENTO)
 // ============================================================
+
+/**
+ * GET /api/banco/categorias/todas
+ * Lista TODAS as categorias (todas empresas)
+ */
+router.get('/categorias/todas', listarTodasCategorias);
 
 /**
  * GET /api/banco/categorias?empresa=ALLMAX

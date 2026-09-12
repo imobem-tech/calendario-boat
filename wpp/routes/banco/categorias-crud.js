@@ -12,6 +12,38 @@ const pool = new Pool({
 });
 
 /**
+ * GET /api/banco/categorias/todas
+ * Lista TODAS as categorias ativas de todas as empresas
+ * Ordenado por: tipo (CREDITO primeiro), depois nome alfabético
+ */
+export async function listarTodasCategorias(req, res) {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        empresa,
+        nome,
+        tipo,
+        icone
+      FROM bank_categorias
+      WHERE ativo = true
+      ORDER BY
+        CASE WHEN tipo = 'CREDITO' THEN 1 ELSE 2 END,
+        nome
+    `);
+
+    res.json({
+      total: result.rows.length,
+      categorias: result.rows
+    });
+
+  } catch (err) {
+    console.error('❌ Erro ao listar todas categorias:', err);
+    res.status(500).json({ erro: err.message });
+  }
+}
+
+/**
  * GET /api/banco/categorias?empresa=ALLMAX
  * Lista categorias de uma empresa
  */
