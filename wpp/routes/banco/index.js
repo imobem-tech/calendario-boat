@@ -21,6 +21,7 @@ import {
   atualizarCategoria,
   deletarCategoria
 } from './categorias-crud.js';
+import recibosRouter from './recibos-api.js';
 
 const router = express.Router();
 
@@ -92,6 +93,17 @@ router.post('/sicredi/sync', async (req, res) => {
 router.get('/status', (req, res) => {
   res.json(statusSincronizacao());
 });
+
+// ============================================================
+// API DE RECIBOS (CONSULTA/DOWNLOAD)
+// ============================================================
+
+/**
+ * GET /api/banco/recibos/listar?empresa=IMOBEM
+ * GET /api/banco/recibos/download/:empresa/:categoria/:arquivo
+ * GET /api/banco/recibos/empresas
+ */
+router.use('/recibos', recibosRouter);
 
 // ============================================================
 // BACKUPS AUTOMÁTICOS (Railway + Vercel Blob)
