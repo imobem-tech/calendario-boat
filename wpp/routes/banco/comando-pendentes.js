@@ -338,8 +338,8 @@ async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
     const texto = (mensagem.message.conversation || mensagem.message.extendedTextMessage?.text || '').trim().toLowerCase();
 
     if (texto === 'pular' || texto === '-') {
-      sessao.reciboArquivo = null;
-      // Ir para confirmação
+      // Não adiciona arquivo, vai direto para confirmação
+      // Se já tem arquivos anexados, mantém. Se não tem, fica sem.
       return await mostrarConfirmacao(sock, grupoId, sessao);
     }
 
@@ -387,12 +387,16 @@ async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
 
     const nomeCompleto = `${nomeArquivo}.${ext}`;
 
-    // Salvar sessão com dados do arquivo
-    sessao.reciboArquivo = {
+    // Salvar arquivo na sessão (suporta múltiplos arquivos)
+    if (!sessao.recibosArquivos) {
+      sessao.recibosArquivos = [];
+    }
+
+    sessao.recibosArquivos.push({
       buffer,
       nome: nomeCompleto,
       mimetype: mimeType
-    };
+    });
 
     // Ir para confirmação
     return await mostrarConfirmacao(sock, grupoId, sessao);
@@ -425,13 +429,21 @@ async function mostrarConfirmacao(sock, grupoId, sessao) {
     mensagem += `   ${sessao.observacaoUsuario}\n\n`;
   }
 
-  if (sessao.reciboArquivo) {
-    mensagem += `📎 *Recibo:*\n`;
-    mensagem += `   ✅ Anexado (${sessao.reciboArquivo.nome})\n\n`;
+  if (sessao.recibosArquivos && sessao.recibosArquivos.length > 0) {
+    if (sessao.recibosArquivos.length === 1) {
+      mensagem += `📎 *Recibo:*\n`;
+      mensagem += `   ✅ Anexado: ${sessao.recibosArquivos[0].nome}\n\n`;
+    } else {
+      mensagem += `📎 *Recibos:*\n`;
+      sessao.recibosArquivos.forEach((arquivo, index) => {
+        mensagem += `   ✅ Anexado (${index + 1}): ${arquivo.nome}\n`;
+      });
+      mensagem += `\n`;
+    }
   }
 
   mensagem += `━━━━━━━━━━━━━━━━\n`;
-  mensagem += `✏️ *Confirma? (s/n)*`;
+  mensagem += `✏️ *Confirma? (s/n) ou (o) outro*`;
 
   await sock.sendMessage(grupoId, { text: mensagem });
 
@@ -448,13 +460,15 @@ async function mostrarConfirmacao(sock, grupoId, sessao) {
 async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   const resposta = texto.trim().toLowerCase();
 
-  if (resposta !== 's' && resposta !== 'n' && resposta !== 'sim' && resposta !== 'nao' && resposta !== 'não') {
+  // Aceita: s, n, o
+  if (!['s', 'sim', 'n', 'nao', 'não', 'o', 'outro'].includes(resposta)) {
     await sock.sendMessage(grupoId, {
-      text: '⚠️ Responda *s* para confirmar ou *n* para cancelar.'
+      text: '⚠️ Responda *s* para confirmar, *n* para cancelar ou *o* para anexar outro arquivo.'
     });
     return true;
   }
 
+  // Cancelar
   if (resposta === 'n' || resposta === 'nao' || resposta === 'não') {
     await sock.sendMessage(grupoId, {
       text: '❌ Classificação cancelada.\n\nUse *lll* para ver a lista novamente.'
@@ -463,17 +477,38 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
     return true;
   }
 
+  // Anexar outro arquivo
+  if (resposta === 'o' || resposta === 'outro') {
+    const totalAnexado = sessao.recibosArquivos?.length || 0;
+
+    let mensagem = `📎 *ANEXAR OUTRO ARQUIVO*\n\n`;
+    mensagem += `✅ Já anexado: ${totalAnexado} arquivo${totalAnexado !== 1 ? 's' : ''}\n\n`;
+    mensagem += `Envie mais uma foto ou PDF\n`;
+    mensagem += `ou responda *pular* para finalizar.\n\n`;
+    mensagem += `━━━━━━━━━━━━━━━━\n`;
+    mensagem += `✏️ *Envie o arquivo ou "pular"*`;
+
+    await sock.sendMessage(grupoId, { text: mensagem });
+
+    // Volta para aguardar recibo
+    sessao.etapa = 'AGUARDANDO_RECIBO';
+    sessao.timestamp = Date.now();
+
+    return true;
+  }
+
   // CONFIRMAR - Atualizar banco
   const lanc = sessao.lancamentoEscolhido;
   const categoria = sessao.categoriaEscolhida;
   const observacao = sessao.observacaoUsuario || null;
-  const reciboArquivo = sessao.reciboArquivo;
+  const recibosArquivos = sessao.recibosArquivos || [];
 
-  // SALVAR RECIBO NA PASTA (se houver)
+  // SALVAR RECIBOS NA PASTA (se houver)
   // ATENÇÃO: Railway tem storage ephemeral - arquivos podem ser perdidos no redeploy!
   // TODO: Migrar para Vercel Blob para storage permanente
-  let caminhoRecibo = null;
-  if (reciboArquivo) {
+  const caminhosRecibos = [];
+
+  if (recibosArquivos.length > 0) {
     try {
       // Estrutura FLAT: {EMPRESA}/{CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
       // Exemplo: IMOBEM/001_123456_20260912_022021.jpg
@@ -487,23 +522,30 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
       // Formatar ID da categoria como nnn (3 dígitos)
       const categoriaIdFormatado = String(categoria.id).padStart(3, '0');
 
-      // Nome do arquivo: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
-      const ext = path.extname(reciboArquivo.nome); // .jpg, .pdf, etc
-      const timestamp = reciboArquivo.nome.replace(ext, ''); // Remove extensão
-      const nomeArquivo = `${categoriaIdFormatado}_${lanc.id}_${timestamp}${ext}`;
+      // Salvar cada arquivo
+      for (const reciboArquivo of recibosArquivos) {
+        // Nome do arquivo: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
+        const ext = path.extname(reciboArquivo.nome); // .jpg, .pdf, etc
+        const timestamp = reciboArquivo.nome.replace(ext, ''); // Remove extensão
+        const nomeArquivo = `${categoriaIdFormatado}_${lanc.id}_${timestamp}${ext}`;
 
-      // Caminho completo
-      caminhoRecibo = path.join(empresaDir, nomeArquivo);
+        // Caminho completo
+        const caminhoRecibo = path.join(empresaDir, nomeArquivo);
 
-      // Salvar arquivo
-      fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
+        // Salvar arquivo
+        fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
 
-      console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
+        caminhosRecibos.push(caminhoRecibo);
+
+        console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
+      }
+
+      console.log(`✅ Total de recibos salvos: ${caminhosRecibos.length}`);
       console.log(`📋 Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}`);
       console.log(`⚠️  Storage ephemeral - considerar migração para Vercel Blob`);
 
     } catch (err) {
-      console.error('❌ Erro ao salvar recibo:', err);
+      console.error('❌ Erro ao salvar recibos:', err);
       // Continua mesmo com erro no arquivo
     }
   }
@@ -537,11 +579,11 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
     WHERE id = $1
   `, [categoria.id]);
 
-  // Registrar no histórico (com observação e caminho do recibo)
+  // Registrar no histórico (com observação e caminhos dos recibos)
   const observacaoHistorico = [
-    'Classificação manual via WhatsApp (comando ppp)',
+    'Classificação manual via WhatsApp (comando lll)',
     observacao ? `Observação: ${observacao}` : null,
-    caminhoRecibo ? `Recibo: ${caminhoRecibo}` : null
+    caminhosRecibos.length > 0 ? `Recibos (${caminhosRecibos.length}): ${caminhosRecibos.join(', ')}` : null
   ].filter(Boolean).join(' | ');
 
   await pool.query(`
@@ -558,8 +600,12 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
     mensagemSucesso += `\n📝 ${observacao}`;
   }
 
-  if (caminhoRecibo) {
-    mensagemSucesso += `\n📎 Recibo salvo`;
+  if (caminhosRecibos.length > 0) {
+    if (caminhosRecibos.length === 1) {
+      mensagemSucesso += `\n📎 1 recibo salvo`;
+    } else {
+      mensagemSucesso += `\n📎 ${caminhosRecibos.length} recibos salvos`;
+    }
   }
 
   await sock.sendMessage(grupoId, { text: mensagemSucesso });
