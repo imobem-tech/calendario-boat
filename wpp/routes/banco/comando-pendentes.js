@@ -475,21 +475,31 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   let caminhoRecibo = null;
   if (reciboArquivo) {
     try {
-      // Salvar no Railway em /app/doc_financeiros/
+      // Estrutura FLAT: {EMPRESA}/{CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
+      // Exemplo: IMOBEM/001_123456_20260912_022021.jpg
+
       const baseDir = path.join(process.cwd(), 'doc_financeiros');
       const empresaDir = path.join(baseDir, lanc.empresa);
-      const categoriaNome = categoria.nome.replace(/[/\\?%*:|"<>]/g, '_'); // Sanitizar nome
-      const categoriaDir = path.join(empresaDir, categoriaNome);
 
       if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
       if (!fs.existsSync(empresaDir)) fs.mkdirSync(empresaDir, { recursive: true });
-      if (!fs.existsSync(categoriaDir)) fs.mkdirSync(categoriaDir, { recursive: true });
+
+      // Formatar ID da categoria como nnn (3 dígitos)
+      const categoriaIdFormatado = String(categoria.id).padStart(3, '0');
+
+      // Nome do arquivo: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
+      const ext = path.extname(reciboArquivo.nome); // .jpg, .pdf, etc
+      const timestamp = reciboArquivo.nome.replace(ext, ''); // Remove extensão
+      const nomeArquivo = `${categoriaIdFormatado}_${lanc.id}_${timestamp}${ext}`;
+
+      // Caminho completo
+      caminhoRecibo = path.join(empresaDir, nomeArquivo);
 
       // Salvar arquivo
-      caminhoRecibo = path.join(categoriaDir, reciboArquivo.nome);
       fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
 
       console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
+      console.log(`📋 Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}`);
       console.log(`⚠️  Storage ephemeral - considerar migração para Vercel Blob`);
 
     } catch (err) {

@@ -28,45 +28,54 @@ router.get('/listar', (req, res) => {
 
     const arquivos = [];
 
-    // Função recursiva para listar arquivos
-    function listarRecursivo(dir, empresaAtual = '', categoria = '') {
-      const items = fs.readdirSync(dir);
+    // Função para listar arquivos (estrutura FLAT)
+    // Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
+    function listarEmpresa(empresaNome) {
+      const empresaDir = path.join(BASE_DIR, empresaNome);
+      if (!fs.existsSync(empresaDir)) return;
+
+      const items = fs.readdirSync(empresaDir);
 
       for (const item of items) {
-        const fullPath = path.join(dir, item);
+        const fullPath = path.join(empresaDir, item);
         const stat = fs.statSync(fullPath);
 
-        if (stat.isDirectory()) {
-          // Se está na raiz, é empresa
-          if (!empresaAtual) {
-            listarRecursivo(fullPath, item, '');
+        if (stat.isFile()) {
+          // Parse do nome: 001_123456_20260912_022021.jpg
+          const match = item.match(/^(\d{3})_(\d+)_(\d{8}_\d{6})\.(.*)$/);
+
+          if (match) {
+            const [, categoriaId, lancamentoId, timestamp, ext] = match;
+
+            arquivos.push({
+              empresa: empresaNome,
+              categoriaId: parseInt(categoriaId),
+              lancamentoId: parseInt(lancamentoId),
+              timestamp: timestamp,
+              arquivo: item,
+              tamanho: stat.size,
+              data: stat.mtime,
+              url: `/api/banco/recibos/download/${empresaNome}/${encodeURIComponent(item)}`
+            });
           }
-          // Se tem empresa, é categoria
-          else if (!categoria) {
-            listarRecursivo(fullPath, empresaAtual, item);
-          }
-        } else {
-          // É arquivo
-          arquivos.push({
-            empresa: empresaAtual,
-            categoria: categoria,
-            arquivo: item,
-            tamanho: stat.size,
-            data: stat.mtime,
-            url: `/api/banco/recibos/download/${empresaAtual}/${encodeURIComponent(categoria)}/${encodeURIComponent(item)}`
-          });
         }
       }
     }
 
     // Listar de empresa específica ou todas
     if (empresa) {
-      const empresaDir = path.join(BASE_DIR, empresa);
-      if (fs.existsSync(empresaDir)) {
-        listarRecursivo(empresaDir, empresa, '');
-      }
+      listarEmpresa(empresa);
     } else {
-      listarRecursivo(BASE_DIR);
+      // Listar todas empresas
+      if (fs.existsSync(BASE_DIR)) {
+        const empresas = fs.readdirSync(BASE_DIR);
+        for (const emp of empresas) {
+          const stat = fs.statSync(path.join(BASE_DIR, emp));
+          if (stat.isDirectory()) {
+            listarEmpresa(emp);
+          }
+        }
+      }
     }
 
     res.json({
@@ -81,14 +90,15 @@ router.get('/listar', (req, res) => {
 });
 
 /**
- * GET /api/recibos/download/:empresa/:categoria/:arquivo
- * Baixa um recibo específico
+ * GET /api/recibos/download/:empresa/:arquivo
+ * Baixa um recibo específico (estrutura FLAT)
+ * Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
  */
-router.get('/download/:empresa/:categoria/:arquivo', (req, res) => {
+router.get('/download/:empresa/:arquivo', (req, res) => {
   try {
-    const { empresa, categoria, arquivo } = req.params;
+    const { empresa, arquivo } = req.params;
 
-    const filePath = path.join(BASE_DIR, empresa, categoria, arquivo);
+    const filePath = path.join(BASE_DIR, empresa, arquivo);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ erro: 'Arquivo não encontrado' });
