@@ -554,8 +554,11 @@
         // Carregar categorias
         async function carregarCategorias() {
             try {
+                console.log('🔄 Carregando categorias...');
                 const response = await fetch(`${API_URL}/categorias/todas`);
                 const data = await response.json();
+
+                console.log('✅ Categorias carregadas:', data.total);
 
                 const select = document.getElementById('filtroCategoria');
 
@@ -564,23 +567,42 @@
 
                 // Agrupar por tipo
                 let tipoAtual = '';
+                let optgroupAtual = null;
+
                 data.categorias.forEach(cat => {
-                    // Separador visual entre CREDITO e DEBITO
+                    // Novo tipo? Criar novo optgroup
                     if (cat.tipo !== tipoAtual) {
                         tipoAtual = cat.tipo;
-                        const optgroup = document.createElement('optgroup');
-                        optgroup.label = `━━━ ${cat.tipo === 'CREDITO' ? '💰 CRÉDITO' : '💸 DÉBITO'} ━━━`;
-                        select.appendChild(optgroup);
+                        optgroupAtual = document.createElement('optgroup');
+
+                        let labelTipo = '';
+                        if (cat.tipo === 'CREDITO') {
+                            labelTipo = '💰 CRÉDITO';
+                        } else if (cat.tipo === 'DEBITO') {
+                            labelTipo = '💸 DÉBITO';
+                        } else {
+                            labelTipo = cat.tipo; // Outros tipos
+                        }
+
+                        optgroupAtual.label = `━━━ ${labelTipo} ━━━`;
+                        select.appendChild(optgroupAtual);
                     }
 
                     const option = document.createElement('option');
                     option.value = cat.id;
                     option.textContent = `${cat.icone || '📌'} ${cat.nome}`;
-                    select.appendChild(option);
+
+                    if (optgroupAtual) {
+                        optgroupAtual.appendChild(option);
+                    } else {
+                        select.appendChild(option);
+                    }
                 });
 
+                console.log('✅ Dropdown populado com', data.categorias.length, 'categorias');
+
             } catch (err) {
-                console.error('Erro ao carregar categorias:', err);
+                console.error('❌ Erro ao carregar categorias:', err);
             }
         }
 
@@ -593,4 +615,4 @@
 </body>
 </html>
 
-<!-- V.260912095000 -->
+<!-- V.260912100000 -->
