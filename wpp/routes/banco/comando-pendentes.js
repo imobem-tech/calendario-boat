@@ -329,6 +329,9 @@ async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
   const lanc = sessao.lancamentoEscolhido;
   const categoria = sessao.categoriaEscolhida;
 
+  // DEBUG: Log da estrutura da mensagem
+  console.log('📎 Processando recibo, tipo de mensagem:', mensagem.message ? Object.keys(mensagem.message) : 'SEM MENSAGEM');
+
   // Verificar se é texto "pular"
   if (mensagem.message?.conversation || mensagem.message?.extendedTextMessage) {
     const texto = (mensagem.message.conversation || mensagem.message.extendedTextMessage?.text || '').trim().toLowerCase();
@@ -338,6 +341,12 @@ async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
       // Ir para confirmação
       return await mostrarConfirmacao(sock, grupoId, sessao);
     }
+
+    // Se é texto mas NÃO é "pular", avisa que precisa enviar arquivo
+    await sock.sendMessage(grupoId, {
+      text: '⚠️ Envie uma *imagem* ou *PDF* do recibo, ou responda *pular* para continuar sem anexo.'
+    });
+    return true;
   }
 
   // Verificar se enviou arquivo/imagem
