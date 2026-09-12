@@ -105,7 +105,7 @@ export async function criarCategoria(req, res) {
       });
     }
 
-    const tiposValidos = ['RECEITA', 'DESPESA', 'TRANSFERENCIA'];
+    const tiposValidos = ['CREDITO', 'DEBITO'];
     if (!tiposValidos.includes(tipo)) {
       return res.status(400).json({
         erro: 'Tipo inválido',
