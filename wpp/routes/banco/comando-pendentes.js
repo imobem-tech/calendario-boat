@@ -94,12 +94,11 @@ export async function listarPendentes(sock, grupoId) {
 
     pendentes.forEach((lanc, index) => {
       const numero = index + 1;
-      const emoji = numero === 1 ? '1️⃣' : numero === 2 ? '2️⃣' : '3️⃣';
       const dataFormatada = new Date(lanc.data).toLocaleDateString('pt-BR');
       const valorFormatado = Math.abs(parseFloat(lanc.valor)).toFixed(2);
-      const tipoEmoji = lanc.tipo === 'CREDITO' ? '💰' : '💸';
 
-      mensagem += `${emoji} R$ ${valorFormatado} - ${lanc.tipo === 'CREDITO' ? 'Recebido' : 'Pago'} - ${dataFormatada}\n`;
+      mensagem += `${numero} ━━━━━━━━━━━━━━━━\n`;
+      mensagem += `R$ ${valorFormatado} - ${lanc.tipo === 'CREDITO' ? 'Recebido' : 'Pago'} - ${dataFormatada}\n`;
       mensagem += `   🏢 ${lanc.empresa} | ${lanc.banco}\n`;
       mensagem += `   📝 ${lanc.descricao_original}\n`;
 
@@ -230,7 +229,7 @@ async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao)
 
   categorias.rows.forEach((cat, index) => {
     const num = index + 1;
-    mensagem += `${num}. ${cat.icone || '📌'} ${cat.nome} (${cat.tipo})\n`;
+    mensagem += `${num}. ${cat.icone || '📌'} ${cat.nome}\n`;
   });
 
   mensagem += `\n✏️ *Responda o número da categoria*`;
