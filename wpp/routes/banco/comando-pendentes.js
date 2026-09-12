@@ -470,11 +470,13 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   const reciboArquivo = sessao.reciboArquivo;
 
   // SALVAR RECIBO NA PASTA (se houver)
+  // ATENÇÃO: Railway tem storage ephemeral - arquivos podem ser perdidos no redeploy!
+  // TODO: Migrar para Vercel Blob para storage permanente
   let caminhoRecibo = null;
   if (reciboArquivo) {
     try {
-      // Salvar no Railway em /app/recibos/
-      const baseDir = path.join(process.cwd(), 'recibos');
+      // Salvar no Railway em /app/doc_financeiros/
+      const baseDir = path.join(process.cwd(), 'doc_financeiros');
       const empresaDir = path.join(baseDir, lanc.empresa);
       const categoriaNome = categoria.nome.replace(/[/\\?%*:|"<>]/g, '_'); // Sanitizar nome
       const categoriaDir = path.join(empresaDir, categoriaNome);
@@ -488,23 +490,10 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
       fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
 
       console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
-
-      // REENVIAR ARQUIVO NO WHATSAPP com legenda
-      const legenda = `📎 *RECIBO ARQUIVADO*\n\n` +
-        `🏢 ${lanc.empresa}\n` +
-        `📂 ${categoria.icone || '📌'} ${categoria.nome}\n` +
-        `💰 R$ ${Math.abs(parseFloat(lanc.valor)).toFixed(2)}\n` +
-        `📅 ${new Date(lanc.data).toLocaleDateString('pt-BR')}\n` +
-        (observacao ? `📝 ${observacao}\n` : '') +
-        `\n✅ Arquivo salvo no sistema`;
-
-      await sock.sendMessage(grupoId, {
-        image: reciboArquivo.buffer,
-        caption: legenda
-      });
+      console.log(`⚠️  Storage ephemeral - considerar migração para Vercel Blob`);
 
     } catch (err) {
-      console.error('❌ Erro ao salvar/reenviar recibo:', err);
+      console.error('❌ Erro ao salvar recibo:', err);
       // Continua mesmo com erro no arquivo
     }
   }
