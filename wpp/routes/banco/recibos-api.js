@@ -1,86 +1,87 @@
 // ============================================================
-// wpp/routes/banco/recibos-api.js — V.260912030000
-// API PARA ACESSAR RECIBOS SALVOS NO RAILWAY
+// wpp/routes/banco/recibos-api.js — V.260912080000
+// API PARA ACESSAR RECIBOS SALVOS NO VERCEL BLOB
+// Migrado de filesystem (Railway ephemeral) para Vercel Blob (permanente)
 // ============================================================
 
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 const router = express.Router();
 
-const BASE_DIR = path.join(process.cwd(), 'doc_financeiros');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 /**
- * GET /api/recibos/listar?empresa=IMOBEM
+ * GET /api/banco/recibos/listar?empresa=IMOBEM
  * Lista todos os recibos (opcionalmente filtrado por empresa)
+ * Busca do banco de dados (campo recibos_urls)
  */
-router.get('/listar', (req, res) => {
+router.get('/listar', async (req, res) => {
   try {
     const { empresa } = req.query;
 
-    if (!fs.existsSync(BASE_DIR)) {
-      return res.json({
-        mensagem: 'Nenhum recibo encontrado (pasta não existe)',
-        arquivos: []
-      });
+    let query = `
+      SELECT
+        id,
+        empresa,
+        data,
+        valor,
+        descricao,
+        classificacao,
+        recibos_urls
+      FROM bank_extratos
+      WHERE recibos_urls IS NOT NULL
+        AND recibos_urls::TEXT != '[]'
+    `;
+
+    const params = [];
+
+    if (empresa) {
+      query += ` AND empresa = $1`;
+      params.push(empresa);
     }
 
+    query += ` ORDER BY data DESC`;
+
+    const result = await pool.query(query, params);
+
+    // Transformar resultado para formato esperado pela interface
     const arquivos = [];
 
-    // Função para listar arquivos (estrutura FLAT)
-    // Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
-    function listarEmpresa(empresaNome) {
-      const empresaDir = path.join(BASE_DIR, empresaNome);
-      if (!fs.existsSync(empresaDir)) return;
+    for (const row of result.rows) {
+      const recibos = row.recibos_urls || [];
 
-      const items = fs.readdirSync(empresaDir);
+      for (const recibo of recibos) {
+        // Parse do nome: 001_123456_20260912_022021.jpg
+        const match = recibo.nome.match(/^(\d{3})_(\d+)_(\d{8}_\d{6})\.(.*)$/);
 
-      for (const item of items) {
-        const fullPath = path.join(empresaDir, item);
-        const stat = fs.statSync(fullPath);
+        if (match) {
+          const [, categoriaId, lancamentoId, timestamp, ext] = match;
 
-        if (stat.isFile()) {
-          // Parse do nome: 001_123456_20260912_022021.jpg
-          const match = item.match(/^(\d{3})_(\d+)_(\d{8}_\d{6})\.(.*)$/);
-
-          if (match) {
-            const [, categoriaId, lancamentoId, timestamp, ext] = match;
-
-            arquivos.push({
-              empresa: empresaNome,
-              categoriaId: parseInt(categoriaId),
-              lancamentoId: parseInt(lancamentoId),
-              timestamp: timestamp,
-              arquivo: item,
-              tamanho: stat.size,
-              data: stat.mtime,
-              url: `/api/banco/recibos/download/${empresaNome}/${encodeURIComponent(item)}`
-            });
-          }
-        }
-      }
-    }
-
-    // Listar de empresa específica ou todas
-    if (empresa) {
-      listarEmpresa(empresa);
-    } else {
-      // Listar todas empresas
-      if (fs.existsSync(BASE_DIR)) {
-        const empresas = fs.readdirSync(BASE_DIR);
-        for (const emp of empresas) {
-          const stat = fs.statSync(path.join(BASE_DIR, emp));
-          if (stat.isDirectory()) {
-            listarEmpresa(emp);
-          }
+          arquivos.push({
+            empresa: row.empresa,
+            categoriaId: parseInt(categoriaId),
+            lancamentoId: parseInt(lancamentoId),
+            timestamp: timestamp,
+            arquivo: recibo.nome,
+            tamanho: recibo.tamanho || 0,
+            tipo: recibo.tipo || ext,
+            url: recibo.url, // URL direta do Vercel Blob
+            data: row.data,
+            valor: row.valor,
+            descricao: row.descricao,
+            classificacao: row.classificacao
+          });
         }
       }
     }
 
     res.json({
       total: arquivos.length,
-      arquivos: arquivos.sort((a, b) => b.data - a.data) // Mais recentes primeiro
+      arquivos: arquivos
     });
 
   } catch (err) {
@@ -90,91 +91,68 @@ router.get('/listar', (req, res) => {
 });
 
 /**
- * GET /api/recibos/download/:empresa/:arquivo
- * Baixa um recibo específico (estrutura FLAT)
- * Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
- */
-router.get('/download/:empresa/:arquivo', (req, res) => {
-  try {
-    const { empresa, arquivo } = req.params;
-
-    const filePath = path.join(BASE_DIR, empresa, arquivo);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ erro: 'Arquivo não encontrado' });
-    }
-
-    // Detectar tipo de arquivo
-    const ext = path.extname(arquivo).toLowerCase();
-    const mimeTypes = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.pdf': 'application/pdf',
-      '.bin': 'application/octet-stream'
-    };
-
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-
-    // Enviar arquivo
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${arquivo}"`);
-
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-
-  } catch (err) {
-    console.error('❌ Erro ao baixar recibo:', err);
-    res.status(500).json({ erro: err.message });
-  }
-});
-
-/**
- * GET /api/recibos/empresas
+ * GET /api/banco/recibos/empresas
  * Lista empresas que têm recibos
  */
-router.get('/empresas', (req, res) => {
+router.get('/empresas', async (req, res) => {
   try {
-    if (!fs.existsSync(BASE_DIR)) {
-      return res.json({ empresas: [] });
-    }
+    const result = await pool.query(`
+      SELECT
+        empresa,
+        COUNT(*) FILTER (WHERE recibos_urls IS NOT NULL AND recibos_urls::TEXT != '[]') as total_recibos
+      FROM bank_extratos
+      WHERE recibos_urls IS NOT NULL AND recibos_urls::TEXT != '[]'
+      GROUP BY empresa
+      ORDER BY empresa
+    `);
 
-    const empresas = fs.readdirSync(BASE_DIR)
-      .filter(item => {
-        const stat = fs.statSync(path.join(BASE_DIR, item));
-        return stat.isDirectory();
-      })
-      .map(empresa => {
-        const empresaPath = path.join(BASE_DIR, empresa);
-        let totalArquivos = 0;
-
-        // Contar arquivos recursivamente
-        function contarArquivos(dir) {
-          const items = fs.readdirSync(dir);
-          for (const item of items) {
-            const fullPath = path.join(dir, item);
-            const stat = fs.statSync(fullPath);
-            if (stat.isDirectory()) {
-              contarArquivos(fullPath);
-            } else {
-              totalArquivos++;
-            }
-          }
-        }
-
-        contarArquivos(empresaPath);
-
-        return {
-          empresa,
-          totalRecibos: totalArquivos,
-          url: `/api/banco/recibos/listar?empresa=${empresa}`
-        };
-      });
+    const empresas = result.rows.map(row => ({
+      empresa: row.empresa,
+      totalRecibos: parseInt(row.total_recibos),
+      url: `/api/banco/recibos/listar?empresa=${row.empresa}`
+    }));
 
     res.json({ empresas });
 
   } catch (err) {
     console.error('❌ Erro ao listar empresas:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+/**
+ * GET /api/banco/recibos/download/:empresa/:arquivo
+ * Redireciona para URL do Vercel Blob
+ * (Mantido por compatibilidade, mas agora apenas redireciona)
+ */
+router.get('/download/:empresa/:arquivo', async (req, res) => {
+  try {
+    const { empresa, arquivo } = req.params;
+
+    // Buscar URL do Vercel Blob no banco
+    const result = await pool.query(`
+      SELECT recibos_urls
+      FROM bank_extratos
+      WHERE empresa = $1
+        AND recibos_urls @> $2::jsonb
+    `, [empresa, JSON.stringify([{ nome: arquivo }])]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ erro: 'Arquivo não encontrado' });
+    }
+
+    const recibos = result.rows[0].recibos_urls;
+    const recibo = recibos.find(r => r.nome === arquivo);
+
+    if (!recibo) {
+      return res.status(404).json({ erro: 'Arquivo não encontrado' });
+    }
+
+    // Redirecionar para URL do Vercel Blob
+    res.redirect(recibo.url);
+
+  } catch (err) {
+    console.error('❌ Erro ao baixar recibo:', err);
     res.status(500).json({ erro: err.message });
   }
 });

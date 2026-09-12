@@ -478,18 +478,21 @@
 
         function renderizarDocumento(arquivo) {
             const grid = document.getElementById('documentsGrid');
-            const ext = arquivo.arquivo.split('.').pop().toLowerCase();
+            const ext = arquivo.tipo || arquivo.arquivo.split('.').pop().toLowerCase();
             const isPdf = ext === 'pdf';
             const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
 
             const dataFormatada = formatarData(arquivo.timestamp);
             const tamanhoFormatado = formatarTamanho(arquivo.tamanho);
 
+            // URL direta do Vercel Blob
+            const urlDireta = arquivo.url;
+
             const card = document.createElement('div');
             card.className = 'document-card';
             card.innerHTML = `
                 <div class="document-preview">
-                    ${isImage ? `<img src="${API_URL}${arquivo.url}" alt="Preview" loading="lazy">` : ''}
+                    ${isImage ? `<img src="${urlDireta}" alt="Preview" loading="lazy">` : ''}
                     ${isPdf ? '<div class="icon">📄</div>' : ''}
                     ${!isImage && !isPdf ? '<div class="icon">📎</div>' : ''}
                 </div>
@@ -501,10 +504,10 @@
                     <div class="document-categoria">Categoria ${String(arquivo.categoriaId).padStart(3, '0')}</div>
                     <div class="document-data">📅 ${dataFormatada} | ID: ${arquivo.lancamentoId}</div>
                     <div class="document-actions">
-                        <button class="btn-view" onclick="visualizar('${arquivo.url}')">
+                        <button class="btn-view" onclick="visualizar('${urlDireta}')">
                             👁️ Ver
                         </button>
-                        <button class="btn-download" onclick="baixar('${arquivo.url}', '${arquivo.arquivo}')">
+                        <button class="btn-download" onclick="baixar('${urlDireta}', '${arquivo.arquivo}')">
                             ⬇️ Baixar
                         </button>
                     </div>
@@ -528,12 +531,12 @@
         }
 
         function visualizar(url) {
-            window.open(API_URL + url, '_blank');
+            window.open(url, '_blank');
         }
 
         function baixar(url, nome) {
             const link = document.createElement('a');
-            link.href = API_URL + url;
+            link.href = url;
             link.download = nome;
             link.click();
         }
@@ -551,4 +554,4 @@
 </body>
 </html>
 
-<!-- V.260912040000 -->
+<!-- V.260912080000 -->

@@ -1,10 +1,11 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260912020000
+// wpp/routes/banco/comando-pendentes.js — V.260912080000
 // COMANDO WHATSAPP: lll (LANÇAMENTOS PENDENTES)
 // Fluxo interativo de classificação de lançamentos bancários
 // FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
 // FILTRA PENDENTES POR EMPRESA DO GRUPO
 // ORDEM INTELIGENTE: Base + Boost por uso (Híbrido)
+// ✅ STORAGE PERMANENTE: Vercel Blob (migrado do Railway ephemeral)
 // ============================================================
 
 import pkg from 'pg';
@@ -13,6 +14,7 @@ import { isGrupoFinanceiro, identificarEmpresaPorGrupo } from '../../config/grup
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
+import { put } from '@vercel/blob';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -503,54 +505,57 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   const observacao = sessao.observacaoUsuario || null;
   const recibosArquivos = sessao.recibosArquivos || [];
 
-  // SALVAR RECIBOS NA PASTA (se houver)
-  // ATENÇÃO: Railway tem storage ephemeral - arquivos podem ser perdidos no redeploy!
-  // TODO: Migrar para Vercel Blob para storage permanente
-  const caminhosRecibos = [];
+  // SALVAR RECIBOS NO VERCEL BLOB (se houver)
+  // ✅ Storage permanente - arquivos não são perdidos no redeploy
+  const recibosUrls = [];
 
   if (recibosArquivos.length > 0) {
     try {
-      // Estrutura FLAT: {EMPRESA}/{CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
-      // Exemplo: IMOBEM/001_123456_20260912_022021.jpg
-
-      const baseDir = path.join(process.cwd(), 'doc_financeiros');
-      const empresaDir = path.join(baseDir, lanc.empresa);
-
-      if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
-      if (!fs.existsSync(empresaDir)) fs.mkdirSync(empresaDir, { recursive: true });
+      // Estrutura FLAT: recibos/{EMPRESA}/{CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
+      // Exemplo: recibos/IMOBEM/001_123456_20260912_022021.jpg
 
       // Formatar ID da categoria como nnn (3 dígitos)
       const categoriaIdFormatado = String(categoria.id).padStart(3, '0');
 
-      // Salvar cada arquivo
+      // Upload de cada arquivo para Vercel Blob
       for (const reciboArquivo of recibosArquivos) {
         // Nome do arquivo: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
         const ext = path.extname(reciboArquivo.nome); // .jpg, .pdf, etc
         const timestamp = reciboArquivo.nome.replace(ext, ''); // Remove extensão
         const nomeArquivo = `${categoriaIdFormatado}_${lanc.id}_${timestamp}${ext}`;
 
-        // Caminho completo
-        const caminhoRecibo = path.join(empresaDir, nomeArquivo);
+        // Caminho no Vercel Blob: recibos/{EMPRESA}/{ARQUIVO}
+        const blobPath = `recibos/${lanc.empresa}/${nomeArquivo}`;
 
-        // Salvar arquivo
-        fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
+        // Upload para Vercel Blob
+        const blob = await put(blobPath, reciboArquivo.buffer, {
+          access: 'public',
+          addRandomSuffix: false // Manter nome exato
+        });
 
-        caminhosRecibos.push(caminhoRecibo);
+        // Salvar URL retornada
+        recibosUrls.push({
+          nome: nomeArquivo,
+          url: blob.url,
+          tamanho: reciboArquivo.buffer.length,
+          tipo: ext.replace('.', ''),
+          uploadedAt: new Date().toISOString()
+        });
 
-        console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
+        console.log(`📎 Recibo salvo no Vercel Blob: ${blob.url}`);
       }
 
-      console.log(`✅ Total de recibos salvos: ${caminhosRecibos.length}`);
+      console.log(`✅ Total de recibos salvos: ${recibosUrls.length}`);
       console.log(`📋 Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}`);
-      console.log(`⚠️  Storage ephemeral - considerar migração para Vercel Blob`);
+      console.log(`☁️  Storage permanente: Vercel Blob`);
 
     } catch (err) {
-      console.error('❌ Erro ao salvar recibos:', err);
+      console.error('❌ Erro ao salvar recibos no Vercel Blob:', err);
       // Continua mesmo com erro no arquivo
     }
   }
 
-  // Atualizar lançamento (com observação)
+  // Atualizar lançamento (com observação e URLs dos recibos)
   // Cast explícito para TEXT quando observacao é null (evita erro de tipo)
   await pool.query(`
     UPDATE bank_extratos
@@ -568,9 +573,23 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
             ELSE observacoes || E'\\n---\\n' || $4::TEXT
           END
         ELSE observacoes
+      END,
+      recibos_urls = CASE
+        WHEN $5::JSONB IS NOT NULL THEN
+          CASE
+            WHEN recibos_urls IS NULL OR recibos_urls::TEXT = '[]' THEN $5::JSONB
+            ELSE recibos_urls || $5::JSONB
+          END
+        ELSE recibos_urls
       END
     WHERE id = $1
-  `, [lanc.id, categoria.nome, `WhatsApp: ${remetente}`, observacao || null]);
+  `, [
+    lanc.id,
+    categoria.nome,
+    `WhatsApp: ${remetente}`,
+    observacao || null,
+    recibosUrls.length > 0 ? JSON.stringify(recibosUrls) : null
+  ]);
 
   // INCREMENTAR CONTADOR DE USO (Ordem Inteligente)
   await pool.query(`
@@ -579,11 +598,11 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
     WHERE id = $1
   `, [categoria.id]);
 
-  // Registrar no histórico (com observação e caminhos dos recibos)
+  // Registrar no histórico (com observação e URLs dos recibos)
   const observacaoHistorico = [
     'Classificação manual via WhatsApp (comando lll)',
     observacao ? `Observação: ${observacao}` : null,
-    caminhosRecibos.length > 0 ? `Recibos (${caminhosRecibos.length}): ${caminhosRecibos.join(', ')}` : null
+    recibosUrls.length > 0 ? `Recibos (${recibosUrls.length}): ${recibosUrls.map(r => r.url).join(', ')}` : null
   ].filter(Boolean).join(' | ');
 
   await pool.query(`
