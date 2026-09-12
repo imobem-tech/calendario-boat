@@ -32,29 +32,12 @@ async function migrar() {
     // 3️⃣ Popular palavras-chave
     console.log('3️⃣ Populando palavras-chave...\n');
 
+    // ⚠️ DEFINIR PALAVRAS-CHAVE AQUI
+    // Formato: { id: número_da_categoria, palavras: 'palavra1,palavra2,*wildcard*' }
     const regras = [
-      // IMOBEM - CRÉDITO
-      { id: 33, palavras: 'VIDA,Ct_3o,*terceiro*' },
-
-      // IMOBEM - DÉBITO
-      { id: 32, palavras: 'aluguel,*locação*,*loca*' },
-      { id: 20, palavras: 'lote,terreno,*imóvel*,*imovel*,prestação' },
-      { id: 34, palavras: 'celular,telefone,*telecom*,*vivo*,*tim*,*claro*' },
-      { id: 35, palavras: 'contador,contabilidade,*contábil*' },
-      { id: 19, palavras: 'IPTU,*imposto predial*' },
-      { id: 36, palavras: 'energia,*luz*,CEMIG,*energia elétrica*' },
-      { id: 37, palavras: 'água,*saneamento*,COPASA' },
-      { id: 26, palavras: 'internet,*wifi*,*banda larga*' },
-      { id: 38, palavras: '*seguro*' },
-      { id: 29, palavras: 'condomínio,*condominio*' },
-
-      // ALLMAX - CRÉDITO (exemplo)
-      { id: 1, palavras: 'mensalidade,*mensalista*,*aluguel barco*' },
-      { id: 2, palavras: '*diária*,*day use*' },
-
-      // ALLMAX - DÉBITO (exemplo)
-      { id: 10, palavras: 'combustível,*gasolina*,*diesel*,*combustivel*' },
-      { id: 11, palavras: 'manutenção,*manutencao*,*reparo*,*conserto*' }
+      // Adicionar suas categorias aqui
+      // Exemplo:
+      // { id: 1, palavras: 'mensalidade,*aluguel*,*barco*' },
     ];
 
     let atualizados = 0;

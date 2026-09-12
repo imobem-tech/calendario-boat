@@ -194,8 +194,10 @@ async function inserirLancamento(lanc) {
 }
 
 /**
- * Tenta classificar lançamento automaticamente usando 3 prioridades
- * SEMPRE mantém status PENDENTE até anexar recibo
+ * Tenta classificar lançamento automaticamente
+ * NOVA LÓGICA:
+ *   - Cobrança Asaas → palavras_chave → PENDENTE
+ *   - Outros → chave_aprendida → OK
  */
 async function tentarClassificarAutomatico(hashUnico) {
   try {
@@ -207,7 +209,8 @@ async function tentarClassificarAutomatico(hashUnico) {
         descricao_original,
         valor,
         tipo,
-        id_transacao_banco
+        id_transacao_banco,
+        tipo_importacao
       FROM bank_extratos
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
@@ -216,19 +219,20 @@ async function tentarClassificarAutomatico(hashUnico) {
 
     const lanc = lancResult.rows[0];
 
-    // Classificar usando sistema inteligente de 3 prioridades
+    // Classificar usando novo sistema
     const resultado = await classificarLancamento({
-      externalReference: lanc.id_transacao_banco,
       description: lanc.descricao_original,
-      value: Math.abs(lanc.valor),
+      value: lanc.valor,
       tipo: lanc.tipo,
-      empresa: lanc.empresa
+      empresa: lanc.empresa,
+      tipo_importacao: lanc.tipo_importacao,
+      id_transacao_banco: lanc.id_transacao_banco
     });
 
     // Se encontrou classificação
     if (resultado.categoria_id) {
-      // Atualizar banco de dados
-      await pool.query(`
+      // Montar query de atualização
+      let updateQuery = `
         UPDATE bank_extratos
         SET
           classificacao = $2,
@@ -236,16 +240,30 @@ async function tentarClassificarAutomatico(hashUnico) {
           classificacao_manual = false,
           classificado_por = $4,
           classificado_em = NOW()
-        WHERE id = $1
-      `, [
+      `;
+
+      let updateValues = [
         lanc.id,
         resultado.categoria_id,
-        resultado.status,  // SEMPRE 'PENDENTE'
+        resultado.status,  // 'PENDENTE' ou 'OK'
         `Sistema - ${resultado.metodo}`
-      ]);
+      ];
+
+      // Se tem observação padrão (chave aprendida)
+      if (resultado.observacao_padrao) {
+        updateQuery += `, observacao = $5`;
+        updateValues.push(resultado.observacao_padrao);
+      }
+
+      updateQuery += ` WHERE id = $1`;
+
+      await pool.query(updateQuery, updateValues);
 
       console.log(`✅ Classificado: ${resultado.categoria_nome} (${resultado.metodo})`);
-      console.log(`   Status: ${resultado.status} (aguarda recibo)`);
+      console.log(`   Status: ${resultado.status}`);
+      if (resultado.observacao_padrao) {
+        console.log(`   Observação: ${resultado.observacao_padrao}`);
+      }
 
     } else {
       console.log(`ℹ️  Nenhuma regra encontrada para: "${lanc.descricao_original}"`);

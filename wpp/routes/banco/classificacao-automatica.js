@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.260912120000
+// wpp/routes/banco/classificacao-automatica.js — V.260912150000
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
-// PRIORIDADES: 1) Asaas externalReference → 2) Palavras-chave → 3) Regras antigas
-// PALAVRAS-CHAVE: wildcards (*), normalização (sem acentos), case-insensitive
-// STATUS: SEMPRE PENDENTE até anexar recibo
+// LÓGICA:
+//   - Cobrança Asaas → palavras_chave → PENDENTE (precisa recibo)
+//   - Outros → chave_aprendida → OK (não precisa recibo)
+// APRENDIZADO: frase|valor|tolerancia|observacao
 // ============================================================
 
 import pkg from 'pg';
@@ -33,15 +34,13 @@ function testarPalavraChave(description, palavraChave) {
 
   if (palavraNorm.includes('*')) {
     // Match parcial com wildcard
-    // Exemplo: "Bar*" → encontra "Barco", "Barracão", etc
     const pattern = palavraNorm
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')  // Escape caracteres especiais
-      .replace(/\\\*/g, '.*');                 // Asterisco vira .*
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\*/g, '.*');
     const regex = new RegExp(pattern, 'i');
     return regex.test(descNorm);
   } else {
     // Palavra exata com word boundary
-    // Exemplo: "Barco" → encontra "Mensalidade Barco 123" mas não "Embarcação"
     const escapedWord = palavraNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
     return regex.test(descNorm);
@@ -49,52 +48,86 @@ function testarPalavraChave(description, palavraChave) {
 }
 
 /**
- * PRIORIDADE 1: Classificar por pagamento Asaas (externalReference)
+ * Testa CHAVE APRENDIDA (frase + valor ± tolerância)
+ * Formato: "frase|valor|tolerancia|observacao"
+ * Exemplo: "Hora_MOTOR 586-E2|98|10|X"
  */
-export async function classificarPagamentoAsaas({ externalReference, description, value, empresa }) {
-  if (!externalReference) return null;
+async function testarChaveAprendida({ description, value, empresa }) {
+  if (!description) return null;
 
   try {
-    // Buscar cobrança no Asaas que tem esse externalReference
+    // Buscar categorias com chave_aprendida
     const result = await pool.query(`
       SELECT
-        categoria_id,
-        categoria_nome,
-        categoria_tipo
-      FROM bank_asaas_charges
-      WHERE external_reference = $1
-        AND empresa = $2
-      LIMIT 1
-    `, [externalReference, empresa]);
+        id,
+        nome,
+        tipo,
+        chave_aprendida
+      FROM bank_categorias
+      WHERE empresa IN ('TODAS', $1)
+        AND ativo = true
+        AND chave_aprendida IS NOT NULL
+        AND chave_aprendida != ''
+      ORDER BY ordem
+    `, [empresa]);
 
-    if (result.rows.length > 0) {
-      const cat = result.rows[0];
-      console.log(`✅ [P1-Asaas] Classificado por externalReference: ${cat.categoria_nome}`);
-      return {
-        categoria_id: cat.categoria_id,
-        categoria_nome: cat.categoria_nome,
-        tipo: cat.categoria_tipo,
-        prioridade: 1,
-        metodo: 'Asaas externalReference'
-      };
+    const valorLancInteiro = Math.floor(Math.abs(value));
+
+    // Testar cada categoria
+    for (const cat of result.rows) {
+      const regras = cat.chave_aprendida.split(',');
+
+      for (const regra of regras) {
+        const partes = regra.trim().split('|');
+        if (partes.length < 4) continue; // Formato inválido
+
+        const [frase, valorRef, tolerancia, observacao] = partes;
+
+        // 1. Testa FRASE na descrição
+        const descNorm = removeAcentos(description);
+        const fraseNorm = removeAcentos(frase);
+
+        if (!descNorm.includes(fraseNorm)) {
+          continue; // Frase não bate
+        }
+
+        // 2. Testa VALOR ± tolerância
+        const valorRefInt = parseInt(valorRef, 10);
+        const toleranciaInt = parseInt(tolerancia, 10);
+
+        const variacaoMax = Math.floor(valorRefInt * toleranciaInt / 100);
+        const valorMin = valorRefInt - variacaoMax;
+        const valorMax = valorRefInt + variacaoMax;
+
+        if (valorLancInteiro >= valorMin && valorLancInteiro <= valorMax) {
+          // MATCH!
+          console.log(`✅ [Chave-Aprendida] Match: "${frase}" + valor ${valorLancInteiro} [${valorMin}-${valorMax}] → ${cat.nome}`);
+          return {
+            categoria_id: cat.id,
+            categoria_nome: cat.nome,
+            tipo: cat.tipo,
+            observacao_padrao: observacao,
+            metodo: 'Chave aprendida'
+          };
+        }
+      }
     }
 
     return null;
 
   } catch (err) {
-    console.error('❌ Erro ao classificar por Asaas:', err.message);
+    console.error('❌ Erro ao testar chave aprendida:', err.message);
     return null;
   }
 }
 
 /**
- * PRIORIDADE 2: Classificar por palavras-chave (evidentes)
+ * Classificar por palavras-chave (cobranças Asaas)
  */
-export async function tentarClassificacaoAutomatica({ description, value, empresa }) {
+async function tentarClassificacaoPalavrasChave({ description, value, empresa }) {
   if (!description) return null;
 
   try {
-    // Buscar categorias com palavras-chave para esta empresa
     const result = await pool.query(`
       SELECT
         id,
@@ -109,18 +142,16 @@ export async function tentarClassificacaoAutomatica({ description, value, empres
       ORDER BY ordem
     `, [empresa]);
 
-    // Testar cada categoria
     for (const cat of result.rows) {
       const palavras = cat.palavras_chave.split(',');
 
       for (const palavra of palavras) {
         if (testarPalavraChave(description, palavra)) {
-          console.log(`✅ [P2-Palavras] Match: "${palavra.trim()}" → ${cat.nome}`);
+          console.log(`✅ [Palavras-Chave] Match: "${palavra.trim()}" → ${cat.nome}`);
           return {
             categoria_id: cat.id,
             categoria_nome: cat.nome,
             tipo: cat.tipo,
-            prioridade: 2,
             metodo: `Palavra-chave: "${palavra.trim()}"`
           };
         }
@@ -136,94 +167,70 @@ export async function tentarClassificacaoAutomatica({ description, value, empres
 }
 
 /**
- * PRIORIDADE 3: Regras antigas (compatibilidade)
+ * Classificação completa - NOVA LÓGICA
+ *
+ * 1. Identifica se é COBRANÇA Asaas
+ * 2. Cobrança → palavras_chave → PENDENTE
+ * 3. Outros → chave_aprendida → OK
  */
-export async function classificarPorRegrasAntigas({ description, value, tipo, empresa }) {
-  if (!description) return null;
+export async function classificarLancamento({
+  description,
+  value,
+  tipo,
+  empresa,
+  tipo_importacao,
+  id_transacao_banco
+}) {
 
-  try {
-    const result = await pool.query(`
-      SELECT
-        categoria_id,
-        categoria_nome,
-        tipo as categoria_tipo
-      FROM bank_regras_classificacao
-      WHERE empresa IN ('TODAS', $1)
-        AND ativo = true
-        AND tipo = $2
-        AND (
-          (tipo_regra = 'CONTEM' AND LOWER(UNACCENT($3)) LIKE '%' || LOWER(UNACCENT(palavra_chave)) || '%')
-          OR
-          (tipo_regra = 'VALOR_EXATO' AND ABS($4 - valor_referencia) < 0.01)
-        )
-      ORDER BY ordem
-      LIMIT 1
-    `, [empresa, tipo, description, value]);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1️⃣ IDENTIFICAR SE É COBRANÇA ASAAS
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const isCobrancaAsaas = (
+    tipo_importacao === 'WEBHOOK' ||
+    id_transacao_banco?.startsWith('pay_') ||
+    id_transacao_banco?.startsWith('pix_')  // PIX de cobrança também
+  );
 
-    if (result.rows.length > 0) {
-      const regra = result.rows[0];
-      console.log(`✅ [P3-Regras] Classificado por regra antiga: ${regra.categoria_nome}`);
+  if (isCobrancaAsaas) {
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 2️⃣ COBRANÇA ASAAS → palavras_chave → PENDENTE
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const resultado = await tentarClassificacaoPalavrasChave({
+      description,
+      value,
+      empresa
+    });
+
+    if (resultado) {
       return {
-        categoria_id: regra.categoria_id,
-        categoria_nome: regra.categoria_nome,
-        tipo: regra.categoria_tipo,
-        prioridade: 3,
-        metodo: 'Regra antiga (tabela bank_regras_classificacao)'
+        ...resultado,
+        status: 'PENDENTE',  // ← SEMPRE PENDENTE (precisa recibo)
+        classificacao_automatica: true
       };
     }
 
-    return null;
-
-  } catch (err) {
-    console.error('❌ Erro ao classificar por regras antigas:', err.message);
-    return null;
-  }
-}
-
-/**
- * Classificação completa em 3 prioridades
- * SEMPRE retorna status PENDENTE (aguarda recibo)
- */
-export async function classificarLancamento({ externalReference, description, value, tipo, empresa }) {
-  let resultado = null;
-
-  // PRIORIDADE 1: Asaas externalReference
-  resultado = await classificarPagamentoAsaas({
-    externalReference,
-    description,
-    value,
-    empresa
-  });
-
-  // PRIORIDADE 2: Palavras-chave
-  if (!resultado) {
-    resultado = await tentarClassificacaoAutomatica({
+  } else {
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 3️⃣ OUTROS → chave_aprendida → OK
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const resultado = await testarChaveAprendida({
       description,
       value,
       empresa
     });
+
+    if (resultado) {
+      return {
+        ...resultado,
+        status: 'OK',  // ← SEMPRE OK (não precisa recibo)
+        classificacao_automatica: true
+      };
+    }
   }
 
-  // PRIORIDADE 3: Regras antigas
-  if (!resultado) {
-    resultado = await classificarPorRegrasAntigas({
-      description,
-      value,
-      tipo,
-      empresa
-    });
-  }
-
-  // Se encontrou classificação, SEMPRE retorna PENDENTE
-  if (resultado) {
-    return {
-      ...resultado,
-      status: 'PENDENTE',  // ⚠️ SEMPRE PENDENTE até anexar recibo
-      classificacao_automatica: true
-    };
-  }
-
-  // Não encontrou classificação
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // NÃO ENCONTROU CLASSIFICAÇÃO
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   return {
     categoria_id: null,
     categoria_nome: null,
@@ -232,6 +239,54 @@ export async function classificarLancamento({ externalReference, description, va
     classificacao_automatica: false,
     metodo: 'Nenhuma regra encontrada'
   };
+}
+
+/**
+ * Salvar nova regra aprendida
+ */
+export async function salvarRegraAprendida({
+  categoriaId,
+  fraseChave,
+  valorInteiro,
+  toleranciaPercent,
+  observacao
+}) {
+  try {
+    // Buscar categoria atual
+    const result = await pool.query(`
+      SELECT chave_aprendida FROM bank_categorias WHERE id = $1
+    `, [categoriaId]);
+
+    if (result.rows.length === 0) {
+      throw new Error('Categoria não encontrada');
+    }
+
+    // Montar nova regra
+    const novaRegra = `${fraseChave}|${valorInteiro}|${toleranciaPercent}|${observacao}`;
+
+    // Adicionar à lista existente
+    let chaveAprendida = result.rows[0].chave_aprendida || '';
+
+    if (chaveAprendida.trim()) {
+      chaveAprendida += `, ${novaRegra}`;
+    } else {
+      chaveAprendida = novaRegra;
+    }
+
+    // Atualizar banco
+    await pool.query(`
+      UPDATE bank_categorias
+      SET chave_aprendida = $1
+      WHERE id = $2
+    `, [chaveAprendida, categoriaId]);
+
+    console.log(`✅ Regra aprendida salva: ${novaRegra}`);
+    return true;
+
+  } catch (err) {
+    console.error('❌ Erro ao salvar regra aprendida:', err.message);
+    throw err;
+  }
 }
 
 // ============================================================
