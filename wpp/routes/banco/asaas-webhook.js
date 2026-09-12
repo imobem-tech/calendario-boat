@@ -488,7 +488,7 @@ ${lanc.cpf_cnpj_origem ? `👤 *CPF/CNPJ:* ${lanc.cpf_cnpj_origem}` : ''}
 ${motivos.join('\n')}
 
 ━━━━━━━━━━━━━━━━
-Use o comando *ppp* para classificar.
+Use o comando *lll* para classificar.
     `.trim();
 
     console.log(`📱 Enviando WhatsApp para grupo ${lanc.empresa} (${grupoId})`);

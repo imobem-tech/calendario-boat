@@ -1,6 +1,6 @@
 // ============================================================
 // wpp/routes/banco/comando-pendentes.js — V.260912020000
-// COMANDO WHATSAPP: ppp (LANÇAMENTOS PENDENTES)
+// COMANDO WHATSAPP: lll (LANÇAMENTOS PENDENTES)
 // Fluxo interativo de classificação de lançamentos bancários
 // FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
 // FILTRA PENDENTES POR EMPRESA DO GRUPO
@@ -22,10 +22,10 @@ const pool = new Pool({
 export const sessoesAtivas = new Map(); // grupoId → { etapa, dados }
 
 /**
- * Verifica se é comando ppp
+ * Verifica se é comando lll (Lançamentos pendentes)
  */
 export function ehComandoPendentes(texto) {
-  return /^ppp$/i.test(texto.trim());
+  return /^lll$/i.test(texto.trim());
 }
 
 /**
@@ -176,7 +176,7 @@ export async function processarRespostaPendente(sock, grupoId, remetente, texto,
   } catch (err) {
     console.error('❌ Erro ao processar resposta:', err);
     await sock.sendMessage(grupoId, {
-      text: '❌ Erro ao processar resposta. Tente novamente com *ppp*.'
+      text: '❌ Erro ao processar resposta. Tente novamente com *lll*.'
     });
     sessoesAtivas.delete(grupoId);
     return true;
@@ -199,7 +199,7 @@ async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao)
   const lancamento = sessao.pendentes[numero - 1];
   if (!lancamento) {
     await sock.sendMessage(grupoId, {
-      text: '⚠️ Lançamento não encontrado. Use *ppp* para ver a lista novamente.'
+      text: '⚠️ Lançamento não encontrado. Use *lll* para ver a lista novamente.'
     });
     sessoesAtivas.delete(grupoId);
     return true;
@@ -457,7 +457,7 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
 
   if (resposta === 'n' || resposta === 'nao' || resposta === 'não') {
     await sock.sendMessage(grupoId, {
-      text: '❌ Classificação cancelada.\n\nUse *ppp* para ver a lista novamente.'
+      text: '❌ Classificação cancelada.\n\nUse *lll* para ver a lista novamente.'
     });
     sessoesAtivas.delete(grupoId);
     return true;
@@ -495,6 +495,7 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   }
 
   // Atualizar lançamento (com observação)
+  // Cast explícito para TEXT quando observacao é null (evita erro de tipo)
   await pool.query(`
     UPDATE bank_extratos
     SET
@@ -505,15 +506,15 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
       status_classificacao = 'OK',
       confianca = 1.0,
       observacoes = CASE
-        WHEN $4 IS NOT NULL THEN
+        WHEN $4::TEXT IS NOT NULL AND $4::TEXT != '' THEN
           CASE
-            WHEN observacoes IS NULL OR observacoes = '' THEN $4
-            ELSE observacoes || E'\\n---\\n' || $4
+            WHEN observacoes IS NULL OR observacoes = '' THEN $4::TEXT
+            ELSE observacoes || E'\\n---\\n' || $4::TEXT
           END
         ELSE observacoes
       END
     WHERE id = $1
-  `, [lanc.id, categoria.nome, `WhatsApp: ${remetente}`, observacao]);
+  `, [lanc.id, categoria.nome, `WhatsApp: ${remetente}`, observacao || null]);
 
   // INCREMENTAR CONTADOR DE USO (Ordem Inteligente)
   await pool.query(`

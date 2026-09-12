@@ -369,7 +369,7 @@ if (horaMotorTratado) continue
           }
 
           // ============================================================
-          // Comando Lançamentos Pendentes — ppp (grupos financeiros)
+          // Comando Lançamentos Pendentes — lll (grupos financeiros)
           // ============================================================
           if (ehComandoPendentes(texto)) {
             await listarPendentes(sock, grupoId)
