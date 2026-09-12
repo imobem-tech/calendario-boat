@@ -288,6 +288,7 @@
                         <label>Empresa *</label>
                         <select id="empresa" required>
                             <option value="">Selecione...</option>
+                            <option value="TODAS">🌐 TODAS (comum a todas)</option>
                             <option value="ALLMAX">ALLMAX</option>
                             <option value="IMOBEM">IMOBEM</option>
                             <option value="IMOBAN">IMOBAN</option>
@@ -336,6 +337,7 @@
             <div class="filtro-bar">
                 <label>Empresa:</label>
                 <select id="filtroEmpresa" onchange="carregarCategorias()">
+                    <option value="TODAS">🌐 TODAS</option>
                     <option value="ALLMAX">ALLMAX</option>
                     <option value="IMOBEM">IMOBEM</option>
                     <option value="IMOBAN">IMOBAN</option>
@@ -447,6 +449,7 @@
                         <td>${cat.id}</td>
                         <td>
                             <select class="edit-select" id="empresa-${cat.id}" data-original="${cat.empresa}">
+                                <option value="TODAS" ${cat.empresa === 'TODAS' ? 'selected' : ''}>🌐 TODAS</option>
                                 <option value="ALLMAX" ${cat.empresa === 'ALLMAX' ? 'selected' : ''}>ALLMAX</option>
                                 <option value="IMOBEM" ${cat.empresa === 'IMOBEM' ? 'selected' : ''}>IMOBEM</option>
                                 <option value="IMOBAN" ${cat.empresa === 'IMOBAN' ? 'selected' : ''}>IMOBAN</option>

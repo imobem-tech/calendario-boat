@@ -199,11 +199,14 @@ async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao)
   // Buscar categorias da empresa (ORDEM INTELIGENTE + FILTRO POR TIPO)
   // Se lançamento é CREDITO → só mostra categorias CREDITO
   // Se lançamento é DEBITO → só mostra categorias DEBITO
+  // Mostra: categorias da EMPRESA específica + categorias TODAS (comuns)
   const categorias = await pool.query(`
-    SELECT id, nome, tipo, icone, ordem, vezes_usada,
+    SELECT id, nome, tipo, icone, ordem, vezes_usada, empresa,
            (ordem - (vezes_usada::float / 10)) as ordem_dinamica
     FROM bank_categorias
-    WHERE empresa = $1 AND ativo = true AND tipo = $2
+    WHERE (empresa = $1 OR empresa = 'TODAS')
+      AND ativo = true
+      AND tipo = $2
     ORDER BY ordem_dinamica, nome
   `, [lancamento.empresa, lancamento.tipo]);
 
