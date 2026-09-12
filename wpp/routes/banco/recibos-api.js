@@ -53,7 +53,7 @@ router.get('/listar', (req, res) => {
             arquivo: item,
             tamanho: stat.size,
             data: stat.mtime,
-            url: `/api/recibos/download/${empresaAtual}/${encodeURIComponent(categoria)}/${encodeURIComponent(item)}`
+            url: `/api/banco/recibos/download/${empresaAtual}/${encodeURIComponent(categoria)}/${encodeURIComponent(item)}`
           });
         }
       }
@@ -157,7 +157,7 @@ router.get('/empresas', (req, res) => {
         return {
           empresa,
           totalRecibos: totalArquivos,
-          url: `/api/recibos/listar?empresa=${empresa}`
+          url: `/api/banco/recibos/listar?empresa=${empresa}`
         };
       });
 
