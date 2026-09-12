@@ -329,8 +329,9 @@ async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
   const lanc = sessao.lancamentoEscolhido;
   const categoria = sessao.categoriaEscolhida;
 
-  // DEBUG: Log da estrutura da mensagem
+  // DEBUG: Log completo da estrutura
   console.log('📎 Processando recibo, tipo de mensagem:', mensagem.message ? Object.keys(mensagem.message) : 'SEM MENSAGEM');
+  console.log('📎 Estrutura completa da mensagem:', JSON.stringify(mensagem, null, 2).substring(0, 500));
 
   // Verificar se é texto "pular"
   if (mensagem.message?.conversation || mensagem.message?.extendedTextMessage) {
