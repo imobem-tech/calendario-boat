@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultar Recibos - Sistema Financeiro</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .filters {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .documents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .document-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+
+        .document-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .document-preview {
+            width: 100%;
+            height: 200px;
+            background: #f7fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .document-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .document-preview .icon {
+            font-size: 4rem;
+            opacity: 0.3;
+        }
+
+        .document-info {
+            padding: 15px;
+        }
+
+        .document-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .document-empresa {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .document-size {
+            color: #718096;
+            font-size: 0.85rem;
+        }
+
+        .document-categoria {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .document-data {
+            color: #718096;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .document-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-download {
+            flex: 1;
+            padding: 8px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-download:hover {
+            background: #38a169;
+        }
+
+        .btn-view {
+            flex: 1;
+            padding: 8px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-view:hover {
+            background: #3182ce;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .empty-state .icon {
+            font-size: 5rem;
+            opacity: 0.3;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            color: #718096;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .documents-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📎 Consultar Recibos</h1>
+            <p>Sistema de gerenciamento de documentos financeiros</p>
+        </div>
+
+        <div class="filters">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label>Empresa</label>
+                    <select id="filtroEmpresa">
+                        <option value="">Todas</option>
+                        <option value="ALLMAX">ALLMAX</option>
+                        <option value="IMOBEM">IMOBEM</option>
+                        <option value="IMOBAN">IMOBAN</option>
+                        <option value="SUMMER">SUMMER</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Categoria ID</label>
+                    <input type="number" id="filtroCategoria" placeholder="Ex: 001, 015">
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Início</label>
+                    <input type="date" id="filtroDataInicio">
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Fim</label>
+                    <input type="date" id="filtroDataFim">
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button class="btn btn-secondary" onclick="limparFiltros()">
+                    🔄 Limpar
+                </button>
+                <button class="btn btn-primary" onclick="buscarRecibos()">
+                    🔍 Buscar
+                </button>
+            </div>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="label">Total de Documentos</div>
+                <div class="value" id="statTotal">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Tamanho Total</div>
+                <div class="value" id="statTamanho">0 MB</div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            ⏳ Carregando documentos...
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="icon">📭</div>
+            <h3>Nenhum documento encontrado</h3>
+            <p>Tente ajustar os filtros ou aguarde novos recibos serem anexados</p>
+        </div>
+
+        <div class="documents-grid" id="documentsGrid"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://calendario-boat-production.up.railway.app/api/banco/recibos';
+
+        async function buscarRecibos() {
+            const loading = document.getElementById('loading');
+            const emptyState = document.getElementById('emptyState');
+            const grid = document.getElementById('documentsGrid');
+            const stats = document.getElementById('stats');
+
+            loading.style.display = 'block';
+            emptyState.style.display = 'none';
+            grid.innerHTML = '';
+            stats.style.display = 'none';
+
+            try {
+                const empresa = document.getElementById('filtroEmpresa').value;
+                const url = empresa ? `${API_URL}/listar?empresa=${empresa}` : `${API_URL}/listar`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                loading.style.display = 'none';
+
+                if (!data.arquivos || data.arquivos.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                // Aplicar filtros locais
+                let arquivosFiltrados = filtrarArquivos(data.arquivos);
+
+                if (arquivosFiltrados.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                // Mostrar estatísticas
+                mostrarEstatisticas(arquivosFiltrados);
+                stats.style.display = 'flex';
+
+                // Renderizar documentos
+                arquivosFiltrados.forEach(arquivo => renderizarDocumento(arquivo));
+
+            } catch (err) {
+                loading.style.display = 'none';
+                console.error('Erro:', err);
+                alert('Erro ao carregar documentos: ' + err.message);
+            }
+        }
+
+        function filtrarArquivos(arquivos) {
+            const categoriaId = document.getElementById('filtroCategoria').value;
+            const dataInicio = document.getElementById('filtroDataInicio').value;
+            const dataFim = document.getElementById('filtroDataFim').value;
+
+            return arquivos.filter(arquivo => {
+                // Filtro por categoria
+                if (categoriaId && arquivo.categoriaId !== parseInt(categoriaId)) {
+                    return false;
+                }
+
+                // Filtro por data
+                if (dataInicio || dataFim) {
+                    const dataArquivo = arquivo.timestamp.substring(0, 8); // YYYYMMDD
+                    const dataInicioNum = dataInicio ? dataInicio.replace(/-/g, '') : '00000000';
+                    const dataFimNum = dataFim ? dataFim.replace(/-/g, '') : '99999999';
+
+                    if (dataArquivo < dataInicioNum || dataArquivo > dataFimNum) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        }
+
+        function mostrarEstatisticas(arquivos) {
+            const total = arquivos.length;
+            const tamanhoTotal = arquivos.reduce((sum, arq) => sum + arq.tamanho, 0);
+            const tamanhoMB = (tamanhoTotal / 1024 / 1024).toFixed(2);
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statTamanho').textContent = tamanhoMB + ' MB';
+        }
+
+        function renderizarDocumento(arquivo) {
+            const grid = document.getElementById('documentsGrid');
+            const ext = arquivo.arquivo.split('.').pop().toLowerCase();
+            const isPdf = ext === 'pdf';
+            const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
+
+            const dataFormatada = formatarData(arquivo.timestamp);
+            const tamanhoFormatado = formatarTamanho(arquivo.tamanho);
+
+            const card = document.createElement('div');
+            card.className = 'document-card';
+            card.innerHTML = `
+                <div class="document-preview">
+                    ${isImage ? `<img src="${API_URL}${arquivo.url}" alt="Preview" loading="lazy">` : ''}
+                    ${isPdf ? '<div class="icon">📄</div>' : ''}
+                    ${!isImage && !isPdf ? '<div class="icon">📎</div>' : ''}
+                </div>
+                <div class="document-info">
+                    <div class="document-meta">
+                        <span class="document-empresa">${arquivo.empresa}</span>
+                        <span class="document-size">${tamanhoFormatado}</span>
+                    </div>
+                    <div class="document-categoria">Categoria ${String(arquivo.categoriaId).padStart(3, '0')}</div>
+                    <div class="document-data">📅 ${dataFormatada} | ID: ${arquivo.lancamentoId}</div>
+                    <div class="document-actions">
+                        <button class="btn-view" onclick="visualizar('${arquivo.url}')">
+                            👁️ Ver
+                        </button>
+                        <button class="btn-download" onclick="baixar('${arquivo.url}', '${arquivo.arquivo}')">
+                            ⬇️ Baixar
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            grid.appendChild(card);
+        }
+
+        function formatarData(timestamp) {
+            // 20260912_024751 → 12/09/2026 02:47
+            const data = timestamp.substring(0, 8);
+            const hora = timestamp.substring(9, 15);
+            return `${data.substring(6, 8)}/${data.substring(4, 6)}/${data.substring(0, 4)} ${hora.substring(0, 2)}:${hora.substring(2, 4)}`;
+        }
+
+        function formatarTamanho(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        function visualizar(url) {
+            window.open(API_URL + url, '_blank');
+        }
+
+        function baixar(url, nome) {
+            const link = document.createElement('a');
+            link.href = API_URL + url;
+            link.download = nome;
+            link.click();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtroEmpresa').value = '';
+            document.getElementById('filtroCategoria').value = '';
+            document.getElementById('filtroDataInicio').value = '';
+            document.getElementById('filtroDataFim').value = '';
+        }
+
+        // Carregar ao abrir a página
+        window.addEventListener('load', buscarRecibos);
+    </script>
+</body>
+</html>
+
+<!-- V.260912040000 -->
