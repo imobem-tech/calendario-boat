@@ -473,8 +473,8 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
   let caminhoRecibo = null;
   if (reciboArquivo) {
     try {
-      // Criar pasta se não existir
-      const baseDir = 'D:\\OneDrive\\GESTAO_DZ\\-¢-\\OUTROS\\RECIBOS';
+      // Salvar no Railway em /app/recibos/
+      const baseDir = path.join(process.cwd(), 'recibos');
       const empresaDir = path.join(baseDir, lanc.empresa);
       const categoriaNome = categoria.nome.replace(/[/\\?%*:|"<>]/g, '_'); // Sanitizar nome
       const categoriaDir = path.join(empresaDir, categoriaNome);
@@ -488,8 +488,23 @@ async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
       fs.writeFileSync(caminhoRecibo, reciboArquivo.buffer);
 
       console.log(`📎 Recibo salvo: ${caminhoRecibo}`);
+
+      // REENVIAR ARQUIVO NO WHATSAPP com legenda
+      const legenda = `📎 *RECIBO ARQUIVADO*\n\n` +
+        `🏢 ${lanc.empresa}\n` +
+        `📂 ${categoria.icone || '📌'} ${categoria.nome}\n` +
+        `💰 R$ ${Math.abs(parseFloat(lanc.valor)).toFixed(2)}\n` +
+        `📅 ${new Date(lanc.data).toLocaleDateString('pt-BR')}\n` +
+        (observacao ? `📝 ${observacao}\n` : '') +
+        `\n✅ Arquivo salvo no sistema`;
+
+      await sock.sendMessage(grupoId, {
+        image: reciboArquivo.buffer,
+        caption: legenda
+      });
+
     } catch (err) {
-      console.error('❌ Erro ao salvar recibo:', err);
+      console.error('❌ Erro ao salvar/reenviar recibo:', err);
       // Continua mesmo com erro no arquivo
     }
   }
