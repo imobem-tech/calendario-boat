@@ -18,8 +18,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// Controle de sessões interativas
-const sessoesAtivas = new Map(); // grupoId → { etapa, dados }
+// Controle de sessões interativas (exportado para server.js verificar etapa)
+export const sessoesAtivas = new Map(); // grupoId → { etapa, dados }
 
 /**
  * Verifica se é comando ppp

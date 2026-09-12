@@ -315,7 +315,23 @@ async function iniciarBot() {
             ''
           ).trim()
 
-          if (!texto) continue
+          // NÃO pular mensagens sem texto se estiver aguardando arquivo (recibo)
+          // Imagens/PDFs não têm texto, mas precisam ser processadas
+          if (!texto) {
+            // Verificar se está aguardando recibo (permite processar imagens)
+            const { sessoesAtivas } = await import('./routes/banco/comando-pendentes.js');
+            const sessao = sessoesAtivas?.get?.(grupoId);
+
+            if (sessao?.etapa === 'AGUARDANDO_RECIBO') {
+              // Processar arquivo (não pula!)
+              const { processarRespostaPendente } = await import('./routes/banco/comando-pendentes.js');
+              const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto, msg);
+              if (processouPendente) continue;
+            }
+
+            // Se não está aguardando recibo, pula normalmente
+            continue;
+          }
 
           // ============================================================
           // Grupo Administrativo — roteamento exclusivo
