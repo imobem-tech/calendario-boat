@@ -46,7 +46,8 @@ export async function iniciarClassificacaoAsaas(grupoId, lancamento, categorias,
     etapa: 'escolher_categoria',
     lancamentoEscolhido: lancamento,
     categorias: categorias,
-    empresa: empresa
+    empresa: empresa,
+    arquivos: []  // Inicializar array de arquivos
   });
 }
 
