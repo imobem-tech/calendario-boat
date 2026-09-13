@@ -269,8 +269,10 @@ export async function salvarRegraAprendida({
       throw new Error('Categoria não encontrada');
     }
 
-    // Montar nova regra (valor em centavos)
-    const novaRegra = `${fraseChave}|${valorCentavos}|${toleranciaPercent}|${observacao}`;
+    // Montar nova regra (valor em centavos com padding de zeros)
+    // Exemplo: 1 centavo = "001", 150 centavos = "150"
+    const valorPadded = String(valorCentavos).padStart(3, '0');
+    const novaRegra = `${fraseChave}|${valorPadded}|${toleranciaPercent}|${observacao}`;
 
     // Adicionar à lista existente
     let chaveAprendida = result.rows[0].chave_aprendida || '';
