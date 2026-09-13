@@ -50,8 +50,8 @@ function testarPalavraChave(description, palavraChave) {
 
 /**
  * Testa CHAVE APRENDIDA (frase + valor ± tolerância)
- * Formato: "frase|valor|tolerancia|observacao"
- * Exemplo: "Hora_MOTOR 586-E2|98|10|X"
+ * Formato: "frase|valorCentavos|tolerancia|observacao"
+ * Exemplo: "Hora_MOTOR 586-E2|9800|10|X" (R$ 98,00 ± 10%)
  */
 async function testarChaveAprendida({ description, value, empresa }) {
   if (!description) return null;
@@ -72,7 +72,8 @@ async function testarChaveAprendida({ description, value, empresa }) {
       ORDER BY ordem
     `, [empresa]);
 
-    const valorLancInteiro = Math.floor(Math.abs(value));
+    // Converter valor do lançamento para centavos
+    const valorLancCentavos = Math.round(Math.abs(value) * 100);
 
     // Testar cada categoria
     for (const cat of result.rows) {
@@ -82,7 +83,7 @@ async function testarChaveAprendida({ description, value, empresa }) {
         const partes = regra.trim().split('|');
         if (partes.length < 4) continue; // Formato inválido
 
-        const [frase, valorRef, tolerancia, observacao] = partes;
+        const [frase, valorRefCentavos, tolerancia, observacao] = partes;
 
         // 1. Testa FRASE na descrição
         const descNorm = removeAcentos(description);
@@ -92,17 +93,20 @@ async function testarChaveAprendida({ description, value, empresa }) {
           continue; // Frase não bate
         }
 
-        // 2. Testa VALOR ± tolerância
-        const valorRefInt = parseInt(valorRef, 10);
+        // 2. Testa VALOR ± tolerância (em centavos)
+        const valorRefInt = parseInt(valorRefCentavos, 10);
         const toleranciaInt = parseInt(tolerancia, 10);
 
-        const variacaoMax = Math.floor(valorRefInt * toleranciaInt / 100);
+        const variacaoMax = Math.round(valorRefInt * toleranciaInt / 100);
         const valorMin = valorRefInt - variacaoMax;
         const valorMax = valorRefInt + variacaoMax;
 
-        if (valorLancInteiro >= valorMin && valorLancInteiro <= valorMax) {
+        if (valorLancCentavos >= valorMin && valorLancCentavos <= valorMax) {
           // MATCH!
-          console.log(`✅ [Chave-Aprendida] Match: "${frase}" + valor ${valorLancInteiro} [${valorMin}-${valorMax}] → ${cat.nome}`);
+          const valorLancReais = (valorLancCentavos / 100).toFixed(2);
+          const rangeMin = (valorMin / 100).toFixed(2);
+          const rangeMax = (valorMax / 100).toFixed(2);
+          console.log(`✅ [Chave-Aprendida] Match: "${frase}" + valor R$ ${valorLancReais} [R$ ${rangeMin}-${rangeMax}] → ${cat.nome}`);
           return {
             categoria_id: cat.id,
             categoria_nome: cat.nome,
@@ -245,11 +249,13 @@ export async function classificarLancamento({
 
 /**
  * Salvar nova regra aprendida
+ * FORMATO: frase|valorCentavos|tolerancia|observacao
+ * Exemplo: "PIX recebido|1|10|Teste" (R$ 0,01 ± 10%)
  */
 export async function salvarRegraAprendida({
   categoriaId,
   fraseChave,
-  valorInteiro,
+  valorCentavos,
   toleranciaPercent,
   observacao
 }) {
@@ -263,8 +269,8 @@ export async function salvarRegraAprendida({
       throw new Error('Categoria não encontrada');
     }
 
-    // Montar nova regra
-    const novaRegra = `${fraseChave}|${valorInteiro}|${toleranciaPercent}|${observacao}`;
+    // Montar nova regra (valor em centavos)
+    const novaRegra = `${fraseChave}|${valorCentavos}|${toleranciaPercent}|${observacao}`;
 
     // Adicionar à lista existente
     let chaveAprendida = result.rows[0].chave_aprendida || '';

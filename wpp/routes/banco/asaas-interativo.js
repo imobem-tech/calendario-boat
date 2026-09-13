@@ -26,6 +26,7 @@ const aguardandoRespostaWebhook = new Map();
 
 /**
  * Perguntar no grupo sobre lançamento do Asaas
+ * Agora inicia automaticamente o fluxo de classificação
  */
 export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
   try {
@@ -37,7 +38,7 @@ export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
       return;
     }
 
-    // Montar mensagem
+    // 1) Enviar notificação
     let msg = `💰 *NOVO LANÇAMENTO RECEBIDO*\n\n`;
     msg += `📅 Data: ${lancamento.data}\n`;
     msg += `💵 Valor: R$ ${Math.abs(lancamento.valor).toFixed(2)}\n`;
@@ -45,34 +46,92 @@ export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
     msg += `🏢 Empresa: ${empresa}\n\n`;
 
     if (lancamento.descricao_original) {
-      msg += `📝 Descrição do banco:\n"${lancamento.descricao_original}"\n\n`;
+      msg += `📝 Descrição do banco:\n"${lancamento.descricao_original}"\n`;
     }
-
-    msg += `❓ *DO QUE SE TRATA ESTE LANÇAMENTO?*\n\n`;
-    msg += `💡 Responda com:\n`;
-    msg += `• Nome/descrição do lançamento\n`;
-    msg += `• Ou envie foto do recibo/comprovante\n\n`;
-    msg += `Aguardando resposta...`;
 
     await sock.sendMessage(grupoId, { text: msg });
 
-    // Guardar estado
-    const chave = `${empresa}-${lancamento.id_transacao}`;
-    aguardandoRespostaWebhook.set(chave, {
-      grupoId,
-      extratoId: lancamento.id,
-      empresa,
-      valor: lancamento.valor,
-      data: lancamento.data,
-      descricao_original: lancamento.descricao_original,
-      timestamp: Date.now()
-    });
+    // 2) Buscar lançamento completo do banco
+    const lancCompleto = await pool.query(`
+      SELECT
+        id,
+        data,
+        valor,
+        descricao_original,
+        tipo,
+        empresa
+      FROM bank_extratos
+      WHERE id = $1
+    `, [lancamento.id]);
 
-    console.log(`📱 Pergunta enviada para grupo ${empresa}`);
+    if (lancCompleto.rows.length === 0) {
+      console.log(`⚠️ Lançamento ${lancamento.id} não encontrado no banco`);
+      return;
+    }
+
+    const lanc = lancCompleto.rows[0];
+
+    // 3) Determinar tipo e buscar categorias
+    const tipoLancamento = lanc.valor > 0 ? 'CREDITO' : 'DEBITO';
+    const categorias = await pool.query(`
+      SELECT id, nome, tipo, icone
+      FROM bank_categorias
+      WHERE empresa IN ('TODAS', $1)
+        AND ativo = true
+        AND tipo = $2
+      ORDER BY nome
+    `, [empresa, tipoLancamento]);
+
+    if (categorias.rows.length === 0) {
+      await sock.sendMessage(grupoId, {
+        text: `⚠️ Nenhuma categoria ${tipoLancamento} encontrada para ${empresa}`
+      });
+      return;
+    }
+
+    // 4) Enviar lista de categorias
+    await enviarListaCategoriasAsaas(sock, grupoId, lanc, categorias.rows);
+
+    // 5) Iniciar estado (importar do comando-pendentes)
+    const { iniciarClassificacaoAsaas } = await import('./comando-pendentes.js');
+    await iniciarClassificacaoAsaas(grupoId, lanc, categorias.rows, empresa);
+
+    console.log(`📱 Notificação e categorias enviadas para grupo ${empresa}`);
 
   } catch (err) {
     console.error('❌ Erro ao perguntar no grupo:', err);
   }
+}
+
+/**
+ * Enviar lista de categorias para classificação Asaas
+ */
+async function enviarListaCategoriasAsaas(sock, grupoId, lancamento, categorias) {
+  const valorFormatado = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(Math.abs(lancamento.valor));
+
+  const dataFormatada = new Date(lancamento.data).toLocaleDateString('pt-BR');
+
+  let mensagem = `\n📝 *CLASSIFICANDO LANÇAMENTO*\n\n`;
+  mensagem += `💰 ${valorFormatado} - ${lancamento.valor > 0 ? 'Recebido' : 'Pago'}\n`;
+  mensagem += `📅 ${dataFormatada}\n`;
+  mensagem += `🏢 ${lancamento.empresa || 'N/A'}\n`;
+  mensagem += `📝 ${lancamento.descricao_original}\n\n`;
+  mensagem += `${'━'.repeat(16)}\n`;
+  mensagem += `📂 *CATEGORIAS DISPONÍVEIS:*\n\n`;
+
+  categorias.forEach((cat, i) => {
+    const numero = i + 1;
+    const emoji = cat.icone || '📁';
+    mensagem += `${numero} ${emoji} ${cat.nome}\n`;
+  });
+
+  mensagem += `\n${'━'.repeat(16)}\n`;
+  mensagem += `✏️ Responda o número da categoria`;
+
+  await sock.sendMessage(grupoId, { text: mensagem });
 }
 
 /**

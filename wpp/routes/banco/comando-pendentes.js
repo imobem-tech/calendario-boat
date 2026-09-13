@@ -38,6 +38,18 @@ export function estaProcessandoPendentes(grupoId) {
 }
 
 /**
+ * Iniciar classificação Asaas (chamado automaticamente ao receber PIX)
+ */
+export async function iniciarClassificacaoAsaas(grupoId, lancamento, categorias, empresa) {
+  estadoPendentes.set(grupoId, {
+    etapa: 'escolher_categoria',
+    lancamentoEscolhido: lancamento,
+    categorias: categorias,
+    empresa: empresa
+  });
+}
+
+/**
  * COMANDO: lll (listar pendentes)
  */
 export async function listarPendentes(sock, grupoId, empresa) {
@@ -145,8 +157,11 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
 
     const lancamento = estado.lancamentos[numero - 1];
 
-    // Buscar categorias disponíveis
-    const categorias = await buscarCategorias(estado.empresa);
+    // Determinar tipo (CREDITO se positivo, DEBITO se negativo)
+    const tipoLancamento = lancamento.valor > 0 ? 'CREDITO' : 'DEBITO';
+
+    // Buscar categorias disponíveis do tipo correto
+    const categorias = await buscarCategorias(estado.empresa, tipoLancamento);
 
     // Atualizar estado
     estado.etapa = 'escolher_categoria';
@@ -218,8 +233,14 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
     else if (textoLimpo.toLowerCase() === 'aprender') {
       estado.etapa = 'aprender_copiar_descricao';
 
+      // Enviar descrição SOZINHA para facilitar copiar
       await sock.sendMessage(grupoId, {
-        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n📝 *DESCRIÇÃO DO LANÇAMENTO:*\n${estado.lancamentoEscolhido.descricao_original}\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição acima e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n✏️ Cole o trecho:`
+        text: estado.lancamentoEscolhido.descricao_original
+      });
+
+      // Depois enviar instruções
+      await sock.sendMessage(grupoId, {
+        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição acima e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n✏️ Cole o trecho:`
       });
 
       return true;
@@ -238,10 +259,18 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
     estado.fraseChave = textoLimpo;
     estado.etapa = 'aprender_tolerancia';
 
-    const valorInteiro = Math.floor(Math.abs(estado.lancamentoEscolhido.valor));
+    const valorReal = Math.abs(estado.lancamentoEscolhido.valor);
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valorReal);
+
+    const valorCentavos = Math.round(valorReal * 100);
+    const valorMin = Math.round(valorCentavos * 0.9) / 100;
+    const valorMax = Math.round(valorCentavos * 1.1) / 100;
 
     await sock.sendMessage(grupoId, {
-      text: `💰 *TOLERÂNCIA DE VALOR*\n\nValor deste lançamento: R$ ${valorInteiro},00\n\n${'━'.repeat(16)}\nDigite o % de tolerância aceito:\n\n• 0 = Somente R$ ${valorInteiro} (valor exato)\n• 10 = De R$ ${Math.floor(valorInteiro * 0.9)} até R$ ${Math.floor(valorInteiro * 1.1)} (±10%)\n• 50 = De R$ ${Math.floor(valorInteiro * 0.5)} até R$ ${Math.floor(valorInteiro * 1.5)} (±50%)\n\n✏️ Digite o %:`
+      text: `💰 *TOLERÂNCIA DE VALOR*\n\nValor deste lançamento: ${valorFormatado}\n\n${'━'.repeat(16)}\nDigite o % de tolerância aceito:\n\n• 0 = Somente ${valorFormatado} (valor exato)\n• 10 = De R$ ${valorMin.toFixed(2)} até R$ ${valorMax.toFixed(2)} (±10%)\n• 50 = De R$ ${(valorCentavos * 0.5 / 100).toFixed(2)} até R$ ${(valorCentavos * 1.5 / 100).toFixed(2)} (±50%)\n\n✏️ Digite o %:`
     });
 
     return true;
@@ -262,12 +291,12 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
 
     // Salvar regra aprendida
     try {
-      const valorInteiro = Math.floor(Math.abs(estado.lancamentoEscolhido.valor));
+      const valorCentavos = Math.round(Math.abs(estado.lancamentoEscolhido.valor) * 100);
 
       await salvarRegraAprendida({
         categoriaId: estado.categoriaEscolhida.id,
         fraseChave: estado.fraseChave,
-        valorInteiro: valorInteiro,
+        valorCentavos: valorCentavos,
         toleranciaPercent: tolerancia,
         observacao: estado.observacao || ''
       });
@@ -285,21 +314,27 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
         WHERE id = $3
       `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
 
-      // Confirmar sucesso
-      const variacaoMax = Math.floor(valorInteiro * tolerancia / 100);
-      const valorMin = valorInteiro - variacaoMax;
-      const valorMax = valorInteiro + variacaoMax;
+      // Confirmar sucesso com valores em reais
+      const variacaoMax = Math.round(valorCentavos * tolerancia / 100);
+      const valorMin = (valorCentavos - variacaoMax) / 100;
+      const valorMax = (valorCentavos + variacaoMax) / 100;
+
+      const valorFormatado = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(valorCentavos / 100);
 
       await sock.sendMessage(grupoId, {
-        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: R$ ${valorInteiro} ± ${tolerancia}%\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin} e R$ ${valorMax}\n\nVão automaticamente para:\n✅ Categoria ${estado.categoriaEscolhida.id}\n✅ Observação "${estado.observacao || '(vazio)'}"\n✅ Status OK\n\nNada mais a fazer! 🎉`
+        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: ${valorFormatado} ± ${tolerancia}%\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin.toFixed(2)} e R$ ${valorMax.toFixed(2)}\n\nVão automaticamente para:\n✅ Categoria: ${estado.categoriaEscolhida.nome}\n✅ Observação: "${estado.observacao || '(vazio)'}"\n✅ Status: OK\n\nNada mais a fazer! 🎉`
       });
 
       estadoPendentes.delete(grupoId);
 
     } catch (err) {
       console.error('❌ Erro ao salvar regra:', err);
+      console.error('Stack:', err.stack);
       await sock.sendMessage(grupoId, {
-        text: '❌ Erro ao criar regra. Tente novamente.'
+        text: `❌ Erro ao criar regra:\n${err.message}\n\nTente novamente.`
       });
     }
 
@@ -312,12 +347,45 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
   else if (estado.etapa === 'aguardar_mais_arquivos') {
 
     if (textoLimpo.toLowerCase() === 'gravar') {
-      await finalizarClassificacao(sock, grupoId, estado, 'OK');
-      estadoPendentes.delete(grupoId);
+      // Mostrar tela de confirmação final
+      await mostrarConfirmacaoFinal(sock, grupoId, estado);
+      estado.etapa = 'confirmar_finalizacao';
       return true;
     }
 
     // Aguarda próximo arquivo (tratado em outro handler)
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 8: Confirmar finalização (s/n/o)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'confirmar_finalizacao') {
+    const opcao = textoLimpo.toLowerCase();
+
+    if (opcao === 's') {
+      // Salvar e finalizar
+      await finalizarClassificacao(sock, grupoId, estado, 'OK');
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+    else if (opcao === 'n') {
+      // Cancelar
+      await sock.sendMessage(grupoId, {
+        text: '❌ Classificação cancelada.'
+      });
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+    else if (opcao === 'o') {
+      // Anexar outro arquivo
+      estado.etapa = 'aguardar_mais_arquivos';
+      await sock.sendMessage(grupoId, {
+        text: `📎 *ANEXAR OUTRO ARQUIVO*\n\n✅ Já anexado: ${estado.arquivos.length} arquivo(s)\n\nEnvie mais uma foto ou PDF\nou responda "gravar" para confirmar.\n\n${'━'.repeat(16)}\n✏️ Envie o arquivo ou "gravar"`
+      });
+      return true;
+    }
+
     return true;
   }
 
@@ -383,18 +451,51 @@ export async function processarImagemPendente(sock, grupoId, mensagem) {
 }
 
 /**
- * Buscar categorias da empresa
+ * Mostrar tela de confirmação final
  */
-async function buscarCategorias(empresa) {
+async function mostrarConfirmacaoFinal(sock, grupoId, estado) {
+  const valorFormatado = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(Math.abs(estado.lancamentoEscolhido.valor));
+
+  let mensagem = `✅ *CONFIRMAÇÃO FINAL*\n\n`;
+  mensagem += `💰 Lançamento:\n`;
+  mensagem += `   ${valorFormatado} - ${estado.lancamentoEscolhido.descricao_original}\n\n`;
+  mensagem += `📂 Categoria:\n`;
+  mensagem += `   ${estado.categoriaEscolhida.icone || '📁'} ${estado.categoriaEscolhida.nome}\n\n`;
+  mensagem += `📝 Observação:\n`;
+  mensagem += `   ${estado.observacao || '(vazio)'}\n\n`;
+
+  if (estado.arquivos && estado.arquivos.length > 0) {
+    mensagem += `📎 Recibo${estado.arquivos.length > 1 ? 's' : ''}:\n`;
+    estado.arquivos.forEach((arq, i) => {
+      mensagem += `   ✅ Anexado (${i + 1}): ${arq.nome}\n`;
+    });
+  } else {
+    mensagem += `📎 Recibo:\n   ⚠️ Sem anexo\n`;
+  }
+
+  mensagem += `\n${'━'.repeat(16)}\n`;
+  mensagem += `✏️ Confirma? (s/n) ou (o) outro`;
+
+  await sock.sendMessage(grupoId, { text: mensagem });
+}
+
+/**
+ * Buscar categorias da empresa filtradas por tipo
+ * @param {string} empresa - Nome da empresa
+ * @param {string} tipo - 'CREDITO' ou 'DEBITO'
+ */
+async function buscarCategorias(empresa, tipo) {
   const result = await pool.query(`
     SELECT id, nome, tipo, icone
     FROM bank_categorias
     WHERE empresa IN ('TODAS', $1)
       AND ativo = true
-    ORDER BY
-      CASE WHEN tipo = 'CREDITO' THEN 1 ELSE 2 END,
-      nome
-  `, [empresa]);
+      AND tipo = $2
+    ORDER BY nome
+  `, [empresa, tipo]);
 
   return result.rows;
 }
