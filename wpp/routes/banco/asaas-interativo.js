@@ -341,14 +341,6 @@ async function classificarComoNovo(extratoId, descricao, remetente) {
 }
 
 // ============================================================
-// EXPORTAÇÕES
-// ============================================================
-
-export {
-  perguntarSobreLancamentoAsaas,
-  processarRespostaWebhook
-};
-
-// ============================================================
-// FIM
+// FIM — V.2609122245
+// Funções exportadas diretamente nas linhas 30 e 81
 // ============================================================
