@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260912160000
+// wpp/routes/banco/comando-pendentes.js — V.2609130115
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
 // FUNCIONALIDADES:
 // - Listar pendentes (comando "lll")
@@ -213,25 +213,32 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
 
     // Pedir recibo
     await sock.sendMessage(grupoId, {
-      text: `📎 *RECIBO/COMPROVANTE (OPCIONAL)*\n\nEnvie uma foto ou PDF do recibo,\nou escolha uma das opções:\n\n${'━'.repeat(16)}\nAceito: Foto, PDF, Imagem\n\n✏️ *Opções:*\n📎 Envie o arquivo\n⏭️ Digite "pular" (continua PENDENTE)\n🧠 Digite "aprender" (marca OK + cria regra automática)`
+      text: `📎 *RECIBO/COMPROVANTE (OPCIONAL)*\n\nEnvie uma foto ou PDF do recibo,\nou escolha uma das opções:\n\n${'━'.repeat(16)}\nAceito: Foto, PDF, Imagem\n\n✏️ *Opções:*\n📎 Envie o arquivo\n✅ Digite "s" para salvar (marca OK)\n⏭️ Digite "pular" (continua PENDENTE)\n🧠 Digite "aprender" (marca OK + cria regra automática)`
     });
 
     return true;
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ETAPA 4: Aguardar recibo/pular/aprender
+  // ETAPA 4: Aguardar recibo/s/pular/aprender
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   else if (estado.etapa === 'aguardar_recibo') {
 
-    // Opção 1: PULAR (sem recibo)
-    if (textoLimpo.toLowerCase() === 'pular') {
+    // Opção 1: SALVAR DIRETO (sem recibo, marca OK)
+    if (textoLimpo.toLowerCase() === 's') {
+      await finalizarClassificacao(sock, grupoId, estado, 'OK');
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+
+    // Opção 2: PULAR (sem recibo, continua PENDENTE)
+    else if (textoLimpo.toLowerCase() === 'pular') {
       await finalizarClassificacao(sock, grupoId, estado, 'PENDENTE');
       estadoPendentes.delete(grupoId);
       return true;
     }
 
-    // Opção 2: APRENDER (criar regra automática)
+    // Opção 3: APRENDER (criar regra automática)
     else if (textoLimpo.toLowerCase() === 'aprender') {
       estado.etapa = 'aprender_copiar_descricao';
 
@@ -409,13 +416,23 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
  * Processar imagem/PDF de recibo
  */
 export async function processarImagemPendente(sock, grupoId, mensagem) {
+  console.log('🖼️ [processarImagemPendente] Iniciando...');
+  console.log('   Grupo:', grupoId);
+
   const estado = estadoPendentes.get(grupoId);
+  console.log('   Estado existe?', !!estado);
+  console.log('   Etapa atual:', estado?.etapa);
+
   if (!estado || (estado.etapa !== 'aguardar_recibo' && estado.etapa !== 'aguardar_mais_arquivos')) {
+    console.log('❌ [processarImagemPendente] Estado inválido ou etapa incorreta');
     return false;
   }
 
+  console.log('✅ [processarImagemPendente] Estado válido, processando arquivo...');
+
   try {
     // Download do arquivo
+    console.log('📥 [processarImagemPendente] Baixando arquivo...');
     const buffer = await downloadMediaMessage(
       mensagem,
       'buffer',
@@ -423,11 +440,16 @@ export async function processarImagemPendente(sock, grupoId, mensagem) {
       { logger: console, reuploadRequest: sock.updateMediaMessage }
     );
 
+    console.log(`✅ [processarImagemPendente] Arquivo baixado! Tamanho: ${buffer.length} bytes`);
+
     // Upload para Vercel Blob
+    console.log('☁️ [processarImagemPendente] Fazendo upload para Vercel Blob...');
     const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
     const ext = mensagem.message.imageMessage ? '.jpg' : '.pdf';
     const nomeArquivo = `${estado.categoriaEscolhida.id}_${estado.lancamentoEscolhido.id}_${timestamp}${ext}`;
     const blobPath = `recibos/${estado.empresa}/${nomeArquivo}`;
+
+    console.log(`   Path: ${blobPath}`);
 
     const blob = await put(blobPath, buffer, {
       access: 'public',
@@ -435,7 +457,10 @@ export async function processarImagemPendente(sock, grupoId, mensagem) {
       addRandomSuffix: false
     });
 
+    console.log(`✅ [processarImagemPendente] Upload concluído! URL: ${blob.url}`);
+
     // Adicionar à lista
+    console.log('📝 [processarImagemPendente] Adicionando arquivo à lista...');
     estado.arquivos.push({
       nome: nomeArquivo,
       url: blob.url,
@@ -444,18 +469,24 @@ export async function processarImagemPendente(sock, grupoId, mensagem) {
       uploadedAt: new Date().toISOString()
     });
 
+    console.log(`✅ [processarImagemPendente] Arquivo adicionado! Total: ${estado.arquivos.length}`);
+
     // Atualizar etapa
     estado.etapa = 'aguardar_mais_arquivos';
+    console.log(`🔄 [processarImagemPendente] Etapa atualizada: ${estado.etapa}`);
 
     // Confirmar
+    console.log('📱 [processarImagemPendente] Enviando confirmação ao grupo...');
     await sock.sendMessage(grupoId, {
       text: `✅ Arquivo ${estado.arquivos.length} recebido e salvo!\n\n${'━'.repeat(16)}\nOpções:\n📎 Envie outro arquivo\n✅ Digite "s" para salvar e finalizar\n📝 Digite "gravar" para revisar antes de salvar`
     });
 
+    console.log('✅ [processarImagemPendente] Processo concluído com sucesso!');
     return true;
 
   } catch (err) {
-    console.error('❌ Erro ao processar imagem:', err);
+    console.error('❌ [processarImagemPendente] Erro ao processar imagem:', err);
+    console.error('   Stack:', err.stack);
     await sock.sendMessage(grupoId, {
       text: '❌ Erro ao salvar arquivo. Tente novamente.'
     });
