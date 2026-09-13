@@ -297,7 +297,7 @@ async function tentarClassificarAutomatico(hashUnico) {
 
       // Se tem observação padrão (chave aprendida)
       if (resultado.observacao_padrao) {
-        updateQuery += `, observacao = $5`;
+        updateQuery += `, observacoes = $5`;
         updateValues.push(resultado.observacao_padrao);
       }
 

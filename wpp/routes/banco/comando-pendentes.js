@@ -13,6 +13,7 @@
 import { put } from '@vercel/blob';
 import pkg from 'pg';
 const { Pool } = pkg;
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { salvarRegraAprendida } from './classificacao-automatica.js';
 
 const pool = new Pool({
@@ -306,7 +307,7 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
         UPDATE bank_extratos
         SET
           classificacao = $1,
-          observacao = $2,
+          observacoes = $2,
           status = 'OK',
           classificacao_manual = false,
           classificado_por = 'Usuário - Aprendizado',
@@ -543,7 +544,7 @@ async function finalizarClassificacao(sock, grupoId, estado, statusFinal) {
       UPDATE bank_extratos
       SET
         classificacao = $1,
-        observacao = $2,
+        observacoes = $2,
         recibos_urls = $3::jsonb,
         status = $4,
         classificacao_manual = true,
