@@ -216,7 +216,7 @@ async function inserirLancamento(lanc) {
       $1, $2, $3, $4, $5,
       $6, DATE_TRUNC('month', $6::DATE), $7, $8, $9, $10,
       $11, $12, $13,
-      $14, $15::jsonb, NOW()
+      $14, $15::jsonb, NOW() AT TIME ZONE 'America/Sao_Paulo'
     )
     ON CONFLICT (hash_unico) DO NOTHING
   `;
@@ -285,7 +285,7 @@ async function tentarClassificarAutomatico(hashUnico) {
           status = $3,
           classificacao_manual = false,
           classificado_por = $4,
-          classificado_em = NOW()
+          classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
       `;
 
       let updateValues = [

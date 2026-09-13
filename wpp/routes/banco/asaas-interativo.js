@@ -350,7 +350,7 @@ async function classificarComoPadrao(extratoId, classificacao, descricao, remete
       classificacao = $2,
       classificacao_manual = true,
       classificado_por = $3,
-      classificado_em = NOW(),
+      classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
       confianca = 0.90
     WHERE id = $1
   `, [extratoId, classificacao, `WhatsApp - ${remetente} (padrão)`]);
@@ -378,7 +378,7 @@ async function classificarComoNovo(extratoId, descricao, remetente) {
       classificacao = $2,
       classificacao_manual = true,
       classificado_por = $3,
-      classificado_em = NOW(),
+      classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
       confianca = 0.95
     WHERE id = $1
   `, [extratoId, categoria, `WhatsApp - ${remetente} (novo)`]);
