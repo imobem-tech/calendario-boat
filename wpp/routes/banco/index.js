@@ -5,7 +5,7 @@
 // ============================================================
 
 import express from 'express';
-import { handleAsaasWebhook, setSockWhatsApp } from './asaas-webhook.js';
+import { handleAsaasWebhook } from './asaas-webhook.js';
 import { sincronizarSicredi } from './sicredi-sync.js';
 import {
   iniciarSincronizacaoAutomatica,
@@ -14,15 +14,6 @@ import {
 } from './cron-sync.js';
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
-import {
-  listarCategorias,
-  listarTodasCategorias,
-  buscarCategoria,
-  criarCategoria,
-  atualizarCategoria,
-  deletarCategoria
-} from './categorias-crud.js';
-import recibosRouter from './recibos-api.js';
 
 const router = express.Router();
 
@@ -35,47 +26,6 @@ const router = express.Router();
  * Recebe eventos do Asaas em tempo real
  */
 router.post('/asaas/webhook', handleAsaasWebhook);
-
-// ============================================================
-// CRUD DE CATEGORIAS (GERENCIAMENTO)
-// ============================================================
-
-/**
- * GET /api/banco/categorias/todas
- * Lista TODAS as categorias (todas empresas)
- */
-router.get('/categorias/todas', listarTodasCategorias);
-
-/**
- * GET /api/banco/categorias?empresa=ALLMAX
- * Lista categorias de uma empresa
- */
-router.get('/categorias', listarCategorias);
-
-/**
- * GET /api/banco/categorias/:id
- * Busca uma categoria específica
- */
-router.get('/categorias/:id', buscarCategoria);
-
-/**
- * POST /api/banco/categorias
- * Cria nova categoria
- */
-router.post('/categorias', criarCategoria);
-
-/**
- * PUT /api/banco/categorias/:id
- * Atualiza categoria
- */
-router.put('/categorias/:id', atualizarCategoria);
-
-/**
- * DELETE /api/banco/categorias/:id
- * Desativa categoria (soft delete)
- * ?permanent=true para deletar permanentemente
- */
-router.delete('/categorias/:id', deletarCategoria);
 
 // ============================================================
 // SINCRONIZAÇÃO MANUAL (POLLING)
@@ -100,17 +50,6 @@ router.post('/sicredi/sync', async (req, res) => {
 router.get('/status', (req, res) => {
   res.json(statusSincronizacao());
 });
-
-// ============================================================
-// API DE RECIBOS (CONSULTA/DOWNLOAD)
-// ============================================================
-
-/**
- * GET /api/banco/recibos/listar?empresa=IMOBEM
- * GET /api/banco/recibos/download/:empresa/:categoria/:arquivo
- * GET /api/banco/recibos/empresas
- */
-router.use('/recibos', recibosRouter);
 
 // ============================================================
 // BACKUPS AUTOMÁTICOS (Railway + Vercel Blob)
@@ -145,14 +84,8 @@ export async function triggerSincronizacaoWhatsApp(banco = 'SICREDI') {
 /**
  * Inicializa sistema de sincronização automática
  * Chamado pelo server.js ao iniciar
- * @param {Object} sock - Socket WhatsApp para notificações
  */
-export function inicializarSistemaBancario(sock) {
-  // Configurar WhatsApp para webhooks
-  if (sock) {
-    setSockWhatsApp(sock);
-  }
-
+export function inicializarSistemaBancario() {
   console.log('\n' + '='.repeat(80));
   console.log('💰 SISTEMA BANCÁRIO - INICIALIZADO');
   console.log('='.repeat(80));
