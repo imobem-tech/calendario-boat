@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.260912120000
+// wpp/routes/banco/asaas-webhook.js — V.2609122114
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA EM 3 PRIORIDADES
 // STATUS: SEMPRE PENDENTE ATÉ ANEXAR RECIBO
+// ACEITA: payment, transfer, bill, movement (extrato bancário)
 // ============================================================
 
 import pkg from 'pg';
@@ -42,12 +43,16 @@ export async function handleAsaasWebhook(req, res) {
 
     const evento = req.body;
 
-    // Validar estrutura do evento
-    if (!evento.event || !evento.payment) {
-      return res.status(400).json({ error: 'Evento inválido' });
+    // Validar estrutura mínima do evento (apenas 'event' é obrigatório)
+    if (!evento.event) {
+      console.error('❌ Evento sem campo "event"');
+      return res.status(400).json({ error: 'Evento inválido: campo "event" ausente' });
     }
 
-    const { event, payment } = evento;
+    const event = evento.event;
+
+    // Extrair dados do objeto (pode ser payment, transfer, bill, movement, etc)
+    const dadosEvento = evento.payment || evento.transfer || evento.bill || evento.movement || evento.pix || {};
 
     // Processar apenas eventos relevantes (14 eventos essenciais)
     const eventosRelevantes = [
@@ -104,8 +109,21 @@ export async function handleAsaasWebhook(req, res) {
     }
 
     console.log(`🏢 Empresa identificada: ${empresa}`);
+    console.log(`📊 Dados do evento:`, JSON.stringify(dadosEvento, null, 2));
 
-    // Extrair dados do lançamento
+    // Validar se há dados
+    if (!dadosEvento.id && !dadosEvento.value) {
+      console.error('❌ Webhook sem dados válidos (sem id ou value)');
+      console.error('   Event:', event);
+      console.error('   Body completo:', JSON.stringify(evento, null, 2));
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        event: event,
+        help: 'Webhook deve conter payment, transfer, bill, movement ou pix com id e value'
+      });
+    }
+
+    // Extrair dados do lançamento (compatível com múltiplas estruturas)
     const lancamento = {
       empresa: empresa,
       banco: 'Asaas',
@@ -113,29 +131,30 @@ export async function handleAsaasWebhook(req, res) {
       nome_banco: 'Asaas IP S.A.',
       tipo_conta: 'Corrente',
 
-      data: payment.paymentDate || payment.dateCreated?.split('T')[0] || new Date().toISOString().split('T')[0],
-      valor: event === 'TRANSFER_CREATED' ? -Math.abs(payment.value) : payment.value,
+      data: dadosEvento.paymentDate || dadosEvento.date || dadosEvento.dateCreated?.split('T')[0] || new Date().toISOString().split('T')[0],
+      valor: event === 'TRANSFER_CREATED' ? -Math.abs(dadosEvento.value) : (dadosEvento.value || 0),
 
-      descricao_original: payment.description || `${event} - ${payment.billingType}`,
-      documento: payment.invoiceNumber || payment.id,
+      descricao_original: dadosEvento.description || `${event} - ${dadosEvento.billingType || 'N/A'}`,
+      documento: dadosEvento.invoiceNumber || dadosEvento.id || 'N/A',
 
-      tipo: payment.value > 0 ? 'CREDITO' : 'DEBITO',
+      tipo: (dadosEvento.value || 0) > 0 ? 'CREDITO' : 'DEBITO',
 
       // Dados específicos
-      cpf_cnpj_origem: payment.customer || null,
-      id_transacao_banco: payment.id,
+      cpf_cnpj_origem: dadosEvento.customer || dadosEvento.cpfCnpj || null,
+      id_transacao_banco: dadosEvento.id || dadosEvento.transactionId || `${event}-${Date.now()}`,
       tipo_importacao: 'WEBHOOK',
 
       // Campos extras em JSONB
       campos_extras: JSON.stringify({
         evento: event,
-        forma_pagamento: payment.billingType,
-        taxa: payment.value - (payment.netValue || payment.value),
-        valor_liquido: payment.netValue || payment.value,
-        status: payment.status,
-        invoice_url: payment.invoiceUrl,
-        bank_slip_url: payment.bankSlipUrl,
-        nosso_numero: payment.nossoNumero
+        forma_pagamento: dadosEvento.billingType || dadosEvento.type || 'N/A',
+        taxa: (dadosEvento.value || 0) - (dadosEvento.netValue || dadosEvento.value || 0),
+        valor_liquido: dadosEvento.netValue || dadosEvento.value || 0,
+        status: dadosEvento.status || 'N/A',
+        invoice_url: dadosEvento.invoiceUrl || null,
+        bank_slip_url: dadosEvento.bankSlipUrl || null,
+        nosso_numero: dadosEvento.nossoNumero || null,
+        dados_completos: dadosEvento
       })
     };
 
