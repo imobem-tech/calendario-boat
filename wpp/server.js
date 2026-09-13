@@ -323,18 +323,10 @@ async function iniciarBot() {
             ''
           ).trim()
 
-          if (!texto) continue
-
-          // ============================================================
-          // Grupo Administrativo — roteamento exclusivo
-          // ============================================================
-          if (ehGrupoAdm(grupoId)) {
-            await tratarComandoAdmin(sock, pool, grupoId, remetente, texto)
-            continue
-          }
-
           // ============================================================
           // Grupos Financeiros — Comandos bancários
+          // IMPORTANTE: Processar ANTES da verificação de texto
+          // para permitir envio de imagens sem legenda!
           // ============================================================
           if (isGrupoFinanceiro(grupoId)) {
             console.log('💼 [FINANCEIRO] Grupo financeiro detectado:', grupoId)
@@ -372,6 +364,19 @@ async function iniciarBot() {
               }
               continue
             }
+          }
+
+          // ============================================================
+          // Verificar se tem texto (após processar imagens financeiras)
+          // ============================================================
+          if (!texto) continue
+
+          // ============================================================
+          // Grupo Administrativo — roteamento exclusivo
+          // ============================================================
+          if (ehGrupoAdm(grupoId)) {
+            await tratarComandoAdmin(sock, pool, grupoId, remetente, texto)
+            continue
           }
 
           const horaMotorTratado = await tratarComandoHoraMotor(
