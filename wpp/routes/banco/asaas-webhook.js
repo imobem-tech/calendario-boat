@@ -176,11 +176,17 @@ export async function handleAsaasWebhook(req, res) {
     const crypto = await import('crypto');
     lancamento.hash_unico = crypto.createHash('md5').update(hashString).digest('hex');
 
+    console.log('🔑 Hash gerado:', lancamento.hash_unico);
+
     // Inserir no banco (ignorar duplicatas)
+    console.log('💾 Inserindo lançamento no banco...');
     await inserirLancamento(lancamento);
+    console.log('✅ Inserção concluída');
 
     // Tentar classificar automaticamente
+    console.log('🤖 Iniciando classificação automática...');
     await tentarClassificarAutomatico(lancamento.hash_unico);
+    console.log('✅ Classificação concluída');
 
     console.log('✅ Lançamento processado:', lancamento.hash_unico);
 
@@ -232,8 +238,11 @@ async function inserirLancamento(lanc) {
  *   - Outros → chave_aprendida → OK
  */
 async function tentarClassificarAutomatico(hashUnico) {
+  console.log(`🔍 [tentarClassificarAutomatico] Iniciando para hash: ${hashUnico}`);
+
   try {
     // Buscar lançamento
+    console.log('📥 Buscando lançamento no banco...');
     const lancResult = await pool.query(`
       SELECT
         id,
@@ -247,7 +256,12 @@ async function tentarClassificarAutomatico(hashUnico) {
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
 
-    if (lancResult.rows.length === 0) return;
+    console.log(`📊 Lançamentos encontrados: ${lancResult.rows.length}`);
+
+    if (lancResult.rows.length === 0) {
+      console.log('⚠️  Nenhum lançamento encontrado ou já classificado');
+      return;
+    }
 
     const lanc = lancResult.rows[0];
 
@@ -340,6 +354,8 @@ async function tentarClassificarAutomatico(hashUnico) {
 
   } catch (err) {
     console.error('❌ Erro ao classificar automaticamente:', err.message);
+    console.error('❌ Stack trace:', err.stack);
+    console.error('❌ Hash que causou erro:', hashUnico);
   }
 }
 
