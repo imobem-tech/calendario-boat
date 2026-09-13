@@ -34,7 +34,6 @@ import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
 import retornoRoutes from './msg_externa.js'
 import bancoRouter, { inicializarSistemaBancario } from './routes/banco/index.js'
-import testTokenRouter from './routes/test-token.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -53,11 +52,10 @@ import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
-import { ehComandoPendentes, listarPendentes, processarRespostaPendente } from './routes/banco/comando-pendentes.js'
 
 
 const { Pool } = pkg
-const VERSAO_WPP = 'Allmax®260911233000'
+const VERSAO_WPP = 'Allmax®260911195500'
 console.log('VERSAO SERVER:', VERSAO_WPP)
 
 const app = express()
@@ -113,7 +111,6 @@ app.use((req, res, next) => {
 
 app.use('/msg_externa', retornoRoutes)
 app.use('/api/banco', bancoRouter)
-app.use('/api', testTokenRouter)
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -268,9 +265,6 @@ async function iniciarBot() {
         ultimoEvento = 'CONECTADO'
         ultimaConexaoEm = new Date().toISOString()
         motivoDesconexao = null
-
-        // Inicializar sistema bancário com WhatsApp conectado
-        inicializarSistemaBancario(sock)
       }
 
       if (connection === 'close') {
@@ -317,23 +311,7 @@ async function iniciarBot() {
             ''
           ).trim()
 
-          // NÃO pular mensagens sem texto se estiver aguardando arquivo (recibo)
-          // Imagens/PDFs não têm texto, mas precisam ser processadas
-          if (!texto) {
-            // Verificar se está aguardando recibo (permite processar imagens)
-            const { sessoesAtivas } = await import('./routes/banco/comando-pendentes.js');
-            const sessao = sessoesAtivas?.get?.(grupoId);
-
-            if (sessao?.etapa === 'AGUARDANDO_RECIBO') {
-              // Processar arquivo (não pula!)
-              const { processarRespostaPendente } = await import('./routes/banco/comando-pendentes.js');
-              const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto, msg);
-              if (processouPendente) continue;
-            }
-
-            // Se não está aguardando recibo, pula normalmente
-            continue;
-          }
+          if (!texto) continue
 
           // ============================================================
           // Grupo Administrativo — roteamento exclusivo
@@ -369,18 +347,6 @@ if (horaMotorTratado) continue
             await handleConfirmacaoRetorno(sock, pool, grupoId, texto)
             continue
           }
-
-          // ============================================================
-          // Comando Lançamentos Pendentes — lll (grupos financeiros)
-          // ============================================================
-          if (ehComandoPendentes(texto)) {
-            await listarPendentes(sock, grupoId)
-            continue
-          }
-
-          // Processando resposta de classificação de pendentes (passa mensagem completa para receber arquivos)
-          const processouPendente = await processarRespostaPendente(sock, grupoId, remetente, texto, msg)
-          if (processouPendente) continue
 
           // Comando Previsão do tempo — ppp / ppp 02
           const cmdPrevisao = parsearComandoPrevisao(texto)
@@ -1225,8 +1191,8 @@ console.log(`📋 Cron jobs: ${IS_PRODUCTION ? 'ATIVADOS' : 'DESATIVADOS (apenas
 
 app.listen(PORT, () => {
   console.log(`🌐 Servidor rodando na porta ${PORT}`)
+  inicializarSistemaBancario()
   iniciarBot()
-  // inicializarSistemaBancario(sock) agora é chamado dentro de iniciarBot() após conexão
 
   // ============================================================
   // CRON JOBS - APENAS EM PRODUCTION
