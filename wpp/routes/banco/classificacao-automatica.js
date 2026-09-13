@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.2609122220
+// wpp/routes/banco/classificacao-automatica.js — V.2609130135
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
-// LÓGICA FINAL:
-//   - ENTRADA (CREDITO) → palavras_chave → OK (se encontrou) ou PENDENTE (se não encontrou)
-//   - SAÍDA (DEBITO) → chave_aprendida → OK (se encontrou) ou PENDENTE (se não encontrou)
-//   - NOTIFICA WhatsApp: APENAS quando status = PENDENTE (não conseguiu classificar)
-// APRENDIZADO: frase|valor|tolerancia|observacao
+// LÓGICA NOVA (13/09/2026):
+//   - QUALQUER TIPO (CREDITO ou DEBITO):
+//     1. Tenta palavras_chave primeiro (simples)
+//     2. Se não achou, tenta chave_aprendida (complexa)
+//     3. Se achou em qualquer → status OK
+//     4. Se não achou nenhum → status PENDENTE (notifica WhatsApp)
+// APRENDIZADO: frase|valorCentavos|tolerancia|observacao
+// EXEMPLO: "PIX recebido|001|10|Teste" → R$ 0,01 ± 10%
 // ============================================================
 
 import pkg from 'pg';
@@ -172,12 +175,17 @@ async function tentarClassificacaoPalavrasChave({ description, value, empresa })
 }
 
 /**
- * Classificação completa - LÓGICA FINAL
+ * Classificação completa - LÓGICA NOVA
  *
- * 1. Identifica se é ENTRADA (CREDITO) ou SAÍDA (DEBITO)
- * 2. ENTRADA → palavras_chave → OK (se encontrou, obs=descrição) ou PENDENTE (notifica WhatsApp)
- * 3. SAÍDA → chave_aprendida → OK (se encontrou, obs=regra) ou PENDENTE (notifica WhatsApp)
- * 4. Notifica WhatsApp: APENAS quando status = PENDENTE (não conseguiu classificar)
+ * PARA QUALQUER TIPO (CREDITO ou DEBITO):
+ * 1. Tenta palavras_chave primeiro
+ * 2. Se não encontrou, tenta chave_aprendida
+ * 3. Se achou em qualquer método → status OK
+ * 4. Se não achou nenhum → status PENDENTE (notifica WhatsApp)
+ *
+ * PRIORIDADE:
+ * - palavras_chave (mais simples, só texto)
+ * - chave_aprendida (mais complexa, texto + valor + tolerância)
  */
 export async function classificarLancamento({
   description,
@@ -188,55 +196,59 @@ export async function classificarLancamento({
   id_transacao_banco
 }) {
 
+  console.log(`🔍 [Classificação] Iniciando...`)
+  console.log(`   Descrição: "${description}"`)
+  console.log(`   Valor: R$ ${value}`)
+  console.log(`   Tipo: ${tipo}`)
+  console.log(`   Empresa: ${empresa}`)
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 1️⃣ IDENTIFICAR SE É ENTRADA OU SAÍDA
+  // 1️⃣ TENTAR PALAVRAS-CHAVE (mais simples)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const isEntrada = (tipo === 'CREDITO');
+  console.log('🔎 [Classificação] Testando palavras_chave...')
+  const resultadoPalavras = await tentarClassificacaoPalavrasChave({
+    description,
+    value,
+    empresa
+  });
 
-  if (isEntrada) {
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 2️⃣ ENTRADA (receita) → palavras_chave → OK
-    // Se encontrou categoria → OK (não precisa recibo)
-    // Observação recebe a descrição da cobrança
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const resultado = await tentarClassificacaoPalavrasChave({
-      description,
-      value,
-      empresa
-    });
-
-    if (resultado) {
-      return {
-        ...resultado,
-        status: 'OK',  // ← OK quando classificada automaticamente
-        observacao_padrao: description,  // ← Descrição vai para observação
-        classificacao_automatica: true
-      };
-    }
-
-  } else {
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 3️⃣ SAÍDA (despesa) → chave_aprendida → OK
-    // Despesas têm recibo, mas podem ser aprendidas
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const resultado = await testarChaveAprendida({
-      description,
-      value,
-      empresa
-    });
-
-    if (resultado) {
-      return {
-        ...resultado,
-        status: 'OK',  // ← OK quando aprendida (não precisa recibo)
-        classificacao_automatica: true
-      };
-    }
+  if (resultadoPalavras) {
+    console.log(`✅ [Classificação] Match por palavras_chave: ${resultadoPalavras.categoria_nome}`)
+    return {
+      ...resultadoPalavras,
+      status: 'OK',
+      observacao_padrao: description,  // Descrição vai para observação
+      classificacao_automatica: true
+    };
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // NÃO ENCONTROU CLASSIFICAÇÃO
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  console.log('⚠️ [Classificação] Nenhuma palavra-chave encontrada')
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 2️⃣ TENTAR CHAVE APRENDIDA (mais complexa)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  console.log('🔎 [Classificação] Testando chave_aprendida...')
+  const resultadoAprendida = await testarChaveAprendida({
+    description,
+    value,
+    empresa
+  });
+
+  if (resultadoAprendida) {
+    console.log(`✅ [Classificação] Match por chave_aprendida: ${resultadoAprendida.categoria_nome}`)
+    return {
+      ...resultadoAprendida,
+      status: 'OK',
+      classificacao_automatica: true
+    };
+  }
+
+  console.log('⚠️ [Classificação] Nenhuma chave aprendida encontrada')
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 3️⃣ NÃO ENCONTROU NENHUMA CLASSIFICAÇÃO
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  console.log('❌ [Classificação] Nenhuma regra encontrada → PENDENTE')
   return {
     categoria_id: null,
     categoria_nome: null,
