@@ -324,7 +324,7 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
           status = 'OK',
           classificacao_manual = false,
           classificado_por = 'Usuário - Aprendizado',
-          classificado_em = NOW()
+          classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
         WHERE id = $3
       `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
 
@@ -592,7 +592,7 @@ async function finalizarClassificacao(sock, grupoId, estado, statusFinal) {
         status = $4,
         classificacao_manual = true,
         classificado_por = 'Usuário - WhatsApp',
-        classificado_em = NOW()
+        classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
       WHERE id = $5
     `, [
       estado.categoriaEscolhida.id,

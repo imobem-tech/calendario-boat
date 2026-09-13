@@ -459,7 +459,7 @@ async function classificarLancamento(extratoId, dados, nomeArquivo, remetente) {
       classificacao = $2,
       classificacao_manual = true,
       classificado_por = $3,
-      classificado_em = NOW(),
+      classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
       confianca = 0.95,
       campos_extras = jsonb_set(
         COALESCE(campos_extras, '{}'),

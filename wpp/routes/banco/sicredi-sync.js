@@ -211,7 +211,7 @@ async function inserirLancamento(lanc) {
       $8, $9, $10, $11, $12,
       $13, $14, $15, $16,
       $17, $18,
-      $19, $20::jsonb, NOW()
+      $19, $20::jsonb, NOW() AT TIME ZONE 'America/Sao_Paulo'
     )
     ON CONFLICT (hash_unico) DO NOTHING
     RETURNING id
@@ -271,7 +271,7 @@ async function tentarClassificarAutomatico(hashUnico) {
         classificacao = $2,
         classificacao_manual = false,
         classificado_por = 'Sistema - Sync Sicredi',
-        classificado_em = NOW(),
+        classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
         confianca = $3
       WHERE id = $1
     `, [lanc.id, regra.classificacao, regra.confianca_base]);
