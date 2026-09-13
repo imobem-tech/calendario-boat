@@ -1,660 +1,477 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.260912090000
-// COMANDO WHATSAPP: lll (LANÇAMENTOS PENDENTES)
-// Fluxo interativo de classificação de lançamentos bancários
-// FUNCIONA APENAS EM GRUPOS FINANCEIROS AUTORIZADOS
-// FILTRA PENDENTES POR EMPRESA DO GRUPO
-// ORDEM INTELIGENTE: Base + Boost por uso (Híbrido)
-// ✅ STORAGE PERMANENTE: Vercel Blob (migrado do Railway ephemeral)
+// wpp/routes/banco/comando-pendentes.js — V.260912160000
+// COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
+// FUNCIONALIDADES:
+// - Listar pendentes (comando "lll")
+// - Escolher número para classificar
+// - Escolher categoria
+// - Adicionar observação
+// - Enviar recibo OU "pular" OU "aprender"
+// - Múltiplos arquivos com "gravar"
 // ============================================================
 
+import { put } from '@vercel/blob';
 import pkg from 'pg';
 const { Pool } = pkg;
-import { isGrupoFinanceiro, identificarEmpresaPorGrupo } from '../../config/grupos-financeiros.js';
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import fs from 'fs';
-import path from 'path';
-import { put } from '@vercel/blob';
+import { salvarRegraAprendida } from './classificacao-automatica.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// Controle de sessões interativas (exportado para server.js verificar etapa)
-export const sessoesAtivas = new Map(); // grupoId → { etapa, dados }
+// Estado de processamento por grupo
+// grupoId → { etapa, lancamentoId, categoriaId, observacao, arquivos[], ... }
+const estadoPendentes = new Map();
 
 /**
- * Verifica se é comando lll (Lançamentos pendentes)
+ * Verifica se é comando "lll"
  */
-export function ehComandoPendentes(texto) {
-  return /^lll$/i.test(texto.trim());
+export function ehComandoListarPendentes(texto) {
+  return /^lll$/i.test(texto?.trim());
 }
 
 /**
- * Lista lançamentos pendentes
+ * Verifica se grupo está processando pendentes
  */
-export async function listarPendentes(sock, grupoId) {
+export function estaProcessandoPendentes(grupoId) {
+  return estadoPendentes.has(grupoId);
+}
+
+/**
+ * COMANDO: lll (listar pendentes)
+ */
+export async function listarPendentes(sock, grupoId, empresa) {
   try {
-    // ⚠️ VERIFICAR SE É GRUPO FINANCEIRO
-    if (!isGrupoFinanceiro(grupoId)) {
-      console.log(`⛔ Tentativa de usar ppp em grupo não autorizado: ${grupoId}`);
-      return; // Ignora silenciosamente
-    }
-
-    // Identificar empresa do grupo
-    const empresa = identificarEmpresaPorGrupo(grupoId);
-
-    if (!empresa) {
-      console.log(`⚠️ Grupo financeiro sem empresa identificada: ${grupoId}`);
-      await sock.sendMessage(grupoId, {
-        text: '⚠️ Grupo financeiro não configurado. Contate o administrador.'
-      });
-      return;
-    }
-
-    console.log(`📋 Listando pendentes para ${empresa} (grupo: ${grupoId})`);
-
-    // Buscar total de pendentes DA EMPRESA
-    const totalResult = await pool.query(`
-      SELECT COUNT(*) as total
-      FROM bank_extratos
-      WHERE status_classificacao = 'PENDENTE'
-        AND empresa = $1
-    `, [empresa]);
-
-    const total = parseInt(totalResult.rows[0].total);
-
-    if (total === 0) {
-      await sock.sendMessage(grupoId, {
-        text: `✅ *NENHUM LANÇAMENTO PENDENTE - ${empresa}*\n\nTodos os lançamentos foram classificados!`
-      });
-      return;
-    }
-
-    // Buscar 3 mais recentes DA EMPRESA
+    // Buscar lançamentos PENDENTES
     const result = await pool.query(`
       SELECT
         id,
-        empresa,
-        banco,
         data,
         valor,
-        tipo,
         descricao_original,
+        tipo,
         cpf_cnpj_origem,
-        observacoes,
-        importado_em
+        classificacao,
+        campos_extras
       FROM bank_extratos
-      WHERE status_classificacao = 'PENDENTE'
-        AND empresa = $1
-      ORDER BY importado_em DESC
-      LIMIT 3
+      WHERE empresa = $1
+        AND status = 'PENDENTE'
+      ORDER BY data DESC, id DESC
+      LIMIT 10
     `, [empresa]);
 
-    const pendentes = result.rows;
-    const mostrados = pendentes.length;
+    if (result.rows.length === 0) {
+      await sock.sendMessage(grupoId, {
+        text: '✅ *NENHUM LANÇAMENTO PENDENTE!*\n\nTodos os lançamentos estão classificados.'
+      });
+      return;
+    }
 
     // Montar mensagem
-    let mensagem = `📋 *LANÇAMENTOS PENDENTES (${mostrados}/${total})*\n\n`;
+    let mensagem = `📋 *LANÇAMENTOS PENDENTES (${result.rows.length}/10)*\n\n`;
 
-    pendentes.forEach((lanc, index) => {
-      const numero = index + 1;
+    for (let i = 0; i < Math.min(3, result.rows.length); i++) {
+      const lanc = result.rows[i];
+      const numero = i + 1;
       const dataFormatada = new Date(lanc.data).toLocaleDateString('pt-BR');
-      const valorFormatado = Math.abs(parseFloat(lanc.valor)).toFixed(2);
+      const valorFormatado = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(Math.abs(lanc.valor));
 
-      mensagem += `${numero} ━━━━━━━━━━━━━━━━\n`;
-      mensagem += `R$ ${valorFormatado} - ${lanc.tipo === 'CREDITO' ? 'Recebido' : 'Pago'} - ${dataFormatada}\n`;
-      mensagem += `   🏢 ${lanc.empresa} | ${lanc.banco}\n`;
+      const tipoEmoji = lanc.valor > 0 ? 'Recebido' : 'Pago';
+
+      // Extrair info extra
+      let infoExtra = '';
+      try {
+        const extras = JSON.parse(lanc.campos_extras || '{}');
+        if (extras.forma_pagamento) {
+          infoExtra = `\n   💬 ${extras.forma_pagamento}`;
+        }
+      } catch {}
+
+      mensagem += `${numero} ${'━'.repeat(16)}\n`;
+      mensagem += `${valorFormatado} - ${tipoEmoji} - ${dataFormatada}\n`;
+      mensagem += `   🏢 ${empresa} | Asaas\n`;
       mensagem += `   📝 ${lanc.descricao_original}\n`;
-
       if (lanc.cpf_cnpj_origem) {
         mensagem += `   👤 CPF/CNPJ: ${lanc.cpf_cnpj_origem}\n`;
-      } else {
-        mensagem += `   ⚠️ CPF/CNPJ: não identificado\n`;
       }
+      mensagem += infoExtra;
+      mensagem += `\n`;
+    }
 
-      if (lanc.observacoes) {
-        mensagem += `   💬 ${lanc.observacoes}\n`;
-      }
-
-      mensagem += '\n';
-    });
-
-    mensagem += '━━━━━━━━━━━━━━━━\n';
-    mensagem += '✏️ *Responda o número (1, 2 ou 3) para classificar*';
+    mensagem += `${'━'.repeat(16)}\n`;
+    mensagem += `✏️ Responda o número (1, 2 ou 3) para classificar`;
 
     await sock.sendMessage(grupoId, { text: mensagem });
 
-    // Salvar sessão
-    sessoesAtivas.set(grupoId, {
-      etapa: 'AGUARDANDO_NUMERO',
-      pendentes: pendentes,
-      timestamp: Date.now()
+    // Salvar lançamentos para escolha
+    estadoPendentes.set(grupoId, {
+      etapa: 'escolher_numero',
+      lancamentos: result.rows.slice(0, 3),
+      empresa
     });
-
-    // Limpar sessão após 5 minutos
-    setTimeout(() => {
-      if (sessoesAtivas.get(grupoId)?.timestamp === sessoesAtivas.get(grupoId)?.timestamp) {
-        sessoesAtivas.delete(grupoId);
-      }
-    }, 5 * 60 * 1000);
 
   } catch (err) {
     console.error('❌ Erro ao listar pendentes:', err);
     await sock.sendMessage(grupoId, {
-      text: '❌ Erro ao buscar lançamentos pendentes. Tente novamente.'
+      text: '❌ Erro ao buscar lançamentos pendentes.'
     });
   }
 }
 
 /**
- * Processa resposta do usuário (etapa do fluxo)
- * @param {Object} mensagem - Mensagem completa do Baileys (para receber arquivos)
+ * Processar resposta do usuário
  */
-export async function processarRespostaPendente(sock, grupoId, remetente, texto, mensagem = null) {
-  const sessao = sessoesAtivas.get(grupoId);
-  if (!sessao) return false;
+export async function processarRespostaPendentes(sock, grupoId, mensagem, remetente) {
+  const estado = estadoPendentes.get(grupoId);
+  if (!estado) return false;
 
-  try {
-    switch (sessao.etapa) {
-      case 'AGUARDANDO_NUMERO':
-        return await processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao);
+  const texto = mensagem.message?.conversation ||
+                mensagem.message?.extendedTextMessage?.text || '';
 
-      case 'AGUARDANDO_CATEGORIA':
-        return await processarCategoriaEscolhida(sock, grupoId, remetente, texto, sessao);
+  const textoLimpo = texto.trim();
 
-      case 'AGUARDANDO_OBSERVACAO':
-        return await processarObservacao(sock, grupoId, remetente, texto, sessao);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 1: Escolher número do lançamento
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  if (estado.etapa === 'escolher_numero') {
+    const numero = parseInt(textoLimpo, 10);
 
-      case 'AGUARDANDO_RECIBO':
-        return await processarRecibo(sock, grupoId, remetente, mensagem, sessao);
-
-      case 'AGUARDANDO_CONFIRMACAO':
-        return await processarConfirmacao(sock, grupoId, remetente, texto, sessao);
-
-      default:
-        return false;
-    }
-  } catch (err) {
-    console.error('❌ Erro ao processar resposta:', err);
-    await sock.sendMessage(grupoId, {
-      text: '❌ Erro ao processar resposta. Tente novamente com *lll*.'
-    });
-    sessoesAtivas.delete(grupoId);
-    return true;
-  }
-}
-
-/**
- * Processa número escolhido (1, 2 ou 3)
- */
-async function processarNumeroEscolhido(sock, grupoId, remetente, texto, sessao) {
-  const numero = parseInt(texto.trim());
-
-  if (isNaN(numero) || numero < 1 || numero > 3) {
-    await sock.sendMessage(grupoId, {
-      text: '⚠️ Número inválido. Responda 1, 2 ou 3.'
-    });
-    return true;
-  }
-
-  const lancamento = sessao.pendentes[numero - 1];
-  if (!lancamento) {
-    await sock.sendMessage(grupoId, {
-      text: '⚠️ Lançamento não encontrado. Use *lll* para ver a lista novamente.'
-    });
-    sessoesAtivas.delete(grupoId);
-    return true;
-  }
-
-  // Buscar categorias da empresa (ORDEM INTELIGENTE + FILTRO POR TIPO)
-  // Se lançamento é CREDITO → só mostra categorias CREDITO
-  // Se lançamento é DEBITO → só mostra categorias DEBITO
-  // Mostra: categorias da EMPRESA específica + categorias TODAS (comuns)
-  const categorias = await pool.query(`
-    SELECT id, nome, tipo, icone, ordem, vezes_usada, empresa,
-           (ordem - (vezes_usada::float / 10)) as ordem_dinamica
-    FROM bank_categorias
-    WHERE (empresa = $1 OR empresa = 'TODAS')
-      AND ativo = true
-      AND tipo = $2
-    ORDER BY ordem_dinamica, nome
-  `, [lancamento.empresa, lancamento.tipo]);
-
-  if (categorias.rows.length === 0) {
-    await sock.sendMessage(grupoId, {
-      text: `⚠️ Nenhuma categoria cadastrada para ${lancamento.empresa}.\n\nCadastre categorias antes de classificar.`
-    });
-    sessoesAtivas.delete(grupoId);
-    return true;
-  }
-
-  // Montar mensagem com categorias
-  const valorFormatado = Math.abs(parseFloat(lancamento.valor)).toFixed(2);
-  let mensagem = `📝 *CLASSIFICANDO LANÇAMENTO*\n\n`;
-  mensagem += `💰 R$ ${valorFormatado} - ${lancamento.tipo === 'CREDITO' ? 'Recebido' : 'Pago'}\n`;
-  mensagem += `📅 ${new Date(lancamento.data).toLocaleDateString('pt-BR')}\n`;
-  mensagem += `🏢 ${lancamento.empresa}\n`;
-  mensagem += `📝 ${lancamento.descricao_original}\n\n`;
-  mensagem += `━━━━━━━━━━━━━━━━\n`;
-  mensagem += `📂 *CATEGORIAS DISPONÍVEIS:*\n\n`;
-
-  categorias.rows.forEach((cat, index) => {
-    const num = index + 1;
-    mensagem += `${num}. ${cat.icone || '📌'} ${cat.nome}\n`;
-  });
-
-  mensagem += `\n✏️ *Responda o número da categoria*`;
-
-  await sock.sendMessage(grupoId, { text: mensagem });
-
-  // Atualizar sessão
-  sessao.etapa = 'AGUARDANDO_CATEGORIA';
-  sessao.lancamentoEscolhido = lancamento;
-  sessao.categorias = categorias.rows;
-  sessao.timestamp = Date.now();
-
-  return true;
-}
-
-/**
- * Processa categoria escolhida
- */
-async function processarCategoriaEscolhida(sock, grupoId, remetente, texto, sessao) {
-  const numero = parseInt(texto.trim());
-
-  if (isNaN(numero) || numero < 1 || numero > sessao.categorias.length) {
-    await sock.sendMessage(grupoId, {
-      text: `⚠️ Número inválido. Responda entre 1 e ${sessao.categorias.length}.`
-    });
-    return true;
-  }
-
-  const categoria = sessao.categorias[numero - 1];
-  const lanc = sessao.lancamentoEscolhido;
-
-  // Pedir observação
-  let mensagem = `📝 *OBSERVAÇÃO (OPCIONAL)*\n\n`;
-  mensagem += `Digite uma observação sobre este lançamento\n`;
-  mensagem += `ou responda *pular* para continuar sem observação.\n\n`;
-  mensagem += `━━━━━━━━━━━━━━━━\n`;
-  mensagem += `Exemplos:\n`;
-  mensagem += `• Referente ao mês de agosto\n`;
-  mensagem += `• Pagamento parcial\n`;
-  mensagem += `• Manutenção programada\n\n`;
-  mensagem += `✏️ *Digite a observação ou "pular"*`;
-
-  await sock.sendMessage(grupoId, { text: mensagem });
-
-  // Atualizar sessão
-  sessao.etapa = 'AGUARDANDO_OBSERVACAO';
-  sessao.categoriaEscolhida = categoria;
-  sessao.timestamp = Date.now();
-
-  return true;
-}
-
-/**
- * Processa observação digitada
- */
-async function processarObservacao(sock, grupoId, remetente, texto, sessao) {
-  const observacao = texto.trim();
-
-  // Verificar se pulou
-  if (observacao.toLowerCase() === 'pular' || observacao === '-') {
-    sessao.observacaoUsuario = null;
-  } else {
-    sessao.observacaoUsuario = observacao;
-  }
-
-  // Pedir recibo
-  let mensagem = `📎 *RECIBO/COMPROVANTE (OPCIONAL)*\n\n`;
-  mensagem += `Envie uma foto ou PDF do recibo\n`;
-  mensagem += `ou responda *pular* para continuar sem anexo.\n\n`;
-  mensagem += `━━━━━━━━━━━━━━━━\n`;
-  mensagem += `Aceito: Foto, PDF, Imagem\n\n`;
-  mensagem += `✏️ *Envie o arquivo ou "pular"*`;
-
-  await sock.sendMessage(grupoId, { text: mensagem });
-
-  // Atualizar sessão
-  sessao.etapa = 'AGUARDANDO_RECIBO';
-  sessao.timestamp = Date.now();
-
-  return true;
-}
-
-/**
- * Processa recibo enviado
- */
-async function processarRecibo(sock, grupoId, remetente, mensagem, sessao) {
-  const lanc = sessao.lancamentoEscolhido;
-  const categoria = sessao.categoriaEscolhida;
-
-  // DEBUG: Log completo da estrutura
-  console.log('📎 Processando recibo, tipo de mensagem:', mensagem.message ? Object.keys(mensagem.message) : 'SEM MENSAGEM');
-  console.log('📎 Estrutura completa da mensagem:', JSON.stringify(mensagem, null, 2).substring(0, 500));
-
-  // Verificar se é texto "pular"
-  if (mensagem.message?.conversation || mensagem.message?.extendedTextMessage) {
-    const texto = (mensagem.message.conversation || mensagem.message.extendedTextMessage?.text || '').trim().toLowerCase();
-
-    if (texto === 'pular' || texto === '-') {
-      // Não adiciona arquivo, vai direto para confirmação
-      // Se já tem arquivos anexados, mantém. Se não tem, fica sem.
-      return await mostrarConfirmacao(sock, grupoId, sessao);
+    if (isNaN(numero) || numero < 1 || numero > estado.lancamentos.length) {
+      return true; // Ignora resposta inválida
     }
 
-    // Se é texto mas NÃO é "pular", avisa que precisa enviar arquivo
-    await sock.sendMessage(grupoId, {
-      text: '⚠️ Envie uma *imagem* ou *PDF* do recibo, ou responda *pular* para continuar sem anexo.'
-    });
+    const lancamento = estado.lancamentos[numero - 1];
+
+    // Buscar categorias disponíveis
+    const categorias = await buscarCategorias(estado.empresa);
+
+    // Atualizar estado
+    estado.etapa = 'escolher_categoria';
+    estado.lancamentoEscolhido = lancamento;
+    estado.categorias = categorias;
+
+    // Montar mensagem de categorias
+    await enviarListaCategorias(sock, grupoId, lancamento, categorias);
+
     return true;
   }
 
-  // Verificar se enviou arquivo/imagem
-  const messageType = Object.keys(mensagem.message || {})[0];
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 2: Escolher categoria
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'escolher_categoria') {
+    const numero = parseInt(textoLimpo, 10);
 
-  if (!['imageMessage', 'documentMessage', 'videoMessage'].includes(messageType)) {
+    if (isNaN(numero) || numero < 1 || numero > estado.categorias.length) {
+      return true;
+    }
+
+    const categoria = estado.categorias[numero - 1];
+
+    // Atualizar estado
+    estado.etapa = 'digitar_observacao';
+    estado.categoriaEscolhida = categoria;
+
+    // Pedir observação
     await sock.sendMessage(grupoId, {
-      text: '⚠️ Envie uma imagem, PDF ou responda *pular*.'
+      text: `📝 *OBSERVAÇÃO (OPCIONAL)*\n\nDigite uma observação sobre este lançamento\nou responda *pular* para continuar sem observação.\n\n${'━'.repeat(16)}\nExemplos:\n* Referente ao mês de agosto\n* Pagamento parcial\n* Manutenção programada\n\n✏️ Digite a observação ou "pular"`
     });
+
     return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 3: Digitar observação
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'digitar_observacao') {
+    const observacao = textoLimpo.toLowerCase() === 'pular' ? '' : textoLimpo;
+
+    // Atualizar estado
+    estado.etapa = 'aguardar_recibo';
+    estado.observacao = observacao;
+    estado.arquivos = [];
+
+    // Pedir recibo
+    await sock.sendMessage(grupoId, {
+      text: `📎 *RECIBO/COMPROVANTE (OPCIONAL)*\n\nEnvie uma foto ou PDF do recibo,\nou escolha uma das opções:\n\n${'━'.repeat(16)}\nAceito: Foto, PDF, Imagem\n\n✏️ *Opções:*\n📎 Envie o arquivo\n⏭️ Digite "pular" (continua PENDENTE)\n🧠 Digite "aprender" (marca OK + cria regra automática)`
+    });
+
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 4: Aguardar recibo/pular/aprender
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aguardar_recibo') {
+
+    // Opção 1: PULAR (sem recibo)
+    if (textoLimpo.toLowerCase() === 'pular') {
+      await finalizarClassificacao(sock, grupoId, estado, 'PENDENTE');
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+
+    // Opção 2: APRENDER (criar regra automática)
+    else if (textoLimpo.toLowerCase() === 'aprender') {
+      estado.etapa = 'aprender_copiar_descricao';
+
+      await sock.sendMessage(grupoId, {
+        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n📝 *DESCRIÇÃO DO LANÇAMENTO:*\n${estado.lancamentoEscolhido.descricao_original}\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição acima e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n✏️ Cole o trecho:`
+      });
+
+      return true;
+    }
+
+    // Opção 3: ARQUIVO (processarImagemPendente)
+    // Tratado em outro handler
+
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 5: Aprender - Copiar descrição
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aprender_copiar_descricao') {
+    estado.fraseChave = textoLimpo;
+    estado.etapa = 'aprender_tolerancia';
+
+    const valorInteiro = Math.floor(Math.abs(estado.lancamentoEscolhido.valor));
+
+    await sock.sendMessage(grupoId, {
+      text: `💰 *TOLERÂNCIA DE VALOR*\n\nValor deste lançamento: R$ ${valorInteiro},00\n\n${'━'.repeat(16)}\nDigite o % de tolerância aceito:\n\n• 0 = Somente R$ ${valorInteiro} (valor exato)\n• 10 = De R$ ${Math.floor(valorInteiro * 0.9)} até R$ ${Math.floor(valorInteiro * 1.1)} (±10%)\n• 50 = De R$ ${Math.floor(valorInteiro * 0.5)} até R$ ${Math.floor(valorInteiro * 1.5)} (±50%)\n\n✏️ Digite o %:`
+    });
+
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 6: Aprender - Tolerância
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aprender_tolerancia') {
+    const tolerancia = parseInt(textoLimpo, 10);
+
+    if (isNaN(tolerancia) || tolerancia < 0) {
+      await sock.sendMessage(grupoId, {
+        text: '❌ Digite um número válido (0, 10, 50, etc.)'
+      });
+      return true;
+    }
+
+    // Salvar regra aprendida
+    try {
+      const valorInteiro = Math.floor(Math.abs(estado.lancamentoEscolhido.valor));
+
+      await salvarRegraAprendida({
+        categoriaId: estado.categoriaEscolhida.id,
+        fraseChave: estado.fraseChave,
+        valorInteiro: valorInteiro,
+        toleranciaPercent: tolerancia,
+        observacao: estado.observacao || ''
+      });
+
+      // Marcar lançamento como OK
+      await pool.query(`
+        UPDATE bank_extratos
+        SET
+          classificacao = $1,
+          observacao = $2,
+          status = 'OK',
+          classificacao_manual = false,
+          classificado_por = 'Usuário - Aprendizado',
+          classificado_em = NOW()
+        WHERE id = $3
+      `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
+
+      // Confirmar sucesso
+      const variacaoMax = Math.floor(valorInteiro * tolerancia / 100);
+      const valorMin = valorInteiro - variacaoMax;
+      const valorMax = valorInteiro + variacaoMax;
+
+      await sock.sendMessage(grupoId, {
+        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: R$ ${valorInteiro} ± ${tolerancia}%\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin} e R$ ${valorMax}\n\nVão automaticamente para:\n✅ Categoria ${estado.categoriaEscolhida.id}\n✅ Observação "${estado.observacao || '(vazio)'}"\n✅ Status OK\n\nNada mais a fazer! 🎉`
+      });
+
+      estadoPendentes.delete(grupoId);
+
+    } catch (err) {
+      console.error('❌ Erro ao salvar regra:', err);
+      await sock.sendMessage(grupoId, {
+        text: '❌ Erro ao criar regra. Tente novamente.'
+      });
+    }
+
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 7: Aguardar múltiplos arquivos
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aguardar_mais_arquivos') {
+
+    if (textoLimpo.toLowerCase() === 'gravar') {
+      await finalizarClassificacao(sock, grupoId, estado, 'OK');
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+
+    // Aguarda próximo arquivo (tratado em outro handler)
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Processar imagem/PDF de recibo
+ */
+export async function processarImagemPendente(sock, grupoId, mensagem) {
+  const estado = estadoPendentes.get(grupoId);
+  if (!estado || (estado.etapa !== 'aguardar_recibo' && estado.etapa !== 'aguardar_mais_arquivos')) {
+    return false;
   }
 
   try {
-    // Baixar arquivo
+    // Download do arquivo
     const buffer = await downloadMediaMessage(
       mensagem,
       'buffer',
       {},
-      {
-        logger: console,
-        reuploadRequest: sock.updateMediaMessage
-      }
+      { logger: console, reuploadRequest: sock.updateMediaMessage }
     );
 
-    // Gerar nome do arquivo
-    const agora = new Date();
-    const nomeArquivo = agora.toISOString()
-      .replace(/[-:]/g, '')
-      .replace('T', '_')
-      .slice(0, 15); // yyyymmdd_hhmmss
+    // Upload para Vercel Blob
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
+    const ext = mensagem.message.imageMessage ? '.jpg' : '.pdf';
+    const nomeArquivo = `${estado.categoriaEscolhida.id}_${estado.lancamentoEscolhido.id}_${timestamp}${ext}`;
+    const blobPath = `recibos/${estado.empresa}/${nomeArquivo}`;
 
-    // Extensão do arquivo
-    const mimeType = mensagem.message[messageType]?.mimetype || 'image/jpeg';
-    const ext = mimeType.includes('pdf') ? 'pdf' :
-                mimeType.includes('png') ? 'png' :
-                mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'bin';
-
-    const nomeCompleto = `${nomeArquivo}.${ext}`;
-
-    // Salvar arquivo na sessão (suporta múltiplos arquivos)
-    if (!sessao.recibosArquivos) {
-      sessao.recibosArquivos = [];
-    }
-
-    sessao.recibosArquivos.push({
-      buffer,
-      nome: nomeCompleto,
-      mimetype: mimeType
+    const blob = await put(blobPath, buffer, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: false
     });
 
-    // Ir para confirmação
-    return await mostrarConfirmacao(sock, grupoId, sessao);
+    // Adicionar à lista
+    estado.arquivos.push({
+      nome: nomeArquivo,
+      url: blob.url,
+      tamanho: buffer.length,
+      tipo: ext.replace('.', ''),
+      uploadedAt: new Date().toISOString()
+    });
+
+    // Atualizar etapa
+    estado.etapa = 'aguardar_mais_arquivos';
+
+    // Confirmar
+    await sock.sendMessage(grupoId, {
+      text: `✅ Arquivo ${estado.arquivos.length} recebido e salvo!\n\n${'━'.repeat(16)}\nOpções:\n📎 Envie outro arquivo\n✅ Digite "gravar" para finalizar`
+    });
+
+    return true;
 
   } catch (err) {
-    console.error('❌ Erro ao processar arquivo:', err);
+    console.error('❌ Erro ao processar imagem:', err);
     await sock.sendMessage(grupoId, {
-      text: '❌ Erro ao processar arquivo. Tente novamente ou responda *pular*.'
+      text: '❌ Erro ao salvar arquivo. Tente novamente.'
     });
     return true;
   }
 }
 
 /**
- * Mostra confirmação final
+ * Buscar categorias da empresa
  */
-async function mostrarConfirmacao(sock, grupoId, sessao) {
-  const lanc = sessao.lancamentoEscolhido;
-  const categoria = sessao.categoriaEscolhida;
-  const valorFormatado = Math.abs(parseFloat(lanc.valor)).toFixed(2);
+async function buscarCategorias(empresa) {
+  const result = await pool.query(`
+    SELECT id, nome, tipo, icone
+    FROM bank_categorias
+    WHERE empresa IN ('TODAS', $1)
+      AND ativo = true
+    ORDER BY
+      CASE WHEN tipo = 'CREDITO' THEN 1 ELSE 2 END,
+      nome
+  `, [empresa]);
 
-  let mensagem = `✅ *CONFIRMAÇÃO FINAL*\n\n`;
-  mensagem += `💰 *Lançamento:*\n`;
-  mensagem += `   R$ ${valorFormatado} - ${lanc.descricao_original}\n\n`;
-  mensagem += `📂 *Categoria:*\n`;
-  mensagem += `   ${categoria.icone || '📌'} ${categoria.nome}\n\n`;
+  return result.rows;
+}
 
-  if (sessao.observacaoUsuario) {
-    mensagem += `📝 *Observação:*\n`;
-    mensagem += `   ${sessao.observacaoUsuario}\n\n`;
+/**
+ * Enviar lista de categorias
+ */
+async function enviarListaCategorias(sock, grupoId, lancamento, categorias) {
+  const valorFormatado = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(Math.abs(lancamento.valor));
+
+  const dataFormatada = new Date(lancamento.data).toLocaleDateString('pt-BR');
+
+  let mensagem = `📝 *CLASSIFICANDO LANÇAMENTO*\n\n`;
+  mensagem += `💰 ${valorFormatado} - ${lancamento.valor > 0 ? 'Recebido' : 'Pago'}\n`;
+  mensagem += `📅 ${dataFormatada}\n`;
+  mensagem += `🏢 ${lancamento.empresa || 'N/A'}\n`;
+  mensagem += `📝 ${lancamento.descricao_original}\n\n`;
+  mensagem += `${'━'.repeat(16)}\n`;
+  mensagem += `📂 *CATEGORIAS DISPONÍVEIS:*\n\n`;
+
+  for (let i = 0; i < categorias.length; i++) {
+    const cat = categorias[i];
+    const icone = cat.icone || '📌';
+    mensagem += `${i + 1}. ${icone} ${cat.nome}\n`;
   }
 
-  if (sessao.recibosArquivos && sessao.recibosArquivos.length > 0) {
-    if (sessao.recibosArquivos.length === 1) {
-      mensagem += `📎 *Recibo:*\n`;
-      mensagem += `   ✅ Anexado: ${sessao.recibosArquivos[0].nome}\n\n`;
-    } else {
-      mensagem += `📎 *Recibos:*\n`;
-      sessao.recibosArquivos.forEach((arquivo, index) => {
-        mensagem += `   ✅ Anexado (${index + 1}): ${arquivo.nome}\n`;
-      });
-      mensagem += `\n`;
-    }
-  }
-
-  mensagem += `━━━━━━━━━━━━━━━━\n`;
-  mensagem += `✏️ *Confirma? (s/n) ou (o) outro*`;
+  mensagem += `\n✏️ Responda o número da categoria`;
 
   await sock.sendMessage(grupoId, { text: mensagem });
-
-  // Atualizar sessão
-  sessao.etapa = 'AGUARDANDO_CONFIRMACAO';
-  sessao.timestamp = Date.now();
-
-  return true;
 }
 
 /**
- * Processa confirmação (s/n)
+ * Finalizar classificação
  */
-async function processarConfirmacao(sock, grupoId, remetente, texto, sessao) {
-  const resposta = texto.trim().toLowerCase();
+async function finalizarClassificacao(sock, grupoId, estado, statusFinal) {
+  try {
+    // Montar URLs dos recibos
+    const recibosUrls = estado.arquivos || [];
 
-  // Aceita: s, n, o
-  if (!['s', 'sim', 'n', 'nao', 'não', 'o', 'outro'].includes(resposta)) {
+    // Atualizar banco
+    await pool.query(`
+      UPDATE bank_extratos
+      SET
+        classificacao = $1,
+        observacao = $2,
+        recibos_urls = $3::jsonb,
+        status = $4,
+        classificacao_manual = true,
+        classificado_por = 'Usuário - WhatsApp',
+        classificado_em = NOW()
+      WHERE id = $5
+    `, [
+      estado.categoriaEscolhida.id,
+      estado.observacao || '',
+      JSON.stringify(recibosUrls),
+      statusFinal,
+      estado.lancamentoEscolhido.id
+    ]);
+
+    // Confirmar
+    const emoji = statusFinal === 'OK' ? '✅' : '⏭️';
+    const msg = statusFinal === 'OK'
+      ? `${emoji} *Lançamento classificado e FINALIZADO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n📎 Recibos: ${recibosUrls.length} arquivo(s)`
+      : `${emoji} *Lançamento classificado (PENDENTE)*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n\n⚠️ Aguardando recibo para finalizar`;
+
+    await sock.sendMessage(grupoId, { text: msg });
+
+  } catch (err) {
+    console.error('❌ Erro ao finalizar:', err);
     await sock.sendMessage(grupoId, {
-      text: '⚠️ Responda *s* para confirmar, *n* para cancelar ou *o* para anexar outro arquivo.'
+      text: '❌ Erro ao salvar classificação.'
     });
-    return true;
   }
-
-  // Cancelar
-  if (resposta === 'n' || resposta === 'nao' || resposta === 'não') {
-    await sock.sendMessage(grupoId, {
-      text: '❌ Classificação cancelada.\n\nUse *lll* para ver a lista novamente.'
-    });
-    sessoesAtivas.delete(grupoId);
-    return true;
-  }
-
-  // Anexar outro arquivo
-  if (resposta === 'o' || resposta === 'outro') {
-    const totalAnexado = sessao.recibosArquivos?.length || 0;
-
-    let mensagem = `📎 *ANEXAR OUTRO ARQUIVO*\n\n`;
-    mensagem += `✅ Já anexado: ${totalAnexado} arquivo${totalAnexado !== 1 ? 's' : ''}\n\n`;
-    mensagem += `Envie mais uma foto ou PDF\n`;
-    mensagem += `ou responda *pular* para finalizar.\n\n`;
-    mensagem += `━━━━━━━━━━━━━━━━\n`;
-    mensagem += `✏️ *Envie o arquivo ou "pular"*`;
-
-    await sock.sendMessage(grupoId, { text: mensagem });
-
-    // Volta para aguardar recibo
-    sessao.etapa = 'AGUARDANDO_RECIBO';
-    sessao.timestamp = Date.now();
-
-    return true;
-  }
-
-  // CONFIRMAR - Atualizar banco
-  const lanc = sessao.lancamentoEscolhido;
-  const categoria = sessao.categoriaEscolhida;
-  const observacao = sessao.observacaoUsuario || null;
-  const recibosArquivos = sessao.recibosArquivos || [];
-
-  // SALVAR RECIBOS NO VERCEL BLOB (se houver)
-  // ✅ Storage permanente - arquivos não são perdidos no redeploy
-  const recibosUrls = [];
-
-  if (recibosArquivos.length > 0) {
-    try {
-      // Estrutura FLAT: recibos/{EMPRESA}/{CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
-      // Exemplo: recibos/IMOBEM/001_123456_20260912_022021.jpg
-
-      // Formatar ID da categoria como nnn (3 dígitos)
-      const categoriaIdFormatado = String(categoria.id).padStart(3, '0');
-
-      // Upload de cada arquivo para Vercel Blob
-      for (const reciboArquivo of recibosArquivos) {
-        // Nome do arquivo: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}
-        const ext = path.extname(reciboArquivo.nome); // .jpg, .pdf, etc
-        const timestamp = reciboArquivo.nome.replace(ext, ''); // Remove extensão
-        const nomeArquivo = `${categoriaIdFormatado}_${lanc.id}_${timestamp}${ext}`;
-
-        // Caminho no Vercel Blob: recibos/{EMPRESA}/{ARQUIVO}
-        const blobPath = `recibos/${lanc.empresa}/${nomeArquivo}`;
-
-        // Upload para Vercel Blob
-        const blob = await put(blobPath, reciboArquivo.buffer, {
-          access: 'public',
-          token: process.env.BLOB_READ_WRITE_TOKEN, // Token explícito (igual ao backup)
-          addRandomSuffix: false
-        });
-
-        // Salvar URL retornada
-        recibosUrls.push({
-          nome: nomeArquivo,
-          url: blob.url,
-          tamanho: reciboArquivo.buffer.length,
-          tipo: ext.replace('.', ''),
-          uploadedAt: new Date().toISOString()
-        });
-
-        console.log(`📎 Recibo salvo no Vercel Blob: ${blob.url}`);
-      }
-
-      console.log(`✅ Total de recibos salvos: ${recibosUrls.length}`);
-      console.log(`📋 Formato: {CATEGORIA_ID}_{LANCAMENTO_ID}_{TIMESTAMP}.{ext}`);
-      console.log(`☁️  Storage permanente: Vercel Blob`);
-
-    } catch (err) {
-      console.error('❌ Erro ao salvar recibos no Vercel Blob:', err);
-      // Continua mesmo com erro no arquivo
-    }
-  }
-
-  // Atualizar lançamento (com observação e URLs dos recibos)
-  // Cast explícito para TEXT quando observacao é null (evita erro de tipo)
-  await pool.query(`
-    UPDATE bank_extratos
-    SET
-      classificacao = $2,
-      classificacao_manual = true,
-      classificado_por = $3,
-      classificado_em = NOW(),
-      status_classificacao = 'OK',
-      confianca = 1.0,
-      observacoes = CASE
-        WHEN $4::TEXT IS NOT NULL AND $4::TEXT != '' THEN
-          CASE
-            WHEN observacoes IS NULL OR observacoes = '' THEN $4::TEXT
-            ELSE observacoes || E'\\n---\\n' || $4::TEXT
-          END
-        ELSE observacoes
-      END,
-      recibos_urls = CASE
-        WHEN $5::JSONB IS NOT NULL THEN
-          CASE
-            WHEN recibos_urls IS NULL OR recibos_urls::TEXT = '[]' THEN $5::JSONB
-            ELSE recibos_urls || $5::JSONB
-          END
-        ELSE recibos_urls
-      END
-    WHERE id = $1
-  `, [
-    lanc.id,
-    categoria.nome,
-    `WhatsApp: ${remetente}`,
-    observacao || null,
-    recibosUrls.length > 0 ? JSON.stringify(recibosUrls) : null
-  ]);
-
-  // INCREMENTAR CONTADOR DE USO (Ordem Inteligente)
-  await pool.query(`
-    UPDATE bank_categorias
-    SET vezes_usada = vezes_usada + 1
-    WHERE id = $1
-  `, [categoria.id]);
-
-  // Registrar no histórico (com observação e URLs dos recibos)
-  const observacaoHistorico = [
-    'Classificação manual via WhatsApp (comando lll)',
-    observacao ? `Observação: ${observacao}` : null,
-    recibosUrls.length > 0 ? `Recibos (${recibosUrls.length}): ${recibosUrls.map(r => r.url).join(', ')}` : null
-  ].filter(Boolean).join(' | ');
-
-  await pool.query(`
-    INSERT INTO bank_historico_classificacoes
-      (extrato_id, classificacao_nova, classificado_por, observacao)
-    VALUES ($1, $2, $3, $4)
-  `, [lanc.id, categoria.nome, `WhatsApp: ${remetente}`, observacaoHistorico]);
-
-  // Mensagem de sucesso
-  let mensagemSucesso = `✅ *LANÇAMENTO CLASSIFICADO COM SUCESSO!*\n\n`;
-  mensagemSucesso += `📂 ${categoria.icone || '📌'} ${categoria.nome}`;
-
-  if (observacao) {
-    mensagemSucesso += `\n📝 ${observacao}`;
-  }
-
-  if (recibosUrls.length > 0) {
-    if (recibosUrls.length === 1) {
-      mensagemSucesso += `\n📎 1 recibo salvo`;
-    } else {
-      mensagemSucesso += `\n📎 ${recibosUrls.length} recibos salvos`;
-    }
-  }
-
-  await sock.sendMessage(grupoId, { text: mensagemSucesso });
-
-  // Limpar sessão
-  sessoesAtivas.delete(grupoId);
-
-  // Mostrar próximos pendentes automaticamente
-  setTimeout(() => {
-    listarPendentes(sock, grupoId);
-  }, 1500);
-
-  return true;
 }
-
-// ============================================================
-// LIMPEZA DE SESSÕES EXPIRADAS (a cada 10 minutos)
-// ============================================================
-setInterval(() => {
-  const agora = Date.now();
-  const timeout = 10 * 60 * 1000; // 10 minutos
-
-  for (const [grupoId, sessao] of sessoesAtivas.entries()) {
-    if (agora - sessao.timestamp > timeout) {
-      console.log(`🧹 Limpando sessão expirada: ${grupoId}`);
-      sessoesAtivas.delete(grupoId);
-    }
-  }
-}, 10 * 60 * 1000);
 
 // ============================================================
 // FIM

@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2606051345 REBUILD
+// wpp/server.js — V.2609122107
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
@@ -1242,16 +1242,17 @@ app.listen(PORT, () => {
       processandoFila = false
     }, 10000)
 
-    // Alerta HM às 11h
+    // Alerta HM às 8:30h
     let alertaHMUltimaData = ''
     setInterval(async () => {
       const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-      const hora  = agora.getHours()
-      const hoje  = agora.toISOString().slice(0, 10)
+      const hora   = agora.getHours()
+      const minuto = agora.getMinutes()
+      const hoje   = agora.toISOString().slice(0, 10)
 
-      if (hora === 11 && alertaHMUltimaData !== hoje) {
+      if (hora === 8 && minuto === 30 && alertaHMUltimaData !== hoje) {
         alertaHMUltimaData = hoje
-        console.log('[HM_PENDENTE] Iniciando verificação diária das 11h...')
+        console.log('[HM_PENDENTE] Iniciando verificação diária das 8:30h...')
         await enviarAlertasHMRetornoPendente(pool, sock, conectado).catch(console.error)
       }
     }, 60000)
