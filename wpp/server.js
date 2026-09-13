@@ -337,20 +337,34 @@ async function iniciarBot() {
           // Grupos Financeiros — Comandos bancários
           // ============================================================
           if (isGrupoFinanceiro(grupoId)) {
+            console.log('💼 [FINANCEIRO] Grupo financeiro detectado:', grupoId)
             const empresa = identificarEmpresaPorGrupo(grupoId)
+            console.log('   Empresa:', empresa)
 
             // Comando "lll" - Listar pendentes
             if (ehComandoListarPendentes(texto)) {
+              console.log('📝 [FINANCEIRO] Comando "lll" detectado')
               await listarPendentes(sock, grupoId, empresa)
               continue
             }
 
             // Processando resposta de pendentes
-            if (estaProcessandoPendentes(grupoId)) {
+            const estaProcessando = estaProcessandoPendentes(grupoId)
+            console.log('🔄 [FINANCEIRO] Está processando pendentes?', estaProcessando)
+
+            if (estaProcessando) {
+              const temImagem = !!msg.message?.imageMessage
+              const temDocumento = !!msg.message?.documentMessage
+              console.log('📎 [FINANCEIRO] Tem imagem?', temImagem)
+              console.log('📄 [FINANCEIRO] Tem documento?', temDocumento)
+
               // Verificar se é imagem ou documento (PDF)
-              if (msg.message?.imageMessage || msg.message?.documentMessage) {
+              if (temImagem || temDocumento) {
+                console.log('🖼️ [FINANCEIRO] Chamando processarImagemPendente...')
                 await processarImagemPendente(sock, grupoId, msg)
               } else {
+                console.log('💬 [FINANCEIRO] Chamando processarRespostaPendentes...')
+                console.log('   Texto recebido:', texto?.substring(0, 50))
                 await processarRespostaPendentes(sock, grupoId, msg, remetente)
               }
               continue
