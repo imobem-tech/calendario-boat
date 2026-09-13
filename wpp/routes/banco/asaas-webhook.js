@@ -145,7 +145,7 @@ export async function handleAsaasWebhook(req, res) {
       tipo_conta: 'Corrente',
 
       data: dadosEvento.paymentDate || dadosEvento.date || dadosEvento.dateCreated?.split('T')[0] || new Date().toISOString().split('T')[0],
-      valor: event === 'TRANSFER_CREATED' ? -Math.abs(dadosEvento.value) : (dadosEvento.value || 0),
+      valor: (event === 'TRANSFER_CREATED' || event === 'PAYMENT_REFUNDED') ? -Math.abs(dadosEvento.value) : (dadosEvento.value || 0),
 
       descricao_original: dadosEvento.description || `${event} - ${dadosEvento.billingType || 'N/A'}`,
       documento: dadosEvento.invoiceNumber || dadosEvento.id || 'N/A',
