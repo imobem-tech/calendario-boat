@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.260912150000
+// wpp/routes/banco/classificacao-automatica.js — V.2609122220
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
-// LÓGICA:
-//   - Cobrança Asaas → palavras_chave → PENDENTE (precisa recibo)
-//   - Outros → chave_aprendida → OK (não precisa recibo)
+// LÓGICA FINAL:
+//   - ENTRADA (CREDITO) → palavras_chave → OK (se encontrou) ou PENDENTE (se não encontrou)
+//   - SAÍDA (DEBITO) → chave_aprendida → OK (se encontrou) ou PENDENTE (se não encontrou)
+//   - NOTIFICA WhatsApp: APENAS quando status = PENDENTE (não conseguiu classificar)
 // APRENDIZADO: frase|valor|tolerancia|observacao
 // ============================================================
 
@@ -167,11 +168,12 @@ async function tentarClassificacaoPalavrasChave({ description, value, empresa })
 }
 
 /**
- * Classificação completa - NOVA LÓGICA
+ * Classificação completa - LÓGICA FINAL
  *
- * 1. Identifica se é COBRANÇA Asaas
- * 2. Cobrança → palavras_chave → PENDENTE
- * 3. Outros → chave_aprendida → OK
+ * 1. Identifica se é ENTRADA (CREDITO) ou SAÍDA (DEBITO)
+ * 2. ENTRADA → palavras_chave → OK (se encontrou, obs=descrição) ou PENDENTE (notifica WhatsApp)
+ * 3. SAÍDA → chave_aprendida → OK (se encontrou, obs=regra) ou PENDENTE (notifica WhatsApp)
+ * 4. Notifica WhatsApp: APENAS quando status = PENDENTE (não conseguiu classificar)
  */
 export async function classificarLancamento({
   description,
@@ -183,17 +185,15 @@ export async function classificarLancamento({
 }) {
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 1️⃣ IDENTIFICAR SE É COBRANÇA ASAAS
+  // 1️⃣ IDENTIFICAR SE É ENTRADA OU SAÍDA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const isCobrancaAsaas = (
-    tipo_importacao === 'WEBHOOK' ||
-    id_transacao_banco?.startsWith('pay_') ||
-    id_transacao_banco?.startsWith('pix_')  // PIX de cobrança também
-  );
+  const isEntrada = (tipo === 'CREDITO');
 
-  if (isCobrancaAsaas) {
+  if (isEntrada) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 2️⃣ COBRANÇA ASAAS → palavras_chave → PENDENTE
+    // 2️⃣ ENTRADA (receita) → palavras_chave → OK
+    // Se encontrou categoria → OK (não precisa recibo)
+    // Observação recebe a descrição da cobrança
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const resultado = await tentarClassificacaoPalavrasChave({
       description,
@@ -204,14 +204,16 @@ export async function classificarLancamento({
     if (resultado) {
       return {
         ...resultado,
-        status: 'PENDENTE',  // ← SEMPRE PENDENTE (precisa recibo)
+        status: 'OK',  // ← OK quando classificada automaticamente
+        observacao_padrao: description,  // ← Descrição vai para observação
         classificacao_automatica: true
       };
     }
 
   } else {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 3️⃣ OUTROS → chave_aprendida → OK
+    // 3️⃣ SAÍDA (despesa) → chave_aprendida → OK
+    // Despesas têm recibo, mas podem ser aprendidas
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const resultado = await testarChaveAprendida({
       description,
@@ -222,7 +224,7 @@ export async function classificarLancamento({
     if (resultado) {
       return {
         ...resultado,
-        status: 'OK',  // ← SEMPRE OK (não precisa recibo)
+        status: 'OK',  // ← OK quando aprendida (não precisa recibo)
         classificacao_automatica: true
       };
     }
