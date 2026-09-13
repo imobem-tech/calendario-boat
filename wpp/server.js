@@ -34,6 +34,14 @@ import { handleCriarOuAtualizarGrupo } from './criar-ou-atualizar-grupo.js'
 
 import retornoRoutes from './msg_externa.js'
 import bancoRouter, { inicializarSistemaBancario } from './routes/banco/index.js'
+import {
+  ehComandoListarPendentes,
+  estaProcessandoPendentes,
+  listarPendentes,
+  processarRespostaPendentes,
+  processarImagemPendente
+} from './routes/banco/comando-pendentes.js'
+import { isGrupoFinanceiro, identificarEmpresaPorGrupo } from './config/grupos-financeiros.js'
 
 import makeWASocket, {
   useMultiFileAuthState,
@@ -323,6 +331,30 @@ async function iniciarBot() {
           if (ehGrupoAdm(grupoId)) {
             await tratarComandoAdmin(sock, pool, grupoId, remetente, texto)
             continue
+          }
+
+          // ============================================================
+          // Grupos Financeiros — Comandos bancários
+          // ============================================================
+          if (isGrupoFinanceiro(grupoId)) {
+            const empresa = identificarEmpresaPorGrupo(grupoId)
+
+            // Comando "lll" - Listar pendentes
+            if (ehComandoListarPendentes(texto)) {
+              await listarPendentes(sock, grupoId, empresa)
+              continue
+            }
+
+            // Processando resposta de pendentes
+            if (estaProcessandoPendentes(grupoId)) {
+              // Verificar se é imagem
+              if (msg.message?.imageMessage) {
+                await processarImagemPendente(sock, grupoId, msg)
+              } else {
+                await processarRespostaPendentes(sock, grupoId, msg, remetente)
+              }
+              continue
+            }
           }
 
           const horaMotorTratado = await tratarComandoHoraMotor(
