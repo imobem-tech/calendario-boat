@@ -347,8 +347,8 @@ async function iniciarBot() {
 
             // Processando resposta de pendentes
             if (estaProcessandoPendentes(grupoId)) {
-              // Verificar se é imagem
-              if (msg.message?.imageMessage) {
+              // Verificar se é imagem ou documento (PDF)
+              if (msg.message?.imageMessage || msg.message?.documentMessage) {
                 await processarImagemPendente(sock, grupoId, msg)
               } else {
                 await processarRespostaPendentes(sock, grupoId, msg, remetente)

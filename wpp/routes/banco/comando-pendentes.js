@@ -234,14 +234,19 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
     else if (textoLimpo.toLowerCase() === 'aprender') {
       estado.etapa = 'aprender_copiar_descricao';
 
-      // Enviar descrição SOZINHA para facilitar copiar
+      // Primeiro enviar instruções
+      await sock.sendMessage(grupoId, {
+        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição abaixo e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n${'━'.repeat(16)}\n📝 *DESCRIÇÃO DO LANÇAMENTO:*`
+      });
+
+      // Depois enviar descrição SOZINHA para facilitar copiar
       await sock.sendMessage(grupoId, {
         text: estado.lancamentoEscolhido.descricao_original
       });
 
-      // Depois enviar instruções
+      // Pedir para colar
       await sock.sendMessage(grupoId, {
-        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição acima e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n✏️ Cole o trecho:`
+        text: `✏️ Cole o trecho:`
       });
 
       return true;
@@ -347,7 +352,13 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   else if (estado.etapa === 'aguardar_mais_arquivos') {
 
-    if (textoLimpo.toLowerCase() === 'gravar') {
+    if (textoLimpo.toLowerCase() === 's') {
+      // Salvar direto (sem confirmação)
+      await finalizarClassificacao(sock, grupoId, estado, 'OK');
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+    else if (textoLimpo.toLowerCase() === 'gravar') {
       // Mostrar tela de confirmação final
       await mostrarConfirmacaoFinal(sock, grupoId, estado);
       estado.etapa = 'confirmar_finalizacao';
@@ -437,7 +448,7 @@ export async function processarImagemPendente(sock, grupoId, mensagem) {
 
     // Confirmar
     await sock.sendMessage(grupoId, {
-      text: `✅ Arquivo ${estado.arquivos.length} recebido e salvo!\n\n${'━'.repeat(16)}\nOpções:\n📎 Envie outro arquivo\n✅ Digite "gravar" para finalizar`
+      text: `✅ Arquivo ${estado.arquivos.length} recebido e salvo!\n\n${'━'.repeat(16)}\nOpções:\n📎 Envie outro arquivo\n✅ Digite "s" para salvar e finalizar\n📝 Digite "gravar" para revisar antes de salvar`
     });
 
     return true;
