@@ -353,6 +353,9 @@ async function iniciarBot() {
             console.log('🔄 [FINANCEIRO] Está processando pendentes?', estaProcessando)
 
             if (estaProcessando) {
+              // Debug: mostrar estrutura completa da mensagem
+              console.log('📦 [FINANCEIRO] Estrutura msg.message:', JSON.stringify(Object.keys(msg.message || {})))
+
               const temImagem = !!msg.message?.imageMessage
               const temDocumento = !!msg.message?.documentMessage
               console.log('📎 [FINANCEIRO] Tem imagem?', temImagem)
