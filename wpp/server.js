@@ -265,6 +265,10 @@ async function iniciarBot() {
         ultimoEvento = 'CONECTADO'
         ultimaConexaoEm = new Date().toISOString()
         motivoDesconexao = null
+
+        // Configurar WhatsApp para notificações bancárias
+        const { setSockWhatsApp: configurarWebhookAsaas } = await import('./routes/banco/asaas-webhook.js')
+        configurarWebhookAsaas(sock)
       }
 
       if (connection === 'close') {

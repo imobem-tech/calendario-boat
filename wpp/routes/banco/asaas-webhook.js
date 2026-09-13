@@ -1,15 +1,28 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609122114
+// wpp/routes/banco/asaas-webhook.js — V.2609122150
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA EM 3 PRIORIDADES
 // STATUS: SEMPRE PENDENTE ATÉ ANEXAR RECIBO
 // ACEITA: payment, transfer, bill, movement (extrato bancário)
+// NOTIFICAÇÃO WhatsApp para lançamentos PENDENTES
 // ============================================================
 
 import pkg from 'pg';
 const { Pool } = pkg;
 import { classificarLancamento } from './classificacao-automatica.js';
+import { perguntarSobreLancamentoAsaas } from './asaas-interativo.js';
+
+// Socket WhatsApp (configurado pelo server.js)
+let sockWhatsApp = null;
+
+/**
+ * Configura socket WhatsApp para notificações
+ */
+export function setSockWhatsApp(sock) {
+  sockWhatsApp = sock;
+  console.log('✅ WhatsApp configurado para notificações bancárias');
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -284,6 +297,20 @@ async function tentarClassificarAutomatico(hashUnico) {
         console.log(`   Observação: ${resultado.observacao_padrao}`);
       }
 
+      // 📱 NOTIFICAR NO WHATSAPP se status = PENDENTE
+      if (resultado.status === 'PENDENTE' && sockWhatsApp) {
+        console.log('📱 Enviando notificação WhatsApp para lançamento PENDENTE (classificado)...');
+        await perguntarSobreLancamentoAsaas(sockWhatsApp, lanc.empresa, {
+          id: lanc.id,
+          id_transacao: lanc.id_transacao_banco,
+          data: lanc.data || new Date().toISOString().split('T')[0],
+          valor: lanc.valor,
+          descricao_original: lanc.descricao_original
+        }).catch(err => {
+          console.error('❌ Erro ao enviar notificação WhatsApp:', err.message);
+        });
+      }
+
     } else {
       console.log(`ℹ️  Nenhuma regra encontrada para: "${lanc.descricao_original}"`);
 
@@ -293,6 +320,22 @@ async function tentarClassificarAutomatico(hashUnico) {
         SET status = 'PENDENTE'
         WHERE id = $1 AND status IS NULL
       `, [lanc.id]);
+
+      // 📱 NOTIFICAR NO WHATSAPP
+      if (sockWhatsApp) {
+        console.log('📱 Enviando notificação WhatsApp para lançamento PENDENTE...');
+        await perguntarSobreLancamentoAsaas(sockWhatsApp, lanc.empresa, {
+          id: lanc.id,
+          id_transacao: lanc.id_transacao_banco,
+          data: lanc.data || new Date().toISOString().split('T')[0],
+          valor: lanc.valor,
+          descricao_original: lanc.descricao_original
+        }).catch(err => {
+          console.error('❌ Erro ao enviar notificação WhatsApp:', err.message);
+        });
+      } else {
+        console.warn('⚠️ WhatsApp não configurado, notificação não enviada');
+      }
     }
 
   } catch (err) {
