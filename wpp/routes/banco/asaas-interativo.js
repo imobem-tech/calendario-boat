@@ -13,7 +13,7 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 
-import GRUPOS_FINANCEIROS from '../config/grupos-financeiros.js';
+import { GRUPOS_FINANCEIROS } from '../../config/grupos-financeiros.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
