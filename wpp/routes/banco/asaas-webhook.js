@@ -184,7 +184,9 @@ export async function handleAsaasWebhook(req, res) {
 
       // Dados específicos
       cpf_cnpj_origem: dadosEvento.customer || dadosEvento.cpfCnpj || null,
-      id_transacao_banco: dadosEvento.id || dadosEvento.transactionId || `${event}-${Date.now()}`,
+      id_transacao_banco: (event === 'PAYMENT_REFUNDED' && dadosEvento.refunds?.[0]?.endToEndIdentifier)
+        ? dadosEvento.refunds[0].endToEndIdentifier
+        : (dadosEvento.id || dadosEvento.transactionId || `${event}-${Date.now()}`),
       tipo_importacao: 'WEBHOOK',
 
       // Campos extras em JSONB
@@ -207,6 +209,9 @@ export async function handleAsaasWebhook(req, res) {
     lancamento.hash_unico = crypto.createHash('md5').update(hashString).digest('hex');
 
     console.log('🔑 Hash gerado:', lancamento.hash_unico);
+    if (event === 'PAYMENT_REFUNDED' && dadosEvento.refunds?.[0]?.endToEndIdentifier) {
+      console.log('   ✅ ID único do refund:', dadosEvento.refunds[0].endToEndIdentifier);
+    }
 
     // ============================================================
     // EVENTOS FAILED: Duplo lançamento (saída + reversão)
