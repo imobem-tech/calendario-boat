@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609132216
+// wpp/routes/banco/asaas-webhook.js — V.2609132314
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
@@ -8,6 +8,8 @@
 //
 // NOVO (13/09 21:21):
 //   - Busca dados do cliente via API Asaas (nome + CPF/CNPJ)
+// FIX CRÍTICO (13/09 23:14):
+//   - Tipo baseado no valor PROCESSADO, não no original
 //   - Grava nome_origem e cpf_cnpj_origem reais no banco
 //
 // LÓGICA DE SINAIS (13/09/2026):
@@ -250,12 +252,25 @@ export async function handleAsaasWebhook(req, res) {
       tipo_conta: 'Corrente',
 
       data: dadosEvento.paymentDate || dadosEvento.date || dadosEvento.dateCreated?.split('T')[0] || new Date().toISOString().split('T')[0],
-      valor: EVENTOS_DEBITO.includes(event) ? -Math.abs(dadosEvento.value) : (dadosEvento.value || 0),
+
+      // Calcular valor final (negativo para DEBITO, positivo/zero para CREDITO)
+      valor: (() => {
+        const valorFinal = EVENTOS_DEBITO.includes(event)
+          ? -Math.abs(dadosEvento.value)
+          : (dadosEvento.value || 0);
+        return valorFinal;
+      })(),
 
       descricao_original: dadosEvento.description || `${event} - ${dadosEvento.billingType || 'N/A'}`,
       documento: dadosEvento.invoiceNumber || dadosEvento.id || 'N/A',
 
-      tipo: (dadosEvento.value || 0) > 0 ? 'CREDITO' : 'DEBITO',
+      // IMPORTANTE: tipo baseado no valor JÁ PROCESSADO (não no original)
+      tipo: (() => {
+        const valorFinal = EVENTOS_DEBITO.includes(event)
+          ? -Math.abs(dadosEvento.value)
+          : (dadosEvento.value || 0);
+        return valorFinal > 0 ? 'CREDITO' : 'DEBITO';
+      })(),
 
       // Dados do cliente (buscados via API ou customer ID)
       cpf_cnpj_origem: dadosCliente?.cpfCnpj || customerId || null,
