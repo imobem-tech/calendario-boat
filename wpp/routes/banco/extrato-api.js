@@ -64,7 +64,12 @@ router.get('/listar', async (req, res) => {
         c.icone as categoria_icone,
         c.cor as categoria_cor
       FROM bank_extratos e
-      LEFT JOIN bank_categorias c ON e.classificacao = c.id
+      LEFT JOIN bank_categorias c ON (
+        CASE
+          WHEN e.classificacao ~ '^[0-9]+$' THEN e.classificacao::INTEGER
+          ELSE NULL
+        END = c.id
+      )
       WHERE e.empresa = $1
     `;
 
