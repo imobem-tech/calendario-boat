@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.260911192500
+// wpp/routes/banco/index.js — V.2609140105
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
 // + Sistema de Backup Automático (Railway + Vercel Blob)
+// + API de Recibos (V.2609140105)
 // ============================================================
 
 import express from 'express';
@@ -14,6 +15,7 @@ import {
 } from './cron-sync.js';
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
+import recibosRouter from './recibos-api.js';
 
 const router = express.Router();
 
@@ -57,6 +59,16 @@ router.get('/status', (req, res) => {
 
 // Configurar rotas de backup
 setupBackupRoutes(router);
+
+// ============================================================
+// API DE RECIBOS (V.2609140105)
+// ============================================================
+
+/**
+ * /api/banco/recibos/*
+ * Gerenciamento de recibos salvos no Vercel Blob
+ */
+router.use('/recibos', recibosRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
@@ -121,6 +133,12 @@ export function inicializarSistemaBancario(sock = null) {
   console.log('   POST /api/banco/backup/semanal        → Backup manual semanal');
   console.log('   GET  /api/banco/backup/listar/:tipo   → Listar backups');
   console.log('   GET  /api/banco/backup/baixar?url=... → Baixar backup');
+  console.log('');
+  console.log('📎 API de Recibos:');
+  console.log('   GET  /api/banco/recibos/listar         → Listar todos recibos');
+  console.log('   GET  /api/banco/recibos/listar?empresa → Filtrar por empresa');
+  console.log('   GET  /api/banco/recibos/empresas       → Listar empresas com recibos');
+  console.log('   GET  /api/banco/recibos/download/:empresa/:arquivo → Baixar recibo');
   console.log('');
   console.log('='.repeat(80) + '\n');
 

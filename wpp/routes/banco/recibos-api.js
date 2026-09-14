@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/recibos-api.js — V.260912081500
+// wpp/routes/banco/recibos-api.js — V.2609140105
 // API PARA ACESSAR RECIBOS SALVOS NO VERCEL BLOB
 // Migrado de filesystem (Railway ephemeral) para Vercel Blob (permanente)
+// NOVO (14/09 01:05): Endpoint /categorias/todas adicionado
 // ============================================================
 
 import express from 'express';
@@ -153,6 +154,34 @@ router.get('/download/:empresa/:arquivo', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Erro ao baixar recibo:', err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+/**
+ * GET /api/banco/recibos/categorias/todas
+ * Lista todas as categorias disponíveis
+ */
+router.get('/categorias/todas', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        nome,
+        tipo,
+        icone
+      FROM bank_categorias
+      WHERE ativo = true
+      ORDER BY tipo, nome
+    `);
+
+    res.json({
+      total: result.rows.length,
+      categorias: result.rows
+    });
+
+  } catch (err) {
+    console.error('❌ Erro ao listar categorias:', err);
     res.status(500).json({ erro: err.message });
   }
 });
