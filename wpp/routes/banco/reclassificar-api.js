@@ -1,9 +1,11 @@
 // ============================================================
-// reclassificar-api.js — V.2609141935
+// reclassificar-api.js — V.2609141950
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
 // + Filtros: empresa (TODAS ou específica)
 // + Filtros: intervalo de datas (dataInicio/dataFim)
 // + Apenas não classificados (classificacao IS NULL OR = '')
+// + Estatísticas detalhadas: analisados, semTexto, semRegra,
+//   classificados, naoClassificados, erros
 // ============================================================
 
 import express from 'express';
@@ -83,19 +85,22 @@ router.post('/', async (req, res) => {
     const registros = await pool.query(query, params);
 
     const stats = {
-      processados: 0,
-      reclassificados: 0,
-      semRegra: 0,
+      analisados: 0,           // Total de registros tentados
+      semTexto: 0,             // Sem observacoes/descricao_original
+      semRegra: 0,             // Tinha texto mas nenhuma palavra-chave bateu
+      classificados: 0,        // Encontrou regra e classificou
+      naoClassificados: 0,     // Tinha texto mas não classificou (sem regra)
       erros: 0
     };
 
     for (const reg of registros.rows) {
       try {
-        stats.processados++;
+        stats.analisados++;
 
         const texto = reg.observacoes || reg.descricao_original;
         if (!texto) {
-          stats.semRegra++;
+          stats.semTexto++;
+          stats.naoClassificados++;
           continue;
         }
 
@@ -103,6 +108,7 @@ router.post('/', async (req, res) => {
 
         if (!resultado) {
           stats.semRegra++;
+          stats.naoClassificados++;
           continue;
         }
 
@@ -115,7 +121,7 @@ router.post('/', async (req, res) => {
           WHERE id = $2
         `, [resultado.classificacao, reg.id]);
 
-        stats.reclassificados++;
+        stats.classificados++;
 
       } catch (err) {
         console.error(`Erro ao processar ID ${reg.id}:`, err);

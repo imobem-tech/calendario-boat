@@ -4,6 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extrato Bancário</title>
+    <!--
+    ============================================================
+    EXTRATO BANCÁRIO - V.2609141950
+    ============================================================
+
+    📥 IMPORTAR OFX - V.2609142100
+       POST /api/banco/importar-ofx
+       - Upload arquivo .ofx
+       - Detecção de duplicatas
+       - Importação em lote
+
+    🔍 ENRIQUECER DADOS - V.2609142050
+       POST /api/banco/enriquecer
+       - Busca cliente por nome parcial
+       - Vincula Conta a Receber (±7 dias, ±5%)
+       - Copia descrição da CR
+       - Desempate por CR quando 2+ clientes
+
+    🏷️ RECLASSIFICAR - V.2609141950
+       POST /api/banco/reclassificar
+       - Apenas não classificados
+       - Filtros: empresa, intervalo de datas
+       - Estatísticas detalhadas
+
+    ✏️ EDITAR LANÇAMENTO - V.2609141626
+       PUT /api/banco/editar-lancamento
+       - Editar categoria, observações, status
+
+    🗑️ EXCLUIR RECIBOS - V.2609141738
+       DELETE /api/banco/recibos/excluir/:id
+       - Remove recibos do Vercel Blob
+       - Atualiza banco de dados
+
+    ============================================================
+    -->
     <style>
         * {
             margin: 0;
@@ -991,11 +1026,16 @@
                 const data = await response.json();
 
                 if (data.sucesso) {
+                    const taxaSucesso = data.stats.analisados > 0 ?
+                        ((data.stats.classificados/data.stats.analisados)*100).toFixed(1) : '0.0';
+
                     alert(`✅ Reclassificação concluída!\n\n📊 Estatísticas:\n` +
-                          `• Processados: ${data.stats.processados}\n` +
-                          `• Reclassificados: ${data.stats.reclassificados}\n` +
-                          `• Sem regra: ${data.stats.semRegra}\n` +
-                          `• Taxa de sucesso: ${data.stats.processados > 0 ? ((data.stats.reclassificados/data.stats.processados)*100).toFixed(1) : '0.0'}%`);
+                          `• Analisados: ${data.stats.analisados}\n` +
+                          `• Classificados: ${data.stats.classificados}\n` +
+                          `• Não classificados: ${data.stats.naoClassificados}\n` +
+                          `  └─ Sem texto: ${data.stats.semTexto}\n` +
+                          `  └─ Sem regra: ${data.stats.semRegra}\n` +
+                          `• Taxa de sucesso: ${taxaSucesso}%`);
 
                     // Recarregar extrato
                     buscarExtrato();
@@ -1055,4 +1095,4 @@
 </body>
 </html>
 
-<!-- V.2609141935 -->
+<!-- V.2609141950 - Estatísticas detalhadas na reclassificação -->
