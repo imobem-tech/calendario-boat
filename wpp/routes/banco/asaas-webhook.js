@@ -453,7 +453,8 @@ async function tentarClassificarAutomatico(hashUnico) {
         valor,
         tipo,
         id_transacao_banco,
-        tipo_importacao
+        tipo_importacao,
+        cpf_cnpj_origem
       FROM bank_extratos
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
@@ -474,7 +475,8 @@ async function tentarClassificarAutomatico(hashUnico) {
       tipo: lanc.tipo,
       empresa: lanc.empresa,
       tipo_importacao: lanc.tipo_importacao,
-      id_transacao_banco: lanc.id_transacao_banco
+      id_transacao_banco: lanc.id_transacao_banco,
+      cpfCnpjOrigem: lanc.cpf_cnpj_origem
     });
 
     // Se encontrou classificação

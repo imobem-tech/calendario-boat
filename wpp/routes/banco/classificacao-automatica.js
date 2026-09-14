@@ -1,6 +1,7 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.2609130135
+// wpp/routes/banco/classificacao-automatica.js — V.2609132252
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
+// NOVO (13/09 22:52): Suporte a CPF/CNPJ na chave_aprendida
 // LÓGICA NOVA (13/09/2026):
 //   - QUALQUER TIPO (CREDITO ou DEBITO):
 //     1. Tenta palavras_chave primeiro (simples)
@@ -52,11 +53,15 @@ function testarPalavraChave(description, palavraChave) {
 }
 
 /**
- * Testa CHAVE APRENDIDA (frase + valor ± tolerância)
- * Formato: "frase|valorCentavos|tolerancia|observacao"
- * Exemplo: "Hora_MOTOR 586-E2|9800|10|X" (R$ 98,00 ± 10%)
+ * Testa CHAVE APRENDIDA (frase + valor ± tolerância + CPF/CNPJ)
+ * Formato ANTIGO: "frase|valorCentavos|tolerancia|observacao"
+ * Formato NOVO:   "frase|valorCentavos|tolerancia|cpfCnpj|observacao"
+ *
+ * cpfCnpj: CPF/CNPJ específico OU "*" para qualquer pessoa
+ * Exemplo: "Hora_MOTOR 586-E2|9800|10|12345678901|Fulano" (só CPF 123...)
+ * Exemplo: "Hora_MOTOR 586-E2|9800|10|*|Qualquer pessoa" (qualquer)
  */
-async function testarChaveAprendida({ description, value, empresa }) {
+async function testarChaveAprendida({ description, value, empresa, cpfCnpjOrigem }) {
   if (!description) return null;
 
   try {
@@ -78,6 +83,9 @@ async function testarChaveAprendida({ description, value, empresa }) {
     // Converter valor do lançamento para centavos
     const valorLancCentavos = Math.round(Math.abs(value) * 100);
 
+    // Normalizar CPF/CNPJ para comparação (só números)
+    const cpfCnpjNorm = cpfCnpjOrigem ? cpfCnpjOrigem.replace(/\D/g, '') : null;
+
     // Testar cada categoria
     for (const cat of result.rows) {
       const regras = cat.chave_aprendida.split(',');
@@ -86,7 +94,17 @@ async function testarChaveAprendida({ description, value, empresa }) {
         const partes = regra.trim().split('|');
         if (partes.length < 4) continue; // Formato inválido
 
-        const [frase, valorRefCentavos, tolerancia, observacao] = partes;
+        // Formato: frase|valor|tol|cpfCnpj|obs (5 partes) OU frase|valor|tol|obs (4 partes - retrocompatível)
+        let frase, valorRefCentavos, tolerancia, cpfCnpj, observacao;
+
+        if (partes.length >= 5) {
+          // NOVO formato (5 partes)
+          [frase, valorRefCentavos, tolerancia, cpfCnpj, observacao] = partes;
+        } else {
+          // ANTIGO formato (4 partes) - trata como "*" (qualquer pessoa)
+          [frase, valorRefCentavos, tolerancia, observacao] = partes;
+          cpfCnpj = '*';
+        }
 
         // 1. Testa FRASE na descrição
         const descNorm = removeAcentos(description);
@@ -104,20 +122,32 @@ async function testarChaveAprendida({ description, value, empresa }) {
         const valorMin = valorRefInt - variacaoMax;
         const valorMax = valorRefInt + variacaoMax;
 
-        if (valorLancCentavos >= valorMin && valorLancCentavos <= valorMax) {
-          // MATCH!
-          const valorLancReais = (valorLancCentavos / 100).toFixed(2);
-          const rangeMin = (valorMin / 100).toFixed(2);
-          const rangeMax = (valorMax / 100).toFixed(2);
-          console.log(`✅ [Chave-Aprendida] Match: "${frase}" + valor R$ ${valorLancReais} [R$ ${rangeMin}-${rangeMax}] → ${cat.nome}`);
-          return {
-            categoria_id: cat.id,
-            categoria_nome: cat.nome,
-            tipo: cat.tipo,
-            observacao_padrao: observacao,
-            metodo: 'Chave aprendida'
-          };
+        if (valorLancCentavos < valorMin || valorLancCentavos > valorMax) {
+          continue; // Valor não bate
         }
+
+        // 3. Testa CPF/CNPJ (se não for "*")
+        if (cpfCnpj && cpfCnpj !== '*') {
+          const cpfCnpjRegraNorm = cpfCnpj.replace(/\D/g, '');
+          if (!cpfCnpjNorm || cpfCnpjNorm !== cpfCnpjRegraNorm) {
+            continue; // CPF/CNPJ não bate
+          }
+        }
+
+        // MATCH COMPLETO!
+        const valorLancReais = (valorLancCentavos / 100).toFixed(2);
+        const rangeMin = (valorMin / 100).toFixed(2);
+        const rangeMax = (valorMax / 100).toFixed(2);
+        const pessoa = cpfCnpj === '*' ? 'qualquer pessoa' : `CPF/CNPJ ${cpfCnpj}`;
+        console.log(`✅ [Chave-Aprendida] Match: "${frase}" + valor R$ ${valorLancReais} [R$ ${rangeMin}-${rangeMax}] + ${pessoa} → ${cat.nome}`);
+
+        return {
+          categoria_id: cat.id,
+          categoria_nome: cat.nome,
+          tipo: cat.tipo,
+          observacao_padrao: observacao,
+          metodo: 'Chave aprendida'
+        };
       }
     }
 
@@ -193,7 +223,8 @@ export async function classificarLancamento({
   tipo,
   empresa,
   tipo_importacao,
-  id_transacao_banco
+  id_transacao_banco,
+  cpfCnpjOrigem  // NOVO: CPF/CNPJ do cliente (para chave aprendida)
 }) {
 
   console.log(`🔍 [Classificação] Iniciando...`)
@@ -201,6 +232,9 @@ export async function classificarLancamento({
   console.log(`   Valor: R$ ${value}`)
   console.log(`   Tipo: ${tipo}`)
   console.log(`   Empresa: ${empresa}`)
+  if (cpfCnpjOrigem) {
+    console.log(`   Cliente: ${cpfCnpjOrigem}`)
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 1️⃣ TENTAR PALAVRAS-CHAVE (mais simples)
@@ -231,7 +265,8 @@ export async function classificarLancamento({
   const resultadoAprendida = await testarChaveAprendida({
     description,
     value,
-    empresa
+    empresa,
+    cpfCnpjOrigem  // Passar CPF/CNPJ para verificação
   });
 
   if (resultadoAprendida) {
