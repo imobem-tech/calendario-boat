@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609140145
+// wpp/routes/banco/extrato-api.js — V.2609140155
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
 // NOVO (14/09 01:45): Adicionar saldo_acumulado (saldo total da conta)
+// NOVO (14/09 01:55): ORDER BY data ASC (crescente - mais antigo primeiro)
 // ============================================================
 
 import express from 'express';
@@ -91,9 +92,9 @@ router.get('/listar', async (req, res) => {
       paramIndex++;
     }
 
-    // Ordenação e paginação
+    // Ordenação e paginação (crescente por data - mais antigo primeiro)
     query += `
-      ORDER BY e.data DESC, e.id DESC
+      ORDER BY e.data ASC, e.id ASC
       LIMIT $${paramIndex}
       OFFSET $${paramIndex + 1}
     `;

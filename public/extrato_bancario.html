@@ -418,6 +418,7 @@
                 <div class="bank-info">
                     <h1 id="headerBanco">Carregando...</h1>
                     <div class="bank-code" id="headerCodigoBanco"></div>
+                    <div class="bank-code" id="headerAgenciaConta" style="margin-top: 5px;"></div>
                 </div>
                 <div class="period-info">
                     <div class="month" id="headerMes">-</div>
@@ -521,6 +522,50 @@
     <script>
         const API_URL = 'https://calendario-boat-production.up.railway.app/api/banco/extrato';
 
+        // Dados fixos das contas por empresa
+        const CONTAS_EMPRESAS = {
+            'ALLMAX': {
+                banco: '461',
+                banco_nome: 'Asaas I.P S.A',
+                agencia: '0001',
+                conta: '6327105',
+                conta_dv: '0',
+                tipo_conta: 'Conta de Pagamento',
+                nome_completo: 'ALLMAX GESTAO DE COTAS LTDA',
+                cnpj: '45.703.081/0001-24'
+            },
+            'SUMMER': {
+                banco: '461',
+                banco_nome: 'Asaas I.P S.A',
+                agencia: '0001',
+                conta: '6327037',
+                conta_dv: '5',
+                tipo_conta: 'Conta de Pagamento',
+                nome_completo: 'SUMMER NAUTICA LTDA',
+                cnpj: '59.338.067/0001-83'
+            },
+            'IMOBEM': {
+                banco: '461',
+                banco_nome: 'Asaas I.P S.A',
+                agencia: '0001',
+                conta: '6576593',
+                conta_dv: '5',
+                tipo_conta: 'Conta de Pagamento',
+                nome_completo: 'IMOBEM IMOVEIS LTDA',
+                cnpj: '09.148.523/0001-54'
+            },
+            'IMOBAN': {
+                banco: '461',
+                banco_nome: 'Asaas I.P S.A',
+                agencia: '0001',
+                conta: '0000000',
+                conta_dv: '0',
+                tipo_conta: 'Conta de Pagamento',
+                nome_completo: 'IMOBAN (dados pendentes)',
+                cnpj: '00.000.000/0001-00'
+            }
+        };
+
         // Carregar ao abrir
         window.addEventListener('load', () => {
             carregarMeses();
@@ -580,12 +625,17 @@
                 }
 
                 // Atualizar cabeçalho
-                if (data.lancamentos.length > 0) {
-                    const primeiro = data.lancamentos[0];
-                    document.getElementById('headerBanco').textContent = primeiro.nome_banco || primeiro.banco;
-                    document.getElementById('headerCodigoBanco').textContent = `Código: ${primeiro.codigo_banco || '-'}`;
-                    document.getElementById('headerEmpresa').textContent = primeiro.empresa;
+                const empresa = document.getElementById('filtroEmpresa').value;
+                const contaEmpresa = CONTAS_EMPRESAS[empresa];
 
+                if (contaEmpresa) {
+                    document.getElementById('headerBanco').textContent = `${contaEmpresa.banco} - ${contaEmpresa.banco_nome}`;
+                    document.getElementById('headerCodigoBanco').textContent = `${contaEmpresa.nome_completo} | CNPJ: ${contaEmpresa.cnpj}`;
+                    document.getElementById('headerAgenciaConta').textContent = `Agência: ${contaEmpresa.agencia} | Conta: ${contaEmpresa.conta}-${contaEmpresa.conta_dv}`;
+                    document.getElementById('headerEmpresa').textContent = empresa;
+                }
+
+                if (data.lancamentos.length > 0) {
                     if (mes) {
                         const [ano, mesNum] = mes.split('-');
                         const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -720,4 +770,4 @@
 </body>
 </html>
 
-<!-- V.2609140145 -->
+<!-- V.2609140155 -->
