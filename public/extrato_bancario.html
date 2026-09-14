@@ -629,13 +629,15 @@
             dados.lancamentos.forEach(lanc => {
                 const tr = document.createElement('tr');
 
-                // Data da transação
-                const dataTransacao = new Date(lanc.data + 'T00:00:00');
-                const dataFormatada = dataTransacao.toLocaleDateString('pt-BR');
+                // Data da transação (pode vir como string ou objeto Date)
+                const dataTransacao = new Date(lanc.data);
+                const dataFormatada = !isNaN(dataTransacao) ? dataTransacao.toLocaleDateString('pt-BR') : 'Data inválida';
 
                 // Data/Hora de importação
                 const dataImportacao = new Date(lanc.importado_em);
-                const importadoFormatado = dataImportacao.toLocaleDateString('pt-BR') + ' ' + dataImportacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                const importadoFormatado = !isNaN(dataImportacao) ?
+                    dataImportacao.toLocaleDateString('pt-BR') + ' ' + dataImportacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) :
+                    '-';
 
                 // Categoria
                 const catHTML = lanc.categoria ?
