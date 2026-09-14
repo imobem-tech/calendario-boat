@@ -16,5 +16,8 @@
     "pg": "latest",
     "pino": "latest",
     "qrcode": "latest"
+  },
+  "devDependencies": {
+    "xlsx": "^0.18.5"
   }
 }

@@ -1,10 +1,14 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609130200
+// wpp/routes/banco/asaas-webhook.js — V.2609132121
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
 // ACEITA: payment, transfer, bill, movement, pix
 // NOTIFICAÇÃO WhatsApp para lançamentos PENDENTES
+//
+// NOVO (13/09 21:21):
+//   - Busca dados do cliente via API Asaas (nome + CPF/CNPJ)
+//   - Grava nome_origem e cpf_cnpj_origem reais no banco
 //
 // LÓGICA DE SINAIS (13/09/2026):
 //   - Eventos SAÍDA: valor negativo (DEBITO)
@@ -16,6 +20,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import { classificarLancamento } from './classificacao-automatica.js';
 import { perguntarSobreLancamentoAsaas } from './asaas-interativo.js';
+import { buscarDadosCliente } from './asaas-api.js';
 
 // Socket WhatsApp (configurado pelo server.js)
 let sockWhatsApp = null;
@@ -166,6 +171,16 @@ export async function handleAsaasWebhook(req, res) {
       });
     }
 
+    // ============================================================
+    // BUSCAR DADOS DO CLIENTE (nome + CPF/CNPJ) via API Asaas
+    // ============================================================
+    let dadosCliente = null;
+    const customerId = dadosEvento.customer || dadosEvento.cpfCnpj || null;
+
+    if (customerId && customerId.startsWith('cus_')) {
+      dadosCliente = await buscarDadosCliente(customerId, empresa);
+    }
+
     // Extrair dados do lançamento (compatível com múltiplas estruturas)
     const lancamento = {
       empresa: empresa,
@@ -182,8 +197,9 @@ export async function handleAsaasWebhook(req, res) {
 
       tipo: (dadosEvento.value || 0) > 0 ? 'CREDITO' : 'DEBITO',
 
-      // Dados específicos
-      cpf_cnpj_origem: dadosEvento.customer || dadosEvento.cpfCnpj || null,
+      // Dados do cliente (buscados via API ou customer ID)
+      cpf_cnpj_origem: dadosCliente?.cpfCnpj || customerId || null,
+      nome_origem: dadosCliente?.nome || null,
       id_transacao_banco: (event === 'PAYMENT_REFUNDED' && dadosEvento.refunds?.[0]?.endToEndIdentifier)
         ? dadosEvento.refunds[0].endToEndIdentifier
         : (dadosEvento.id || dadosEvento.transactionId || `${event}-${Date.now()}`),
@@ -336,13 +352,13 @@ async function inserirLancamento(lanc) {
     INSERT INTO bank_extratos (
       empresa, banco, codigo_banco, nome_banco, tipo_conta,
       data, mes_ref, valor, descricao_original, documento, tipo,
-      cpf_cnpj_origem, id_transacao_banco, tipo_importacao,
+      cpf_cnpj_origem, nome_origem, id_transacao_banco, tipo_importacao,
       hash_unico, campos_extras, importado_em
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, DATE_TRUNC('month', $6::DATE), $7, $8, $9, $10,
-      $11, $12, $13,
-      $14, $15::jsonb, NOW() AT TIME ZONE 'America/Sao_Paulo'
+      $11, $12, $13, $14,
+      $15, $16::jsonb, NOW() AT TIME ZONE 'America/Sao_Paulo'
     )
     ON CONFLICT (hash_unico) DO NOTHING
   `;
@@ -350,7 +366,7 @@ async function inserirLancamento(lanc) {
   const valores = [
     lanc.empresa, lanc.banco, lanc.codigo_banco, lanc.nome_banco, lanc.tipo_conta,
     lanc.data, lanc.valor, lanc.descricao_original, lanc.documento, lanc.tipo,
-    lanc.cpf_cnpj_origem, lanc.id_transacao_banco, lanc.tipo_importacao,
+    lanc.cpf_cnpj_origem, lanc.nome_origem, lanc.id_transacao_banco, lanc.tipo_importacao,
     lanc.hash_unico, lanc.campos_extras
   ];
 
