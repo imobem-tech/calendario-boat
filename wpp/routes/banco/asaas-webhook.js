@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609132121
+// wpp/routes/banco/asaas-webhook.js — V.2609132158
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
@@ -20,10 +20,64 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import { classificarLancamento } from './classificacao-automatica.js';
 import { perguntarSobreLancamentoAsaas } from './asaas-interativo.js';
-import { buscarDadosCliente } from './asaas-api.js';
 
 // Socket WhatsApp (configurado pelo server.js)
 let sockWhatsApp = null;
+
+// ============================================================
+// BUSCAR DADOS DO CLIENTE VIA API ASAAS (inline)
+// ============================================================
+async function buscarDadosCliente(customerId, empresa) {
+  try {
+    if (!customerId || !customerId.startsWith('cus_')) {
+      console.log(`⚠️  Customer ID inválido: ${customerId}`);
+      return null;
+    }
+
+    // API Keys por empresa
+    const apiKeys = {
+      'ALLMAX': process.env.ASAAS_API_KEY_ALLMAX,
+      'IMOBEM': process.env.ASAAS_API_KEY_IMOBEM,
+      'IMOBAN': process.env.ASAAS_API_KEY_IMOBAN,
+      'SUMMER': process.env.ASAAS_API_KEY_SUMMER
+    };
+
+    const apiKey = apiKeys[empresa];
+    if (!apiKey) {
+      console.error(`❌ API Key não encontrada para empresa: ${empresa}`);
+      return null;
+    }
+
+    console.log(`🔍 Buscando dados do cliente ${customerId} (${empresa})...`);
+
+    const url = `https://www.asaas.com/api/v3/customers/${customerId}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'access_token': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`❌ Erro ao buscar cliente: HTTP ${response.status}`);
+      return null;
+    }
+
+    const cliente = await response.json();
+    const dadosCliente = {
+      nome: cliente.name || null,
+      cpfCnpj: cliente.cpfCnpj || null
+    };
+
+    console.log(`✅ Cliente encontrado: ${dadosCliente.nome} (${dadosCliente.cpfCnpj})`);
+    return dadosCliente;
+
+  } catch (err) {
+    console.error(`❌ Erro ao buscar dados do cliente ${customerId}:`, err.message);
+    return null;
+  }
+}
 
 /**
  * Configura socket WhatsApp para notificações
