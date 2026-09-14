@@ -1,6 +1,7 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.2609130115
+// wpp/routes/banco/comando-pendentes.js — V.2609132302
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
+// NOVO (13/09 23:02): Exibir nome_origem ao invés de cpf_cnpj_origem
 // FUNCIONALIDADES:
 // - Listar pendentes (comando "lll")
 // - Escolher número para classificar
@@ -65,6 +66,7 @@ export async function listarPendentes(sock, grupoId, empresa) {
         descricao_original,
         tipo,
         cpf_cnpj_origem,
+        nome_origem,
         classificacao,
         campos_extras
       FROM bank_extratos
@@ -108,8 +110,8 @@ export async function listarPendentes(sock, grupoId, empresa) {
       mensagem += `${valorFormatado} - ${tipoEmoji} - ${dataFormatada}\n`;
       mensagem += `   🏢 ${empresa} | Asaas\n`;
       mensagem += `   📝 ${lanc.descricao_original}\n`;
-      if (lanc.cpf_cnpj_origem) {
-        mensagem += `   👤 CPF/CNPJ: ${lanc.cpf_cnpj_origem}\n`;
+      if (lanc.nome_origem) {
+        mensagem += `   🙋 ${lanc.nome_origem}\n`;
       }
       mensagem += infoExtra;
       mensagem += `\n`;
