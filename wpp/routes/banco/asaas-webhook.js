@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609132314
+// wpp/routes/banco/asaas-webhook.js — V.2609141705
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
@@ -93,12 +93,52 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// Mapa de empresas → código banco Asaas
+// Mapa de empresas → código banco Asaas + dados bancários
 const EMPRESAS_ASAAS = {
-  'ALLMAX': { codigo: 6, conta: 'conta_allmax' },
-  'IMOBEM': { codigo: 8, conta: 'conta_imobem' },
-  'IMOBAN': { codigo: 9, conta: 'conta_imoban' },
-  'SUMMER': { codigo: 10, conta: 'conta_summer' }
+  'ALLMAX': {
+    codigo: 6,
+    conta: 'conta_allmax',
+    banco: '461',
+    nome_banco: 'Asaas I.P S.A',
+    agencia: '0001',
+    agencia_dv: null,
+    conta_numero: '6327105',
+    conta_dv: '0',
+    tipo_conta: 'Conta de Pagamento'
+  },
+  'IMOBEM': {
+    codigo: 8,
+    conta: 'conta_imobem',
+    banco: '461',
+    nome_banco: 'Asaas I.P S.A',
+    agencia: '0001',
+    agencia_dv: null,
+    conta_numero: '6576593',
+    conta_dv: '5',
+    tipo_conta: 'Conta de Pagamento'
+  },
+  'IMOBAN': {
+    codigo: 9,
+    conta: 'conta_imoban',
+    banco: '461',
+    nome_banco: 'Asaas I.P S.A',
+    agencia: null,
+    agencia_dv: null,
+    conta_numero: null,
+    conta_dv: null,
+    tipo_conta: 'Conta de Pagamento'
+  },
+  'SUMMER': {
+    codigo: 10,
+    conta: 'conta_summer',
+    banco: '461',
+    nome_banco: 'Asaas I.P S.A',
+    agencia: '0001',
+    agencia_dv: null,
+    conta_numero: '6327037',
+    conta_dv: '5',
+    tipo_conta: 'Conta de Pagamento'
+  }
 };
 
 // ============================================================
@@ -244,12 +284,18 @@ export async function handleAsaasWebhook(req, res) {
     }
 
     // Extrair dados do lançamento (compatível com múltiplas estruturas)
+    const dadosEmpresa = EMPRESAS_ASAAS[empresa];
+
     const lancamento = {
       empresa: empresa,
       banco: 'Asaas',
-      codigo_banco: '461', // Código Asaas no BACEN
-      nome_banco: 'Asaas IP S.A.',
-      tipo_conta: 'Corrente',
+      codigo_banco: dadosEmpresa.banco || '461',
+      nome_banco: dadosEmpresa.nome_banco || 'Asaas IP S.A.',
+      agencia: dadosEmpresa.agencia,
+      agencia_dv: dadosEmpresa.agencia_dv,
+      conta: dadosEmpresa.conta_numero,
+      conta_dv: dadosEmpresa.conta_dv,
+      tipo_conta: dadosEmpresa.tipo_conta || 'Conta de Pagamento',
 
       data: dadosEvento.paymentDate || dadosEvento.date || dadosEvento.dateCreated?.split('T')[0] || new Date().toISOString().split('T')[0],
 
