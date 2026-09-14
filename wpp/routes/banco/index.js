@@ -18,6 +18,7 @@ import { inicializarBackupCron } from './backup-cron.js';
 import recibosRouter from './recibos-api.js';
 import debugRecibosRouter from './debug-recibos.js';
 import extratoRouter from './extrato-api.js';
+import { preencherContasExistentes } from './preencher-contas.js';
 
 const router = express.Router();
 
@@ -53,6 +54,23 @@ router.post('/sicredi/sync', async (req, res) => {
  */
 router.get('/status', (req, res) => {
   res.json(statusSincronizacao());
+});
+
+// ============================================================
+// SCRIPT ÚNICO: Preencher agência/conta (EXECUTAR UMA VEZ)
+// ============================================================
+/**
+ * POST /api/banco/preencher-contas
+ * ATENÇÃO: Executar apenas UMA VEZ para preencher registros históricos
+ * Depois de executar, DELETAR o arquivo preencher-contas.js
+ */
+router.post('/preencher-contas', async (req, res) => {
+  try {
+    const resultado = await preencherContasExistentes();
+    res.json(resultado);
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 // ============================================================
