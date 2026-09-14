@@ -1,12 +1,17 @@
 // ============================================================
-// enriquecer-api.js — V.2609142050
+// enriquecer-api.js — V.2609142100
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
+// + FIX: Usa classificarLancamento() (banco_categorias)
+// + FIX: Salva ID da categoria (não nome)
+// + FIX: Status OK apenas se TUDO encontrado (cliente + CR + classificacao)
+// + FIX: Tolerância valor ±5% com campo Total do CR
+// + NOVO: Filtros data_inicio, data_fim (igual reclassificar)
 // ============================================================
 
 import express from 'express';
 import pkg from 'pg';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
+import { classificarLancamento } from './classificacao-automatica.js';
 
 dotenv.config();
 
@@ -37,17 +42,18 @@ async function buscarCliente(nomeParcial, empresa) {
   return result.rows;
 }
 
-// Buscar CR
+// Buscar CR (Contas a Receber)
+// Tolerâncias: Data ±7 dias, Valor ±5% (campo Total)
 async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
   const dataStr = dataExtrato instanceof Date
     ? dataExtrato.toISOString().split('T')[0]
     : dataExtrato.toString().split('T')[0];
 
   const codigoEmpresa = empresa === 'ALLMAX' ? 1 : empresa === 'IMOBEM' ? 2 : 3;
-  const valorNum = parseFloat(valorExtrato);
+  const valorNum = Math.abs(parseFloat(valorExtrato)); // Valor absoluto
 
   const result = await pool.query(`
-    SELECT "Código_Cliente", "Data_Vencimento", "Valor", "Descrição"
+    SELECT "Código_Cliente", "Data_Vencimento", "Total", "Descrição"
     FROM "Contas_Receber"
     WHERE "Código_Cliente" = $1 AND "Empresa" = $2
     ORDER BY "Data_Vencimento"
@@ -57,31 +63,11 @@ async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
     const dataVenc = new Date(cr.Data_Vencimento);
     const dataExt = new Date(dataStr);
     const difDias = Math.abs((dataVenc - dataExt) / (1000 * 60 * 60 * 24));
-    const valorCR = parseFloat(cr.Valor);
+    const valorCR = parseFloat(cr.Total); // ✅ Campo Total (não Valor!)
     const difValorPercent = Math.abs((valorCR - valorNum) / valorCR);
+
+    // Tolerância: ±7 dias E ±5% do valor
     if (difDias <= 7 && difValorPercent <= 0.05) return cr;
-  }
-  return null;
-}
-
-// Classificar
-async function classificarAutomaticamente(texto, empresa) {
-  if (!texto) return null;
-  const regras = await pool.query(`
-    SELECT id, nome_regra, classificacao, palavras_chave
-    FROM bank_regras_classificacao
-    WHERE ativa = true AND ativo = true
-      AND (empresa = $1 OR empresa IS NULL)
-    ORDER BY prioridade DESC
-  `, [empresa]);
-
-  const textoLower = texto.toLowerCase();
-  for (const regra of regras.rows) {
-    if (!regra.palavras_chave) continue;
-    const palavras = regra.palavras_chave.split(',').map(p => p.trim().toLowerCase());
-    if (palavras.some(palavra => textoLower.includes(palavra))) {
-      return { classificacao: regra.classificacao };
-    }
   }
   return null;
 }
@@ -89,71 +75,137 @@ async function classificarAutomaticamente(texto, empresa) {
 // ENDPOINT POST /api/banco/enriquecer
 router.post('/', async (req, res) => {
   try {
-    const { empresa = 'ALLMAX' } = req.query;
+    const { empresa = 'ALLMAX', data_inicio, data_fim } = req.query;
 
-    // Buscar registros
-    const registros = await pool.query(`
-      SELECT id, empresa, data, valor, descricao_original, nome_origem, observacoes, classificacao
+    // Montar query com filtros
+    let query = `
+      SELECT id, empresa, data, valor, tipo, descricao_original, nome_origem,
+             observacoes, classificacao, status, cpf_cnpj_origem
       FROM bank_extratos
       WHERE tipo_importacao = 'OFX'
         AND banco = 'Asaas'
         AND empresa = $1
         AND (nome_origem IS NULL OR nome_origem = '')
-      ORDER BY data, id
-    `, [empresa]);
+    `;
+
+    const params = [empresa];
+    let paramIndex = 2;
+
+    // Filtro de datas (opcional)
+    if (data_inicio && data_fim) {
+      query += ` AND data BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      params.push(data_inicio, data_fim);
+      paramIndex += 2;
+    }
+
+    query += ` ORDER BY data, id`;
+
+    const registros = await pool.query(query, params);
 
     const stats = {
       processados: 0,
       clienteEncontrado: 0,
       crEncontrada: 0,
       classificado: 0,
+      statusOK: 0,
       erros: 0
     };
 
     for (const reg of registros.rows) {
       try {
         stats.processados++;
+
+        // 1. Extrair nome do cliente
         const nomeParcial = extrairNome(reg.descricao_original);
         if (!nomeParcial) continue;
 
+        // 2. Buscar cliente
         const clientes = await buscarCliente(nomeParcial, reg.empresa);
         if (clientes.length === 0) continue;
 
-        let clienteSelecionado = clientes[0];
+        const clienteSelecionado = clientes[0];
         stats.clienteEncontrado++;
 
-        const cr = await buscarCR(clienteSelecionado.Codigo, reg.data, reg.valor, reg.empresa);
+        // 3. Buscar CR (Contas a Receber)
+        const cr = await buscarCR(
+          clienteSelecionado.Codigo,
+          reg.data,
+          reg.valor,
+          reg.empresa
+        );
+
         let observacoes = reg.observacoes || '';
+        let crEncontrada = false;
         if (cr) {
           observacoes = cr.Descrição;
+          crEncontrada = true;
           stats.crEncontrada++;
         }
 
-        let classificacao = reg.classificacao;
-        const resultado = await classificarAutomaticamente(observacoes || reg.descricao_original, reg.empresa);
-        if (resultado) {
-          classificacao = resultado.classificacao;
+        // 4. Classificar automaticamente
+        const textoParaClassificar = observacoes || reg.descricao_original;
+        const resultado = await classificarLancamento({
+          description: textoParaClassificar,
+          value: Math.abs(reg.valor),
+          tipo: reg.tipo,
+          empresa: reg.empresa,
+          cpfCnpjOrigem: reg.cpf_cnpj_origem || clienteSelecionado.Cliente_CPF
+        });
+
+        let categoriaId = reg.classificacao; // Mantém atual se não classificar
+        let classificou = false;
+        if (resultado && resultado.categoria_id) {
+          categoriaId = resultado.categoria_id;
+          classificou = true;
           stats.classificado++;
         }
 
+        // 5. Status = OK SOMENTE se encontrou TUDO (cliente + CR + classificacao)
+        const tudoEncontrado = crEncontrada && classificou;
+        const novoStatus = tudoEncontrado ? 'OK' : reg.status; // Mantém atual se não completou
+
+        if (tudoEncontrado) {
+          stats.statusOK++;
+        }
+
+        // 6. Atualizar registro
         await pool.query(`
           UPDATE bank_extratos
-          SET nome_origem = $1, cpf_cnpj_origem = $2, observacoes = $3,
-              classificacao = $4::text,
-              status = CASE WHEN $4::text IS NOT NULL THEN 'OK' ELSE status END
-          WHERE id = $5
-        `, [clienteSelecionado.Cliente_Nome, clienteSelecionado.Cliente_CPF, observacoes, classificacao, reg.id]);
+          SET nome_origem = $1,
+              cpf_cnpj_origem = $2,
+              observacoes = $3,
+              classificacao = $4::TEXT,
+              status = $5
+          WHERE id = $6
+        `, [
+          clienteSelecionado.Cliente_Nome,
+          clienteSelecionado.Cliente_CPF,
+          observacoes,
+          categoriaId, // ✅ ID numérico (ou mantém atual)
+          novoStatus,  // ✅ OK só se tudo encontrado
+          reg.id
+        ]);
 
       } catch (err) {
-        console.error(`Erro ao processar ID ${reg.id}:`, err);
+        console.error(`❌ Erro ao processar ID ${reg.id}:`, err);
         stats.erros++;
       }
     }
 
-    res.json({ sucesso: true, stats });
+    res.json({
+      sucesso: true,
+      stats: {
+        processados: stats.processados,
+        clienteEncontrado: stats.clienteEncontrado,
+        crEncontrada: stats.crEncontrada,
+        classificado: stats.classificado,
+        statusOK: stats.statusOK,
+        erros: stats.erros
+      }
+    });
 
   } catch (err) {
-    console.error('Erro ao enriquecer:', err);
+    console.error('❌ Erro ao enriquecer:', err);
     res.status(500).json({ sucesso: false, erro: err.message });
   }
 });
