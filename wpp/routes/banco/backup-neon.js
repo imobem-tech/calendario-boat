@@ -75,7 +75,6 @@ export async function backupDiario() {
         `pg_dump "${DB_URL}" --data-only --column-inserts ` +
         `--table="bank_extratos" ` +
         `--table="bank_categorias" ` +
-        `--table="bank_regras_classificacao" ` +
         `--table="bank_historico_classificacoes" ` +
         `--table="bank_codigos_bacen" ` +
         `--no-owner --no-privileges -f "${arquivoBank}"`
@@ -341,7 +340,6 @@ async function coletarInfoBanco() {
   const tabelas = [
     'bank_extratos',
     'bank_categorias',
-    'bank_regras_classificacao',
     'bank_historico_classificacoes'
   ];
 

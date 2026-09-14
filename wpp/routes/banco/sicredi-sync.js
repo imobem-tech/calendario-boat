@@ -1,6 +1,10 @@
 // ============================================================
-// wpp/routes/banco/sicredi-sync.js — V.260911202500
+// wpp/routes/banco/sicredi-sync.js — V.2609140047
 // SINCRONIZAÇÃO SICREDI - POLLING MANUAL
+// NOVO (14/09 00:47): Migrado para nova lógica de classificação
+//   - Usa classificarLancamento() (mesma do Asaas)
+//   - NÃO USA MAIS bank_regras_classificacao
+//   - Usa palavras_chave + chave_aprendida das categorias
 // ============================================================
 
 import pkg from 'pg';
@@ -231,12 +235,22 @@ async function inserirLancamento(lanc) {
 }
 
 /**
- * Tenta classificar automaticamente
+ * Tenta classificar automaticamente usando NOVA LÓGICA
+ * (mesma do Asaas: palavras_chave + chave_aprendida)
  */
 async function tentarClassificarAutomatico(hashUnico) {
   try {
+    // Buscar lançamento completo
     const lancResult = await pool.query(`
-      SELECT id, descricao_original
+      SELECT
+        id,
+        descricao_original,
+        valor,
+        tipo,
+        empresa,
+        tipo_importacao,
+        id_transacao_banco,
+        cpf_cnpj_origem
       FROM bank_extratos
       WHERE hash_unico = $1 AND classificacao IS NULL
     `, [hashUnico]);
@@ -245,44 +259,40 @@ async function tentarClassificarAutomatico(hashUnico) {
 
     const lanc = lancResult.rows[0];
 
-    const regraResult = await pool.query(`
-      SELECT id, classificacao, confianca_base, nome_regra
-      FROM bank_regras_classificacao
-      WHERE ativa = true
-        AND (
-          banco_especifico IS NULL OR banco_especifico = 'Sicredi'
-        )
-        AND (
-          (palavras_chave IS NOT NULL AND $1 ~* ANY(palavras_chave))
-          OR
-          (regex_pattern IS NOT NULL AND $1 ~ regex_pattern)
-        )
-      ORDER BY prioridade DESC, taxa_acerto DESC NULLS LAST
-      LIMIT 1
-    `, [lanc.descricao_original]);
+    // Usar mesma lógica de classificação do Asaas
+    const { classificarLancamento } = await import('./classificacao-automatica.js');
 
-    if (regraResult.rows.length === 0) return;
+    const resultado = await classificarLancamento({
+      description: lanc.descricao_original,
+      value: lanc.valor,
+      tipo: lanc.tipo,
+      empresa: lanc.empresa,
+      tipo_importacao: lanc.tipo_importacao,
+      id_transacao_banco: lanc.id_transacao_banco,
+      cpfCnpjOrigem: lanc.cpf_cnpj_origem
+    });
 
-    const regra = regraResult.rows[0];
+    // Se encontrou classificação automática
+    if (resultado.categoria_id) {
+      await pool.query(`
+        UPDATE bank_extratos
+        SET
+          classificacao = $2,
+          observacoes = $3,
+          status = $4,
+          classificacao_manual = false,
+          classificado_por = 'Sistema - Sync Sicredi (nova lógica)',
+          classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
+        WHERE id = $1
+      `, [
+        lanc.id,
+        resultado.categoria_id,
+        resultado.observacao_padrao || '',
+        resultado.status
+      ]);
 
-    await pool.query(`
-      UPDATE bank_extratos
-      SET
-        classificacao = $2,
-        classificacao_manual = false,
-        classificado_por = 'Sistema - Sync Sicredi',
-        classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo',
-        confianca = $3
-      WHERE id = $1
-    `, [lanc.id, regra.classificacao, regra.confianca_base]);
-
-    await pool.query(`
-      UPDATE bank_regras_classificacao
-      SET vezes_aplicada = vezes_aplicada + 1
-      WHERE id = $1
-    `, [regra.id]);
-
-    console.log(`✅ Classificado: ${regra.classificacao}`);
+      console.log(`✅ Classificado (${resultado.metodo}): ${resultado.categoria_nome}`);
+    }
 
   } catch (err) {
     console.error('❌ Erro ao classificar:', err.message);
