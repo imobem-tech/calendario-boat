@@ -1,14 +1,17 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609141430
+// wpp/routes/banco/extrato-api.js — V.2609141825
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
 // NOVO (14/09 01:45): Adicionar saldo_acumulado (saldo total da conta)
 // NOVO (14/09 01:55): ORDER BY data ASC (crescente - mais antigo primeiro)
 // NOVO (14/09 14:30): Cálculo saldo linha a linha (saldo_linha)
+// NOVO (14/09 18:25): Geração automática de tokens para acesso seguro a anexos
 // ============================================================
 
 import express from 'express';
 import pkg from 'pg';
+import { nanoid } from 'nanoid';
+
 const { Pool } = pkg;
 
 const router = express.Router();
@@ -190,6 +193,60 @@ router.get('/listar', async (req, res) => {
       saldo_linha: saldoPorId[row.id] || 0
     }));
 
+    // ============================================================
+    // GERAR TOKEN PARA ACESSO SEGURO AOS ANEXOS
+    // ============================================================
+    let tokenExtrato = null;
+    let urlBaseToken = null;
+
+    // Verificar se há lançamentos com anexos
+    const lancamentosComAnexos = lancamentos.filter(l => l.tem_anexo);
+
+    if (lancamentosComAnexos.length > 0) {
+      // Montar objeto todos_arquivos: { lancamento_id: [{url, nome}] }
+      const todosArquivos = {};
+      lancamentosComAnexos.forEach(lanc => {
+        todosArquivos[lanc.id] = lanc.anexos.map((anexo, i) => ({
+          url: anexo.url || anexo,
+          nome: anexo.nome || `Anexo_${lanc.id}_${i + 1}`
+        }));
+      });
+
+      // Definir extrato_ref (empresa + mes ou empresa se for todos)
+      const extratoRef = mes ? `${empresa}_${mes}` : `${empresa}_TODOS`;
+      const descricao = mes ?
+        `Extrato Bancário ${empresa} - ${mes}` :
+        `Extrato Bancário ${empresa} - Todos os períodos`;
+
+      // Verificar se já existe token para este extrato
+      const tokenExistente = await pool.query(
+        'SELECT token FROM file_tokens WHERE extrato_ref = $1',
+        [extratoRef]
+      );
+
+      if (tokenExistente.rows.length > 0) {
+        // Reutilizar token existente
+        tokenExtrato = tokenExistente.rows[0].token;
+      } else {
+        // Gerar novo token
+        tokenExtrato = nanoid();
+        await pool.query(
+          `INSERT INTO file_tokens (token, extrato_ref, descricao, todos_arquivos, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [tokenExtrato, extratoRef, descricao, todosArquivos, 'API_EXTRATO']
+        );
+      }
+
+      urlBaseToken = `https://calendario-boat-production.up.railway.app/visualizador/${tokenExtrato}`;
+
+      // Adicionar url_token em cada lançamento com anexo
+      lancamentos.forEach(lanc => {
+        if (lanc.tem_anexo) {
+          lanc.url_token = `${urlBaseToken}?lancamento_id=${lanc.id}`;
+        }
+      });
+    }
+
     res.json({
       sucesso: true,
       empresa: empresa,
@@ -207,6 +264,8 @@ router.get('/listar', async (req, res) => {
         offset: parseInt(offset),
         total: result.rows.length
       },
+      token: tokenExtrato,
+      url_base_token: urlBaseToken,
       lancamentos: lancamentos
     });
 

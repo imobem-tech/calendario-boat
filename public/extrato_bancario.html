@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrato Bancário - Sistema de Gestão</title>
-
+    <title>Extrato Bancário</title>
     <style>
         * {
             margin: 0;
@@ -13,770 +12,667 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
             padding: 20px;
-            font-size: 14px;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
             background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
 
-        /* CABEÇALHO DO EXTRATO */
-        .extrato-header {
-            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
         }
 
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 25px;
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
         }
 
-        .bank-info h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .bank-info .bank-code {
-            font-size: 13px;
+        .header p {
             opacity: 0.9;
-        }
-
-        .period-info {
-            text-align: right;
-        }
-
-        .period-info .month {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .period-info .empresa {
             font-size: 14px;
-            opacity: 0.9;
         }
 
-        .totais-resumo {
+        .filters {
+            padding: 25px 30px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            margin-top: 20px;
         }
 
-        .total-card {
-            background: rgba(255,255,255,0.15);
-            padding: 15px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-        }
-
-        .total-card .label {
-            font-size: 11px;
-            text-transform: uppercase;
-            opacity: 0.8;
-            margin-bottom: 5px;
-        }
-
-        .total-card .value {
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        .total-card.positivo .value {
-            color: #2ecc71;
-        }
-
-        .total-card.negativo .value {
-            color: #e74c3c;
-        }
-
-        /* FILTROS */
-        .filtros {
-            padding: 20px 30px;
-            background: #ecf0f1;
-            border-bottom: 2px solid #bdc3c7;
-        }
-
-        .filtros-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            align-items: end;
+        .filter-group {
+            display: flex;
+            flex-direction: column;
         }
 
         .filter-group label {
-            display: block;
             font-size: 12px;
             font-weight: 600;
-            color: #2c3e50;
+            color: #666;
             margin-bottom: 5px;
-        }
-
-        .filter-group select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            font-size: 14px;
-            background: white;
-        }
-
-        .btn-filtrar {
-            padding: 8px 24px;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-filtrar:hover {
-            background: #2980b9;
-        }
-
-        /* TABELA EXTRATO */
-        .extrato-body {
-            padding: 0;
-        }
-
-        .extrato-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .extrato-table thead {
-            background: #34495e;
-            color: white;
-        }
-
-        .extrato-table th {
-            padding: 12px 15px;
-            text-align: left;
-            font-size: 12px;
-            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .extrato-table th.center {
-            text-align: center;
+        .filter-group select,
+        .filter-group input {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: all 0.2s;
         }
 
-        .extrato-table th.right {
-            text-align: right;
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .extrato-table tbody tr {
-            border-bottom: 1px solid #ecf0f1;
-            transition: background 0.2s;
+        .actions {
+            padding: 20px 30px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
-        .extrato-table tbody tr:hover {
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .summary {
+            padding: 25px 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            background: white;
+        }
+
+        .summary-card {
+            padding: 20px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .summary-card.creditos {
+            background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+        }
+
+        .summary-card.debitos {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .summary-card.saldo {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .summary-card label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            opacity: 0.8;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .table-container {
+            padding: 30px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        tbody tr:hover {
             background: #f8f9fa;
         }
 
-        .extrato-table tbody tr.pendente {
-            background: #fff3cd;
+        .credito {
+            color: #10b981;
+            font-weight: 600;
         }
 
-        .extrato-table tbody tr.pendente:hover {
-            background: #ffe8a1;
+        .debito {
+            color: #ef4444;
+            font-weight: 600;
         }
 
-        .extrato-table td {
-            padding: 12px 15px;
-            font-size: 13px;
-            color: #2c3e50;
-        }
-
-        .extrato-table td.center {
-            text-align: center;
-        }
-
-        .extrato-table td.right {
-            text-align: right;
-        }
-
-        /* DESCRIÇÃO - 2 linhas com quebra automática */
-        .descricao-cell {
-            max-width: 400px;
-            white-space: normal;
-            word-wrap: break-word;
-            line-height: 1.4;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* OBSERVAÇÕES - sempre visível */
-        .observacoes-cell {
-            max-width: 200px;
-            white-space: normal;
-            word-wrap: break-word;
-            line-height: 1.3;
-            font-size: 12px;
-            color: #7f8c8d;
-        }
-
-        /* CATEGORIA */
         .categoria {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            display: inline-block;
             padding: 4px 10px;
             border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .categoria.pendente {
-            background: #ffc107;
-            color: #856404;
-        }
-
-        /* VALOR */
-        .valor {
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
-        }
-
-        .valor.credito {
-            color: #27ae60;
-        }
-
-        .valor.debito {
-            color: #c0392b;
-        }
-
-        /* ANEXO */
-        .anexo-icon {
-            font-size: 16px;
-            color: #7f8c8d;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-
-        .anexo-icon:hover {
-            color: #3498db;
-        }
-
-        .anexo-icon.tem-anexo {
-            color: #27ae60;
-        }
-
-        /* DATA */
-        .data {
-            font-size: 12px;
-            color: #7f8c8d;
-        }
-
-        /* ORIGEM */
-        .origem {
-            font-size: 12px;
-            max-width: 180px;
-            white-space: normal;
-            word-wrap: break-word;
-        }
-
-        .origem .nome {
-            font-weight: 500;
-            color: #2c3e50;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .origem .cpf {
-            color: #95a5a6;
             font-size: 11px;
+            font-weight: 600;
         }
 
-        /* LOADING */
         .loading {
             text-align: center;
             padding: 60px 20px;
-            color: #7f8c8d;
+            color: #666;
         }
 
         .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #ecf0f1;
-            border-top-color: #3498db;
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            margin: 0 auto 20px;
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        /* EMPTY STATE */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #7f8c8d;
-        }
-
-        .empty-state .icon {
-            font-size: 64px;
-            margin-bottom: 15px;
-            opacity: 0.3;
-        }
-
-        /* STATUS BADGE */
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 10px;
+        .anexo-link {
+            color: #667eea;
+            text-decoration: none;
             font-weight: 600;
-            text-transform: uppercase;
         }
 
-        .status-badge.ok {
-            background: #d4edda;
-            color: #155724;
+        .anexo-link:hover {
+            text-decoration: underline;
         }
 
-        .status-badge.pendente {
-            background: #fff3cd;
-            color: #856404;
+        .filter-mode {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
+        .filter-mode button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .filter-mode button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        @media print {
             body {
-                padding: 10px;
+                background: white;
             }
-
-            .extrato-header {
-                padding: 20px;
+            .filters, .actions {
+                display: none;
             }
-
-            .header-top {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .period-info {
-                text-align: left;
-            }
-
-            .totais-resumo {
-                grid-template-columns: 1fr;
-            }
-
-            .filtros {
-                padding: 15px;
-            }
-
-            .filtros-grid {
-                grid-template-columns: 1fr;
-            }
-
-            /* Tabela responsiva */
-            .extrato-table {
-                display: block;
-                overflow-x: auto;
-                white-space: nowrap;
-            }
-
-            .extrato-table th,
-            .extrato-table td {
-                padding: 8px 10px;
-                font-size: 12px;
-            }
-        }
-
-        /* OBSERVAÇÕES TOOLTIP */
-        .obs-icon {
-            cursor: help;
-            color: #95a5a6;
-            font-size: 14px;
-        }
-
-        .obs-icon:hover {
-            color: #3498db;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- CABEÇALHO DO EXTRATO -->
-        <div class="extrato-header">
-            <div class="header-top">
-                <div class="bank-info">
-                    <h1 id="headerBanco">Carregando...</h1>
-                    <div class="bank-code" id="headerCodigoBanco"></div>
-                    <div class="bank-code" id="headerAgenciaConta" style="margin-top: 5px;"></div>
-                </div>
-                <div class="period-info">
-                    <div class="month" id="headerMes">-</div>
-                    <div class="empresa" id="headerEmpresa">-</div>
-                </div>
-            </div>
-
-            <div class="totais-resumo">
-                <div class="total-card positivo">
-                    <div class="label">Créditos</div>
-                    <div class="value" id="totalCreditos">R$ 0,00</div>
-                </div>
-                <div class="total-card negativo">
-                    <div class="label">Débitos</div>
-                    <div class="value" id="totalDebitos">R$ 0,00</div>
-                </div>
-                <div class="total-card">
-                    <div class="label">Saldo</div>
-                    <div class="value" id="totalSaldo">R$ 0,00</div>
-                </div>
-                <div class="total-card">
-                    <div class="label">Lançamentos</div>
-                    <div class="value" id="totalLancamentos">0</div>
-                </div>
-                <div class="total-card" style="background: rgba(255,255,255,0.25);">
-                    <div class="label">Saldo Acumulado</div>
-                    <div class="value" id="totalSaldoAcumulado" style="color: #f39c12;">R$ 0,00</div>
-                </div>
-            </div>
+        <!-- HEADER -->
+        <div class="header">
+            <h1>📊 Extrato Bancário</h1>
+            <p>Visualize e exporte seus extratos bancários com segurança</p>
         </div>
 
         <!-- FILTROS -->
-        <div class="filtros">
-            <div class="filtros-grid">
-                <div class="filter-group">
-                    <label>Empresa</label>
-                    <select id="filtroEmpresa">
-                        <option value="ALLMAX">ALLMAX</option>
-                        <option value="IMOBEM" selected>IMOBEM</option>
-                        <option value="IMOBAN">IMOBAN</option>
-                        <option value="SUMMER">SUMMER</option>
-                    </select>
-                </div>
+        <div class="filters">
+            <div class="filter-group">
+                <label>Empresa</label>
+                <select id="empresaSelect">
+                    <option value="TODAS" selected>🏢 TODAS</option>
+                    <option value="ALLMAX">ALLMAX</option>
+                    <option value="IMOBEM">IMOBEM</option>
+                    <option value="IMOBAN">IMOBAN</option>
+                    <option value="SUMMER">SUMMER</option>
+                </select>
+            </div>
 
-                <div class="filter-group">
-                    <label>Mês</label>
-                    <select id="filtroMes">
-                        <option value="">Todos os meses</option>
-                        <!-- Carregado dinamicamente -->
-                    </select>
+            <div class="filter-group">
+                <label>Modo de Filtro</label>
+                <div class="filter-mode">
+                    <button id="btnModoMes" class="active" onclick="trocarModoFiltro('mes')">Por Mês</button>
+                    <button id="btnModoDatas" onclick="trocarModoFiltro('datas')">Por Datas</button>
                 </div>
+            </div>
 
-                <div class="filter-group">
-                    <label>Status</label>
-                    <select id="filtroStatus">
-                        <option value="">Todos</option>
-                        <option value="OK">Classificados</option>
-                        <option value="PENDENTE">Pendentes</option>
-                    </select>
-                </div>
+            <div class="filter-group" id="filtroMes">
+                <label>Mês</label>
+                <input type="month" id="mesSelect">
+            </div>
 
-                <div class="filter-group">
-                    <button class="btn-filtrar" onclick="buscarExtrato()">🔍 Buscar</button>
-                </div>
+            <div class="filter-group" id="filtroDataInicio" style="display: none;">
+                <label>Data Início</label>
+                <input type="date" id="dataInicio">
+            </div>
+
+            <div class="filter-group" id="filtroDataFim" style="display: none;">
+                <label>Data Fim</label>
+                <input type="date" id="dataFim">
+            </div>
+
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="statusSelect">
+                    <option value="todos">Todos</option>
+                    <option value="OK">Classificado</option>
+                    <option value="PENDENTE">Pendente</option>
+                </select>
             </div>
         </div>
 
-        <!-- LOADING -->
-        <div id="loading" class="loading">
-            <div class="loading-spinner"></div>
-            <div>Carregando extrato...</div>
+        <!-- AÇÕES -->
+        <div class="actions">
+            <button class="btn btn-primary" onclick="buscarExtrato()">
+                🔍 Buscar
+            </button>
+            <button class="btn btn-success" id="btnGerarPDF" onclick="gerarPDF()" disabled>
+                📄 Gerar PDF
+            </button>
         </div>
 
-        <!-- EMPTY STATE -->
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <div class="icon">📭</div>
-            <h3>Nenhum lançamento encontrado</h3>
-            <p>Tente ajustar os filtros ou selecione outro período</p>
+        <!-- RESUMO -->
+        <div class="summary" id="summary" style="display: none;">
+            <div class="summary-card">
+                <label>Lançamentos</label>
+                <div class="value" id="totalLancamentos">0</div>
+            </div>
+            <div class="summary-card creditos">
+                <label>Créditos</label>
+                <div class="value" id="totalCreditos">R$ 0,00</div>
+            </div>
+            <div class="summary-card debitos">
+                <label>Débitos</label>
+                <div class="value" id="totalDebitos">R$ 0,00</div>
+            </div>
+            <div class="summary-card saldo">
+                <label>Saldo do Período</label>
+                <div class="value" id="saldoPeriodo">R$ 0,00</div>
+            </div>
         </div>
 
-        <!-- TABELA EXTRATO -->
-        <div class="extrato-body" id="extratoBody" style="display: none;">
-            <table class="extrato-table">
+        <!-- TABELA -->
+        <div class="table-container">
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Carregando extratos...</p>
+            </div>
+            <table id="tabelaExtrato" style="display: none;">
                 <thead>
                     <tr>
-                        <th class="center">Data</th>
+                        <th>Data</th>
+                        <th>Empresa</th>
                         <th>Categoria</th>
                         <th>Descrição</th>
+                        <th>📎</th>
                         <th>Origem</th>
-                        <th>Observações</th>
-                        <th class="right">Valor</th>
-                        <th class="right">Saldo</th>
-                        <th class="center">📎</th>
-                        <th class="center">Status</th>
+                        <th>Valor</th>
+                        <th>Saldo</th>
                     </tr>
                 </thead>
-                <tbody id="extratoTableBody"></tbody>
+                <tbody id="corpoTabela">
+                </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://calendario-boat-production.up.railway.app/api/banco/extrato';
+        // Estado global
+        let dadosAtuais = null;
+        let modoFiltro = 'mes'; // 'mes' ou 'datas'
 
-        // Dados fixos das contas por empresa
-        const CONTAS_EMPRESAS = {
-            'ALLMAX': {
-                banco: '461',
-                banco_nome: 'Asaas I.P S.A',
-                agencia: '0001',
-                conta: '6327105',
-                conta_dv: '0',
-                tipo_conta: 'Conta de Pagamento',
-                nome_completo: 'ALLMAX GESTAO DE COTAS LTDA',
-                cnpj: '45.703.081/0001-24'
-            },
-            'SUMMER': {
-                banco: '461',
-                banco_nome: 'Asaas I.P S.A',
-                agencia: '0001',
-                conta: '6327037',
-                conta_dv: '5',
-                tipo_conta: 'Conta de Pagamento',
-                nome_completo: 'SUMMER NAUTICA LTDA',
-                cnpj: '59.338.067/0001-83'
-            },
-            'IMOBEM': {
-                banco: '461',
-                banco_nome: 'Asaas I.P S.A',
-                agencia: '0001',
-                conta: '6576593',
-                conta_dv: '5',
-                tipo_conta: 'Conta de Pagamento',
-                nome_completo: 'IMOBEM IMOVEIS LTDA',
-                cnpj: '09.148.523/0001-54'
-            },
-            'IMOBAN': {
-                banco: '461',
-                banco_nome: 'Asaas I.P S.A',
-                agencia: '0001',
-                conta: '0000000',
-                conta_dv: '0',
-                tipo_conta: 'Conta de Pagamento',
-                nome_completo: 'IMOBAN (dados pendentes)',
-                cnpj: '00.000.000/0001-00'
-            }
-        };
+        // Inicializar
+        window.addEventListener('DOMContentLoaded', () => {
+            // Definir mês atual como padrão
+            const hoje = new Date();
+            const mesAtual = hoje.toISOString().substring(0, 7);
+            document.getElementById('mesSelect').value = mesAtual;
 
-        // Carregar ao abrir
-        window.addEventListener('load', () => {
-            carregarMeses();
+            // Buscar automaticamente
             buscarExtrato();
         });
 
-        // Carregar meses disponíveis
-        async function carregarMeses() {
-            try {
-                const empresa = document.getElementById('filtroEmpresa').value;
-                const response = await fetch(`${API_URL}/meses?empresa=${empresa}`);
-                const data = await response.json();
+        // Trocar modo de filtro
+        function trocarModoFiltro(modo) {
+            modoFiltro = modo;
 
-                const select = document.getElementById('filtroMes');
-                select.innerHTML = '<option value="">Todos os meses</option>';
+            // Atualizar botões
+            document.getElementById('btnModoMes').classList.toggle('active', modo === 'mes');
+            document.getElementById('btnModoDatas').classList.toggle('active', modo === 'datas');
 
-                data.meses.forEach(mes => {
-                    const option = document.createElement('option');
-                    option.value = mes.mes.split('T')[0].substring(0, 7); // YYYY-MM
-                    option.textContent = `${mes.mes_formatado} (${mes.total_lancamentos} lanç.)`;
-                    select.appendChild(option);
-                });
-
-            } catch (err) {
-                console.error('Erro ao carregar meses:', err);
-            }
+            // Mostrar/ocultar campos
+            document.getElementById('filtroMes').style.display = modo === 'mes' ? 'flex' : 'none';
+            document.getElementById('filtroDataInicio').style.display = modo === 'datas' ? 'flex' : 'none';
+            document.getElementById('filtroDataFim').style.display = modo === 'datas' ? 'flex' : 'none';
         }
 
         // Buscar extrato
         async function buscarExtrato() {
-            const loading = document.getElementById('loading');
-            const emptyState = document.getElementById('emptyState');
-            const extratoBody = document.getElementById('extratoBody');
-            const tableBody = document.getElementById('extratoTableBody');
-
-            loading.style.display = 'block';
-            emptyState.style.display = 'none';
-            extratoBody.style.display = 'none';
-
             try {
-                const empresa = document.getElementById('filtroEmpresa').value;
-                const mes = document.getElementById('filtroMes').value;
-                const status = document.getElementById('filtroStatus').value;
+                mostrarLoading(true);
 
-                let url = `${API_URL}/listar?empresa=${empresa}&limit=500`;
-                if (mes) url += `&mes=${mes}`;
-                if (status) url += `&status=${status}`;
+                const empresa = document.getElementById('empresaSelect').value;
+                const status = document.getElementById('statusSelect').value;
+
+                let url = 'https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?';
+
+                // Empresa
+                if (empresa !== 'TODAS') {
+                    url += `empresa=${empresa}&`;
+                } else {
+                    // Para TODAS, buscar cada empresa e consolidar
+                    url += `empresa=ALLMAX&`;
+                }
+
+                // Período
+                if (modoFiltro === 'mes') {
+                    const mes = document.getElementById('mesSelect').value;
+                    if (mes) {
+                        url += `mes=${mes}&`;
+                    }
+                } else {
+                    const dataInicio = document.getElementById('dataInicio').value;
+                    const dataFim = document.getElementById('dataFim').value;
+                    if (dataInicio) url += `data_inicio=${dataInicio}&`;
+                    if (dataFim) url += `data_fim=${dataFim}&`;
+                }
+
+                // Status
+                if (status !== 'todos') {
+                    url += `status=${status}&`;
+                }
+
+                url += 'limit=1000';
 
                 const response = await fetch(url);
-                const data = await response.json();
+                const dados = await response.json();
 
-                loading.style.display = 'none';
-
-                if (!data.lancamentos || data.lancamentos.length === 0) {
-                    emptyState.style.display = 'block';
-                    return;
-                }
-
-                // Atualizar cabeçalho (empresa e mes já declarados acima)
-                const contaEmpresa = CONTAS_EMPRESAS[empresa];
-
-                if (contaEmpresa) {
-                    document.getElementById('headerBanco').textContent = `${contaEmpresa.banco} - ${contaEmpresa.banco_nome}`;
-                    document.getElementById('headerCodigoBanco').textContent = `${contaEmpresa.nome_completo} | CNPJ: ${contaEmpresa.cnpj}`;
-                    document.getElementById('headerAgenciaConta').textContent = `Agência: ${contaEmpresa.agencia} | Conta: ${contaEmpresa.conta}-${contaEmpresa.conta_dv}`;
-                    document.getElementById('headerEmpresa').textContent = empresa;
-                }
-
-                // Atualizar mês
-                if (mes) {
-                    const [ano, mesNum] = mes.split('-');
-                    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    document.getElementById('headerMes').textContent = `${meses[parseInt(mesNum)-1]}/${ano}`;
+                if (empresa === 'TODAS') {
+                    // Buscar todas as empresas
+                    dadosAtuais = await buscarTodasEmpresas();
                 } else {
-                    document.getElementById('headerMes').textContent = 'Todos os períodos';
+                    dadosAtuais = dados;
                 }
 
-                // Atualizar totais
-                document.getElementById('totalCreditos').textContent = formatarMoeda(data.totais.creditos);
-                document.getElementById('totalDebitos').textContent = formatarMoeda(data.totais.debitos);
-                document.getElementById('totalSaldo').textContent = formatarMoeda(data.totais.saldo);
-                document.getElementById('totalLancamentos').textContent = data.totais.lancamentos;
-                document.getElementById('totalSaldoAcumulado').textContent = formatarMoeda(data.totais.saldo_acumulado);
-
-                // Renderizar tabela
-                tableBody.innerHTML = '';
-                data.lancamentos.forEach(lanc => renderizarLancamento(lanc));
-
-                extratoBody.style.display = 'block';
+                renderizarTabela(dadosAtuais);
+                atualizarResumo(dadosAtuais);
+                document.getElementById('btnGerarPDF').disabled = false;
 
             } catch (err) {
-                loading.style.display = 'none';
-                console.error('Erro:', err);
-                alert('Erro ao carregar extrato: ' + err.message);
+                console.error('Erro ao buscar extrato:', err);
+                alert('Erro ao buscar extrato: ' + err.message);
+            } finally {
+                mostrarLoading(false);
             }
         }
 
-        // Renderizar lançamento
-        function renderizarLancamento(lanc) {
-            const tbody = document.getElementById('extratoTableBody');
-            const tr = document.createElement('tr');
+        // Buscar todas as empresas
+        async function buscarTodasEmpresas() {
+            const empresas = ['ALLMAX', 'IMOBEM', 'IMOBAN', 'SUMMER'];
+            const status = document.getElementById('statusSelect').value;
 
-            if (lanc.status === 'PENDENTE') {
-                tr.classList.add('pendente');
+            let todosLancamentos = [];
+            let totais = {
+                lancamentos: 0,
+                creditos: 0,
+                debitos: 0,
+                saldo: 0,
+                saldo_acumulado: 0
+            };
+
+            for (const emp of empresas) {
+                let url = `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${emp}&`;
+
+                if (modoFiltro === 'mes') {
+                    const mes = document.getElementById('mesSelect').value;
+                    if (mes) url += `mes=${mes}&`;
+                } else {
+                    const dataInicio = document.getElementById('dataInicio').value;
+                    const dataFim = document.getElementById('dataFim').value;
+                    if (dataInicio) url += `data_inicio=${dataInicio}&`;
+                    if (dataFim) url += `data_fim=${dataFim}&`;
+                }
+
+                if (status !== 'todos') url += `status=${status}&`;
+                url += 'limit=1000';
+
+                const response = await fetch(url);
+                const dados = await response.json();
+
+                todosLancamentos = todosLancamentos.concat(dados.lancamentos || []);
+                totais.lancamentos += dados.totais.lancamentos;
+                totais.creditos += dados.totais.creditos;
+                totais.debitos += dados.totais.debitos;
+                totais.saldo += dados.totais.saldo;
             }
 
-            const dataFormatada = formatarData(lanc.importado_em);
-            const valorFormatado = formatarMoeda(lanc.valor);
-            const classeValor = lanc.valor > 0 ? 'credito' : 'debito';
+            // Ordenar por data
+            todosLancamentos.sort((a, b) => new Date(b.importado_em) - new Date(a.importado_em));
 
-            // Categoria
-            let categoriaHtml = '';
-            if (lanc.categoria) {
-                const cor = lanc.categoria.cor || '#95a5a6';
-                categoriaHtml = `
-                    <span class="categoria" style="background-color: ${cor}20; color: ${cor}">
-                        ${lanc.categoria.icone || '📌'} ${lanc.categoria.nome}
-                    </span>
+            return {
+                sucesso: true,
+                empresa: 'TODAS',
+                totais: totais,
+                lancamentos: todosLancamentos
+            };
+        }
+
+        // Renderizar tabela
+        function renderizarTabela(dados) {
+            const tbody = document.getElementById('corpoTabela');
+            tbody.innerHTML = '';
+
+            if (!dados.lancamentos || dados.lancamentos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
+                return;
+            }
+
+            dados.lancamentos.forEach(lanc => {
+                const tr = document.createElement('tr');
+
+                // Data
+                const data = new Date(lanc.importado_em);
+                const dataFormatada = data.toLocaleDateString('pt-BR') + '<br>' + data.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+
+                // Categoria
+                const catHTML = lanc.categoria ?
+                    `<span class="categoria" style="background-color: ${lanc.categoria.cor}20; color: ${lanc.categoria.cor}">${lanc.categoria.icone} ${lanc.categoria.nome}</span>` :
+                    '<span class="categoria" style="background: #fee; color: #c00;">⚠️ Não classificado</span>';
+
+                // Anexo
+                const anexoHTML = lanc.tem_anexo && lanc.url_token ?
+                    `<a href="${lanc.url_token}" target="_blank" class="anexo-link">📎${lanc.anexos.length}</a>` :
+                    '-';
+
+                tr.innerHTML = `
+                    <td>${dataFormatada}</td>
+                    <td><strong>${lanc.empresa}</strong></td>
+                    <td>${catHTML}</td>
+                    <td>${lanc.descricao.substring(0, 100)}</td>
+                    <td style="text-align:center;">${anexoHTML}</td>
+                    <td>${lanc.origem.nome || '-'}</td>
+                    <td class="${lanc.valor >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
+                        ${lanc.valor >= 0 ? '' : '-'}R$ ${Math.abs(lanc.valor).toFixed(2).replace('.', ',')}
+                    </td>
+                    <td class="${lanc.saldo_linha >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
+                        ${lanc.saldo_linha >= 0 ? '' : '-'}R$ ${Math.abs(lanc.saldo_linha).toFixed(2).replace('.', ',')}
+                    </td>
                 `;
-            } else {
-                categoriaHtml = '<span class="categoria pendente">⚠️ Não classificado</span>';
-            }
 
-            // Origem
-            const origemHtml = lanc.origem.nome ? `
-                <div class="origem">
-                    <div class="nome">${lanc.origem.nome}</div>
-                    <div class="cpf">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</div>
-                </div>
-            ` : '<span class="origem">-</span>';
-
-            // Observações - sempre visível
-            const obsHtml = lanc.observacoes || '-';
-
-            // Anexo - com número
-            const anexoHtml = lanc.tem_anexo ?
-                `<span class="anexo-icon tem-anexo" onclick="verAnexos(${JSON.stringify(lanc.anexos).replace(/"/g, '&quot;')})" style="cursor: pointer;" title="Clique para abrir ${lanc.anexos.length} arquivo(s)">📎${lanc.anexos.length}</span>` :
-                '<span class="anexo-icon">-</span>';
-
-            // Status
-            const statusClass = lanc.status === 'OK' ? 'ok' : 'pendente';
-            const statusHtml = `<span class="status-badge ${statusClass}">${lanc.status}</span>`;
-
-            // Saldo linha
-            const saldoFormatado = formatarMoeda(lanc.saldo_linha);
-            const classeSaldo = lanc.saldo_linha >= 0 ? 'credito' : 'debito';
-
-            tr.innerHTML = `
-                <td class="center data">${dataFormatada}</td>
-                <td>${categoriaHtml}</td>
-                <td class="descricao-cell">${lanc.descricao}</td>
-                <td>${origemHtml}</td>
-                <td class="observacoes-cell">${obsHtml}</td>
-                <td class="right valor ${classeValor}">${valorFormatado}</td>
-                <td class="right valor ${classeSaldo}">${saldoFormatado}</td>
-                <td class="center">${anexoHtml}</td>
-                <td class="center">${statusHtml}</td>
-            `;
-
-            tbody.appendChild(tr);
-        }
-
-        // Formatar moeda
-        function formatarMoeda(valor) {
-            return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-            }).format(valor || 0);
-        }
-
-        // Formatar data com hora
-        function formatarData(dataISO) {
-            const data = new Date(dataISO);
-            const dia = data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            return `${dia} ${hora}`;
-        }
-
-        // Formatar CPF/CNPJ
-        function formatarCpfCnpj(valor) {
-            if (!valor) return '-';
-            valor = valor.replace(/\D/g, '');
-            if (valor.length === 11) {
-                return valor.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-            } else if (valor.length === 14) {
-                return valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-            }
-            return valor;
-        }
-
-        // Ver anexos
-        function verAnexos(anexos) {
-            if (!anexos || anexos.length === 0) return;
-
-            anexos.forEach(anexo => {
-                window.open(anexo.url, '_blank');
+                tbody.appendChild(tr);
             });
         }
 
-        // Atualizar meses ao trocar empresa
-        document.getElementById('filtroEmpresa').addEventListener('change', () => {
-            carregarMeses();
-        });
+        // Atualizar resumo
+        function atualizarResumo(dados) {
+            document.getElementById('summary').style.display = 'grid';
+            document.getElementById('totalLancamentos').textContent = dados.totais.lancamentos;
+            document.getElementById('totalCreditos').textContent = 'R$ ' + dados.totais.creditos.toFixed(2).replace('.', ',');
+            document.getElementById('totalDebitos').textContent = 'R$ ' + dados.totais.debitos.toFixed(2).replace('.', ',');
+            document.getElementById('saldoPeriodo').textContent = 'R$ ' + dados.totais.saldo.toFixed(2).replace('.', ',');
+        }
+
+        // Mostrar loading
+        function mostrarLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('tabelaExtrato').style.display = show ? 'none' : 'table';
+        }
+
+        // Gerar PDF
+        async function gerarPDF() {
+            if (!dadosAtuais || !dadosAtuais.lancamentos || dadosAtuais.lancamentos.length === 0) {
+                alert('Não há dados para gerar PDF');
+                return;
+            }
+
+            try {
+                document.getElementById('btnGerarPDF').disabled = true;
+                document.getElementById('btnGerarPDF').textContent = '⏳ Gerando PDF...';
+
+                const empresa = document.getElementById('empresaSelect').value;
+                const mes = modoFiltro === 'mes' ? document.getElementById('mesSelect').value : null;
+
+                // Criar descrição do filtro
+                let descricao = `Extrato Bancário - ${empresa}`;
+                if (mes) {
+                    descricao += ` - ${mes}`;
+                } else if (modoFiltro === 'datas') {
+                    const dataInicio = document.getElementById('dataInicio').value;
+                    const dataFim = document.getElementById('dataFim').value;
+                    if (dataInicio && dataFim) {
+                        descricao += ` - ${dataInicio} a ${dataFim}`;
+                    }
+                }
+
+                // Chamar endpoint de geração de PDF
+                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/extrato/gerar-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        empresa: empresa,
+                        mes: mes,
+                        data_inicio: modoFiltro === 'datas' ? document.getElementById('dataInicio').value : null,
+                        data_fim: modoFiltro === 'datas' ? document.getElementById('dataFim').value : null,
+                        descricao: descricao,
+                        dados: dadosAtuais
+                    })
+                });
+
+                if (response.ok) {
+                    // Baixar PDF
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `extrato_${empresa}_${Date.now()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    alert('PDF gerado com sucesso!');
+                } else {
+                    const erro = await response.json();
+                    alert('Erro ao gerar PDF: ' + (erro.erro || 'Erro desconhecido'));
+                }
+
+            } catch (err) {
+                console.error('Erro ao gerar PDF:', err);
+                alert('Erro ao gerar PDF: ' + err.message);
+            } finally {
+                document.getElementById('btnGerarPDF').disabled = false;
+                document.getElementById('btnGerarPDF').textContent = '📄 Gerar PDF';
+            }
+        }
     </script>
 </body>
 </html>
 
-<!-- V.2609141500 -->
+<!-- V.2609141900 -->

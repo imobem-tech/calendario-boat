@@ -1,8 +1,7 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.2609140105
+// wpp/routes/banco/index.js — V.260911192500
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
 // + Sistema de Backup Automático (Railway + Vercel Blob)
-// + API de Recibos (V.2609140105)
 // ============================================================
 
 import express from 'express';
@@ -15,10 +14,8 @@ import {
 } from './cron-sync.js';
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
-import recibosRouter from './recibos-api.js';
-import debugRecibosRouter from './debug-recibos.js';
 import extratoRouter from './extrato-api.js';
-import { preencherContasExistentes } from './preencher-contas.js';
+import gerarPdfRouter from './gerar-pdf-api.js';
 
 const router = express.Router();
 
@@ -57,23 +54,6 @@ router.get('/status', (req, res) => {
 });
 
 // ============================================================
-// SCRIPT ÚNICO: Preencher agência/conta (EXECUTAR UMA VEZ)
-// ============================================================
-/**
- * POST /api/banco/preencher-contas
- * ATENÇÃO: Executar apenas UMA VEZ para preencher registros históricos
- * Depois de executar, DELETAR o arquivo preencher-contas.js
- */
-router.post('/preencher-contas', async (req, res) => {
-  try {
-    const resultado = await preencherContasExistentes();
-    res.json(resultado);
-  } catch (err) {
-    res.status(500).json({ erro: err.message });
-  }
-});
-
-// ============================================================
 // BACKUPS AUTOMÁTICOS (Railway + Vercel Blob)
 // ============================================================
 
@@ -81,26 +61,14 @@ router.post('/preencher-contas', async (req, res) => {
 setupBackupRoutes(router);
 
 // ============================================================
-// API DE RECIBOS (V.2609140105)
+// EXTRATO E PDF
 // ============================================================
 
-/**
- * /api/banco/recibos/*
- * Gerenciamento de recibos salvos no Vercel Blob
- */
-router.use('/recibos', recibosRouter);
-
-/**
- * /api/banco/debug/recibos
- * DEBUG TEMPORÁRIO: Verificar todos os recibos no banco
- */
-router.use('/debug/recibos', debugRecibosRouter);
-
-/**
- * /api/banco/extrato/*
- * Relatório de Extrato Bancário (V.2609140130)
- */
+// Rotas de extrato bancário
 router.use('/extrato', extratoRouter);
+
+// Rota de geração de PDF
+router.use('/extrato', gerarPdfRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
@@ -165,12 +133,6 @@ export function inicializarSistemaBancario(sock = null) {
   console.log('   POST /api/banco/backup/semanal        → Backup manual semanal');
   console.log('   GET  /api/banco/backup/listar/:tipo   → Listar backups');
   console.log('   GET  /api/banco/backup/baixar?url=... → Baixar backup');
-  console.log('');
-  console.log('📎 API de Recibos:');
-  console.log('   GET  /api/banco/recibos/listar         → Listar todos recibos');
-  console.log('   GET  /api/banco/recibos/listar?empresa → Filtrar por empresa');
-  console.log('   GET  /api/banco/recibos/empresas       → Listar empresas com recibos');
-  console.log('   GET  /api/banco/recibos/download/:empresa/:arquivo → Baixar recibo');
   console.log('');
   console.log('='.repeat(80) + '\n');
 
