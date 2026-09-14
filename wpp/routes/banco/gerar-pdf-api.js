@@ -98,31 +98,34 @@ function gerarHTMLPDF(dados, empresa, descricao) {
   // Gerar lançamentos HTML
   let lancamentosHTML = '';
   dados.lancamentos.forEach(lanc => {
+    // Categoria com fundo cinza, letra preta e ícone
     const categoriaHTML = lanc.categoria ?
-      `<span class="categoria" style="background-color: ${lanc.categoria.cor}20; color: ${lanc.categoria.cor}; padding: 2px 8px; border-radius: 4px; font-size: 10px;">${lanc.categoria.icone} ${lanc.categoria.nome}</span>` :
-      '<span class="categoria pendente">⚠️ Não classificado</span>';
+      `<span style="background: #e5e7eb; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500; display: inline-block;">${lanc.categoria.icone} ${lanc.categoria.nome}</span>` :
+      '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500;">⚠️ Não classificado</span>';
 
     const origemHTML = lanc.origem.nome ?
-      `<span class="origem-nome">${lanc.origem.nome}</span><br><span style="font-size: 9px; color: #999;">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</span>` :
+      `<span style="font-weight: 500;">${lanc.origem.nome}</span><br><span style="font-size: 8px; color: #6b7280;">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</span>` :
       '<span>-</span>';
 
-    let anexoHTML = '<span style="color: #ccc;">-</span>';
+    // Anexo: apenas número, negrito, maior
+    let anexoHTML = '<span style="color: #d1d5db; font-size: 10px;">-</span>';
     if (lanc.tem_anexo && lanc.url_token) {
-      anexoHTML = `<a href="${lanc.url_token}" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 600;">📎${lanc.anexos.length}</a>`;
+      anexoHTML = `<a href="${lanc.url_token}" target="_blank" style="color: #10b981; text-decoration: none; font-weight: 700; font-size: 13px;">${lanc.anexos.length}</a>`;
     }
 
     lancamentosHTML += `
       <tr>
-        <td style="text-align:center; font-size: 10px;">${formatarData(lanc.importado_em)}</td>
-        <td style="font-weight: 600; font-size: 11px;">${lanc.empresa}</td>
+        <td style="text-align:center; font-size: 9px;">${formatarData(lanc.importado_em)}</td>
+        <td style="font-weight: 500; font-size: 8px;">${lanc.empresa}</td>
         <td>${categoriaHTML}</td>
-        <td style="font-size: 10px;">${lanc.descricao.substring(0, 120)}</td>
+        <td style="font-size: 9px; line-height: 1.3;">${lanc.descricao.substring(0, 120)}</td>
         <td style="text-align:center;">${anexoHTML}</td>
-        <td style="font-size: 10px;">${origemHTML}</td>
-        <td style="text-align:right; font-weight: 600; color: ${lanc.valor >= 0 ? '#10b981' : '#ef4444'};">
+        <td style="font-size: 9px;">${origemHTML}</td>
+        <td style="font-size: 8px; color: #6b7280;">${lanc.observacoes || '-'}</td>
+        <td style="text-align:right; font-weight: 600; font-size: 10px; color: ${lanc.valor >= 0 ? '#10b981' : '#ef4444'};">
           ${lanc.valor >= 0 ? '' : '-'}${formatarValor(lanc.valor)}
         </td>
-        <td style="text-align:right; font-weight: 600; color: ${lanc.saldo_linha >= 0 ? '#10b981' : '#ef4444'};">
+        <td style="text-align:right; font-weight: 600; font-size: 10px; color: ${lanc.saldo_linha >= 0 ? '#10b981' : '#ef4444'};">
           ${lanc.saldo_linha >= 0 ? '' : '-'}${formatarValor(lanc.saldo_linha)}
         </td>
       </tr>`;
@@ -278,14 +281,15 @@ function gerarHTMLPDF(dados, empresa, descricao) {
     <table>
         <thead>
             <tr>
-                <th style="width: 80px;">Data</th>
-                <th style="width: 70px;">Empresa</th>
-                <th style="width: 120px;">Categoria</th>
+                <th style="width: 70px;">Data</th>
+                <th style="width: 50px; font-size: 8px;">Empresa</th>
+                <th style="width: 100px;">Categoria</th>
                 <th>Descrição</th>
-                <th style="width: 30px; text-align:center;">📎</th>
-                <th style="width: 120px;">Origem</th>
-                <th style="width: 80px; text-align:right;">Valor</th>
-                <th style="width: 80px; text-align:right;">Saldo</th>
+                <th style="width: 35px; text-align:center;">Anexos</th>
+                <th style="width: 110px;">Origem</th>
+                <th style="width: 90px;">Observações</th>
+                <th style="width: 70px; text-align:right;">Valor</th>
+                <th style="width: 70px; text-align:right;">Saldo</th>
             </tr>
         </thead>
         <tbody>
