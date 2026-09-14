@@ -1,11 +1,12 @@
 // ============================================================
-// reclassificar-api.js — V.2609142005
+// reclassificar-api.js — V.2609142010
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
 // + USA LÓGICA CORRETA: bank_categorias (palavras_chave + chave_aprendida)
 // + NÃO USA MAIS: bank_regras_classificacao (tabela antiga)
 // + Filtros: empresa (TODAS ou específica)
 // + Filtros: intervalo de datas (dataInicio/dataFim)
 // + Apenas não classificados (classificacao IS NULL OR = '')
+// + IMPORTANTE: Atualiza APENAS classificacao (status não muda!)
 // ============================================================
 
 import express from 'express';
@@ -89,11 +90,10 @@ router.post('/', async (req, res) => {
           continue;
         }
 
-        // Atualizar registro
+        // Atualizar registro (APENAS classificacao, status não muda)
         await pool.query(`
           UPDATE bank_extratos
           SET classificacao = $1,
-              status = 'OK',
               classificado_em = NOW()
           WHERE id = $2
         `, [resultado.categoria_nome, reg.id]);

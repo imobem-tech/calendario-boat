@@ -22,12 +22,12 @@
        - Copia descrição da CR
        - Desempate por CR quando 2+ clientes
 
-    🏷️ RECLASSIFICAR - V.2609142005
+    🏷️ RECLASSIFICAR - V.2609142010
        POST /api/banco/reclassificar
        - USA: bank_categorias (palavras_chave + chave_aprendida)
+       - Atualiza APENAS classificacao (status não muda)
        - Apenas não classificados
        - Filtros: empresa, intervalo de datas
-       - Estatísticas detalhadas
 
     ✏️ EDITAR LANÇAMENTO - V.2609141626
        PUT /api/banco/editar-lancamento
@@ -347,7 +347,7 @@
                             style="background: #4CAF50; color: white; height: fit-content;">
                         🔍 Enriquecer Dados
                     </button>
-                    <button class="btn" onclick="reclassificar()"
+                    <button class="btn" onclick="reclassificar(event)"
                             style="background: #2196F3; color: white; height: fit-content;">
                         🏷️ Reclassificar
                     </button>
@@ -979,7 +979,11 @@
         }
 
         // Reclassificar por palavras-chave
-        async function reclassificar() {
+        async function reclassificar(event) {
+            // Guardar referência ao botão ANTES de qualquer coisa
+            const btn = event ? event.target : null;
+            const btnTextoOriginal = btn ? btn.textContent : '🏷️ Reclassificar';
+
             // Pegar valores dos filtros atuais
             const empresa = document.getElementById('empresaSelect').value || 'TODAS';
             const modoAtual = document.getElementById('btnModoMes').classList.contains('active') ? 'mes' : 'datas';
@@ -1004,15 +1008,26 @@
             if (empresa !== 'TODAS') mensagemFiltro += `\n📍 Empresa: ${empresa}`;
             if (dataInicio && dataFim) mensagemFiltro += `\n📅 Período: ${dataInicio} a ${dataFim}`;
 
-            if (!confirm(`🏷️ Reclassificar extratos por palavras-chave?\n\nIsso irá:\n✅ Aplicar regras de classificação aos NÃO classificados\n✅ Atualizar categorias\n✅ Marcar como OK${mensagemFiltro}\n\nDeseja continuar?`)) {
+            if (!confirm(`🏷️ Reclassificar extratos por palavras-chave?\n\nIsso irá:\n✅ Aplicar regras de classificação aos NÃO classificados\n✅ Atualizar categorias\n⚠️  Status permanece como está${mensagemFiltro}\n\nDeseja continuar?`)) {
                 return;
             }
 
             try {
-                // Mostrar loading
-                const btnTexto = event.target.textContent;
-                event.target.disabled = true;
-                event.target.textContent = '⏳ Reclassificando...';
+                // Mostrar modal de progresso
+                const modal = document.getElementById('modalProgresso');
+                const progressoTexto = document.getElementById('progressoTexto');
+                const progressoDetalhe = document.getElementById('progressoDetalhe');
+
+                modal.style.display = 'flex';
+                progressoTexto.textContent = `Analisando registros...`;
+                progressoDetalhe.textContent = empresa !== 'TODAS' ?
+                    `Empresa: ${empresa}` :
+                    'Todas as empresas';
+
+                // Desabilitar botão também
+                if (btn) {
+                    btn.disabled = true;
+                }
 
                 // Construir URL com parâmetros
                 let url = `https://calendario-boat-production.up.railway.app/api/banco/reclassificar?empresa=${empresa}`;
@@ -1025,6 +1040,9 @@
                 });
 
                 const data = await response.json();
+
+                // Fechar modal
+                modal.style.display = 'none';
 
                 if (data.sucesso) {
                     const taxaSucesso = data.stats.analisados > 0 ?
@@ -1045,11 +1063,22 @@
                 }
 
             } catch (err) {
+                // Fechar modal em caso de erro
+                const modal = document.getElementById('modalProgresso');
+                if (modal) modal.style.display = 'none';
+
                 console.error('❌ Erro ao reclassificar:', err);
                 alert('❌ Erro ao reclassificar: ' + err.message);
             } finally {
-                event.target.disabled = false;
-                event.target.textContent = btnTexto;
+                // Garantir que modal está fechado
+                const modal = document.getElementById('modalProgresso');
+                if (modal) modal.style.display = 'none';
+
+                // Restaurar botão
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = btnTextoOriginal;
+                }
             }
         }
 
@@ -1057,6 +1086,30 @@
         carregarCategorias();
 
     </script>
+
+    <!-- MODAL DE PROGRESSO RECLASSIFICAÇÃO -->
+    <div id="modalProgresso" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 40px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); text-align: center;">
+            <h2 style="margin-bottom: 20px; color: #333;">🏷️ Reclassificando</h2>
+
+            <div style="margin: 30px 0;">
+                <!-- Spinner -->
+                <div class="spinner" style="margin: 0 auto 20px; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+
+                <p id="progressoTexto" style="font-size: 16px; color: #666; margin: 10px 0;">Aguarde...</p>
+                <p id="progressoDetalhe" style="font-size: 14px; color: #999;">Processando registros não classificados</p>
+            </div>
+
+            <p style="font-size: 12px; color: #aaa; margin-top: 20px;">⚠️ Não feche esta janela</p>
+        </div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 
     <!-- MODAL DE EDIÇÃO -->
     <div id="modalEdicao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
@@ -1096,4 +1149,4 @@
 </body>
 </html>
 
-<!-- V.2609142005 - Corrigido para usar bank_categorias (palavras_chave + chave_aprendida) -->
+<!-- V.2609142015 - Modal de progresso + fix botão inativo + atualiza só classificacao -->
