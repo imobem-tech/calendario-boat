@@ -1,9 +1,9 @@
 // ============================================================
-// wpp/server.js — V.2609122107
+// wpp/server.js — V.2609140053
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
-// + Sistema 70m: ÚNICA forma de retorno via geo (<70m + autorização)
+// + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
 // ============================================================
 
@@ -59,7 +59,8 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
-import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
+// GEOLOCALIZAÇÃO DESABILITADA (14/09/2026) - Até segunda ordem
+// import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
 
 const { Pool } = pkg
@@ -87,8 +88,9 @@ app.use((req, res, next) => {
 
 // ============================================================
 // SISTEMA 70m: Estado em memória para confirmações pendentes
+// DESABILITADO (14/09/2026) - Até segunda ordem
 // ============================================================
-const aguardandoConfirmacao70m = new Map()
+// const aguardandoConfirmacao70m = new Map()
 // Chave: grupoId
 // Valor: { agendamentoId, pb, cota, ultimaPergunta, tentativas }
 
@@ -147,7 +149,9 @@ async function limparSessao() {
 
 // ============================================================
 // SISTEMA 70m: Handler de confirmação S/N
+// DESABILITADO (14/09/2026) - Até segunda ordem
 // ============================================================
+/*
 async function handleConfirmacao70m(sock, pool, grupoId, texto, remetente) {
   const estado = aguardandoConfirmacao70m.get(grupoId)
   if (!estado) return false
@@ -226,6 +230,7 @@ ${VERSAO_WPP}`
   // Não é S nem N: ignora
   return false
 }
+*/
 
 async function iniciarBot() {
   if (iniciando) return
@@ -394,11 +399,14 @@ if (horaMotorTratado) continue
 
           // ============================================================
           // Sistema 70m: Confirmação S/N de retorno semi-automático
+          // DESABILITADO (14/09/2026) - Até segunda ordem
           // ============================================================
+          /*
           if (aguardandoConfirmacao70m.has(grupoId)) {
             const respondeu = await handleConfirmacao70m(sock, pool, grupoId, texto, remetente)
             if (respondeu) continue
           }
+          */
 
           // Aguardando confirmação de retorno
           if (estaAguardandoRetorno(grupoId)) {
@@ -1282,6 +1290,8 @@ app.listen(PORT, () => {
     }, 60000)
 
     // Sistema 70m: Verificação periódica a cada 5 minutos
+    // DESABILITADO (14/09/2026) - Até segunda ordem
+    /*
     setInterval(async () => {
       if (!conectado || !sock) return
       try {
@@ -1290,6 +1300,7 @@ app.listen(PORT, () => {
         console.error('❌ Erro na verificação 70m:', erro)
       }
     }, 5 * 60 * 1000) // 5 minutos
+    */
 
     // ✅ REABILITADO - Cache evita duplicatas (05/06/2026 20:11)
     // Previsão diária às 8h
