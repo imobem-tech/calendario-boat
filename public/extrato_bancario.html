@@ -944,19 +944,47 @@
 
         // Reclassificar por palavras-chave
         async function reclassificar() {
-            if (!confirm('🏷️ Reclassificar extratos por palavras-chave?\n\nIsso irá:\n✅ Aplicar regras de classificação\n✅ Atualizar categorias\n✅ Marcar como OK\n\nDeseja continuar?')) {
+            // Pegar valores dos filtros atuais
+            const empresa = document.getElementById('empresaSelect').value || 'TODAS';
+            const modoAtual = document.getElementById('btnModoMes').classList.contains('active') ? 'mes' : 'datas';
+
+            let dataInicio, dataFim;
+
+            if (modoAtual === 'mes') {
+                const mes = document.getElementById('mesSelect').value;
+                if (mes) {
+                    dataInicio = `${mes}-01`;
+                    const [ano, mesNum] = mes.split('-');
+                    const ultimoDia = new Date(ano, mesNum, 0).getDate();
+                    dataFim = `${mes}-${ultimoDia}`;
+                }
+            } else {
+                dataInicio = document.getElementById('dataInicio').value;
+                dataFim = document.getElementById('dataFim').value;
+            }
+
+            // Montar mensagem com informações do filtro
+            let mensagemFiltro = '';
+            if (empresa !== 'TODAS') mensagemFiltro += `\n📍 Empresa: ${empresa}`;
+            if (dataInicio && dataFim) mensagemFiltro += `\n📅 Período: ${dataInicio} a ${dataFim}`;
+
+            if (!confirm(`🏷️ Reclassificar extratos por palavras-chave?\n\nIsso irá:\n✅ Aplicar regras de classificação aos NÃO classificados\n✅ Atualizar categorias\n✅ Marcar como OK${mensagemFiltro}\n\nDeseja continuar?`)) {
                 return;
             }
 
             try {
-                const empresa = document.getElementById('empresa').value || 'ALLMAX';
-
                 // Mostrar loading
                 const btnTexto = event.target.textContent;
                 event.target.disabled = true;
                 event.target.textContent = '⏳ Reclassificando...';
 
-                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/reclassificar?empresa=${empresa}`, {
+                // Construir URL com parâmetros
+                let url = `https://calendario-boat-production.up.railway.app/api/banco/reclassificar?empresa=${empresa}`;
+                if (dataInicio && dataFim) {
+                    url += `&dataInicio=${dataInicio}&dataFim=${dataFim}`;
+                }
+
+                const response = await fetch(url, {
                     method: 'POST'
                 });
 
@@ -967,7 +995,7 @@
                           `• Processados: ${data.stats.processados}\n` +
                           `• Reclassificados: ${data.stats.reclassificados}\n` +
                           `• Sem regra: ${data.stats.semRegra}\n` +
-                          `• Taxa de sucesso: ${((data.stats.reclassificados/data.stats.processados)*100).toFixed(1)}%`);
+                          `• Taxa de sucesso: ${data.stats.processados > 0 ? ((data.stats.reclassificados/data.stats.processados)*100).toFixed(1) : '0.0'}%`);
 
                     // Recarregar extrato
                     buscarExtrato();
@@ -1027,4 +1055,4 @@
 </body>
 </html>
 
-<!-- V.2609142105 -->
+<!-- V.2609141935 -->

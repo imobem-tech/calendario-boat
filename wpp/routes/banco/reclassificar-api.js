@@ -1,6 +1,9 @@
 // ============================================================
-// reclassificar-api.js — V.2609142051
+// reclassificar-api.js — V.2609141935
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
+// + Filtros: empresa (TODAS ou específica)
+// + Filtros: intervalo de datas (dataInicio/dataFim)
+// + Apenas não classificados (classificacao IS NULL OR = '')
 // ============================================================
 
 import express from 'express';
@@ -47,17 +50,37 @@ async function classificarAutomaticamente(texto, empresa) {
 // ENDPOINT POST /api/banco/reclassificar
 router.post('/', async (req, res) => {
   try {
-    const { empresa = 'ALLMAX' } = req.query;
+    const { empresa = 'ALLMAX', dataInicio, dataFim } = req.query;
 
-    // Buscar registros não classificados
-    const registros = await pool.query(`
+    // Construir query dinamicamente
+    let query = `
       SELECT id, empresa, descricao_original, observacoes, classificacao, status
       FROM bank_extratos
-      WHERE empresa = $1
-        AND banco = 'Asaas'
-        AND (classificacao IS NULL OR classificacao = '' OR status != 'OK')
-      ORDER BY data, id
-    `, [empresa]);
+      WHERE banco = 'Asaas'
+        AND (classificacao IS NULL OR classificacao = '')
+    `;
+
+    const params = [];
+    let paramIndex = 1;
+
+    // Filtro de empresa
+    if (empresa && empresa !== 'TODAS') {
+      query += ` AND empresa = $${paramIndex}`;
+      params.push(empresa);
+      paramIndex++;
+    }
+
+    // Filtro de data
+    if (dataInicio && dataFim) {
+      query += ` AND data BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      params.push(dataInicio, dataFim);
+      paramIndex += 2;
+    }
+
+    query += ` ORDER BY data, id`;
+
+    // Buscar registros não classificados
+    const registros = await pool.query(query, params);
 
     const stats = {
       processados: 0,
