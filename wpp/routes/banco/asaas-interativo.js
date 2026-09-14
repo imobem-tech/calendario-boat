@@ -1,6 +1,8 @@
 // ============================================================
 // ASAAS WEBHOOK INTERATIVO
-// V.260911221000
+// V.2609132127
+//
+// NOVO (13/09 21:27): Mostra nome do cliente na notificação WhatsApp
 //
 // FUNCIONALIDADES:
 // 1. Quando webhook chegar → Perguntar no grupo o que é
@@ -43,7 +45,13 @@ export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
     msg += `📅 Data: ${lancamento.data}\n`;
     msg += `💵 Valor: R$ ${Math.abs(lancamento.valor).toFixed(2)}\n`;
     msg += `🏦 Banco: Asaas\n`;
-    msg += `🏢 Empresa: ${empresa}\n\n`;
+    msg += `🏢 Empresa: ${empresa}\n`;
+
+    if (lancamento.nome_origem) {
+      msg += `👤 Cliente: ${lancamento.nome_origem}\n`;
+    }
+
+    msg += `\n`;
 
     if (lancamento.descricao_original) {
       msg += `📝 Descrição do banco:\n"${lancamento.descricao_original}"\n`;
@@ -59,7 +67,9 @@ export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
         valor,
         descricao_original,
         tipo,
-        empresa
+        empresa,
+        nome_origem,
+        cpf_cnpj_origem
       FROM bank_extratos
       WHERE id = $1
     `, [lancamento.id]);
