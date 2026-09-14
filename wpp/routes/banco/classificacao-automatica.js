@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.2609132304
+// wpp/routes/banco/classificacao-automatica.js — V.2609142020
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
 // NOVO (13/09 22:52): Suporte a CPF/CNPJ na chave_aprendida
 // NOVO (13/09 23:04): salvarRegraAprendida com parâmetro cpfCnpj
+// NOVO (14/09 20:20): Fix pool connection + dotenv.config()
 // LÓGICA NOVA (13/09/2026):
 //   - QUALQUER TIPO (CREDITO ou DEBITO):
 //     1. Tenta palavras_chave primeiro (simples)
@@ -14,6 +15,10 @@
 // ============================================================
 
 import pkg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 const { Pool } = pkg;
 
 const pool = new Pool({
@@ -155,7 +160,7 @@ async function testarChaveAprendida({ description, value, empresa, cpfCnpjOrigem
     return null;
 
   } catch (err) {
-    console.error('❌ Erro ao testar chave aprendida:', err.message);
+    console.error('❌ Erro ao testar chave aprendida:', err);
     return null;
   }
 }
@@ -200,7 +205,7 @@ async function tentarClassificacaoPalavrasChave({ description, value, empresa })
     return null;
 
   } catch (err) {
-    console.error('❌ Erro ao classificar por palavras-chave:', err.message);
+    console.error('❌ Erro ao classificar por palavras-chave:', err);
     return null;
   }
 }
