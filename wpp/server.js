@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/server.js — V.2609140053
+// wpp/server.js — V.2609140120
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
+// CORREÇÃO (14/09 01:20): Comentar TODAS as chamadas de funções geo
 // + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
 // ============================================================
@@ -319,8 +320,9 @@ async function iniciarBot() {
 
           // ============================================================
           // LOCALIZAÇÃO EM TEMPO REAL → Retorno automático + Ranking
+          // DESABILITADO (14/09/2026) - Até segunda ordem
           // ============================================================
-          if (await handleLocalizacao(sock, pool, grupoId, msg)) continue
+          // if (await handleLocalizacao(sock, pool, grupoId, msg)) continue
 
           const texto = (
             msg.message?.conversation ||
@@ -746,7 +748,9 @@ app.get('/simular-fila', async (req, res) => {
 
 // ============================================================
 // ENDPOINT DE TESTE: Forçar envio de ranking manualmente
+// DESABILITADO (14/09/2026) - Até segunda ordem (depende de geolocalização)
 // ============================================================
+/*
 app.get('/testar-ranking', async (req, res) => {
   try {
     if (!conectado || !sock) {
@@ -780,6 +784,7 @@ app.get('/testar-ranking', async (req, res) => {
     })
   }
 })
+*/
 
 app.get('/qr', async (req, res) => {
   if (conectado) return res.send('<h2>WhatsApp já conectado ✅</h2>')
@@ -1318,6 +1323,8 @@ app.listen(PORT, () => {
     console.log('✅ [PREVISAO] Envio automático às 8h ATIVO (cache evita duplicatas)')
 
     // Verificação de posições expiradas (localização)
+    // DESABILITADO (14/09/2026) - Até segunda ordem
+    /*
     let intervaloPosicoes = null
 
     async function verificarEAgendar() {
@@ -1352,6 +1359,7 @@ app.listen(PORT, () => {
 
     // Primeira verificação após 1 minuto de boot
     setTimeout(verificarEAgendar, 60000)
+    */
 
     console.log('✅ Cron jobs iniciados (production)')
   } else {
