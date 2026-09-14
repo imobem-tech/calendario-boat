@@ -1,8 +1,12 @@
 // ============================================================
 // ASAAS WEBHOOK INTERATIVO
-// V.2609132127
+// V.2609132236
 //
-// NOVO (13/09 21:27): Mostra nome do cliente na notificação WhatsApp
+// NOVO (13/09 22:36):
+// - Removida primeira mensagem (desnecessária)
+// - Mensagem de classificação com hora/minutos
+// - Nome do cliente com emoji 🙋
+// - Texto final: "digite o número da categoria"
 //
 // FUNCIONALIDADES:
 // 1. Quando webhook chegar → Perguntar no grupo o que é
@@ -40,24 +44,7 @@ export async function perguntarSobreLancamentoAsaas(sock, empresa, lancamento) {
       return;
     }
 
-    // 1) Enviar notificação
-    let msg = `💰 *NOVO LANÇAMENTO RECEBIDO*\n\n`;
-    msg += `📅 Data: ${lancamento.data}\n`;
-    msg += `💵 Valor: R$ ${Math.abs(lancamento.valor).toFixed(2)}\n`;
-    msg += `🏦 Banco: Asaas\n`;
-    msg += `🏢 Empresa: ${empresa}\n`;
-
-    if (lancamento.nome_origem) {
-      msg += `👤 Cliente: ${lancamento.nome_origem}\n`;
-    }
-
-    msg += `\n`;
-
-    if (lancamento.descricao_original) {
-      msg += `📝 Descrição do banco:\n"${lancamento.descricao_original}"\n`;
-    }
-
-    await sock.sendMessage(grupoId, { text: msg });
+    // 1) REMOVIDO: Primeira mensagem desnecessária (já vai direto para classificação)
 
     // 2) Buscar lançamento completo do banco
     const lancCompleto = await pool.query(`
@@ -122,14 +109,23 @@ async function enviarListaCategoriasAsaas(sock, grupoId, lancamento, categorias)
     currency: 'BRL'
   }).format(Math.abs(lancamento.valor));
 
-  const dataFormatada = new Date(lancamento.data).toLocaleDateString('pt-BR');
+  // Data com hora e minutos (formato: 13/09/2026 22:30)
+  const dataObj = new Date(lancamento.data);
+  const agora = new Date();
+  const dataComHora = `${dataObj.toLocaleDateString('pt-BR')} ${agora.getHours().toString().padStart(2, '0')}:${agora.getMinutes().toString().padStart(2, '0')}`;
 
   let mensagem = `\n📝 *CLASSIFICANDO LANÇAMENTO*\n\n`;
   mensagem += `💰 ${valorFormatado} - ${lancamento.valor > 0 ? 'Recebido' : 'Pago'}\n`;
-  mensagem += `📅 ${dataFormatada}\n`;
+  mensagem += `📅 ${dataComHora}\n`;
   mensagem += `🏢 ${lancamento.empresa || 'N/A'}\n`;
-  mensagem += `📝 ${lancamento.descricao_original}\n\n`;
-  mensagem += `${'━'.repeat(16)}\n`;
+  mensagem += `📝 ${lancamento.descricao_original}\n`;
+
+  // Adicionar nome da pessoa se existir
+  if (lancamento.nome_origem) {
+    mensagem += `🙋 ${lancamento.nome_origem}\n`;
+  }
+
+  mensagem += `\n${'━'.repeat(16)}\n`;
   mensagem += `📂 *CATEGORIAS DISPONÍVEIS:*\n\n`;
 
   categorias.forEach((cat, i) => {
@@ -139,7 +135,7 @@ async function enviarListaCategoriasAsaas(sock, grupoId, lancamento, categorias)
   });
 
   mensagem += `\n${'━'.repeat(16)}\n`;
-  mensagem += `✏️ Responda o número da categoria`;
+  mensagem += `✏️ digite o número da categoria`;
 
   await sock.sendMessage(grupoId, { text: mensagem });
 }
