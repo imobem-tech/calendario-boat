@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609132158
+// wpp/routes/banco/asaas-webhook.js — V.2609132216
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
@@ -228,11 +228,17 @@ export async function handleAsaasWebhook(req, res) {
     // ============================================================
     // BUSCAR DADOS DO CLIENTE (nome + CPF/CNPJ) via API Asaas
     // ============================================================
+    console.log('🔍 [DEBUG] Iniciando busca de dados do cliente...');
     let dadosCliente = null;
     const customerId = dadosEvento.customer || dadosEvento.cpfCnpj || null;
+    console.log(`🔍 [DEBUG] Customer ID encontrado: ${customerId}`);
 
     if (customerId && customerId.startsWith('cus_')) {
+      console.log('🔍 [DEBUG] Chamando buscarDadosCliente...');
       dadosCliente = await buscarDadosCliente(customerId, empresa);
+      console.log(`🔍 [DEBUG] Resultado: ${dadosCliente ? JSON.stringify(dadosCliente) : 'null'}`);
+    } else {
+      console.log('⚠️ [DEBUG] Customer ID inválido ou não começa com cus_');
     }
 
     // Extrair dados do lançamento (compatível com múltiplas estruturas)
