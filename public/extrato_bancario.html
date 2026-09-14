@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609141950
+    EXTRATO BANCÁRIO - V.2609142015
     ============================================================
 
     📥 IMPORTAR OFX - V.2609142100
@@ -22,10 +22,12 @@
        - Copia descrição da CR
        - Desempate por CR quando 2+ clientes
 
-    🏷️ RECLASSIFICAR - V.2609142010
+    🏷️ RECLASSIFICAR - V.2609142015
        POST /api/banco/reclassificar
        - USA: bank_categorias (palavras_chave + chave_aprendida)
        - Atualiza APENAS classificacao (status não muda)
+       - Modal de progresso com spinner
+       - Botão sempre volta ao normal
        - Apenas não classificados
        - Filtros: empresa, intervalo de datas
 
@@ -1144,6 +1146,17 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- RODAPÉ COM VERSÃO VISÍVEL -->
+    <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
+        <p style="margin: 5px 0;">
+            <strong>Extrato Bancário Allmax</strong> •
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142015</span>
+        </p>
+        <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
+            📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
+        </p>
     </div>
 
 </body>
