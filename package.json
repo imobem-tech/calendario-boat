@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm install --force",
     "start": "node wpp/server.js"
   },
   "dependencies": {
@@ -16,10 +15,8 @@
     "node-cron": "^3.0.3",
     "pg": "latest",
     "pino": "latest",
-    "qrcode": "latest"
-  },
-  "devDependencies": {
     "puppeteer": "^25.11.0",
+    "qrcode": "latest",
     "xlsx": "^0.18.5"
   }
 }

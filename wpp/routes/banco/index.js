@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.2609141730
+// wpp/routes/banco/index.js — V.2609141738
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
 // + Sistema de Backup Automático (Railway + Vercel Blob)
+// + API de Exclusão de Recibos (Vercel Blob + Banco)
 // ============================================================
 
 import express from 'express';
@@ -17,6 +18,7 @@ import { inicializarBackupCron } from './backup-cron.js';
 import extratoRouter from './extrato-api.js';
 import gerarPdfRouter from './gerar-pdf-api.js';
 import editarLancamentoRouter from './editar-lancamento-api.js';
+import excluirRecibosRouter from './excluir-recibos-api.js';
 
 const router = express.Router();
 
@@ -73,6 +75,9 @@ router.use('/extrato', gerarPdfRouter);
 
 // Rotas de edição de lançamentos
 router.use('/', editarLancamentoRouter);
+
+// Rotas de exclusão de recibos
+router.use('/recibos', excluirRecibosRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
@@ -137,6 +142,11 @@ export function inicializarSistemaBancario(sock = null) {
   console.log('   POST /api/banco/backup/semanal        → Backup manual semanal');
   console.log('   GET  /api/banco/backup/listar/:tipo   → Listar backups');
   console.log('   GET  /api/banco/backup/baixar?url=... → Baixar backup');
+  console.log('');
+  console.log('🗑️  Endpoints de exclusão de recibos:');
+  console.log('   DELETE /api/banco/recibos/excluir/:id               → Excluir todos os recibos de um lançamento');
+  console.log('   POST   /api/banco/recibos/excluir/lote              → Excluir recibos em lote (até 50)');
+  console.log('   DELETE /api/banco/recibos/excluir/:id/arquivo/:nome → Excluir um arquivo específico');
   console.log('');
   console.log('='.repeat(80) + '\n');
 
