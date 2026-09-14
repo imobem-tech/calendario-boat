@@ -22,6 +22,7 @@ import excluirRecibosRouter from './excluir-recibos-api.js';
 import enriquecerRouter from './enriquecer-api.js';
 import reclassificarRouter from './reclassificar-api.js';
 import importarOfxRouter from './importar-ofx-api.js';
+import debugClassificacaoRouter from './debug-classificacao-api.js';
 
 const router = express.Router();
 
@@ -94,6 +95,9 @@ router.use('/enriquecer', enriquecerRouter);
 
 // Rota para reclassificar por palavras-chave
 router.use('/reclassificar', reclassificarRouter);
+
+// Rota de debug para classificação
+router.use('/debug-classificacao', debugClassificacaoRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
