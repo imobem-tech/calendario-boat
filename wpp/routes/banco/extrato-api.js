@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609140130
+// wpp/routes/banco/extrato-api.js — V.2609140145
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
+// NOVO (14/09 01:45): Adicionar saldo_acumulado (saldo total da conta)
 // ============================================================
 
 import express from 'express';
@@ -128,6 +129,14 @@ router.get('/listar', async (req, res) => {
     const totaisResult = await pool.query(queryTotais, paramsTotais);
     const totais = totaisResult.rows[0];
 
+    // Buscar saldo acumulado total (sem filtros de período)
+    const saldoAcumuladoResult = await pool.query(`
+      SELECT SUM(valor) as saldo_acumulado
+      FROM bank_extratos
+      WHERE empresa = $1
+    `, [empresa]);
+    const saldoAcumulado = parseFloat(saldoAcumuladoResult.rows[0].saldo_acumulado || 0);
+
     // Formatar lançamentos
     const lancamentos = result.rows.map(row => ({
       id: row.id,
@@ -170,7 +179,8 @@ router.get('/listar', async (req, res) => {
         lancamentos: parseInt(totais.total_lancamentos),
         creditos: parseFloat(totais.total_creditos || 0),
         debitos: parseFloat(totais.total_debitos || 0),
-        saldo: parseFloat(totais.saldo || 0)
+        saldo: parseFloat(totais.saldo || 0),
+        saldo_acumulado: saldoAcumulado
       },
       paginacao: {
         limit: parseInt(limit),

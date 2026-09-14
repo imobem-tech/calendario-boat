@@ -210,6 +210,28 @@
             text-align: right;
         }
 
+        /* DESCRIÇÃO - 2 linhas com quebra automática */
+        .descricao-cell {
+            max-width: 250px;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* OBSERVAÇÕES - sempre visível */
+        .observacoes-cell {
+            max-width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.3;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
         /* CATEGORIA */
         .categoria {
             display: inline-flex;
@@ -420,6 +442,10 @@
                     <div class="label">Lançamentos</div>
                     <div class="value" id="totalLancamentos">0</div>
                 </div>
+                <div class="total-card" style="background: rgba(255,255,255,0.25);">
+                    <div class="label">Saldo Acumulado</div>
+                    <div class="value" id="totalSaldoAcumulado" style="color: #f39c12;">R$ 0,00</div>
+                </div>
             </div>
         </div>
 
@@ -574,6 +600,7 @@
                 document.getElementById('totalDebitos').textContent = formatarMoeda(data.totais.debitos);
                 document.getElementById('totalSaldo').textContent = formatarMoeda(data.totais.saldo);
                 document.getElementById('totalLancamentos').textContent = data.totais.lancamentos;
+                document.getElementById('totalSaldoAcumulado').textContent = formatarMoeda(data.totais.saldo_acumulado);
 
                 // Renderizar tabela
                 tableBody.innerHTML = '';
@@ -622,14 +649,12 @@
                 </div>
             ` : '<span class="origem">-</span>';
 
-            // Observações
-            const obsHtml = lanc.observacoes ?
-                `<span class="obs-icon" title="${lanc.observacoes}">💬</span>` :
-                '-';
+            // Observações - sempre visível
+            const obsHtml = lanc.observacoes || '-';
 
-            // Anexo
+            // Anexo - com número
             const anexoHtml = lanc.tem_anexo ?
-                `<span class="anexo-icon tem-anexo" onclick="verAnexos(${JSON.stringify(lanc.anexos).replace(/"/g, '&quot;')})" title="${lanc.anexos.length} arquivo(s)">📎</span>` :
+                `<span class="anexo-icon tem-anexo" onclick="verAnexos(${JSON.stringify(lanc.anexos).replace(/"/g, '&quot;')})" style="cursor: pointer;" title="Clique para abrir ${lanc.anexos.length} arquivo(s)">📎${lanc.anexos.length}</span>` :
                 '<span class="anexo-icon">-</span>';
 
             // Status
@@ -639,9 +664,9 @@
             tr.innerHTML = `
                 <td class="center data">${dataFormatada}</td>
                 <td>${categoriaHtml}</td>
-                <td>${lanc.descricao}</td>
+                <td class="descricao-cell">${lanc.descricao}</td>
                 <td>${origemHtml}</td>
-                <td class="center">${obsHtml}</td>
+                <td class="observacoes-cell">${obsHtml}</td>
                 <td class="right valor ${classeValor}">${valorFormatado}</td>
                 <td class="center">${anexoHtml}</td>
                 <td class="center">${statusHtml}</td>
@@ -658,10 +683,12 @@
             }).format(valor || 0);
         }
 
-        // Formatar data
+        // Formatar data com hora
         function formatarData(dataISO) {
             const data = new Date(dataISO);
-            return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const dia = data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `${dia} ${hora}`;
         }
 
         // Formatar CPF/CNPJ
@@ -693,4 +720,4 @@
 </body>
 </html>
 
-<!-- V.2609140130 -->
+<!-- V.2609140145 -->
