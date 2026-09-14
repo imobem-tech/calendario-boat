@@ -41,7 +41,7 @@ router.post('/gerar-pdf', async (req, res) => {
     }
 
     // Gerar HTML do PDF
-    const htmlContent = gerarHTMLPDF(dados, empresa, descricao);
+    const htmlContent = gerarHTMLPDF(dados, empresa, descricao, mes, data_inicio, data_fim);
 
     // Gerar PDF com Puppeteer
     const browser = await puppeteer.launch({
@@ -78,14 +78,20 @@ router.post('/gerar-pdf', async (req, res) => {
   }
 });
 
-function gerarHTMLPDF(dados, empresa, descricao) {
+function gerarHTMLPDF(dados, empresa, descricao, mes, data_inicio, data_fim) {
   // Funções auxiliares
   const formatarData = (dataISO) => {
     const d = new Date(dataISO);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}<br>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
-  const formatarValor = (v) => Math.abs(v).toFixed(2).replace('.', ',');
+  const formatarValor = (v) => {
+    const valor = Math.abs(v).toFixed(2);
+    const [inteiro, decimal] = valor.split('.');
+    // Adicionar separador de milhares
+    const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `${inteiroFormatado},${decimal}`;
+  };
 
   const formatarCpfCnpj = (cpf_cnpj) => {
     if (!cpf_cnpj) return '-';
@@ -98,10 +104,10 @@ function gerarHTMLPDF(dados, empresa, descricao) {
   // Gerar lançamentos HTML
   let lancamentosHTML = '';
   dados.lancamentos.forEach(lanc => {
-    // Categoria com fundo cinza, letra preta e ícone
+    // Categoria com fundo cinza, letra preta, SEM ícone
     const categoriaHTML = lanc.categoria ?
-      `<span style="background: #e5e7eb; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500; display: inline-block;">${lanc.categoria.icone} ${lanc.categoria.nome}</span>` :
-      '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500;">⚠️ Não classificado</span>';
+      `<span style="background: #e5e7eb; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500; display: inline-block;">${lanc.categoria.nome}</span>` :
+      '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 500;">Não classificado</span>';
 
     const origemHTML = lanc.origem.nome ?
       `<span style="font-weight: 500;">${lanc.origem.nome}</span><br><span style="font-size: 8px; color: #6b7280;">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</span>` :
@@ -227,8 +233,9 @@ function gerarHTMLPDF(dados, empresa, descricao) {
         }
 
         td {
-            padding: 8px 5px;
-            border-bottom: 1px solid #f3f4f6;
+            padding: 5px 5px;
+            border-bottom: 1.5px solid #d1d5db;
+            line-height: 1.2;
         }
 
         .footer {
@@ -254,7 +261,24 @@ function gerarHTMLPDF(dados, empresa, descricao) {
 <body>
     <div class="header">
         <h1>${descricao}</h1>
-        <p>Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <p style="margin: 0;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+            <p style="margin: 0; text-align: right;">
+                ${(() => {
+                    if (mes) {
+                        const [ano, mesNum] = mes.split('-');
+                        const dataInicio = new Date(ano, mesNum - 1, 1);
+                        const dataFim = new Date(ano, mesNum, 0);
+                        return `Seleção: ${dataInicio.toLocaleDateString('pt-BR')} a ${dataFim.toLocaleDateString('pt-BR')}`;
+                    } else if (data_inicio && data_fim) {
+                        const di = new Date(data_inicio + 'T00:00:00');
+                        const df = new Date(data_fim + 'T00:00:00');
+                        return `Seleção: ${di.toLocaleDateString('pt-BR')} a ${df.toLocaleDateString('pt-BR')}`;
+                    }
+                    return 'Seleção: Todos os períodos';
+                })()}
+            </p>
+        </div>
     </div>
 
     <div class="summary">
