@@ -92,9 +92,9 @@ router.get('/listar', async (req, res) => {
       paramIndex++;
     }
 
-    // Ordenação e paginação (crescente por data - mais antigo primeiro)
+    // Ordenação e paginação (decrescente - mais recente primeiro)
     query += `
-      ORDER BY e.data ASC, e.id ASC
+      ORDER BY e.data DESC, e.id DESC
       LIMIT $${paramIndex}
       OFFSET $${paramIndex + 1}
     `;
