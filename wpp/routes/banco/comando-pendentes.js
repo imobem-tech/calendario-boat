@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.2609140020
+// wpp/routes/banco/comando-pendentes.js — V.2609140028
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
 // NOVO (13/09 23:02): Exibir nome_origem ao invés de cpf_cnpj_origem
 // NOVO (13/09 23:04): Etapa aprender_pessoa - escolher pessoa específica ou qualquer
 // NOVO (14/09 00:20): Cabeçalho simplificado "LANÇ. PENDENTES: N"
+// NOVO (14/09 00:28): Mostra pendentes restantes após finalizar
 // FUNCIONALIDADES:
 // - Listar pendentes (comando "lll")
 // - Escolher número para classificar
@@ -657,11 +658,20 @@ async function finalizarClassificacao(sock, grupoId, estado, statusFinal) {
       estado.lancamentoEscolhido.id
     ]);
 
+    // Contar pendentes restantes
+    const pendentesRestantes = await pool.query(`
+      SELECT COUNT(*) as total
+      FROM bank_extratos
+      WHERE empresa = $1 AND status = 'PENDENTE'
+    `, [estado.empresa]);
+
+    const totalPendentes = parseInt(pendentesRestantes.rows[0].total);
+
     // Confirmar
     const emoji = statusFinal === 'OK' ? '✅' : '⏭️';
     const msg = statusFinal === 'OK'
-      ? `${emoji} *Lançamento classificado e FINALIZADO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n📎 Recibos: ${recibosUrls.length} arquivo(s)`
-      : `${emoji} *Lançamento classificado (PENDENTE)*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n\n⚠️ Aguardando recibo para finalizar`;
+      ? `${emoji} *Lançamento classificado e FINALIZADO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n📎 Recibos: ${recibosUrls.length} arquivo(s)\n\n📋 *LANÇ. PENDENTES: ${totalPendentes}*`
+      : `${emoji} *Lançamento classificado (PENDENTE)*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n💬 Observação: ${estado.observacao || '(vazio)'}\n\n⚠️ Aguardando recibo para finalizar\n\n📋 *LANÇ. PENDENTES: ${totalPendentes}*`;
 
     await sock.sendMessage(grupoId, { text: msg });
 
