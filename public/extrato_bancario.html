@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrato Bancário - Sistema de Gestão</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* CABEÇALHO DO EXTRATO */
+        .extrato-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+
+        .bank-info h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .bank-info .bank-code {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .period-info {
+            text-align: right;
+        }
+
+        .period-info .month {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .period-info .empresa {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .totais-resumo {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .total-card {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .total-card .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .total-card .value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .total-card.positivo .value {
+            color: #2ecc71;
+        }
+
+        .total-card.negativo .value {
+            color: #e74c3c;
+        }
+
+        /* FILTROS */
+        .filtros {
+            padding: 20px 30px;
+            background: #ecf0f1;
+            border-bottom: 2px solid #bdc3c7;
+        }
+
+        .filtros-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .btn-filtrar {
+            padding: 8px 24px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-filtrar:hover {
+            background: #2980b9;
+        }
+
+        /* TABELA EXTRATO */
+        .extrato-body {
+            padding: 0;
+        }
+
+        .extrato-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .extrato-table thead {
+            background: #34495e;
+            color: white;
+        }
+
+        .extrato-table th {
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .extrato-table th.center {
+            text-align: center;
+        }
+
+        .extrato-table th.right {
+            text-align: right;
+        }
+
+        .extrato-table tbody tr {
+            border-bottom: 1px solid #ecf0f1;
+            transition: background 0.2s;
+        }
+
+        .extrato-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .extrato-table tbody tr.pendente {
+            background: #fff3cd;
+        }
+
+        .extrato-table tbody tr.pendente:hover {
+            background: #ffe8a1;
+        }
+
+        .extrato-table td {
+            padding: 12px 15px;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .extrato-table td.center {
+            text-align: center;
+        }
+
+        .extrato-table td.right {
+            text-align: right;
+        }
+
+        /* CATEGORIA */
+        .categoria {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .categoria.pendente {
+            background: #ffc107;
+            color: #856404;
+        }
+
+        /* VALOR */
+        .valor {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .valor.credito {
+            color: #27ae60;
+        }
+
+        .valor.debito {
+            color: #c0392b;
+        }
+
+        /* ANEXO */
+        .anexo-icon {
+            font-size: 16px;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .anexo-icon:hover {
+            color: #3498db;
+        }
+
+        .anexo-icon.tem-anexo {
+            color: #27ae60;
+        }
+
+        /* DATA */
+        .data {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        /* ORIGEM */
+        .origem {
+            font-size: 12px;
+        }
+
+        .origem .nome {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .origem .cpf {
+            color: #95a5a6;
+            font-size: 11px;
+        }
+
+        /* LOADING */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ecf0f1;
+            border-top-color: #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state .icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        /* STATUS BADGE */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.ok {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.pendente {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .extrato-header {
+                padding: 20px;
+            }
+
+            .header-top {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .period-info {
+                text-align: left;
+            }
+
+            .totais-resumo {
+                grid-template-columns: 1fr;
+            }
+
+            .filtros {
+                padding: 15px;
+            }
+
+            .filtros-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Tabela responsiva */
+            .extrato-table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            .extrato-table th,
+            .extrato-table td {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+        }
+
+        /* OBSERVAÇÕES TOOLTIP */
+        .obs-icon {
+            cursor: help;
+            color: #95a5a6;
+            font-size: 14px;
+        }
+
+        .obs-icon:hover {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- CABEÇALHO DO EXTRATO -->
+        <div class="extrato-header">
+            <div class="header-top">
+                <div class="bank-info">
+                    <h1 id="headerBanco">Carregando...</h1>
+                    <div class="bank-code" id="headerCodigoBanco"></div>
+                </div>
+                <div class="period-info">
+                    <div class="month" id="headerMes">-</div>
+                    <div class="empresa" id="headerEmpresa">-</div>
+                </div>
+            </div>
+
+            <div class="totais-resumo">
+                <div class="total-card positivo">
+                    <div class="label">Créditos</div>
+                    <div class="value" id="totalCreditos">R$ 0,00</div>
+                </div>
+                <div class="total-card negativo">
+                    <div class="label">Débitos</div>
+                    <div class="value" id="totalDebitos">R$ 0,00</div>
+                </div>
+                <div class="total-card">
+                    <div class="label">Saldo</div>
+                    <div class="value" id="totalSaldo">R$ 0,00</div>
+                </div>
+                <div class="total-card">
+                    <div class="label">Lançamentos</div>
+                    <div class="value" id="totalLancamentos">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="filtros">
+            <div class="filtros-grid">
+                <div class="filter-group">
+                    <label>Empresa</label>
+                    <select id="filtroEmpresa">
+                        <option value="ALLMAX">ALLMAX</option>
+                        <option value="IMOBEM" selected>IMOBEM</option>
+                        <option value="IMOBAN">IMOBAN</option>
+                        <option value="SUMMER">SUMMER</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Mês</label>
+                    <select id="filtroMes">
+                        <option value="">Todos os meses</option>
+                        <!-- Carregado dinamicamente -->
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="filtroStatus">
+                        <option value="">Todos</option>
+                        <option value="OK">Classificados</option>
+                        <option value="PENDENTE">Pendentes</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <button class="btn-filtrar" onclick="buscarExtrato()">🔍 Buscar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div>Carregando extrato...</div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="icon">📭</div>
+            <h3>Nenhum lançamento encontrado</h3>
+            <p>Tente ajustar os filtros ou selecione outro período</p>
+        </div>
+
+        <!-- TABELA EXTRATO -->
+        <div class="extrato-body" id="extratoBody" style="display: none;">
+            <table class="extrato-table">
+                <thead>
+                    <tr>
+                        <th class="center">Data</th>
+                        <th>Categoria</th>
+                        <th>Descrição</th>
+                        <th>Origem</th>
+                        <th>Observações</th>
+                        <th class="right">Valor</th>
+                        <th class="center">📎</th>
+                        <th class="center">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="extratoTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://calendario-boat-production.up.railway.app/api/banco/extrato';
+
+        // Carregar ao abrir
+        window.addEventListener('load', () => {
+            carregarMeses();
+            buscarExtrato();
+        });
+
+        // Carregar meses disponíveis
+        async function carregarMeses() {
+            try {
+                const empresa = document.getElementById('filtroEmpresa').value;
+                const response = await fetch(`${API_URL}/meses?empresa=${empresa}`);
+                const data = await response.json();
+
+                const select = document.getElementById('filtroMes');
+                select.innerHTML = '<option value="">Todos os meses</option>';
+
+                data.meses.forEach(mes => {
+                    const option = document.createElement('option');
+                    option.value = mes.mes.split('T')[0].substring(0, 7); // YYYY-MM
+                    option.textContent = `${mes.mes_formatado} (${mes.total_lancamentos} lanç.)`;
+                    select.appendChild(option);
+                });
+
+            } catch (err) {
+                console.error('Erro ao carregar meses:', err);
+            }
+        }
+
+        // Buscar extrato
+        async function buscarExtrato() {
+            const loading = document.getElementById('loading');
+            const emptyState = document.getElementById('emptyState');
+            const extratoBody = document.getElementById('extratoBody');
+            const tableBody = document.getElementById('extratoTableBody');
+
+            loading.style.display = 'block';
+            emptyState.style.display = 'none';
+            extratoBody.style.display = 'none';
+
+            try {
+                const empresa = document.getElementById('filtroEmpresa').value;
+                const mes = document.getElementById('filtroMes').value;
+                const status = document.getElementById('filtroStatus').value;
+
+                let url = `${API_URL}/listar?empresa=${empresa}&limit=500`;
+                if (mes) url += `&mes=${mes}`;
+                if (status) url += `&status=${status}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                loading.style.display = 'none';
+
+                if (!data.lancamentos || data.lancamentos.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                // Atualizar cabeçalho
+                if (data.lancamentos.length > 0) {
+                    const primeiro = data.lancamentos[0];
+                    document.getElementById('headerBanco').textContent = primeiro.nome_banco || primeiro.banco;
+                    document.getElementById('headerCodigoBanco').textContent = `Código: ${primeiro.codigo_banco || '-'}`;
+                    document.getElementById('headerEmpresa').textContent = primeiro.empresa;
+
+                    if (mes) {
+                        const [ano, mesNum] = mes.split('-');
+                        const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        document.getElementById('headerMes').textContent = `${meses[parseInt(mesNum)-1]}/${ano}`;
+                    } else {
+                        document.getElementById('headerMes').textContent = 'Todos os períodos';
+                    }
+                }
+
+                // Atualizar totais
+                document.getElementById('totalCreditos').textContent = formatarMoeda(data.totais.creditos);
+                document.getElementById('totalDebitos').textContent = formatarMoeda(data.totais.debitos);
+                document.getElementById('totalSaldo').textContent = formatarMoeda(data.totais.saldo);
+                document.getElementById('totalLancamentos').textContent = data.totais.lancamentos;
+
+                // Renderizar tabela
+                tableBody.innerHTML = '';
+                data.lancamentos.forEach(lanc => renderizarLancamento(lanc));
+
+                extratoBody.style.display = 'block';
+
+            } catch (err) {
+                loading.style.display = 'none';
+                console.error('Erro:', err);
+                alert('Erro ao carregar extrato: ' + err.message);
+            }
+        }
+
+        // Renderizar lançamento
+        function renderizarLancamento(lanc) {
+            const tbody = document.getElementById('extratoTableBody');
+            const tr = document.createElement('tr');
+
+            if (lanc.status === 'PENDENTE') {
+                tr.classList.add('pendente');
+            }
+
+            const dataFormatada = formatarData(lanc.importado_em);
+            const valorFormatado = formatarMoeda(Math.abs(lanc.valor));
+            const classeValor = lanc.valor > 0 ? 'credito' : 'debito';
+
+            // Categoria
+            let categoriaHtml = '';
+            if (lanc.categoria) {
+                const cor = lanc.categoria.cor || '#95a5a6';
+                categoriaHtml = `
+                    <span class="categoria" style="background-color: ${cor}20; color: ${cor}">
+                        ${lanc.categoria.icone || '📌'} ${lanc.categoria.nome}
+                    </span>
+                `;
+            } else {
+                categoriaHtml = '<span class="categoria pendente">⚠️ Não classificado</span>';
+            }
+
+            // Origem
+            const origemHtml = lanc.origem.nome ? `
+                <div class="origem">
+                    <div class="nome">${lanc.origem.nome}</div>
+                    <div class="cpf">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</div>
+                </div>
+            ` : '<span class="origem">-</span>';
+
+            // Observações
+            const obsHtml = lanc.observacoes ?
+                `<span class="obs-icon" title="${lanc.observacoes}">💬</span>` :
+                '-';
+
+            // Anexo
+            const anexoHtml = lanc.tem_anexo ?
+                `<span class="anexo-icon tem-anexo" onclick="verAnexos(${JSON.stringify(lanc.anexos).replace(/"/g, '&quot;')})" title="${lanc.anexos.length} arquivo(s)">📎</span>` :
+                '<span class="anexo-icon">-</span>';
+
+            // Status
+            const statusClass = lanc.status === 'OK' ? 'ok' : 'pendente';
+            const statusHtml = `<span class="status-badge ${statusClass}">${lanc.status}</span>`;
+
+            tr.innerHTML = `
+                <td class="center data">${dataFormatada}</td>
+                <td>${categoriaHtml}</td>
+                <td>${lanc.descricao}</td>
+                <td>${origemHtml}</td>
+                <td class="center">${obsHtml}</td>
+                <td class="right valor ${classeValor}">${valorFormatado}</td>
+                <td class="center">${anexoHtml}</td>
+                <td class="center">${statusHtml}</td>
+            `;
+
+            tbody.appendChild(tr);
+        }
+
+        // Formatar moeda
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor || 0);
+        }
+
+        // Formatar data
+        function formatarData(dataISO) {
+            const data = new Date(dataISO);
+            return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        }
+
+        // Formatar CPF/CNPJ
+        function formatarCpfCnpj(valor) {
+            if (!valor) return '-';
+            valor = valor.replace(/\D/g, '');
+            if (valor.length === 11) {
+                return valor.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            } else if (valor.length === 14) {
+                return valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            }
+            return valor;
+        }
+
+        // Ver anexos
+        function verAnexos(anexos) {
+            if (!anexos || anexos.length === 0) return;
+
+            anexos.forEach(anexo => {
+                window.open(anexo.url, '_blank');
+            });
+        }
+
+        // Atualizar meses ao trocar empresa
+        document.getElementById('filtroEmpresa').addEventListener('change', () => {
+            carregarMeses();
+        });
+    </script>
+</body>
+</html>
+
+<!-- V.2609140130 -->

@@ -17,6 +17,7 @@ import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
 import recibosRouter from './recibos-api.js';
 import debugRecibosRouter from './debug-recibos.js';
+import extratoRouter from './extrato-api.js';
 
 const router = express.Router();
 
@@ -76,6 +77,12 @@ router.use('/recibos', recibosRouter);
  * DEBUG TEMPORÁRIO: Verificar todos os recibos no banco
  */
 router.use('/debug/recibos', debugRecibosRouter);
+
+/**
+ * /api/banco/extrato/*
+ * Relatório de Extrato Bancário (V.2609140130)
+ */
+router.use('/extrato', extratoRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
