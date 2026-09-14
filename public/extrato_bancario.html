@@ -626,6 +626,7 @@
 
                 // Atualizar cabeçalho
                 const empresa = document.getElementById('filtroEmpresa').value;
+                const mes = document.getElementById('filtroMes').value;
                 const contaEmpresa = CONTAS_EMPRESAS[empresa];
 
                 if (contaEmpresa) {
@@ -635,14 +636,13 @@
                     document.getElementById('headerEmpresa').textContent = empresa;
                 }
 
-                if (data.lancamentos.length > 0) {
-                    if (mes) {
-                        const [ano, mesNum] = mes.split('-');
-                        const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                        document.getElementById('headerMes').textContent = `${meses[parseInt(mesNum)-1]}/${ano}`;
-                    } else {
-                        document.getElementById('headerMes').textContent = 'Todos os períodos';
-                    }
+                // Atualizar mês
+                if (mes) {
+                    const [ano, mesNum] = mes.split('-');
+                    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    document.getElementById('headerMes').textContent = `${meses[parseInt(mesNum)-1]}/${ano}`;
+                } else {
+                    document.getElementById('headerMes').textContent = 'Todos os períodos';
                 }
 
                 // Atualizar totais
@@ -770,4 +770,4 @@
 </body>
 </html>
 
-<!-- V.2609140155 -->
+<!-- V.2609140200 -->
