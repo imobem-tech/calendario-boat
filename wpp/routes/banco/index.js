@@ -14,6 +14,8 @@ import {
 } from './cron-sync.js';
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
+import extratoRouter from './extrato-api.js';
+import gerarPdfRouter from './gerar-pdf-api.js';
 
 const router = express.Router();
 
@@ -57,6 +59,16 @@ router.get('/status', (req, res) => {
 
 // Configurar rotas de backup
 setupBackupRoutes(router);
+
+// ============================================================
+// EXTRATO E PDF
+// ============================================================
+
+// Rotas de extrato bancário
+router.use('/extrato', extratoRouter);
+
+// Rota de geração de PDF
+router.use('/extrato', gerarPdfRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
