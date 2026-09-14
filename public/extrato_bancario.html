@@ -399,6 +399,7 @@
                         <th>Valor</th>
                         <th>Saldo</th>
                         <th>Status</th>
+                        <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="corpoTabela">
@@ -566,7 +567,7 @@
             tbody.innerHTML = '';
 
             if (!dados.lancamentos || dados.lancamentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
                 return;
             }
 
@@ -612,7 +613,15 @@
                         ${lanc.saldo_linha >= 0 ? '' : '-'}R$ ${Math.abs(lanc.saldo_linha).toFixed(2).replace('.', ',')}
                     </td>
                     <td style="text-align:center;">${statusHTML}</td>
+                    <td style="text-align:center;">
+                        <button onclick="abrirModalEdicao(${lanc.id})" style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            ✏️ Editar
+                        </button>
+                    </td>
                 `;
+
+                // Guardar dados do lançamento no elemento
+                tr.dataset.lancamento = JSON.stringify(lanc);
 
                 tbody.appendChild(tr);
             });
@@ -701,8 +710,151 @@
                 document.getElementById('btnGerarPDF').textContent = '📄 Gerar PDF';
             }
         }
+        // ========================================
+        // FUNÇÕES DE EDIÇÃO
+        // ========================================
+
+        let categoriasDisponiveis = [];
+
+        // Carregar categorias ao iniciar
+        async function carregarCategorias() {
+            try {
+                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/categorias');
+                const data = await response.json();
+
+                if (data.sucesso) {
+                    categoriasDisponiveis = data.categorias;
+                }
+            } catch (err) {
+                console.error('❌ Erro ao carregar categorias:', err);
+            }
+        }
+
+        // Abrir modal de edição
+        async function abrirModalEdicao(lancamentoId) {
+            // Buscar dados do lançamento
+            const tr = document.querySelector(`button[onclick="abrirModalEdicao(${lancamentoId})"]`).closest('tr');
+            const lancamento = JSON.parse(tr.dataset.lancamento);
+
+            // Preencher modal
+            document.getElementById('editLancamentoId').value = lancamento.id;
+            document.getElementById('editDescricao').value = lancamento.descricao;
+            document.getElementById('editObservacoes').value = lancamento.observacoes || '';
+
+            // Preencher select de categorias
+            const selectCategoria = document.getElementById('editCategoria');
+            selectCategoria.innerHTML = '<option value="">-- Selecione --</option>';
+
+            categoriasDisponiveis.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = `${cat.icone} ${cat.nome}`;
+
+                if (lancamento.categoria && lancamento.categoria.id === cat.id) {
+                    option.selected = true;
+                }
+
+                selectCategoria.appendChild(option);
+            });
+
+            // Mostrar modal
+            document.getElementById('modalEdicao').style.display = 'flex';
+        }
+
+        // Fechar modal
+        function fecharModalEdicao() {
+            document.getElementById('modalEdicao').style.display = 'none';
+        }
+
+        // Salvar edição
+        async function salvarEdicao() {
+            const lancamentoId = document.getElementById('editLancamentoId').value;
+            const categoriaId = document.getElementById('editCategoria').value;
+            const descricao = document.getElementById('editDescricao').value;
+            const observacoes = document.getElementById('editObservacoes').value;
+
+            if (!descricao) {
+                alert('Descrição é obrigatória!');
+                return;
+            }
+
+            try {
+                document.getElementById('btnSalvarEdicao').disabled = true;
+                document.getElementById('btnSalvarEdicao').textContent = 'Salvando...';
+
+                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/lancamento/${lancamentoId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        categoria_id: categoriaId ? parseInt(categoriaId) : null,
+                        descricao,
+                        observacoes
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.sucesso) {
+                    alert('✅ Lançamento atualizado com sucesso!');
+                    fecharModalEdicao();
+                    // Recarregar extrato
+                    buscarExtrato();
+                } else {
+                    alert('❌ Erro: ' + data.erro);
+                }
+
+            } catch (err) {
+                console.error('❌ Erro ao salvar:', err);
+                alert('❌ Erro ao salvar alterações');
+            } finally {
+                document.getElementById('btnSalvarEdicao').disabled = false;
+                document.getElementById('btnSalvarEdicao').textContent = '💾 Salvar';
+            }
+        }
+
+        // Carregar categorias ao iniciar
+        carregarCategorias();
+
     </script>
+
+    <!-- MODAL DE EDIÇÃO -->
+    <div id="modalEdicao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <h2 style="margin-bottom: 20px; color: #333;">✏️ Editar Lançamento</h2>
+
+            <input type="hidden" id="editLancamentoId">
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Categoria:</label>
+                <select id="editCategoria" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    <option value="">-- Selecione --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Descrição:</label>
+                <textarea id="editDescricao" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit;"></textarea>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Observações:</label>
+                <textarea id="editObservacoes" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="fecharModalEdicao()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    ❌ Cancelar
+                </button>
+                <button id="btnSalvarEdicao" onclick="salvarEdicao()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">
+                    💾 Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 
-<!-- V.2609141900 -->
+<!-- V.2609141735 -->

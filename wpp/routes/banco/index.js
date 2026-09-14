@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.260911192500
+// wpp/routes/banco/index.js — V.2609141730
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
 // + Sistema de Backup Automático (Railway + Vercel Blob)
 // ============================================================
@@ -16,6 +16,7 @@ import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
 import extratoRouter from './extrato-api.js';
 import gerarPdfRouter from './gerar-pdf-api.js';
+import editarLancamentoRouter from './editar-lancamento-api.js';
 
 const router = express.Router();
 
@@ -69,6 +70,9 @@ router.use('/extrato', extratoRouter);
 
 // Rota de geração de PDF
 router.use('/extrato', gerarPdfRouter);
+
+// Rotas de edição de lançamentos
+router.use('/', editarLancamentoRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
