@@ -1,53 +1,23 @@
 // ============================================================
-// reclassificar-api.js — V.2609141950
+// reclassificar-api.js — V.2609142005
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
+// + USA LÓGICA CORRETA: bank_categorias (palavras_chave + chave_aprendida)
+// + NÃO USA MAIS: bank_regras_classificacao (tabela antiga)
 // + Filtros: empresa (TODAS ou específica)
 // + Filtros: intervalo de datas (dataInicio/dataFim)
 // + Apenas não classificados (classificacao IS NULL OR = '')
-// + Estatísticas detalhadas: analisados, semTexto, semRegra,
-//   classificados, naoClassificados, erros
 // ============================================================
 
 import express from 'express';
 import pkg from 'pg';
 import dotenv from 'dotenv';
+import { classificarLancamento } from './classificacao-automatica.js';
 
 dotenv.config();
 
 const router = express.Router();
 const { Pool } = pkg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
-// Classificar automaticamente
-async function classificarAutomaticamente(texto, empresa) {
-  if (!texto) return null;
-
-  const regras = await pool.query(`
-    SELECT id, nome_regra, classificacao, palavras_chave, prioridade
-    FROM bank_regras_classificacao
-    WHERE ativa = true
-      AND ativo = true
-      AND (empresa = $1 OR empresa IS NULL)
-    ORDER BY prioridade DESC, id ASC
-  `, [empresa]);
-
-  const textoLower = texto.toLowerCase();
-
-  for (const regra of regras.rows) {
-    if (!regra.palavras_chave) continue;
-
-    const palavras = regra.palavras_chave.split(',').map(p => p.trim().toLowerCase());
-
-    if (palavras.some(palavra => textoLower.includes(palavra))) {
-      return {
-        classificacao: regra.classificacao,
-        regra_nome: regra.nome_regra
-      };
-    }
-  }
-
-  return null;
-}
 
 // ENDPOINT POST /api/banco/reclassificar
 router.post('/', async (req, res) => {
@@ -56,7 +26,7 @@ router.post('/', async (req, res) => {
 
     // Construir query dinamicamente
     let query = `
-      SELECT id, empresa, descricao_original, observacoes, classificacao, status
+      SELECT id, empresa, descricao_original, observacoes, classificacao, status, valor, tipo, cpf_cnpj_origem
       FROM bank_extratos
       WHERE banco = 'Asaas'
         AND (classificacao IS NULL OR classificacao = '')
@@ -87,9 +57,9 @@ router.post('/', async (req, res) => {
     const stats = {
       analisados: 0,           // Total de registros tentados
       semTexto: 0,             // Sem observacoes/descricao_original
-      semRegra: 0,             // Tinha texto mas nenhuma palavra-chave bateu
+      semRegra: 0,             // Tinha texto mas nenhuma regra bateu
       classificados: 0,        // Encontrou regra e classificou
-      naoClassificados: 0,     // Tinha texto mas não classificou (sem regra)
+      naoClassificados: 0,     // Tinha texto mas não classificou
       erros: 0
     };
 
@@ -97,16 +67,23 @@ router.post('/', async (req, res) => {
       try {
         stats.analisados++;
 
-        const texto = reg.observacoes || reg.descricao_original;
-        if (!texto) {
+        const descricao = reg.observacoes || reg.descricao_original;
+        if (!descricao) {
           stats.semTexto++;
           stats.naoClassificados++;
           continue;
         }
 
-        const resultado = await classificarAutomaticamente(texto, reg.empresa);
+        // Usar a função correta de classificação!
+        const resultado = await classificarLancamento({
+          description: descricao,
+          value: Math.abs(reg.valor), // Valor absoluto
+          tipo: reg.tipo,
+          empresa: reg.empresa,
+          cpfCnpjOrigem: reg.cpf_cnpj_origem
+        });
 
-        if (!resultado) {
+        if (!resultado || !resultado.categoria_id) {
           stats.semRegra++;
           stats.naoClassificados++;
           continue;
@@ -119,7 +96,7 @@ router.post('/', async (req, res) => {
               status = 'OK',
               classificado_em = NOW()
           WHERE id = $2
-        `, [resultado.classificacao, reg.id]);
+        `, [resultado.categoria_nome, reg.id]);
 
         stats.classificados++;
 
