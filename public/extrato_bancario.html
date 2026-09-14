@@ -164,13 +164,14 @@
             font-weight: 600;
             text-transform: uppercase;
             opacity: 0.8;
-            display: block;
-            margin-bottom: 8px;
+            display: inline;
+            margin-right: 8px;
         }
 
         .summary-card .value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
+            display: inline;
         }
 
         .table-container {
@@ -296,8 +297,15 @@
     <div class="container">
         <!-- HEADER -->
         <div class="header">
-            <h1>📊 Extrato Bancário</h1>
-            <p>Visualize e exporte seus extratos bancários com segurança</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 style="margin-bottom: 10px;">📊 Extrato Bancário</h1>
+                    <p style="margin: 0;">Visualize e exporte seus extratos bancários com segurança</p>
+                </div>
+                <button class="btn btn-success" id="btnGerarPDF" onclick="gerarPDF()" disabled style="height: fit-content;">
+                    📄 Gerar PDF
+                </button>
+            </div>
         </div>
 
         <!-- FILTROS -->
@@ -344,16 +352,12 @@
                     <option value="PENDENTE">Pendente</option>
                 </select>
             </div>
-        </div>
 
-        <!-- AÇÕES -->
-        <div class="actions">
-            <button class="btn btn-primary" onclick="buscarExtrato()">
-                🔍 Buscar
-            </button>
-            <button class="btn btn-success" id="btnGerarPDF" onclick="gerarPDF()" disabled>
-                📄 Gerar PDF
-            </button>
+            <div class="filter-group" style="display: flex; align-items: flex-end;">
+                <button class="btn btn-primary" onclick="buscarExtrato()" style="width: 100%;">
+                    🔍 Buscar
+                </button>
+            </div>
         </div>
 
         <!-- RESUMO -->
