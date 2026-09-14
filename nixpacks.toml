@@ -1,12 +1,16 @@
+# ============================================================
+# nixpacks.toml — V.2609140032
+# Configuração do Railway para instalar PostgreSQL tools
+# ============================================================
+
 [phases.setup]
-nixPkgs = ["nodejs_20"]
-aptPkgs = ["postgresql-client"]
+nixPkgs = ["nodejs_20", "postgresql"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["echo 'No build needed'"]
+cmds = ["echo 'Build concluído'"]
 
 [start]
 cmd = "npm start"
