@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.2609132302
+// wpp/routes/banco/comando-pendentes.js — V.2609132304
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
 // NOVO (13/09 23:02): Exibir nome_origem ao invés de cpf_cnpj_origem
+// NOVO (13/09 23:04): Etapa aprender_pessoa - escolher pessoa específica ou qualquer
 // FUNCIONALIDADES:
 // - Listar pendentes (comando "lll")
 // - Escolher número para classificar
@@ -305,6 +306,50 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
       return true;
     }
 
+    // Salvar tolerância e ir para próxima etapa
+    estado.tolerancia = tolerancia;
+    estado.etapa = 'aprender_pessoa';
+
+    // Perguntar se é para pessoa específica ou qualquer pessoa
+    const nomeCliente = estado.lancamentoEscolhido.nome_origem || 'Cliente';
+    const cpfCnpj = estado.lancamentoEscolhido.cpf_cnpj_origem || '';
+
+    // Formatar CPF/CNPJ para exibição (só os 3 primeiros dígitos)
+    let cpfExibicao = '';
+    if (cpfCnpj && cpfCnpj.length >= 3) {
+      const somenteNumeros = cpfCnpj.replace(/\D/g, '');
+      cpfExibicao = somenteNumeros.length === 11
+        ? `CPF ${somenteNumeros.substring(0, 3)}...`
+        : somenteNumeros.length === 14
+        ? `CNPJ ${somenteNumeros.substring(0, 2)}...`
+        : '';
+    }
+
+    await sock.sendMessage(grupoId, {
+      text: `🙋 *APLICAR REGRA PARA:*\n\n${'━'.repeat(16)}\n\n1️⃣ Apenas para *${nomeCliente}*${cpfExibicao ? ` (${cpfExibicao})` : ''}\n   (próximos lançamentos desta pessoa com mesma descrição e valor)\n\n2️⃣ Para *qualquer pessoa*\n   (qualquer lançamento com mesma descrição e valor)\n\n${'━'.repeat(16)}\n✏️ Digite 1 ou 2:`
+    });
+
+    return true;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 7: Aprender - Escolher pessoa
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aprender_pessoa') {
+    const escolha = textoLimpo.trim();
+
+    if (escolha !== '1' && escolha !== '2') {
+      await sock.sendMessage(grupoId, {
+        text: '❌ Digite apenas 1 ou 2'
+      });
+      return true;
+    }
+
+    // Definir CPF/CNPJ conforme escolha
+    const cpfCnpj = escolha === '1'
+      ? (estado.lancamentoEscolhido.cpf_cnpj_origem || '*')
+      : '*';
+
     // Salvar regra aprendida
     try {
       const valorCentavos = Math.round(Math.abs(estado.lancamentoEscolhido.valor) * 100);
@@ -313,7 +358,8 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
         categoriaId: estado.categoriaEscolhida.id,
         fraseChave: estado.fraseChave,
         valorCentavos: valorCentavos,
-        toleranciaPercent: tolerancia,
+        toleranciaPercent: estado.tolerancia,
+        cpfCnpj: cpfCnpj,
         observacao: estado.observacao || ''
       });
 
@@ -331,7 +377,7 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
       `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
 
       // Confirmar sucesso com valores em reais
-      const variacaoMax = Math.round(valorCentavos * tolerancia / 100);
+      const variacaoMax = Math.round(valorCentavos * estado.tolerancia / 100);
       const valorMin = (valorCentavos - variacaoMax) / 100;
       const valorMax = (valorCentavos + variacaoMax) / 100;
 
@@ -340,8 +386,14 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
         currency: 'BRL'
       }).format(valorCentavos / 100);
 
+      // Texto sobre pessoa
+      const nomeCliente = estado.lancamentoEscolhido.nome_origem || 'esta pessoa';
+      const textoPessoa = cpfCnpj === '*'
+        ? '👥 Qualquer pessoa'
+        : `🙋 Apenas para ${nomeCliente}`;
+
       await sock.sendMessage(grupoId, {
-        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: ${valorFormatado} ± ${tolerancia}%\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin.toFixed(2)} e R$ ${valorMax.toFixed(2)}\n\nVão automaticamente para:\n✅ Categoria: ${estado.categoriaEscolhida.nome}\n✅ Observação: "${estado.observacao || '(vazio)'}"\n✅ Status: OK\n\nNada mais a fazer! 🎉`
+        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: ${valorFormatado} ± ${estado.tolerancia}%\n${textoPessoa}\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin.toFixed(2)} e R$ ${valorMax.toFixed(2)}\n${cpfCnpj === '*' ? '✅ De qualquer pessoa' : `✅ De ${nomeCliente}`}\n\nVão automaticamente para:\n✅ Categoria: ${estado.categoriaEscolhida.nome}\n✅ Observação: "${estado.observacao || '(vazio)'}"\n✅ Status: OK\n\nNada mais a fazer! 🎉`
       });
 
       estadoPendentes.delete(grupoId);

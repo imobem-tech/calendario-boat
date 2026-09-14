@@ -1,7 +1,8 @@
 // ============================================================
-// wpp/routes/banco/classificacao-automatica.js — V.2609132252
+// wpp/routes/banco/classificacao-automatica.js — V.2609132304
 // SISTEMA INTELIGENTE DE CLASSIFICAÇÃO AUTOMÁTICA
 // NOVO (13/09 22:52): Suporte a CPF/CNPJ na chave_aprendida
+// NOVO (13/09 23:04): salvarRegraAprendida com parâmetro cpfCnpj
 // LÓGICA NOVA (13/09/2026):
 //   - QUALQUER TIPO (CREDITO ou DEBITO):
 //     1. Tenta palavras_chave primeiro (simples)
@@ -304,6 +305,7 @@ export async function salvarRegraAprendida({
   fraseChave,
   valorCentavos,
   toleranciaPercent,
+  cpfCnpj,        // NOVO: CPF/CNPJ específico ou "*" para qualquer pessoa
   observacao
 }) {
   try {
@@ -316,10 +318,12 @@ export async function salvarRegraAprendida({
       throw new Error('Categoria não encontrada');
     }
 
-    // Montar nova regra (valor em centavos com padding de zeros)
-    // Exemplo: 1 centavo = "001", 150 centavos = "150"
+    // Montar nova regra - FORMATO NOVO (5 partes): frase|valor|tol|cpfCnpj|obs
+    // Exemplo: "Hora_MOTOR 586-E2|9800|10|12345678901|Fulano" (CPF específico)
+    // Exemplo: "Hora_MOTOR 586-E2|9800|10|*|Qualquer pessoa" (qualquer)
     const valorPadded = String(valorCentavos).padStart(3, '0');
-    const novaRegra = `${fraseChave}|${valorPadded}|${toleranciaPercent}|${observacao}`;
+    const cpfCnpjFinal = cpfCnpj || '*';  // Default para "*" se não informado
+    const novaRegra = `${fraseChave}|${valorPadded}|${toleranciaPercent}|${cpfCnpjFinal}|${observacao}`;
 
     // Adicionar à lista existente
     let chaveAprendida = result.rows[0].chave_aprendida || '';
