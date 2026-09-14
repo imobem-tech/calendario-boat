@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.2609132304
+// wpp/routes/banco/comando-pendentes.js — V.2609140020
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
 // NOVO (13/09 23:02): Exibir nome_origem ao invés de cpf_cnpj_origem
 // NOVO (13/09 23:04): Etapa aprender_pessoa - escolher pessoa específica ou qualquer
+// NOVO (14/09 00:20): Cabeçalho simplificado "LANÇ. PENDENTES: N"
 // FUNCIONALIDADES:
 // - Listar pendentes (comando "lll")
 // - Escolher número para classificar
@@ -85,7 +86,7 @@ export async function listarPendentes(sock, grupoId, empresa) {
     }
 
     // Montar mensagem
-    let mensagem = `📋 *LANÇAMENTOS PENDENTES (${result.rows.length}/10)*\n\n`;
+    let mensagem = `📋 *LANÇ. PENDENTES: ${result.rows.length}*\n\n`;
 
     for (let i = 0; i < Math.min(3, result.rows.length); i++) {
       const lanc = result.rows[i];
