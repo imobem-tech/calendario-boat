@@ -16,6 +16,7 @@ import {
 import { setupBackupRoutes } from './backup-neon.js';
 import { inicializarBackupCron } from './backup-cron.js';
 import recibosRouter from './recibos-api.js';
+import debugRecibosRouter from './debug-recibos.js';
 
 const router = express.Router();
 
@@ -69,6 +70,12 @@ setupBackupRoutes(router);
  * Gerenciamento de recibos salvos no Vercel Blob
  */
 router.use('/recibos', recibosRouter);
+
+/**
+ * /api/banco/debug/recibos
+ * DEBUG TEMPORÁRIO: Verificar todos os recibos no banco
+ */
+router.use('/debug/recibos', debugRecibosRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
