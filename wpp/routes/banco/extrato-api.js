@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609140155
+// wpp/routes/banco/extrato-api.js — V.2609141430
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
 // NOVO (14/09 01:45): Adicionar saldo_acumulado (saldo total da conta)
 // NOVO (14/09 01:55): ORDER BY data ASC (crescente - mais antigo primeiro)
+// NOVO (14/09 14:30): Cálculo saldo linha a linha (saldo_linha)
 // ============================================================
 
 import express from 'express';
@@ -138,7 +139,24 @@ router.get('/listar', async (req, res) => {
     `, [empresa]);
     const saldoAcumulado = parseFloat(saldoAcumuladoResult.rows[0].saldo_acumulado || 0);
 
-    // Formatar lançamentos
+    // Calcular saldo linha a linha (ordem crescente de data)
+    // Buscar TODOS os lançamentos para calcular saldo correto
+    const todosLancamentos = await pool.query(`
+      SELECT id, valor, data
+      FROM bank_extratos
+      WHERE empresa = $1
+      ORDER BY data ASC, id ASC
+    `, [empresa]);
+
+    // Mapear saldo por ID
+    const saldoPorId = {};
+    let saldoCorrente = 0;
+    todosLancamentos.rows.forEach(lanc => {
+      saldoCorrente += parseFloat(lanc.valor);
+      saldoPorId[lanc.id] = saldoCorrente;
+    });
+
+    // Formatar lançamentos com saldo
     const lancamentos = result.rows.map(row => ({
       id: row.id,
       empresa: row.empresa,
@@ -168,7 +186,8 @@ router.get('/listar', async (req, res) => {
       importado_em: row.importado_em,
       tipo_importacao: row.tipo_importacao,
       tem_anexo: row.recibos_urls && row.recibos_urls.length > 0,
-      anexos: row.recibos_urls || []
+      anexos: row.recibos_urls || [],
+      saldo_linha: saldoPorId[row.id] || 0
     }));
 
     res.json({

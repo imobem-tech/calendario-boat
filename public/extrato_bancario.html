@@ -510,6 +510,7 @@
                         <th>Origem</th>
                         <th>Observações</th>
                         <th class="right">Valor</th>
+                        <th class="right">Saldo</th>
                         <th class="center">📎</th>
                         <th class="center">Status</th>
                     </tr>
@@ -709,6 +710,10 @@
             const statusClass = lanc.status === 'OK' ? 'ok' : 'pendente';
             const statusHtml = `<span class="status-badge ${statusClass}">${lanc.status}</span>`;
 
+            // Saldo linha
+            const saldoFormatado = formatarMoeda(lanc.saldo_linha);
+            const classeSaldo = lanc.saldo_linha >= 0 ? 'credito' : 'debito';
+
             tr.innerHTML = `
                 <td class="center data">${dataFormatada}</td>
                 <td>${categoriaHtml}</td>
@@ -716,6 +721,7 @@
                 <td>${origemHtml}</td>
                 <td class="observacoes-cell">${obsHtml}</td>
                 <td class="right valor ${classeValor}">${valorFormatado}</td>
+                <td class="right valor ${classeSaldo}">${saldoFormatado}</td>
                 <td class="center">${anexoHtml}</td>
                 <td class="center">${statusHtml}</td>
             `;
@@ -768,4 +774,4 @@
 </body>
 </html>
 
-<!-- V.2609140200 -->
+<!-- V.2609141430 -->
