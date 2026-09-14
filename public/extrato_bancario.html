@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609142015
+    EXTRATO BANCÁRIO - V.2609142030
     ============================================================
 
     📥 IMPORTAR OFX - V.2609142100
@@ -444,6 +444,7 @@
                 <thead>
                     <tr>
                         <th>Data</th>
+                        <th>Importado</th>
                         <th>Empresa</th>
                         <th>Categoria</th>
                         <th>Descrição</th>
@@ -621,16 +622,20 @@
             tbody.innerHTML = '';
 
             if (!dados.lancamentos || dados.lancamentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
                 return;
             }
 
             dados.lancamentos.forEach(lanc => {
                 const tr = document.createElement('tr');
 
-                // Data
-                const data = new Date(lanc.importado_em);
-                const dataFormatada = data.toLocaleDateString('pt-BR') + '<br>' + data.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                // Data da transação
+                const dataTransacao = new Date(lanc.data + 'T00:00:00');
+                const dataFormatada = dataTransacao.toLocaleDateString('pt-BR');
+
+                // Data/Hora de importação
+                const dataImportacao = new Date(lanc.importado_em);
+                const importadoFormatado = dataImportacao.toLocaleDateString('pt-BR') + ' ' + dataImportacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
 
                 // Categoria
                 const catHTML = lanc.categoria ?
@@ -654,6 +659,7 @@
 
                 tr.innerHTML = `
                     <td>${dataFormatada}</td>
+                    <td style="font-size: 11px; color: #666;">${importadoFormatado}</td>
                     <td><strong>${lanc.empresa}</strong></td>
                     <td>${catHTML}</td>
                     <td>${lanc.descricao.substring(0, 100)}</td>
@@ -1152,7 +1158,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142015</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142030</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
@@ -1162,4 +1168,4 @@
 </body>
 </html>
 
-<!-- V.2609142015 - Modal de progresso + fix botão inativo + atualiza só classificacao -->
+<!-- V.2609142030 - Fix filtro de datas + coluna importado_em + ordenação correta -->

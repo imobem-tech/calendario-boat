@@ -1,11 +1,12 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609141825
+// wpp/routes/banco/extrato-api.js — V.2609142025
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
 // NOVO (14/09 01:45): Adicionar saldo_acumulado (saldo total da conta)
 // NOVO (14/09 01:55): ORDER BY data ASC (crescente - mais antigo primeiro)
 // NOVO (14/09 14:30): Cálculo saldo linha a linha (saldo_linha)
 // NOVO (14/09 18:25): Geração automática de tokens para acesso seguro a anexos
+// NOVO (14/09 20:25): Filtros data_inicio/data_fim + ORDER BY data DESC, importado_em DESC
 // ============================================================
 
 import express from 'express';
@@ -33,7 +34,7 @@ const pool = new Pool({
  */
 router.get('/listar', async (req, res) => {
   try {
-    const { empresa, mes, status, limit = 100, offset = 0 } = req.query;
+    const { empresa, mes, data_inicio, data_fim, status, limit = 100, offset = 0 } = req.query;
 
     if (!empresa) {
       return res.status(400).json({
@@ -82,8 +83,14 @@ router.get('/listar', async (req, res) => {
     const params = [empresa];
     let paramIndex = 2;
 
-    // Filtro por mês
-    if (mes) {
+    // Filtro por mês OU por intervalo de datas
+    if (data_inicio && data_fim) {
+      // Prioridade para intervalo de datas
+      query += ` AND e.data BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      params.push(data_inicio, data_fim);
+      paramIndex += 2;
+    } else if (mes) {
+      // Se não tem intervalo, usa o mês
       query += ` AND DATE_TRUNC('month', e.mes_ref) = DATE_TRUNC('month', $${paramIndex}::DATE)`;
       params.push(mes + '-01');
       paramIndex++;
@@ -96,9 +103,9 @@ router.get('/listar', async (req, res) => {
       paramIndex++;
     }
 
-    // Ordenação e paginação (decrescente - mais recente primeiro)
+    // Ordenação: data DESC (mais recente primeiro), depois importado_em DESC
     query += `
-      ORDER BY e.data DESC, e.id DESC
+      ORDER BY e.data DESC, e.importado_em DESC, e.id DESC
       LIMIT $${paramIndex}
       OFFSET $${paramIndex + 1}
     `;
@@ -120,7 +127,12 @@ router.get('/listar', async (req, res) => {
     const paramsTotais = [empresa];
     let paramIndexTotais = 2;
 
-    if (mes) {
+    // Usar mesmos filtros da query principal
+    if (data_inicio && data_fim) {
+      queryTotais += ` AND data BETWEEN $${paramIndexTotais} AND $${paramIndexTotais + 1}`;
+      paramsTotais.push(data_inicio, data_fim);
+      paramIndexTotais += 2;
+    } else if (mes) {
       queryTotais += ` AND DATE_TRUNC('month', mes_ref) = DATE_TRUNC('month', $${paramIndexTotais}::DATE)`;
       paramsTotais.push(mes + '-01');
       paramIndexTotais++;
