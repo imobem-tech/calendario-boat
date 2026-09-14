@@ -12,12 +12,14 @@
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "latest",
+    "nanoid": "^3.3.19",
     "node-cron": "^3.0.3",
     "pg": "latest",
     "pino": "latest",
     "qrcode": "latest"
   },
   "devDependencies": {
+    "puppeteer": "^25.11.0",
     "xlsx": "^0.18.5"
   }
 }
