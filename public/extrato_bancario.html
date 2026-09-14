@@ -674,7 +674,7 @@
             }
 
             const dataFormatada = formatarData(lanc.importado_em);
-            const valorFormatado = formatarMoeda(Math.abs(lanc.valor));
+            const valorFormatado = formatarMoeda(lanc.valor);
             const classeValor = lanc.valor > 0 ? 'credito' : 'debito';
 
             // Categoria
@@ -774,4 +774,4 @@
 </body>
 </html>
 
-<!-- V.2609141430 -->
+<!-- V.2609141445 -->
