@@ -19,6 +19,9 @@ import extratoRouter from './extrato-api.js';
 import gerarPdfRouter from './gerar-pdf-api.js';
 import editarLancamentoRouter from './editar-lancamento-api.js';
 import excluirRecibosRouter from './excluir-recibos-api.js';
+import enriquecerRouter from './enriquecer-api.js';
+import reclassificarRouter from './reclassificar-api.js';
+import importarOfxRouter from './importar-ofx-api.js';
 
 const router = express.Router();
 
@@ -78,6 +81,19 @@ router.use('/', editarLancamentoRouter);
 
 // Rotas de exclusão de recibos
 router.use('/recibos', excluirRecibosRouter);
+
+// ============================================================
+// FERRAMENTAS ADMINISTRATIVAS
+// ============================================================
+
+// Rota para importar arquivo OFX via upload
+router.use('/importar-ofx', importarOfxRouter);
+
+// Rota para enriquecer dados (buscar cliente e CR)
+router.use('/enriquecer', enriquecerRouter);
+
+// Rota para reclassificar por palavras-chave
+router.use('/reclassificar', reclassificarRouter);
 
 // ============================================================
 // TRIGGER DO WHATSAPP
@@ -147,6 +163,11 @@ export function inicializarSistemaBancario(sock = null) {
   console.log('   DELETE /api/banco/recibos/excluir/:id               → Excluir todos os recibos de um lançamento');
   console.log('   POST   /api/banco/recibos/excluir/lote              → Excluir recibos em lote (até 50)');
   console.log('   DELETE /api/banco/recibos/excluir/:id/arquivo/:nome → Excluir um arquivo específico');
+  console.log('');
+  console.log('🔧 Ferramentas administrativas:');
+  console.log('   POST /api/banco/importar-ofx    → Importar arquivo OFX via upload');
+  console.log('   POST /api/banco/enriquecer      → Enriquecer dados (buscar cliente e CR)');
+  console.log('   POST /api/banco/reclassificar   → Reclassificar por palavras-chave');
   console.log('');
   console.log('='.repeat(80) + '\n');
 
