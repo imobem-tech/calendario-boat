@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Anexos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .header {
+            background: #2c2c2c;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #404040;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .file-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .counter {
+            background: #404040;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #b0b0b0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: #404040;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: #505050;
+        }
+
+        .btn-primary {
+            background: #3498db;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-close {
+            background: #e74c3c;
+        }
+
+        .btn-close:hover {
+            background: #c0392b;
+        }
+
+        /* VISUALIZADOR */
+        .viewer-container {
+            height: calc(100vh - 130px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .viewer-content {
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .viewer-content img {
+            max-width: 100%;
+            max-height: calc(100vh - 170px);
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .viewer-content iframe {
+            width: 90vw;
+            height: calc(100vh - 170px);
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        /* NAVEGAÇÃO */
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #404040;
+            color: #fff;
+            font-size: 24px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .nav-btn:hover {
+            background: rgba(52, 152, 219, 0.9);
+            border-color: #3498db;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn:disabled:hover {
+            background: rgba(0,0,0,0.7);
+            border-color: #404040;
+            transform: translateY(-50%) scale(1);
+        }
+
+        .nav-prev {
+            left: 20px;
+        }
+
+        .nav-next {
+            right: 20px;
+        }
+
+        /* THUMBNAILS */
+        .thumbnails {
+            background: #2c2c2c;
+            padding: 15px;
+            border-top: 1px solid #404040;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            max-height: 120px;
+        }
+
+        .thumbnails::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .thumbnails::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .thumbnails::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 3px;
+        }
+
+        .thumb {
+            min-width: 80px;
+            height: 80px;
+            border: 2px solid #404040;
+            border-radius: 6px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.2s;
+            position: relative;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thumb:hover {
+            border-color: #3498db;
+            transform: scale(1.05);
+        }
+
+        .thumb.active {
+            border-color: #3498db;
+            border-width: 3px;
+        }
+
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumb-pdf {
+            font-size: 12px;
+            color: #e74c3c;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* LOADING */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #b0b0b0;
+        }
+
+        .loading-spinner {
+            border: 3px solid #404040;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ZOOM CONTROLS */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #404040;
+        }
+
+        .zoom-btn {
+            background: #404040;
+            border: none;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: #505050;
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-info">
+            <div class="file-name" id="fileName">Carregando...</div>
+            <div class="counter" id="counter">1 de 1</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn" id="btnDownload">
+                <span>⬇</span> Download
+            </button>
+            <button class="btn btn-close" onclick="window.close()">
+                <span>✕</span> Fechar
+            </button>
+        </div>
+    </div>
+
+    <!-- VISUALIZADOR -->
+    <div class="viewer-container">
+        <button class="nav-btn nav-prev" id="btnPrev" onclick="navegarAnexo(-1)">‹</button>
+
+        <div class="viewer-content" id="viewerContent">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Carregando anexo...</p>
+            </div>
+        </div>
+
+        <button class="nav-btn nav-next" id="btnNext" onclick="navegarAnexo(1)">›</button>
+
+        <!-- ZOOM CONTROLS (só para imagens) -->
+        <div class="zoom-controls" id="zoomControls" style="display: none;">
+            <button class="zoom-btn" onclick="zoom(-0.2)" title="Diminuir zoom">−</button>
+            <button class="zoom-btn" onclick="zoom(0)" title="Resetar zoom">⊙</button>
+            <button class="zoom-btn" onclick="zoom(0.2)" title="Aumentar zoom">+</button>
+        </div>
+    </div>
+
+    <!-- THUMBNAILS -->
+    <div class="thumbnails" id="thumbnails"></div>
+
+    <script>
+        // Estado
+        let anexos = [];
+        let currentIndex = 0;
+        let currentZoom = 1;
+
+        // Inicializar
+        window.addEventListener('DOMContentLoaded', () => {
+            carregarAnexos();
+        });
+
+        // Carregar anexos da URL
+        function carregarAnexos() {
+            const params = new URLSearchParams(window.location.search);
+
+            // Tentar pegar array de anexos (formato JSON)
+            const anexosParam = params.get('anexos');
+            if (anexosParam) {
+                try {
+                    anexos = JSON.parse(decodeURIComponent(anexosParam));
+                } catch (e) {
+                    console.error('Erro ao parsear anexos:', e);
+                }
+            }
+
+            // Se não veio array, tentar URLs individuais
+            if (!anexos || anexos.length === 0) {
+                const urls = [];
+                let i = 1;
+                while (params.get(`url${i}`)) {
+                    urls.push({ url: params.get(`url${i}`) });
+                    i++;
+                }
+
+                // Se não tem url1, url2... tentar url único
+                if (urls.length === 0 && params.get('url')) {
+                    urls.push({ url: params.get('url') });
+                }
+
+                anexos = urls;
+            }
+
+            if (anexos.length === 0) {
+                mostrarErro('Nenhum anexo para visualizar');
+                return;
+            }
+
+            // Pegar índice inicial (se fornecido)
+            const indexParam = params.get('index');
+            if (indexParam) {
+                currentIndex = parseInt(indexParam) || 0;
+            }
+
+            renderizarThumbnails();
+            mostrarAnexo(currentIndex);
+        }
+
+        // Renderizar thumbnails
+        function renderizarThumbnails() {
+            const container = document.getElementById('thumbnails');
+
+            if (anexos.length <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            anexos.forEach((anexo, index) => {
+                const thumb = document.createElement('div');
+                thumb.className = 'thumb';
+                if (index === currentIndex) thumb.classList.add('active');
+                thumb.onclick = () => mostrarAnexo(index);
+
+                const tipo = detectarTipo(anexo.url);
+
+                if (tipo === 'imagem') {
+                    const img = document.createElement('img');
+                    img.src = anexo.url;
+                    img.alt = `Anexo ${index + 1}`;
+                    thumb.appendChild(img);
+                } else {
+                    thumb.innerHTML = `<div class="thumb-pdf">📄<br>PDF</div>`;
+                }
+
+                container.appendChild(thumb);
+            });
+        }
+
+        // Mostrar anexo
+        function mostrarAnexo(index) {
+            if (index < 0 || index >= anexos.length) return;
+
+            currentIndex = index;
+            currentZoom = 1;
+
+            const anexo = anexos[currentIndex];
+            const tipo = detectarTipo(anexo.url);
+            const nome = anexo.nome || extrairNome(anexo.url);
+
+            // Atualizar header
+            document.getElementById('fileName').textContent = nome;
+            document.getElementById('counter').textContent = `${currentIndex + 1} de ${anexos.length}`;
+
+            // Atualizar botões de navegação
+            document.getElementById('btnPrev').disabled = currentIndex === 0;
+            document.getElementById('btnNext').disabled = currentIndex === anexos.length - 1;
+
+            // Atualizar thumbnails
+            document.querySelectorAll('.thumb').forEach((thumb, i) => {
+                thumb.classList.toggle('active', i === currentIndex);
+            });
+
+            // Renderizar conteúdo
+            const viewer = document.getElementById('viewerContent');
+            viewer.innerHTML = '';
+
+            if (tipo === 'imagem') {
+                const img = document.createElement('img');
+                img.src = anexo.url;
+                img.alt = nome;
+                img.id = 'currentImage';
+                viewer.appendChild(img);
+
+                // Mostrar controles de zoom
+                document.getElementById('zoomControls').style.display = 'flex';
+            } else {
+                const iframe = document.createElement('iframe');
+                iframe.src = anexo.url;
+                viewer.appendChild(iframe);
+
+                // Esconder controles de zoom
+                document.getElementById('zoomControls').style.display = 'none';
+            }
+
+            // Configurar download
+            document.getElementById('btnDownload').onclick = () => {
+                window.open(anexo.url, '_blank');
+            };
+        }
+
+        // Navegar entre anexos
+        function navegarAnexo(direcao) {
+            const novoIndex = currentIndex + direcao;
+            if (novoIndex >= 0 && novoIndex < anexos.length) {
+                mostrarAnexo(novoIndex);
+            }
+        }
+
+        // Zoom (só para imagens)
+        function zoom(delta) {
+            const img = document.getElementById('currentImage');
+            if (!img) return;
+
+            if (delta === 0) {
+                currentZoom = 1;
+            } else {
+                currentZoom = Math.max(0.5, Math.min(3, currentZoom + delta));
+            }
+
+            img.style.transform = `scale(${currentZoom})`;
+            img.style.transition = 'transform 0.2s';
+        }
+
+        // Detectar tipo de arquivo
+        function detectarTipo(url) {
+            const ext = url.split('.').pop().toLowerCase().split('?')[0];
+            const imagemExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+            return imagemExts.includes(ext) ? 'imagem' : 'pdf';
+        }
+
+        // Extrair nome do arquivo da URL
+        function extrairNome(url) {
+            const partes = url.split('/');
+            const nomeCompleto = partes[partes.length - 1];
+            return nomeCompleto.split('?')[0];
+        }
+
+        // Mostrar erro
+        function mostrarErro(mensagem) {
+            document.getElementById('viewerContent').innerHTML = `
+                <div class="loading">
+                    <p style="color: #e74c3c; font-size: 18px;">⚠️ ${mensagem}</p>
+                </div>
+            `;
+        }
+
+        // Atalhos de teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') navegarAnexo(-1);
+            if (e.key === 'ArrowRight') navegarAnexo(1);
+            if (e.key === 'Escape') window.close();
+            if (e.key === '+' || e.key === '=') zoom(0.2);
+            if (e.key === '-') zoom(-0.2);
+            if (e.key === '0') zoom(0);
+        });
+    </script>
+</body>
+</html>
+
+<!-- V.2609141610 -->
