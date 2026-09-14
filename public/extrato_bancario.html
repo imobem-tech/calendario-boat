@@ -391,8 +391,10 @@
                         <th>Descrição</th>
                         <th>📎</th>
                         <th>Origem</th>
+                        <th>Observações</th>
                         <th>Valor</th>
                         <th>Saldo</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="corpoTabela">
@@ -542,13 +544,25 @@
             };
         }
 
+        // Formatar CPF/CNPJ
+        function formatarCpfCnpj(cpf_cnpj) {
+            if (!cpf_cnpj) return '';
+            const limpo = cpf_cnpj.replace(/\D/g, '');
+            if (limpo.length === 11) {
+                return limpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            } else if (limpo.length === 14) {
+                return limpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            }
+            return cpf_cnpj;
+        }
+
         // Renderizar tabela
         function renderizarTabela(dados) {
             const tbody = document.getElementById('corpoTabela');
             tbody.innerHTML = '';
 
             if (!dados.lancamentos || dados.lancamentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color: #999;">Nenhum lançamento encontrado</td></tr>';
                 return;
             }
 
@@ -569,19 +583,31 @@
                     `<a href="${lanc.url_token}" target="_blank" class="anexo-link">📎${lanc.anexos.length}</a>` :
                     '-';
 
+                // Origem com CPF/CNPJ
+                const origemHTML = lanc.origem.nome ?
+                    `${lanc.origem.nome}<br><span style="font-size: 11px; color: #999;">${formatarCpfCnpj(lanc.origem.cpf_cnpj)}</span>` :
+                    '-';
+
+                // Status
+                const statusHTML = lanc.status === 'OK' ?
+                    '<span style="background: #d4edda; color: #155724; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">OK</span>' :
+                    '<span style="background: #fff3cd; color: #856404; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">PENDENTE</span>';
+
                 tr.innerHTML = `
                     <td>${dataFormatada}</td>
                     <td><strong>${lanc.empresa}</strong></td>
                     <td>${catHTML}</td>
                     <td>${lanc.descricao.substring(0, 100)}</td>
                     <td style="text-align:center;">${anexoHTML}</td>
-                    <td>${lanc.origem.nome || '-'}</td>
+                    <td>${origemHTML}</td>
+                    <td style="font-size: 12px; color: #666;">${lanc.observacoes || '-'}</td>
                     <td class="${lanc.valor >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
                         ${lanc.valor >= 0 ? '' : '-'}R$ ${Math.abs(lanc.valor).toFixed(2).replace('.', ',')}
                     </td>
                     <td class="${lanc.saldo_linha >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
                         ${lanc.saldo_linha >= 0 ? '' : '-'}R$ ${Math.abs(lanc.saldo_linha).toFixed(2).replace('.', ',')}
                     </td>
+                    <td style="text-align:center;">${statusHTML}</td>
                 `;
 
                 tbody.appendChild(tr);
