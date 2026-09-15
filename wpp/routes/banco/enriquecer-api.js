@@ -1,6 +1,12 @@
 // ============================================================
-// enriquecer-api.js — V.2609150015
+// enriquecer-api.js — V.2609150020
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
+//
+// ⚡ FIX (15/09 00:20): Remover filtro de empresa em Contas_Receber
+//    - PROBLEMA: CR com empresa diferente não vinculava
+//    - Ex: CR empresa=8, Cliente empresa=1 → não achava
+//    - SOLUÇÃO: Código_Cliente já é único, não precisa filtrar empresa
+//    - Removido: AND "Empresa" = $2
 //
 // 🔥 HOTFIX (15/09 00:15): Nome da coluna com acento "Descrição"
 //    - ERRO: "Descricao" (sem acento) → column does not exist
@@ -58,20 +64,20 @@ async function buscarCliente(nomeParcial, empresa) {
 
 // Buscar CR (Contas a Receber)
 // Tolerâncias: Data ±10 dias, Valor ±5% (campo Total)
+// ✅ SEM filtro de empresa (Código_Cliente já é único)
 async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
   const dataStr = dataExtrato instanceof Date
     ? dataExtrato.toISOString().split('T')[0]
     : dataExtrato.toString().split('T')[0];
 
-  const codigoEmpresa = empresa === 'ALLMAX' ? 1 : empresa === 'IMOBEM' ? 2 : 3;
   const valorNum = Math.abs(parseFloat(valorExtrato)); // Valor absoluto
 
   const result = await pool.query(`
     SELECT "Codigo", "Código_Cliente", "Data_Vencimento", "Total", "Descrição"
     FROM "Contas_Receber"
-    WHERE "Código_Cliente" = $1 AND "Empresa" = $2
+    WHERE "Código_Cliente" = $1
     ORDER BY "Data_Vencimento"
-  `, [codigoCliente, codigoEmpresa]);
+  `, [codigoCliente]);
 
   for (const cr of result.rows) {
     const dataVenc = new Date(cr.Data_Vencimento);
