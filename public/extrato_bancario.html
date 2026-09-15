@@ -6,7 +6,11 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609142310
+    EXTRATO BANCÁRIO - V.2609150000
+
+    📝 DOCS ATUALIZADAS - V.2609150000
+       - Versões reais das APIs no cabeçalho
+       - Enriquecer: V.2609142200 (±10 dias, não ±7)
 
     ⚡ OTIMIZAÇÃO CARREGAMENTO PÁGINA - V.2609142310
        - Lazy loading: Categorias carregam só quando necessário
@@ -25,12 +29,14 @@
        - Detecção de duplicatas
        - Importação em lote
 
-    🔍 ENRIQUECER DADOS - V.2609142050
+    🔍 ENRIQUECER DADOS - V.2609142200
        POST /api/banco/enriquecer
-       - Busca cliente por nome parcial
-       - Vincula Conta a Receber (±7 dias, ±5%)
+       - Busca cliente por nome parcial (ILIKE)
+       - Vincula Conta a Receber (±10 dias, ±5%)
        - Copia descrição da CR
-       - Desempate por CR quando 2+ clientes
+       - Testa TODOS os homônimos até achar CR
+       - Status OK apenas se TUDO encontrado
+       - Filtros: empresa, data_inicio, data_fim
 
     🏷️ RECLASSIFICAR - V.2609142015
        POST /api/banco/reclassificar
@@ -1265,7 +1271,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609142310</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">📝 V.2609150000</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
@@ -1275,4 +1281,4 @@
 </body>
 </html>
 
-<!-- V.2609142310 - ⚡ Lazy loading categorias + innerHTML otimizado + window function SQL -->
+<!-- V.2609150000 - 📝 Documentação atualizada com versões reais das APIs -->
