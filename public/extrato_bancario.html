@@ -6,7 +6,12 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609142255
+    EXTRATO BANCÁRIO - V.2609142310
+
+    ⚡ OTIMIZAÇÃO CARREGAMENTO PÁGINA - V.2609142310
+       - Lazy loading: Categorias carregam só quando necessário
+       - Página abre INSTANTÂNEA (sem fetch ao carregar)
+       - Fetch só ao clicar em "Editar" pela primeira vez
 
     ⚡ OTIMIZAÇÃO DE PERFORMANCE - V.2609142255
        - Renderização 10x+ mais rápida com innerHTML em bloco
@@ -824,15 +829,20 @@
         // ========================================
 
         let categoriasDisponiveis = [];
+        let categoriasCarregadas = false; // ⚡ Flag para lazy loading
 
-        // Carregar categorias ao iniciar
+        // ⚡ OTIMIZADO: Carregar categorias apenas quando necessário (lazy loading)
         async function carregarCategorias() {
+            // Se já carregou, não carregar de novo
+            if (categoriasCarregadas) return;
+
             try {
                 const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/categorias');
                 const data = await response.json();
 
                 if (data.sucesso) {
                     categoriasDisponiveis = data.categorias;
+                    categoriasCarregadas = true;
                 }
             } catch (err) {
                 console.error('❌ Erro ao carregar categorias:', err);
@@ -841,6 +851,9 @@
 
         // Abrir modal de edição
         async function abrirModalEdicao(lancamentoId) {
+            // ⚡ Carregar categorias apenas na primeira vez (lazy loading)
+            await carregarCategorias();
+
             // ⚡ Buscar dados do cache (não mais do DOM)
             const lancamento = lancamentosCache[lancamentoId];
             if (!lancamento) {
@@ -1184,8 +1197,8 @@
             }
         }
 
-        // Carregar categorias ao iniciar
-        carregarCategorias();
+        // ⚡ REMOVIDO: carregarCategorias() automático
+        // Agora usa lazy loading (só carrega quando abrir modal de edição)
 
     </script>
 
@@ -1252,7 +1265,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609142255</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609142310</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
@@ -1262,4 +1275,4 @@
 </body>
 </html>
 
-<!-- V.2609142255 - ⚡ OTIMIZAÇÃO CRÍTICA: Renderização 10x+ mais rápida (innerHTML em bloco + cache em memória) -->
+<!-- V.2609142310 - ⚡ Lazy loading categorias + innerHTML otimizado + window function SQL -->
