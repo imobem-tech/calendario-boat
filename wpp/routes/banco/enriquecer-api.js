@@ -1,6 +1,11 @@
 // ============================================================
-// enriquecer-api.js — V.2609150010
+// enriquecer-api.js — V.2609150015
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
+//
+// 🔥 HOTFIX (15/09 00:15): Nome da coluna com acento "Descrição"
+//    - ERRO: "Descricao" (sem acento) → column does not exist
+//    - FIX: "Descrição" (com acento ç)
+//    - 29 erros corrigidos
 //
 // ⚡ FIX CRÍTICO (15/09 00:10): Processar registros PENDENTES
 //    - ANTES: só processava registros SEM nome (primeira vez)
@@ -62,7 +67,7 @@ async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
   const valorNum = Math.abs(parseFloat(valorExtrato)); // Valor absoluto
 
   const result = await pool.query(`
-    SELECT "Codigo", "Código_Cliente", "Data_Vencimento", "Total", "Descricao"
+    SELECT "Codigo", "Código_Cliente", "Data_Vencimento", "Total", "Descrição"
     FROM "Contas_Receber"
     WHERE "Código_Cliente" = $1 AND "Empresa" = $2
     ORDER BY "Data_Vencimento"
@@ -79,7 +84,7 @@ async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
     if (difDias <= 10 && difValorPercent <= 0.05) {
       return {
         codigo: cr.Codigo,
-        descricao: cr.Descricao,
+        descricao: cr.Descrição,
         valor: cr.Total
       };
     }
