@@ -6,7 +6,11 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150010
+    EXTRATO BANCÁRIO - V.2609150025
+
+    🔍 DEBUG MODAL - V.2609150025
+       - Logs de debug para categorias no modal
+       - Verificar por que combo está vazio
 
     📝 DOCS ENRIQUECER - V.2609150010
        - Documentação atualizada: V.2609150010
@@ -888,8 +892,21 @@
             const selectCategoria = document.getElementById('editCategoria');
             selectCategoria.innerHTML = '<option value="">-- Selecione --</option>';
 
+            // 🔍 DEBUG
+            console.log('📊 MODAL EDIÇÃO - Lançamento:', {
+                id: lancamento.id,
+                empresa: lancamento.empresa,
+                tipo: lancamento.tipo,
+                valor: lancamento.valor,
+                categoriaAtual: lancamento.categoria
+            });
+            console.log('📦 Total categorias disponíveis:', categoriasDisponiveis.length);
+
             // Determinar tipo esperado da categoria baseado no tipo do lançamento
             const tipoEsperado = lancamento.tipo === 'CREDITO' ? 'RECEITA' : 'DESPESA';
+            console.log('🎯 Tipo esperado categoria:', tipoEsperado);
+
+            let categoriasAdicionadas = 0;
 
             categoriasDisponiveis.forEach(cat => {
                 // Filtrar por empresa (categoria.empresa = null ou = empresa do lançamento)
@@ -897,6 +914,16 @@
 
                 // Filtrar por tipo (categoria.tipo = TODAS ou = tipo esperado)
                 const tipoOK = !cat.tipo || cat.tipo === 'TODAS' || cat.tipo === tipoEsperado;
+
+                // 🔍 DEBUG categoria
+                if (!empresaOK || !tipoOK) {
+                    console.log(`⏭️ Categoria ignorada: ${cat.nome}`, {
+                        catEmpresa: cat.empresa,
+                        catTipo: cat.tipo,
+                        empresaOK,
+                        tipoOK
+                    });
+                }
 
                 // Só adiciona se passar nos dois filtros
                 if (empresaOK && tipoOK) {
@@ -909,8 +936,11 @@
                     }
 
                     selectCategoria.appendChild(option);
+                    categoriasAdicionadas++;
                 }
             });
+
+            console.log(`✅ Categorias adicionadas ao select: ${categoriasAdicionadas}`);
 
             // Mostrar modal
             document.getElementById('modalEdicao').style.display = 'flex';
