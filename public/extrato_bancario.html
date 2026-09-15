@@ -481,7 +481,9 @@
 
         // Mostrar mensagem inicial
         function mostrarMensagemInicial() {
+            console.log('🎯 mostrarMensagemInicial() EXECUTADA!');
             const tbody = document.getElementById('corpoTabela');
+            console.log('🎯 tbody =', tbody);
             tbody.innerHTML = `
                 <tr>
                     <td colspan="20" style="text-align: center; padding: 60px 20px;">
@@ -509,6 +511,7 @@
 
         // Buscar extrato
         async function buscarExtrato() {
+            console.log('⚠️ buscarExtrato() FOI CHAMADA!');
             try {
                 mostrarLoading(true);
 
@@ -1235,7 +1238,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142230</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142240</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
