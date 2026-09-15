@@ -1,13 +1,20 @@
 // ============================================================
-// enriquecer-api.js — V.2609142200
+// enriquecer-api.js — V.2609150010
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
-// + FIX: Usa classificarLancamento() (banco_categorias)
-// + FIX: Salva ID da categoria (não nome)
-// + FIX: Status OK apenas se TUDO encontrado (cliente + CR + classificacao)
-// + FIX: Tolerância valor ±5% com campo Total do CR
-// + FIX: Tolerância data ±10 dias (não ±7)
-// + FIX: Testa TODOS os homônimos até achar CR
-// + NOVO: Filtros data_inicio, data_fim (igual reclassificar)
+//
+// ⚡ FIX CRÍTICO (15/09 00:10): Processar registros PENDENTES
+//    - ANTES: só processava registros SEM nome (primeira vez)
+//    - PROBLEMA: se classificação falhasse, ficava PRESO em PENDENTE
+//    - AGORA: também processa registros com nome mas sem classificação
+//    - Permite múltiplas rodadas até completar TUDO
+//
+// HISTÓRICO:
+// + V.2609150010: Processa PENDENTES (nome OU classificacao OU status)
+// + V.2609142200: Filtros data_inicio, data_fim
+// + V.2609142200: Usa classificarLancamento() (banco_categorias)
+// + V.2609142200: Status OK apenas se TUDO encontrado
+// + V.2609142200: Tolerância ±10 dias, ±5%
+// + V.2609142200: Testa TODOS os homônimos
 // ============================================================
 
 import express from 'express';
@@ -86,6 +93,10 @@ router.post('/', async (req, res) => {
     const { empresa = 'ALLMAX', data_inicio, data_fim } = req.query;
 
     // Montar query com filtros
+    // ✅ Processa registros que PRECISAM de enriquecimento:
+    //    - Sem nome (primeira vez)
+    //    - Sem classificação (completar)
+    //    - Status PENDENTE (completar)
     let query = `
       SELECT id, empresa, data, valor, tipo, descricao_original, nome_origem,
              observacoes, classificacao, status, cpf_cnpj_origem
@@ -93,7 +104,13 @@ router.post('/', async (req, res) => {
       WHERE tipo_importacao = 'OFX'
         AND banco = 'Asaas'
         AND empresa = $1
-        AND (nome_origem IS NULL OR nome_origem = '')
+        AND (
+          nome_origem IS NULL
+          OR nome_origem = ''
+          OR classificacao IS NULL
+          OR classificacao = ''
+          OR status = 'PENDENTE'
+        )
     `;
 
     const params = [empresa];
