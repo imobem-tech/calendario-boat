@@ -1,9 +1,10 @@
 // ============================================================
-// wpp/routes/banco/editar-lancamento-api.js — V.2609142120
+// wpp/routes/banco/editar-lancamento-api.js — V.2609142140
 // API PARA EDITAR LANÇAMENTOS BANCÁRIOS
 // + FIX: Usa bank_categorias (não categorias_bancarias)
 // + FIX: Usa classificacao (não categoria_id)
 // + FIX: JOIN correto (classificacao::INTEGER = c.id)
+// + FIX: GET /categorias retorna campo empresa (para filtro)
 // ============================================================
 
 import express from 'express';
@@ -28,7 +29,8 @@ router.get('/categorias', async (req, res) => {
         nome,
         icone,
         cor,
-        tipo
+        tipo,
+        empresa
       FROM bank_categorias
       WHERE ativo = true
       ORDER BY nome
