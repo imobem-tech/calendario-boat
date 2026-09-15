@@ -1,6 +1,10 @@
 // ============================================================
-// wpp/routes/banco/editar-lancamento-api.js — V.2609150035
+// wpp/routes/banco/editar-lancamento-api.js — V.2609150036
 // API PARA EDITAR LANÇAMENTOS BANCÁRIOS
+//
+// 🔥 HOTFIX V.2609150036: Nome do campo
+//    - ERRO: descricao (não existe)
+//    - FIX: descricao_original (correto!)
 //
 // ✅ V.2609150035: Ordenação + STATUS
 //    - GET /categorias: ORDER BY ordem DESC (maior valor primeiro)
@@ -81,7 +85,7 @@ router.put('/lancamento/:id', async (req, res) => {
     }
 
     if (descricao !== undefined) {
-      campos.push(`descricao = $${contador}`);
+      campos.push(`descricao_original = $${contador}`);
       valores.push(descricao);
       contador++;
     }
