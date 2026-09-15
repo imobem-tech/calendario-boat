@@ -1,6 +1,12 @@
 // ============================================================
-// reclassificar-api.js — V.2609142210
+// reclassificar-api.js — V.2609150038
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
+//
+// ✅ DUPLA TENTATIVA V.2609150038:
+//    - 1ª tentativa: Classificar usando observacoes
+//    - 2ª tentativa: Se falhar, tentar com descricao_original
+//    - Resultado: Máxima taxa de classificação!
+//
 // + USA LÓGICA CORRETA: bank_categorias (palavras_chave + chave_aprendida)
 // + NÃO USA MAIS: bank_regras_classificacao (tabela antiga)
 // + Filtros: empresa (TODAS ou específica)
@@ -70,23 +76,39 @@ router.post('/', async (req, res) => {
       try {
         stats.analisados++;
 
-        // Classificar usando observacoes (se tiver) ou descrição_original
-        const descricao = reg.observacoes || reg.descricao_original;
-        if (!descricao) {
+        // ✅ DUPLA TENTATIVA: Tentar com observacoes, se falhar tentar com descricao_original
+        let resultado = null;
+
+        // 1ª TENTATIVA: Se tem observacoes, tentar primeiro com elas
+        if (reg.observacoes) {
+          resultado = await classificarLancamento({
+            description: reg.observacoes,
+            value: Math.abs(reg.valor),
+            tipo: reg.tipo,
+            empresa: reg.empresa,
+            cpfCnpjOrigem: reg.cpf_cnpj_origem
+          });
+        }
+
+        // 2ª TENTATIVA: Se não classificou com observacoes, tentar com descricao_original
+        if ((!resultado || !resultado.categoria_id) && reg.descricao_original) {
+          resultado = await classificarLancamento({
+            description: reg.descricao_original,
+            value: Math.abs(reg.valor),
+            tipo: reg.tipo,
+            empresa: reg.empresa,
+            cpfCnpjOrigem: reg.cpf_cnpj_origem
+          });
+        }
+
+        // Se não tem NENHUM texto
+        if (!reg.observacoes && !reg.descricao_original) {
           stats.semTexto++;
           stats.naoClassificados++;
           continue;
         }
 
-        // Usar a função correta de classificação!
-        const resultado = await classificarLancamento({
-          description: descricao,
-          value: Math.abs(reg.valor), // Valor absoluto
-          tipo: reg.tipo,
-          empresa: reg.empresa,
-          cpfCnpjOrigem: reg.cpf_cnpj_origem
-        });
-
+        // Se tentou mas não conseguiu classificar
         if (!resultado || !resultado.categoria_id) {
           stats.semRegra++;
           stats.naoClassificados++;
