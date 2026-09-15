@@ -44,7 +44,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -90,11 +90,27 @@
             padding: 12px;
             background: #f8f9fa;
             border-radius: 6px;
-            transition: background 0.2s;
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
         }
 
         .endpoint-item:hover {
             background: #e9ecef;
+            transform: translateX(3px);
+        }
+
+        .endpoint-item.risk-safe {
+            border-left-color: #28a745;
+        }
+
+        .endpoint-item.risk-caution {
+            border-left-color: #ffc107;
+        }
+
+        .endpoint-item.risk-danger {
+            border-left-color: #dc3545;
         }
 
         .method {
@@ -112,34 +128,100 @@
         .method.put { background: #ffc107; color: #333; }
         .method.delete { background: #dc3545; }
 
+        .risk-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 5px;
+        }
+
+        .risk-badge.safe {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .risk-badge.caution {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .risk-badge.danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
         .endpoint-path {
             font-family: 'Courier New', monospace;
             font-size: 13px;
             color: #495057;
             display: block;
-            margin-top: 4px;
+            margin-top: 6px;
+            margin-bottom: 8px;
         }
 
         .endpoint-desc {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 4px;
+            font-size: 13px;
+            color: #495057;
+            margin-top: 8px;
+            line-height: 1.5;
+            font-weight: 500;
         }
 
-        .btn-test {
-            background: #667eea;
-            color: white;
+        .endpoint-warning {
+            font-size: 12px;
+            color: #dc3545;
+            margin-top: 6px;
+            padding: 6px 10px;
+            background: #f8d7da;
+            border-radius: 4px;
+            border-left: 3px solid #dc3545;
+            font-weight: 600;
+        }
+
+        .endpoint-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
             border: none;
             padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-            margin-top: 8px;
-            transition: background 0.2s;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-test {
+            background: #667eea;
+            color: white;
         }
 
         .btn-test:hover {
             background: #5568d3;
+        }
+
+        .btn-copy {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-copy:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
         }
 
         .status-bar {
@@ -166,20 +248,6 @@
         .status-label {
             font-size: 14px;
             color: #666;
-        }
-
-        .footer {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            margin-top: 30px;
-        }
-
-        .footer-version {
-            color: #999;
-            font-size: 12px;
         }
 
         .quick-access {
@@ -224,6 +292,254 @@
             display: block;
             margin-bottom: 8px;
         }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .modal-subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        textarea.form-input {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .console {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .console h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .console-output .success {
+            color: #4ec9b0;
+        }
+
+        .console-output .error {
+            color: #f48771;
+        }
+
+        .console-output .warning {
+            color: #dcdcaa;
+        }
+
+        .console-output .info {
+            color: #9cdcfe;
+        }
+
+        .console-clear {
+            margin-top: 10px;
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .console-clear:hover {
+            background: #c82333;
+        }
+
+        .footer {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+
+        .footer-version {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .history {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .history h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        .history-list {
+            list-style: none;
+        }
+
+        .history-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            border-left: 3px solid #667eea;
+        }
+
+        .history-item .time {
+            color: #999;
+            font-size: 11px;
+        }
+
+        .history-item .method-badge {
+            font-weight: 700;
+            margin-right: 5px;
+        }
+
+        .copy-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 2000;
+        }
+
+        .copy-notification.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -231,7 +547,7 @@
         <!-- Header -->
         <header>
             <h1>⚓ Painel Administrativo - Allmax Gestão</h1>
-            <p class="subtitle">Sistema de Gerenciamento Bancário + WhatsApp Bot + Agendamento de Embarcações</p>
+            <p class="subtitle">Sistema Integrado: WhatsApp Bot + Banco + Agendamento | 🟢 Endpoints clicáveis com alertas de risco</p>
         </header>
 
         <!-- Status Bar -->
@@ -241,11 +557,11 @@
                 <div class="status-label">Endpoints Disponíveis</div>
             </div>
             <div class="status-item">
-                <div class="status-value">4</div>
-                <div class="status-label">Empresas</div>
+                <div class="status-value" id="testsCount">0</div>
+                <div class="status-label">Testes Realizados</div>
             </div>
             <div class="status-item">
-                <div class="status-value" id="statusSync">●</div>
+                <div class="status-value" id="statusSync" style="color: #28a745;">●</div>
                 <div class="status-label">Sincronização</div>
             </div>
         </div>
@@ -262,15 +578,11 @@
                     <span class="quick-link-icon">📊</span>
                     Status do Sistema
                 </a>
-                <a href="#" onclick="testarWebhook()" class="quick-link">
-                    <span class="quick-link-icon">🔔</span>
-                    Testar Webhook
-                </a>
-                <a href="#" onclick="sincronizarManual()" class="quick-link">
+                <a href="#" onclick="event.preventDefault(); sincronizarManual()" class="quick-link">
                     <span class="quick-link-icon">🔄</span>
                     Sincronizar Agora
                 </a>
-                <a href="#" onclick="gerarBackup()" class="quick-link">
+                <a href="#" onclick="event.preventDefault(); gerarBackup()" class="quick-link">
                     <span class="quick-link-icon">💾</span>
                     Backup Manual
                 </a>
@@ -278,206 +590,31 @@
                     <span class="quick-link-icon">🚂</span>
                     Railway Dashboard
                 </a>
+                <a href="#console-section" class="quick-link">
+                    <span class="quick-link-icon">🧪</span>
+                    Console de API
+                </a>
             </div>
         </div>
 
+        <!-- Console de API -->
+        <div class="console" id="console-section">
+            <h2>🧪 Console de API</h2>
+            <div class="console-output" id="consoleOutput">Aguardando comandos...</div>
+            <button class="console-clear" onclick="clearConsole()">Limpar Console</button>
+        </div>
+
+        <!-- Histórico de Testes -->
+        <div class="history">
+            <h2>📊 Histórico de Testes (últimos 10)</h2>
+            <ul class="history-list" id="historyList">
+                <li style="color: #999; font-size: 13px;">Nenhum teste realizado ainda</li>
+            </ul>
+        </div>
+
         <!-- API Cards Grid -->
-        <div class="grid">
-            <!-- 1. Sistema Bancário Principal -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">🏦</div>
-                    <div class="card-title">Sistema Bancário</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/asaas/webhook</span>
-                        <div class="endpoint-desc">Webhook Asaas (tempo real)</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/sicredi/sync</span>
-                        <div class="endpoint-desc">Sincronização manual Sicredi</div>
-                        <button class="btn-test" onclick="sincronizarManual()">Testar</button>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/status</span>
-                        <div class="endpoint-desc">Status da sincronização</div>
-                        <button class="btn-test" onclick="verStatus()">Ver Status</button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 2. Extrato Bancário -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">📊</div>
-                    <div class="card-title">Extrato Bancário</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/extrato/listar</span>
-                        <div class="endpoint-desc">Listar lançamentos (com filtros)</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/extrato/meses</span>
-                        <div class="endpoint-desc">Meses disponíveis</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/extrato/gerar-pdf</span>
-                        <div class="endpoint-desc">Gerar PDF do extrato</div>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 3. Edição de Lançamentos -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">✏️</div>
-                    <div class="card-title">Edição de Lançamentos</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/categorias</span>
-                        <div class="endpoint-desc">Listar categorias</div>
-                        <button class="btn-test" onclick="verCategorias()">Ver Categorias</button>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/lancamento/:id</span>
-                        <div class="endpoint-desc">Buscar lançamento específico</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method put">PUT</span>
-                        <span class="endpoint-path">/api/banco/lancamento/:id</span>
-                        <div class="endpoint-desc">Atualizar lançamento</div>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 4. Recibos -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">🧾</div>
-                    <div class="card-title">Gestão de Recibos</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/recibos/listar</span>
-                        <div class="endpoint-desc">Listar recibos</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/recibos/empresas</span>
-                        <div class="endpoint-desc">Listar empresas</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method delete">DELETE</span>
-                        <span class="endpoint-path">/api/banco/recibos/excluir/:id</span>
-                        <div class="endpoint-desc">Excluir recibos de lançamento</div>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 5. Backups -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">💾</div>
-                    <div class="card-title">Backups Automáticos</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/backup/diario</span>
-                        <div class="endpoint-desc">Backup manual diário</div>
-                        <button class="btn-test" onclick="gerarBackup()">Gerar Backup</button>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/backup/semanal</span>
-                        <div class="endpoint-desc">Backup manual semanal</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/backup/listar/:tipo</span>
-                        <div class="endpoint-desc">Listar backups</div>
-                        <button class="btn-test" onclick="listarBackups()">Ver Backups</button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 6. Tokens de Arquivo -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">🔑</div>
-                    <div class="card-title">Tokens de Acesso</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/tokens/gerar</span>
-                        <div class="endpoint-desc">Gerar token de acesso</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method get">GET</span>
-                        <span class="endpoint-path">/api/banco/tokens/info/:token</span>
-                        <div class="endpoint-desc">Info do token</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method delete">DELETE</span>
-                        <span class="endpoint-path">/api/banco/tokens/revogar/:token</span>
-                        <div class="endpoint-desc">Revogar token</div>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 7. Ferramentas Admin -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">🔧</div>
-                    <div class="card-title">Ferramentas Admin</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/enriquecer</span>
-                        <div class="endpoint-desc">Enriquecer dados (cliente + CR)</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/api/banco/reclassificar</span>
-                        <div class="endpoint-desc">Reclassificar por palavras-chave</div>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- 8. WhatsApp Bot -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon">📱</div>
-                    <div class="card-title">WhatsApp Bot</div>
-                </div>
-                <ul class="endpoint-list">
-                    <li class="endpoint-item">
-                        <span class="method post">POST</span>
-                        <span class="endpoint-path">/msg_externa</span>
-                        <div class="endpoint-desc">Mensagens externas (retorno)</div>
-                    </li>
-                    <li class="endpoint-item">
-                        <div class="endpoint-desc">✅ Comandos via WhatsApp:</div>
-                        <div style="font-size: 11px; color: #999; margin-top: 5px;">
-                            ccc..., rrr..., ppp..., hora motor, saída, admin
-                        </div>
-                    </li>
-                </ul>
-            </div>
+        <div class="grid" id="endpointsGrid">
+            <!-- Cards serão gerados via JavaScript -->
         </div>
 
         <!-- Footer -->
@@ -485,76 +622,572 @@
             <div class="footer-version">
                 <strong>Allmax Gestão © 2026</strong><br>
                 Sistema Integrado: WhatsApp Bot + Banco + Agendamento<br>
-                Versão: V.2609141800 | Railway + Vercel + Neon PostgreSQL<br>
-                Empresas: ALLMAX | IMOBEM | IMOBAN | SUMMER
+                Versão: V.2609142120 | Railway + Vercel + Neon PostgreSQL<br>
+                🟢 Seguro | 🟡 Atenção | 🔴 Perigo
             </div>
         </div>
     </div>
 
+    <!-- Modal de Teste -->
+    <div class="modal" id="testModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Testar Endpoint</h3>
+                <p class="modal-subtitle" id="modalSubtitle"></p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">URL Completa</label>
+                    <input type="text" class="form-input" id="modalUrl" readonly>
+                </div>
+                <div class="form-group" id="bodyGroup" style="display: none;">
+                    <label class="form-label">Body (JSON)</label>
+                    <textarea class="form-input" id="modalBody" placeholder='{"campo": "valor"}'></textarea>
+                </div>
+                <div class="form-group" id="warningGroup" style="display: none;">
+                    <div class="endpoint-warning" id="modalWarning"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn-primary" id="modalExecute" onclick="executeTest()">Executar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificação de Cópia -->
+    <div class="copy-notification" id="copyNotification">
+        ✅ URL copiada para a área de transferência!
+    </div>
+
     <script>
         const BASE_URL = 'https://calendario-boat-production.up.railway.app';
+        let testsCount = 0;
+        let history = JSON.parse(localStorage.getItem('apiHistory') || '[]');
 
-        async function verStatus() {
+        // Definição completa dos endpoints
+        const endpoints = [
+            {
+                category: '🏦 Sistema Bancário',
+                icon: '🏦',
+                items: [
+                    {
+                        method: 'POST',
+                        path: '/api/banco/asaas/webhook',
+                        desc: 'Recebe eventos do Asaas em tempo real (pagamentos, cobranças, etc)',
+                        risk: 'safe',
+                        warning: null,
+                        params: '?empresa=ALLMAX (ou IMOBEM, SUMMER)',
+                        body: true
+                    },
+                    {
+                        method: 'POST',
+                        path: '/api/banco/sicredi/sync',
+                        desc: 'Dispara sincronização COMPLETA do Sicredi - busca todos os lançamentos do dia',
+                        risk: 'caution',
+                        warning: '⚠️ Pode demorar alguns minutos. Use apenas quando necessário.',
+                        params: null,
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/status',
+                        desc: 'Retorna status da sincronização automática, última execução e próxima programada',
+                        risk: 'safe',
+                        warning: null,
+                        params: null,
+                        body: false
+                    }
+                ]
+            },
+            {
+                category: '📊 Extrato Bancário',
+                icon: '📊',
+                items: [
+                    {
+                        method: 'GET',
+                        path: '/api/banco/extrato/listar',
+                        desc: 'Lista lançamentos bancários com filtros (empresa, data, status, categoria)',
+                        risk: 'safe',
+                        warning: null,
+                        params: '?empresa=ALLMAX&ano=2026&mes=9',
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/extrato/meses',
+                        desc: 'Lista meses disponíveis com totais de entrada/saída e quantidade de lançamentos',
+                        risk: 'safe',
+                        warning: null,
+                        params: '?empresa=ALLMAX',
+                        body: false
+                    },
+                    {
+                        method: 'POST',
+                        path: '/api/banco/extrato/gerar-pdf',
+                        desc: 'Gera PDF do extrato bancário - PODE DEMORAR se tiver muitos lançamentos (usa Puppeteer)',
+                        risk: 'caution',
+                        warning: '⚠️ Processo pesado! Pode levar até 30 segundos para extratos grandes.',
+                        params: null,
+                        body: true
+                    }
+                ]
+            },
+            {
+                category: '✏️ Edição de Lançamentos',
+                icon: '✏️',
+                items: [
+                    {
+                        method: 'GET',
+                        path: '/api/banco/categorias',
+                        desc: 'Lista TODAS as categorias disponíveis (receitas e despesas)',
+                        risk: 'safe',
+                        warning: null,
+                        params: null,
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/lancamento/:id',
+                        desc: 'Busca UM lançamento específico com todos os detalhes (categoria, recibos, etc)',
+                        risk: 'safe',
+                        warning: null,
+                        params: 'Substitua :id pelo ID do lançamento',
+                        body: false
+                    },
+                    {
+                        method: 'PUT',
+                        path: '/api/banco/lancamento/:id',
+                        desc: 'Atualiza lançamento - muda categoria, descrição ou observações. Status vira OK automaticamente.',
+                        risk: 'caution',
+                        warning: '⚠️ ALTERA DADOS! Certifique-se do ID correto antes de executar.',
+                        params: 'Substitua :id pelo ID do lançamento',
+                        body: true
+                    }
+                ]
+            },
+            {
+                category: '🧾 Gestão de Recibos',
+                icon: '🧾',
+                items: [
+                    {
+                        method: 'GET',
+                        path: '/api/banco/recibos/listar',
+                        desc: 'Lista recibos armazenados no Vercel Blob (imagens enviadas via WhatsApp)',
+                        risk: 'safe',
+                        warning: null,
+                        params: '?empresa=ALLMAX&data_inicio=2026-09-01',
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/recibos/empresas',
+                        desc: 'Lista empresas que possuem recibos armazenados',
+                        risk: 'safe',
+                        warning: null,
+                        params: null,
+                        body: false
+                    },
+                    {
+                        method: 'DELETE',
+                        path: '/api/banco/recibos/excluir/:id',
+                        desc: 'EXCLUI PERMANENTEMENTE todos os recibos de um lançamento do Vercel Blob',
+                        risk: 'danger',
+                        warning: '🔴 PERIGO! Ação IRREVERSÍVEL! Arquivos serão deletados permanentemente do Vercel Blob.',
+                        params: 'Substitua :id pelo ID do lançamento',
+                        body: false
+                    },
+                    {
+                        method: 'POST',
+                        path: '/api/banco/recibos/excluir/lote',
+                        desc: 'EXCLUI EM MASSA até 50 lançamentos de uma vez - USE COM EXTREMO CUIDADO!',
+                        risk: 'danger',
+                        warning: '🔴 PERIGO MÁXIMO! Pode deletar centenas de arquivos de uma vez. IRREVERSÍVEL!',
+                        params: null,
+                        body: true
+                    }
+                ]
+            },
+            {
+                category: '💾 Backups Automáticos',
+                icon: '💾',
+                items: [
+                    {
+                        method: 'POST',
+                        path: '/api/banco/backup/diario',
+                        desc: 'Gera backup COMPLETO do banco (todas as tabelas) - salva no Vercel Blob',
+                        risk: 'caution',
+                        warning: '⚠️ Processo pesado! Usa pg_dump e pode levar 1-2 minutos.',
+                        params: null,
+                        body: false
+                    },
+                    {
+                        method: 'POST',
+                        path: '/api/banco/backup/semanal',
+                        desc: 'Gera backup SEMANAL (mais detalhado que o diário)',
+                        risk: 'caution',
+                        warning: '⚠️ Processo pesado! Pode levar vários minutos.',
+                        params: null,
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/backup/listar/:tipo',
+                        desc: 'Lista backups disponíveis no Vercel Blob (diario ou semanal)',
+                        risk: 'safe',
+                        warning: null,
+                        params: 'Substitua :tipo por "diario" ou "semanal"',
+                        body: false
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/backup/baixar',
+                        desc: 'Baixa um backup específico do Vercel Blob',
+                        risk: 'safe',
+                        warning: null,
+                        params: '?url=https://blob.vercel.app/...',
+                        body: false
+                    }
+                ]
+            },
+            {
+                category: '🔑 Tokens de Acesso',
+                icon: '🔑',
+                items: [
+                    {
+                        method: 'POST',
+                        path: '/api/banco/tokens/gerar',
+                        desc: 'Gera token temporário para compartilhar recibos (24h de validade padrão)',
+                        risk: 'caution',
+                        warning: '⚠️ O token dá acesso aos recibos. Use apenas com pessoas autorizadas.',
+                        params: null,
+                        body: true
+                    },
+                    {
+                        method: 'GET',
+                        path: '/api/banco/tokens/info/:token',
+                        desc: 'Consulta informações de um token (empresa, lançamentos, validade)',
+                        risk: 'safe',
+                        warning: null,
+                        params: 'Substitua :token pelo token gerado',
+                        body: false
+                    },
+                    {
+                        method: 'DELETE',
+                        path: '/api/banco/tokens/revogar/:token',
+                        desc: 'REVOGA (invalida) um token - ele para de funcionar IMEDIATAMENTE',
+                        risk: 'caution',
+                        warning: '⚠️ Token ficará inválido e links compartilhados pararão de funcionar.',
+                        params: 'Substitua :token pelo token gerado',
+                        body: false
+                    }
+                ]
+            },
+            {
+                category: '🔧 Ferramentas Admin',
+                icon: '🔧',
+                items: [
+                    {
+                        method: 'POST',
+                        path: '/api/banco/enriquecer',
+                        desc: 'Enriquece lançamentos automaticamente: busca CLIENTE e CR no banco (P_BOAT_z_40)',
+                        risk: 'caution',
+                        warning: '⚠️ ALTERA DADOS em massa! Verifica antes mas use com cuidado.',
+                        params: null,
+                        body: true
+                    },
+                    {
+                        method: 'POST',
+                        path: '/api/banco/reclassificar',
+                        desc: 'Reclassifica lançamentos por PALAVRA-CHAVE - muda categoria em massa',
+                        risk: 'danger',
+                        warning: '🔴 PERIGO! Pode alterar DEZENAS de lançamentos de uma vez. Confira palavra-chave!',
+                        params: null,
+                        body: true
+                    }
+                ]
+            },
+            {
+                category: '📱 WhatsApp Bot',
+                icon: '📱',
+                items: [
+                    {
+                        method: 'POST',
+                        path: '/msg_externa',
+                        desc: 'Recebe mensagens externas (usado pelo Vercel para retornos de embarcação)',
+                        risk: 'safe',
+                        warning: null,
+                        params: null,
+                        body: true
+                    }
+                ]
+            }
+        ];
+
+        // Renderizar endpoints
+        function renderEndpoints() {
+            const grid = document.getElementById('endpointsGrid');
+            grid.innerHTML = '';
+
+            endpoints.forEach(category => {
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                let html = `
+                    <div class="card-header">
+                        <div class="card-icon">${category.icon}</div>
+                        <div class="card-title">${category.category}</div>
+                    </div>
+                    <ul class="endpoint-list">
+                `;
+
+                category.items.forEach(item => {
+                    const riskClass = `risk-${item.risk}`;
+                    const riskLabel = item.risk === 'safe' ? 'SEGURO' : item.risk === 'caution' ? 'ATENÇÃO' : 'PERIGO';
+
+                    html += `
+                        <li class="endpoint-item ${riskClass}" onclick="openTestModal('${item.method}', '${item.path}', '${item.desc}', '${item.risk}', ${item.body}, '${item.params || ''}', '${item.warning || ''}')">
+                            <div>
+                                <span class="method ${item.method.toLowerCase()}">${item.method}</span>
+                                <span class="risk-badge ${item.risk}">${riskLabel}</span>
+                            </div>
+                            <span class="endpoint-path">${item.path}</span>
+                            <div class="endpoint-desc">${item.desc}</div>
+                            ${item.warning ? `<div class="endpoint-warning">${item.warning}</div>` : ''}
+                            <div class="endpoint-actions" onclick="event.stopPropagation();">
+                                <button class="btn btn-test" onclick="openTestModal('${item.method}', '${item.path}', '${item.desc}', '${item.risk}', ${item.body}, '${item.params || ''}', '${item.warning || ''}')">🧪 Testar</button>
+                                <button class="btn btn-copy" onclick="copyUrl('${item.path}', '${item.params || ''}')">📋 Copiar URL</button>
+                            </div>
+                        </li>
+                    `;
+                });
+
+                html += '</ul>';
+                card.innerHTML = html;
+                grid.appendChild(card);
+            });
+        }
+
+        // Abrir modal de teste
+        let currentTest = {};
+
+        function openTestModal(method, path, desc, risk, hasBody, params, warning) {
+            currentTest = { method, path, desc, risk, hasBody, params, warning };
+
+            document.getElementById('modalTitle').textContent = `${method} ${path}`;
+            document.getElementById('modalSubtitle').textContent = desc;
+
+            const fullUrl = BASE_URL + path + (params ? ` (${params})` : '');
+            document.getElementById('modalUrl').value = fullUrl;
+
+            const bodyGroup = document.getElementById('bodyGroup');
+            if (hasBody) {
+                bodyGroup.style.display = 'block';
+                document.getElementById('modalBody').value = '{\n  \n}';
+            } else {
+                bodyGroup.style.display = 'none';
+            }
+
+            const warningGroup = document.getElementById('warningGroup');
+            if (warning) {
+                warningGroup.style.display = 'block';
+                document.getElementById('modalWarning').textContent = warning;
+            } else {
+                warningGroup.style.display = 'none';
+            }
+
+            const executeBtn = document.getElementById('modalExecute');
+            executeBtn.className = risk === 'danger' ? 'btn-danger' : 'btn-primary';
+            executeBtn.textContent = risk === 'danger' ? '⚠️ EXECUTAR (PERIGO)' : 'Executar';
+
+            document.getElementById('testModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('testModal').classList.remove('active');
+        }
+
+        // Executar teste
+        async function executeTest() {
+            const { method, path, risk, hasBody } = currentTest;
+
+            if (risk === 'danger') {
+                if (!confirm('⚠️ ATENÇÃO! Esta ação é PERIGOSA e pode ser IRREVERSÍVEL!\n\nTem CERTEZA que deseja continuar?')) {
+                    return;
+                }
+            }
+
+            closeModal();
+
+            const url = BASE_URL + path;
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (hasBody && (method === 'POST' || method === 'PUT')) {
+                const body = document.getElementById('modalBody').value;
+                try {
+                    JSON.parse(body);
+                    options.body = body;
+                } catch (e) {
+                    logConsole('error', `❌ JSON inválido: ${e.message}`);
+                    return;
+                }
+            }
+
+            logConsole('info', `🚀 ${method} ${path}`);
+            logConsole('info', `⏳ Aguardando resposta...`);
+
             try {
-                const response = await fetch(`${BASE_URL}/api/banco/status`);
+                const startTime = Date.now();
+                const response = await fetch(url, options);
+                const elapsed = Date.now() - startTime;
+
                 const data = await response.json();
-                alert(JSON.stringify(data, null, 2));
+
+                if (response.ok) {
+                    logConsole('success', `✅ Sucesso (${response.status}) - ${elapsed}ms`);
+                    logConsole('success', JSON.stringify(data, null, 2));
+                } else {
+                    logConsole('error', `❌ Erro (${response.status}) - ${elapsed}ms`);
+                    logConsole('error', JSON.stringify(data, null, 2));
+                }
+
+                addToHistory(method, path, response.status, elapsed);
+
             } catch (err) {
-                alert('Erro: ' + err.message);
+                logConsole('error', `❌ Falha na requisição: ${err.message}`);
             }
         }
 
+        // Console
+        function logConsole(type, message) {
+            const output = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            const line = `[${timestamp}] ${message}\n`;
+
+            if (output.textContent === 'Aguardando comandos...') {
+                output.textContent = '';
+            }
+
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = line;
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleOutput').textContent = 'Aguardando comandos...';
+        }
+
+        // Histórico
+        function addToHistory(method, path, status, elapsed) {
+            testsCount++;
+            document.getElementById('testsCount').textContent = testsCount;
+
+            const entry = {
+                method,
+                path,
+                status,
+                elapsed,
+                timestamp: new Date().toLocaleString('pt-BR')
+            };
+
+            history.unshift(entry);
+            history = history.slice(0, 10);
+            localStorage.setItem('apiHistory', JSON.stringify(history));
+
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+
+            if (history.length === 0) {
+                list.innerHTML = '<li style="color: #999; font-size: 13px;">Nenhum teste realizado ainda</li>';
+                return;
+            }
+
+            list.innerHTML = history.map(item => {
+                const statusColor = item.status >= 200 && item.status < 300 ? '#28a745' : '#dc3545';
+                return `
+                    <li class="history-item">
+                        <span class="method-badge" style="color: ${statusColor}">${item.method}</span>
+                        ${item.path} -
+                        <strong style="color: ${statusColor}">${item.status}</strong>
+                        (${item.elapsed}ms)
+                        <div class="time">${item.timestamp}</div>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        // Copiar URL
+        function copyUrl(path, params) {
+            const url = BASE_URL + path + (params ? `\n\nParams: ${params}` : '');
+            navigator.clipboard.writeText(url).then(() => {
+                const notification = document.getElementById('copyNotification');
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 2000);
+            });
+        }
+
+        // Funções de ação rápida
         async function sincronizarManual() {
             if (!confirm('Deseja disparar sincronização manual do Sicredi?')) return;
+
+            logConsole('info', '🔄 Sincronizando Sicredi...');
 
             try {
                 const response = await fetch(`${BASE_URL}/api/banco/sicredi/sync`, {
                     method: 'POST'
                 });
                 const data = await response.json();
-                alert('Sincronização disparada!\n\n' + JSON.stringify(data, null, 2));
+
+                if (response.ok) {
+                    logConsole('success', '✅ Sincronização disparada!');
+                    logConsole('success', JSON.stringify(data, null, 2));
+                } else {
+                    logConsole('error', '❌ Erro na sincronização');
+                    logConsole('error', JSON.stringify(data, null, 2));
+                }
             } catch (err) {
-                alert('Erro: ' + err.message);
+                logConsole('error', `❌ Erro: ${err.message}`);
             }
         }
 
         async function gerarBackup() {
-            if (!confirm('Deseja gerar backup manual diário?')) return;
+            if (!confirm('Deseja gerar backup manual diário? Isso pode levar alguns minutos.')) return;
+
+            logConsole('info', '💾 Gerando backup...');
 
             try {
                 const response = await fetch(`${BASE_URL}/api/banco/backup/diario`, {
                     method: 'POST'
                 });
                 const data = await response.json();
-                alert('Backup gerado!\n\n' + JSON.stringify(data, null, 2));
+
+                if (response.ok) {
+                    logConsole('success', '✅ Backup gerado!');
+                    logConsole('success', JSON.stringify(data, null, 2));
+                } else {
+                    logConsole('error', '❌ Erro no backup');
+                    logConsole('error', JSON.stringify(data, null, 2));
+                }
             } catch (err) {
-                alert('Erro: ' + err.message);
+                logConsole('error', `❌ Erro: ${err.message}`);
             }
         }
 
-        async function listarBackups() {
-            try {
-                const response = await fetch(`${BASE_URL}/api/banco/backup/listar/diario`);
-                const data = await response.json();
-                alert('Backups disponíveis:\n\n' + JSON.stringify(data, null, 2));
-            } catch (err) {
-                alert('Erro: ' + err.message);
-            }
-        }
-
-        async function verCategorias() {
-            try {
-                const response = await fetch(`${BASE_URL}/api/banco/categorias`);
-                const data = await response.json();
-                alert('Categorias:\n\n' + JSON.stringify(data, null, 2));
-            } catch (err) {
-                alert('Erro: ' + err.message);
-            }
-        }
-
-        function testarWebhook() {
-            alert('Para testar o webhook Asaas, faça uma requisição POST para:\n\n' + BASE_URL + '/api/banco/asaas/webhook?empresa=ALLMAX\n\nCom o payload do evento Asaas.');
-        }
+        // Inicializar
+        renderEndpoints();
+        renderHistory();
 
         // Atualizar status da sincronização a cada 30 segundos
         setInterval(async () => {
@@ -571,4 +1204,4 @@
 </body>
 </html>
 
-<!-- V.2609141800 -->
+<!-- V.2609142120 -->
