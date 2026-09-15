@@ -475,9 +475,23 @@
             const mesAtual = hoje.toISOString().substring(0, 7);
             document.getElementById('mesSelect').value = mesAtual;
 
-            // Buscar automaticamente
-            buscarExtrato();
+            // Mostrar mensagem inicial
+            mostrarMensagemInicial();
         });
+
+        // Mostrar mensagem inicial
+        function mostrarMensagemInicial() {
+            const tbody = document.getElementById('tabelaLancamentos');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="20" style="text-align: center; padding: 60px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
+                        <h3 style="color: #667eea; margin-bottom: 10px;">Pronto para buscar!</h3>
+                        <p style="color: #666; font-size: 14px;">Escolha os filtros acima e clique em <strong>🔍 Buscar</strong></p>
+                    </td>
+                </tr>
+            `;
+        }
 
         // Trocar modo de filtro
         function trocarModoFiltro(modo) {
@@ -1221,7 +1235,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142135</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142220</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
