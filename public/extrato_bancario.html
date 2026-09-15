@@ -629,15 +629,34 @@
             dados.lancamentos.forEach(lanc => {
                 const tr = document.createElement('tr');
 
-                // Data da transação (pode vir como string ou objeto Date)
-                const dataTransacao = new Date(lanc.data);
-                const dataFormatada = !isNaN(dataTransacao) ? dataTransacao.toLocaleDateString('pt-BR') : 'Data inválida';
+                // Data da transação (parsear SEM conversão de fuso horário)
+                // lanc.data vem como "2026-09-14" (só dia, sem hora)
+                let dataFormatada = 'Data inválida';
+                if (lanc.data) {
+                    try {
+                        // Parsear manualmente para evitar conversão UTC→Local
+                        const dataStr = lanc.data.split('T')[0]; // Pega só a parte da data
+                        const [ano, mes, dia] = dataStr.split('-');
+                        const dataTransacao = new Date(ano, mes - 1, dia); // Cria data local
+                        dataFormatada = dataTransacao.toLocaleDateString('pt-BR');
+                    } catch (e) {
+                        dataFormatada = 'Data inválida';
+                    }
+                }
 
-                // Data/Hora de importação
-                const dataImportacao = new Date(lanc.importado_em);
-                const importadoFormatado = !isNaN(dataImportacao) ?
-                    dataImportacao.toLocaleDateString('pt-BR') + ' ' + dataImportacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) :
-                    '-';
+                // Data/Hora de importação (já vem com timestamp completo em UTC)
+                let importadoFormatado = '-';
+                if (lanc.importado_em) {
+                    try {
+                        // Esta vem como "2026-09-14T16:02:46.000Z" (UTC)
+                        // Converter para GMT-3 (America/Sao_Paulo)
+                        const dataImportacao = new Date(lanc.importado_em);
+                        importadoFormatado = dataImportacao.toLocaleDateString('pt-BR', {timeZone: 'America/Sao_Paulo'}) + ' ' +
+                                           dataImportacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'});
+                    } catch (e) {
+                        importadoFormatado = '-';
+                    }
+                }
 
                 // Categoria
                 const catHTML = lanc.categoria ?
@@ -1190,7 +1209,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142110</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142115</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir

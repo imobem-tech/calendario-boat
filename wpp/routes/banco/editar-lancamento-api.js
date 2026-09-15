@@ -1,6 +1,9 @@
 // ============================================================
-// wpp/routes/banco/editar-lancamento-api.js — V.2609141730
+// wpp/routes/banco/editar-lancamento-api.js — V.2609142120
 // API PARA EDITAR LANÇAMENTOS BANCÁRIOS
+// + FIX: Usa bank_categorias (não categorias_bancarias)
+// + FIX: Usa classificacao (não categoria_id)
+// + FIX: JOIN correto (classificacao::INTEGER = c.id)
 // ============================================================
 
 import express from 'express';
@@ -26,7 +29,8 @@ router.get('/categorias', async (req, res) => {
         icone,
         cor,
         tipo
-      FROM categorias_bancarias
+      FROM bank_categorias
+      WHERE ativo = true
       ORDER BY nome
     `);
 
@@ -63,7 +67,8 @@ router.put('/lancamento/:id', async (req, res) => {
     let contador = 1;
 
     if (categoria_id !== undefined) {
-      campos.push(`categoria_id = $${contador}`);
+      // Campo classificacao armazena ID da categoria como TEXT
+      campos.push(`classificacao = $${contador}::TEXT`);
       valores.push(categoria_id);
       contador++;
     }
@@ -141,7 +146,12 @@ router.get('/lancamento/:id', async (req, res) => {
         c.icone as categoria_icone,
         c.cor as categoria_cor
       FROM bank_extratos e
-      LEFT JOIN categorias_bancarias c ON e.categoria_id = c.id
+      LEFT JOIN bank_categorias c ON (
+        CASE
+          WHEN e.classificacao ~ '^[0-9]+$' THEN e.classificacao::INTEGER
+          ELSE NULL
+        END = c.id
+      )
       WHERE e.id = $1
     `, [id]);
 
