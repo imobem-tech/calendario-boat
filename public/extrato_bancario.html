@@ -6,7 +6,11 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150005
+    EXTRATO BANCÁRIO - V.2609150010
+
+    📝 DOCS ENRIQUECER - V.2609150010
+       - Documentação atualizada: V.2609150010
+       - Processa PENDENTES (não só sem nome)
 
     🔧 FIX LOADING - V.2609150005
        - Loading escondido por padrão (display: none)
@@ -34,12 +38,15 @@
        - Detecção de duplicatas
        - Importação em lote
 
-    🔍 ENRIQUECER DADOS - V.2609142200
+    🔍 ENRIQUECER DADOS - V.2609150010
        POST /api/banco/enriquecer
+       - Processa registros SEM nome OU sem classificação OU PENDENTES
+       - Permite múltiplas rodadas até completar tudo
        - Busca cliente por nome parcial (ILIKE)
        - Vincula Conta a Receber (±10 dias, ±5%)
        - Copia descrição da CR
        - Testa TODOS os homônimos até achar CR
+       - Classifica automaticamente (banco_categorias)
        - Status OK apenas se TUDO encontrado
        - Filtros: empresa, data_inicio, data_fim
 
@@ -1276,7 +1283,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">🔧 V.2609150005</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609150010</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
@@ -1286,4 +1293,4 @@
 </body>
 </html>
 
-<!-- V.2609150005 - 🔧 Fix: Loading escondido por padrão -->
+<!-- V.2609150010 - ⚡ Enriquecer processa PENDENTES + Loading fix -->
