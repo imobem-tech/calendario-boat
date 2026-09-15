@@ -822,20 +822,32 @@
             document.getElementById('editDescricao').value = lancamento.descricao;
             document.getElementById('editObservacoes').value = lancamento.observacoes || '';
 
-            // Preencher select de categorias
+            // Preencher select de categorias (FILTRADO por empresa e tipo)
             const selectCategoria = document.getElementById('editCategoria');
             selectCategoria.innerHTML = '<option value="">-- Selecione --</option>';
 
+            // Determinar tipo esperado da categoria baseado no tipo do lançamento
+            const tipoEsperado = lancamento.tipo === 'CREDITO' ? 'RECEITA' : 'DESPESA';
+
             categoriasDisponiveis.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = `${cat.icone} ${cat.nome}`;
+                // Filtrar por empresa (categoria.empresa = null ou = empresa do lançamento)
+                const empresaOK = !cat.empresa || cat.empresa === 'TODAS' || cat.empresa === lancamento.empresa;
 
-                if (lancamento.categoria && lancamento.categoria.id === cat.id) {
-                    option.selected = true;
+                // Filtrar por tipo (categoria.tipo = TODAS ou = tipo esperado)
+                const tipoOK = !cat.tipo || cat.tipo === 'TODAS' || cat.tipo === tipoEsperado;
+
+                // Só adiciona se passar nos dois filtros
+                if (empresaOK && tipoOK) {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = `${cat.icone} ${cat.nome}`;
+
+                    if (lancamento.categoria && lancamento.categoria.id === cat.id) {
+                        option.selected = true;
+                    }
+
+                    selectCategoria.appendChild(option);
                 }
-
-                selectCategoria.appendChild(option);
             });
 
             // Mostrar modal
@@ -976,7 +988,7 @@
             }
 
             try {
-                const empresa = document.getElementById('empresa').value || 'ALLMAX';
+                const empresa = document.getElementById('empresaSelect').value || 'ALLMAX';
                 const dataInicio = document.getElementById('dataInicio').value;
                 const dataFim = document.getElementById('dataFim').value;
 
@@ -1209,7 +1221,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142115</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">v.2609142135</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir

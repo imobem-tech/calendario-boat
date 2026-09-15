@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciar Recibos - Sistema Bancário</title>
+  <!-- V.260914164300 -->
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1em;
+    }
+
+    .toolbar {
+      padding: 20px 30px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .filter-group label {
+      font-weight: 600;
+      color: #495057;
+    }
+
+    select, input {
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    select:focus, input:focus {
+      border-color: #667eea;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+    }
+
+    .btn-danger:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .stats {
+      padding: 20px 30px;
+      background: #e7f3ff;
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-label {
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .stat-value {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .stat-value.selected {
+      color: #dc3545;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 30px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .card {
+      border: 2px solid #dee2e6;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.3s;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .card.selected {
+      border-color: #dc3545;
+      box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2);
+    }
+
+    .card-image {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      background: #f8f9fa;
+    }
+
+    .card-body {
+      padding: 15px;
+    }
+
+    .card-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #212529;
+      font-size: 1.1em;
+    }
+
+    .card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.9em;
+      color: #6c757d;
+    }
+
+    .card-info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      font-weight: 600;
+    }
+
+    .badge-blob {
+      background: #667eea;
+      color: white;
+    }
+
+    .badge-local {
+      background: #ffc107;
+      color: #000;
+    }
+
+    .badge-empresa {
+      background: #28a745;
+      color: white;
+      margin-left: auto;
+    }
+
+    .checkbox-overlay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 30px;
+      height: 30px;
+      background: white;
+      border: 2px solid #dee2e6;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+
+    .card.selected .checkbox-overlay {
+      background: #dc3545;
+      border-color: #dc3545;
+    }
+
+    .card.selected .checkbox-overlay::after {
+      content: '✓';
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      font-size: 1.2em;
+      color: #6c757d;
+    }
+
+    .loading::before {
+      content: '⏳';
+      display: block;
+      font-size: 3em;
+      margin-bottom: 20px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px;
+      color: #6c757d;
+    }
+
+    .empty::before {
+      content: '📭';
+      display: block;
+      font-size: 4em;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .stats {
+        flex-direction: column;
+      }
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-title {
+      font-size: 1.5em;
+      margin-bottom: 15px;
+      color: #212529;
+    }
+
+    .modal-body {
+      margin-bottom: 20px;
+      color: #6c757d;
+      line-height: 1.6;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🗂️ Gerenciador de Recibos</h1>
+      <p>Visualize e gerencie os recibos armazenados no sistema</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group">
+        <label for="filtroEmpresa">Empresa:</label>
+        <select id="filtroEmpresa">
+          <option value="">Todas</option>
+          <option value="ALLMAX">ALLMAX</option>
+          <option value="IMOBEM">IMOBEM</option>
+          <option value="IMOBAN">IMOBAN</option>
+          <option value="SUMMER">SUMMER</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filtroTipo">Tipo:</label>
+        <select id="filtroTipo">
+          <option value="">Todos</option>
+          <option value="BLOB">Vercel Blob</option>
+          <option value="LOCAL">Local</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filtroValor">Valor até R$:</label>
+        <input type="number" id="filtroValor" placeholder="Ex: 1.00" step="0.01" min="0">
+      </div>
+
+      <button class="btn btn-primary" onclick="carregarRecibos()">
+        🔄 Atualizar
+      </button>
+
+      <button class="btn btn-danger" id="btnExcluir" onclick="confirmarExclusao()" disabled>
+        🗑️ Excluir Selecionados (<span id="countSelecionados">0</span>)
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-label">📊 Total de recibos:</span>
+        <span class="stat-value" id="totalRecibos">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">✅ Selecionados:</span>
+        <span class="stat-value selected" id="totalSelecionados">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">💾 Espaço estimado:</span>
+        <span class="stat-value" id="espacoTotal">0 KB</span>
+      </div>
+    </div>
+
+    <div id="grid" class="grid">
+      <div class="loading">Carregando recibos...</div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação -->
+  <div id="modalConfirmacao" class="modal">
+    <div class="modal-content">
+      <div class="modal-title">⚠️ Confirmar Exclusão</div>
+      <div class="modal-body">
+        <p>Você está prestes a <strong>excluir permanentemente</strong> <span id="qtdExcluir">0</span> recibo(s).</p>
+        <p>Esta ação <strong>não pode ser desfeita</strong>.</p>
+        <p>Os arquivos serão removidos do Vercel Blob Storage e do banco de dados.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-danger" onclick="executarExclusao()">🗑️ Confirmar Exclusão</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let recibos = [];
+    let selecionados = new Set();
+
+    // Carregar recibos ao abrir a página
+    window.addEventListener('load', () => {
+      carregarRecibos();
+    });
+
+    async function carregarRecibos() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '<div class="loading">Carregando recibos...</div>';
+
+      try {
+        const response = await fetch('/api/banco/debug/recibos');
+        const data = await response.json();
+
+        recibos = data.recibos || [];
+
+        // Aplicar filtros
+        aplicarFiltros();
+
+        atualizarEstatisticas();
+        renderizarRecibos();
+
+      } catch (err) {
+        console.error('Erro ao carregar recibos:', err);
+        grid.innerHTML = `
+          <div class="empty">
+            <p>❌ Erro ao carregar recibos</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">${err.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function aplicarFiltros() {
+      const filtroEmpresa = document.getElementById('filtroEmpresa').value;
+      const filtroTipo = document.getElementById('filtroTipo').value;
+      const filtroValor = parseFloat(document.getElementById('filtroValor').value);
+
+      recibos = recibos.filter(r => {
+        if (filtroEmpresa && r.empresa !== filtroEmpresa) return false;
+        if (filtroTipo && r.tipo !== filtroTipo) return false;
+        if (!isNaN(filtroValor) && Math.abs(r.valor) > filtroValor) return false;
+        return true;
+      });
+    }
+
+    function renderizarRecibos() {
+      const grid = document.getElementById('grid');
+
+      if (recibos.length === 0) {
+        grid.innerHTML = `
+          <div class="empty">
+            <h3>Nenhum recibo encontrado</h3>
+            <p>Tente ajustar os filtros ou adicionar novos recibos via WhatsApp</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = recibos.map(r => {
+        const selected = selecionados.has(r.id) ? 'selected' : '';
+        const imgUrl = r.arquivos && r.arquivos.length > 0 && r.arquivos[0].url
+          ? r.arquivos[0].url
+          : 'https://via.placeholder.com/300x200?text=Sem+Imagem';
+
+        return `
+          <div class="card ${selected}" onclick="toggleSelecao(${r.id})">
+            <div class="checkbox-overlay"></div>
+            <img src="${imgUrl}" class="card-image" alt="Recibo ${r.id}" onerror="this.src='https://via.placeholder.com/300x200?text=Erro+ao+Carregar'">
+            <div class="card-body">
+              <div class="card-title">ID #${r.id} - R$ ${r.valor.toFixed(2)}</div>
+              <div class="card-info">
+                <div class="card-info-item">
+                  📅 ${new Date(r.timestamp).toLocaleString('pt-BR')}
+                </div>
+                <div class="card-info-item">
+                  📝 ${r.descricao.substring(0, 40)}${r.descricao.length > 40 ? '...' : ''}
+                </div>
+                <div class="card-info-item">
+                  ${r.fornecedor ? `🏪 ${r.fornecedor}` : ''}
+                </div>
+                <div class="card-info-item">
+                  <span class="badge badge-${r.tipo === 'VERCEL_BLOB' ? 'blob' : 'local'}">
+                    ${r.tipo}
+                  </span>
+                  ${r.arquivos && r.arquivos.length > 1 ? `<span class="badge badge-blob">${r.arquivos.length} arquivos</span>` : ''}
+                  <span class="badge badge-empresa">${r.empresa}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleSelecao(id) {
+      if (selecionados.has(id)) {
+        selecionados.delete(id);
+      } else {
+        selecionados.add(id);
+      }
+
+      renderizarRecibos();
+      atualizarContadores();
+    }
+
+    function atualizarEstatisticas() {
+      const total = recibos.length;
+      const espacoTotal = recibos.reduce((acc, r) => {
+        if (r.arquivos && Array.isArray(r.arquivos)) {
+          return acc + r.arquivos.reduce((sum, a) => sum + (a.tamanho || 0), 0);
+        }
+        return acc;
+      }, 0);
+
+      document.getElementById('totalRecibos').textContent = total;
+      document.getElementById('espacoTotal').textContent = (espacoTotal / 1024).toFixed(2) + ' KB';
+    }
+
+    function atualizarContadores() {
+      const count = selecionados.size;
+      document.getElementById('totalSelecionados').textContent = count;
+      document.getElementById('countSelecionados').textContent = count;
+      document.getElementById('btnExcluir').disabled = count === 0;
+    }
+
+    function confirmarExclusao() {
+      if (selecionados.size === 0) return;
+
+      document.getElementById('qtdExcluir').textContent = selecionados.size;
+      document.getElementById('modalConfirmacao').classList.add('show');
+    }
+
+    function fecharModal() {
+      document.getElementById('modalConfirmacao').classList.remove('show');
+    }
+
+    async function executarExclusao() {
+      // ⚠️ NOTA: Esta função NÃO executa exclusão ainda
+      // Aguardando critérios do usuário
+
+      alert(`⚠️ EXCLUSÃO DESABILITADA\n\nVocê selecionou ${selecionados.size} recibo(s), mas a exclusão está desabilitada até você definir os critérios.\n\nIDs selecionados: ${Array.from(selecionados).join(', ')}`);
+
+      fecharModal();
+
+      // TODO: Descomentar quando usuário autorizar
+      /*
+      try {
+        const ids = Array.from(selecionados);
+
+        const response = await fetch('/api/banco/recibos/excluir/lote', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ids })
+        });
+
+        const result = await response.json();
+
+        if (result.sucesso) {
+          alert(`✅ ${result.totalLancamentos} recibo(s) excluído(s) com sucesso!\n\nArquivos: ${result.totalArquivosExcluidos} excluídos, ${result.totalArquivosComErro} com erro.`);
+          selecionados.clear();
+          carregarRecibos();
+        } else {
+          alert(`❌ Erro: ${result.erro}`);
+        }
+
+        fecharModal();
+
+      } catch (err) {
+        console.error('Erro ao excluir:', err);
+        alert(`❌ Erro ao excluir recibos: ${err.message}`);
+      }
+      */
+    }
+
+    // Atalhos de teclado
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        fecharModal();
+      }
+    });
+
+    // Filtros em tempo real
+    document.getElementById('filtroEmpresa').addEventListener('change', carregarRecibos);
+    document.getElementById('filtroTipo').addEventListener('change', carregarRecibos);
+    document.getElementById('filtroValor').addEventListener('input', carregarRecibos);
+  </script>
+</body>
+</html>

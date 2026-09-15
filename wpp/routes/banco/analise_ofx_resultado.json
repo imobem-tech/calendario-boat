@@ -1,0 +1,2212 @@
+{
+  "arquivo": "C:\\Users\\NOTEBOOK\\Downloads\\Extrato Asaas.ofx",
+  "data_analise": "2026-09-14T19:38:11.291Z",
+  "banco": "461",
+  "conta": "63271050",
+  "total_transacoes": 242,
+  "existentes": 0,
+  "novas": 242,
+  "sem_classificacao": 0,
+  "resumo_por_tipo": {
+    "FEE": {
+      "total": 146,
+      "novas": 146,
+      "existentes": 0
+    },
+    "CREDIT": {
+      "total": 70,
+      "novas": 70,
+      "existentes": 0
+    },
+    "XFER": {
+      "total": 25,
+      "novas": 25,
+      "existentes": 0
+    },
+    "DEBIT": {
+      "total": 1,
+      "novas": 1,
+      "existentes": 0
+    }
+  },
+  "transacoes_novas": [
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044410499",
+      "documento": "2044410499",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 887481095 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044428124",
+      "documento": "2044428124",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 889189979 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044428398",
+      "documento": "2044428398",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 889189936 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044429667",
+      "documento": "2044429667",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 889190014 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044439278",
+      "documento": "2044439278",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 889190123 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.35,
+      "fitid": "2044512915",
+      "documento": "2044512915",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896365795 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 550.44,
+      "fitid": "2044520859",
+      "documento": "896771521",
+      "descricao": "Cobranca recebida - fatura nr. 896771521 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044520860",
+      "documento": "896771521",
+      "descricao": "Taxa do Pix - fatura nr. 896771521 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044520862",
+      "documento": "2044520862",
+      "descricao": "Taxa de mensageria - fatura nr. 896771521 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 2000,
+      "fitid": "2044522363",
+      "documento": "896771606",
+      "descricao": "Cobranca recebida - fatura nr. 896771606 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044522366",
+      "documento": "896771606",
+      "descricao": "Taxa do Pix - fatura nr. 896771606 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044522369",
+      "documento": "2044522369",
+      "descricao": "Taxa de mensageria - fatura nr. 896771606 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 550.44,
+      "fitid": "2044527678",
+      "documento": "887481046",
+      "descricao": "Cobranca recebida - fatura nr. 887481046 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044527679",
+      "documento": "887481046",
+      "descricao": "Taxa do Pix - fatura nr. 887481046 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044527681",
+      "documento": "2044527681",
+      "descricao": "Taxa de mensageria - fatura nr. 887481046 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-01",
+      "valor": -2250,
+      "fitid": "2044540516",
+      "documento": "2044540516",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 563.63,
+      "fitid": "2044572467",
+      "documento": "889189936",
+      "descricao": "Cobranca recebida - fatura nr. 889189936 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044572469",
+      "documento": "889189936",
+      "descricao": "Taxa do Pix - fatura nr. 889189936 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044572473",
+      "documento": "2044572473",
+      "descricao": "Taxa de mensageria - fatura nr. 889189936 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 563.63,
+      "fitid": "2044574630",
+      "documento": "889189979",
+      "descricao": "Cobranca recebida - fatura nr. 889189979 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044574632",
+      "documento": "889189979",
+      "descricao": "Taxa do Pix - fatura nr. 889189979 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044574634",
+      "documento": "2044574634",
+      "descricao": "Taxa de mensageria - fatura nr. 889189979 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 203.77,
+      "fitid": "2044576547",
+      "documento": "889190014",
+      "descricao": "Cobranca recebida - fatura nr. 889190014 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044576548",
+      "documento": "889190014",
+      "descricao": "Taxa do Pix - fatura nr. 889190014 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044576552",
+      "documento": "2044576552",
+      "descricao": "Taxa de mensageria - fatura nr. 889190014 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 507.05,
+      "fitid": "2044578511",
+      "documento": "889190123",
+      "descricao": "Cobranca recebida - fatura nr. 889190123 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2044578512",
+      "documento": "889190123",
+      "descricao": "Taxa do Pix - fatura nr. 889190123 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2044578513",
+      "documento": "2044578513",
+      "descricao": "Taxa de mensageria - fatura nr. 889190123 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-01",
+      "valor": -135,
+      "fitid": "2044736807",
+      "documento": "2044736807",
+      "descricao": "Transacao via Pix com chave para JALAPAO IMPORTADORA, EXPORTADORA, COMERCIO DE LUBRIFICANTES E DISTRIBUIDORA DE PECAS PARA VEICULOS LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-01",
+      "valor": 2051.95,
+      "fitid": "2045034740",
+      "documento": "887481095",
+      "descricao": "Cobranca recebida - fatura nr. 887481095 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.8,
+      "fitid": "2045034741",
+      "documento": "887481095",
+      "descricao": "Taxa do Pix - fatura nr. 887481095 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-01",
+      "valor": -0.55,
+      "fitid": "2045034742",
+      "documento": "2045034742",
+      "descricao": "Taxa de mensageria - fatura nr. 887481095 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-02",
+      "valor": 357.01,
+      "fitid": "2046190082",
+      "documento": "896492728",
+      "descricao": "Cobranca recebida - fatura nr. 896492728 RODRIGO NUNES DE ASSIS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-02",
+      "valor": -1.5,
+      "fitid": "2046190087",
+      "documento": "896492728",
+      "descricao": "Taxa de boleto - fatura nr. 896492728 RODRIGO NUNES DE ASSIS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-02",
+      "valor": -0.55,
+      "fitid": "2046190114",
+      "documento": "2046190114",
+      "descricao": "Taxa de mensageria - fatura nr. 896492728 RODRIGO NUNES DE ASSIS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-02",
+      "valor": 404.08,
+      "fitid": "2047211233",
+      "documento": "890114065",
+      "descricao": "Cobranca recebida - fatura nr. 890114065 PATRICK SWAYZE SOUSA RODRIGUES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-02",
+      "valor": -0.8,
+      "fitid": "2047211234",
+      "documento": "890114065",
+      "descricao": "Taxa do Pix - fatura nr. 890114065 PATRICK SWAYZE SOUSA RODRIGUES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-02",
+      "valor": -0.55,
+      "fitid": "2047211235",
+      "documento": "2047211235",
+      "descricao": "Taxa de mensageria - fatura nr. 890114065 PATRICK SWAYZE SOUSA RODRIGUES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-03",
+      "valor": -0.35,
+      "fitid": "2048869696",
+      "documento": "2048869696",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896365795 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-03",
+      "valor": 392.71,
+      "fitid": "2049293352",
+      "documento": "900953562",
+      "descricao": "Cobranca recebida - fatura nr. 900953562 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-03",
+      "valor": -0.8,
+      "fitid": "2049293353",
+      "documento": "900953562",
+      "descricao": "Taxa do Pix - fatura nr. 900953562 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-03",
+      "valor": -0.55,
+      "fitid": "2049293356",
+      "documento": "2049293356",
+      "descricao": "Taxa de mensageria - fatura nr. 900953562 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-04",
+      "valor": -3622.35,
+      "fitid": "2051286293",
+      "documento": "2051286293",
+      "descricao": "Transacao via Pix com QR Code para PETRO PETROLEO 75 COMERCIO DE COMBUSTIVEIS LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.35,
+      "fitid": "2051289855",
+      "documento": "2051289855",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896771617 ELVIS MAYCON MALDONADO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-04",
+      "valor": 2500,
+      "fitid": "2051339383",
+      "documento": "887481022",
+      "descricao": "Cobranca recebida - fatura nr. 887481022 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.8,
+      "fitid": "2051339388",
+      "documento": "887481022",
+      "descricao": "Taxa do Pix - fatura nr. 887481022 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.55,
+      "fitid": "2051339402",
+      "documento": "2051339402",
+      "descricao": "Taxa de mensageria - fatura nr. 887481022 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.35,
+      "fitid": "2051416110",
+      "documento": "2051416110",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900079609 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-04",
+      "valor": 146.07,
+      "fitid": "2052010117",
+      "documento": "896365795",
+      "descricao": "Cobranca recebida - fatura nr. 896365795 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.8,
+      "fitid": "2052010118",
+      "documento": "896365795",
+      "descricao": "Taxa do Pix - fatura nr. 896365795 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.55,
+      "fitid": "2052010119",
+      "documento": "2052010119",
+      "descricao": "Taxa de mensageria - fatura nr. 896365795 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-04",
+      "valor": 214.21,
+      "fitid": "2052011458",
+      "documento": "900079609",
+      "descricao": "Cobranca recebida - fatura nr. 900079609 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.8,
+      "fitid": "2052011460",
+      "documento": "900079609",
+      "descricao": "Taxa do Pix - fatura nr. 900079609 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.55,
+      "fitid": "2052011466",
+      "documento": "2052011466",
+      "descricao": "Taxa de mensageria - fatura nr. 900079609 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-04",
+      "valor": 144.59,
+      "fitid": "2052013088",
+      "documento": "898456406",
+      "descricao": "Cobranca recebida - fatura nr. 898456406 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.8,
+      "fitid": "2052013089",
+      "documento": "898456406",
+      "descricao": "Taxa do Pix - fatura nr. 898456406 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.55,
+      "fitid": "2052013092",
+      "documento": "2052013092",
+      "descricao": "Taxa de mensageria - fatura nr. 898456406 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-04",
+      "valor": 714.02,
+      "fitid": "2052036074",
+      "documento": "901742411",
+      "descricao": "Cobranca recebida - fatura nr. 901742411 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.8,
+      "fitid": "2052036076",
+      "documento": "901742411",
+      "descricao": "Taxa do Pix - fatura nr. 901742411 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-04",
+      "valor": -0.55,
+      "fitid": "2052036081",
+      "documento": "2052036081",
+      "descricao": "Taxa de mensageria - fatura nr. 901742411 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-05",
+      "valor": 892.52,
+      "fitid": "2054052039",
+      "documento": "903124650",
+      "descricao": "Cobranca recebida - fatura nr. 903124650 ULISSES NOGUEIRA VASCONCELOS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-05",
+      "valor": -0.8,
+      "fitid": "2054052041",
+      "documento": "903124650",
+      "descricao": "Taxa do Pix - fatura nr. 903124650 ULISSES NOGUEIRA VASCONCELOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-05",
+      "valor": -0.55,
+      "fitid": "2054052042",
+      "documento": "2054052042",
+      "descricao": "Taxa de mensageria - fatura nr. 903124650 ULISSES NOGUEIRA VASCONCELOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-05",
+      "valor": 678.32,
+      "fitid": "2054077612",
+      "documento": "903124787",
+      "descricao": "Cobranca recebida - fatura nr. 903124787 JOHNNY ALENCAR VASCONCELOS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-05",
+      "valor": -0.8,
+      "fitid": "2054077614",
+      "documento": "903124787",
+      "descricao": "Taxa do Pix - fatura nr. 903124787 JOHNNY ALENCAR VASCONCELOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-05",
+      "valor": -0.55,
+      "fitid": "2054077616",
+      "documento": "2054077616",
+      "descricao": "Taxa de mensageria - fatura nr. 903124787 JOHNNY ALENCAR VASCONCELOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-07",
+      "valor": -340,
+      "fitid": "2055268245",
+      "documento": "2055268245",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-07",
+      "valor": -6000,
+      "fitid": "2055799243",
+      "documento": "2055799243",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-07",
+      "valor": 6000,
+      "fitid": "2055799316",
+      "documento": "2055799316",
+      "descricao": "Estorno de transacao via Pix",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-07",
+      "valor": -6000,
+      "fitid": "2055799736",
+      "documento": "2055799736",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-07",
+      "valor": 6000,
+      "fitid": "2055799811",
+      "documento": "2055799811",
+      "descricao": "Estorno de transacao via Pix",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-07",
+      "valor": -6000,
+      "fitid": "2055841567",
+      "documento": "2055841567",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-07",
+      "valor": 6000,
+      "fitid": "2055841656",
+      "documento": "2055841656",
+      "descricao": "Estorno de transacao via Pix",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.35,
+      "fitid": "2057524730",
+      "documento": "2057524730",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900757259 MARCUS VINICIUS GUIMARAES FILHO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-08",
+      "valor": -6000,
+      "fitid": "2057765225",
+      "documento": "2057765225",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 749,
+      "fitid": "2057831004",
+      "documento": "900756284",
+      "descricao": "Cobranca recebida - fatura nr. 900756284 ALTIERI LUIS DA COSTA LEITE",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2057831006",
+      "documento": "900756284",
+      "descricao": "Taxa do Pix - fatura nr. 900756284 ALTIERI LUIS DA COSTA LEITE",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2057831010",
+      "documento": "2057831010",
+      "descricao": "Taxa de mensageria - fatura nr. 900756284 ALTIERI LUIS DA COSTA LEITE",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-08",
+      "valor": -22.3,
+      "fitid": "2057882687",
+      "documento": "2057882687",
+      "descricao": "Transacao via Pix com QR Code para AKAD SEGUROS S A",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-08",
+      "valor": -22.3,
+      "fitid": "2057890348",
+      "documento": "2057890348",
+      "descricao": "Transacao via Pix com QR Code para AKAD SEGUROS S A",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 550.44,
+      "fitid": "2057895256",
+      "documento": "904516750",
+      "descricao": "Cobranca recebida - fatura nr. 904516750 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2057895257",
+      "documento": "904516750",
+      "descricao": "Taxa do Pix - fatura nr. 904516750 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2057895260",
+      "documento": "2057895260",
+      "descricao": "Taxa de mensageria - fatura nr. 904516750 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 1766.66,
+      "fitid": "2057899098",
+      "documento": "904516720",
+      "descricao": "Cobranca recebida - fatura nr. 904516720 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2057899099",
+      "documento": "904516720",
+      "descricao": "Taxa do Pix - fatura nr. 904516720 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2057899100",
+      "documento": "2057899100",
+      "descricao": "Taxa de mensageria - fatura nr. 904516720 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 428.41,
+      "fitid": "2057979452",
+      "documento": "904081795",
+      "descricao": "Cobranca recebida - fatura nr. 904081795 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2057979453",
+      "documento": "904081795",
+      "descricao": "Taxa do Pix - fatura nr. 904081795 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2057979454",
+      "documento": "2057979454",
+      "descricao": "Taxa de mensageria - fatura nr. 904081795 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 442.94,
+      "fitid": "2059115219",
+      "documento": "890636110",
+      "descricao": "Cobranca recebida - fatura nr. 890636110 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -1.5,
+      "fitid": "2059115222",
+      "documento": "890636110",
+      "descricao": "Taxa de boleto - fatura nr. 890636110 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059115238",
+      "documento": "2059115238",
+      "descricao": "Taxa de mensageria - fatura nr. 890636110 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 577.34,
+      "fitid": "2059232935",
+      "documento": "873106202",
+      "descricao": "Cobranca recebida - fatura nr. 873106202 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -1.5,
+      "fitid": "2059232939",
+      "documento": "873106202",
+      "descricao": "Taxa de boleto - fatura nr. 873106202 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059232955",
+      "documento": "2059232955",
+      "descricao": "Taxa de mensageria - fatura nr. 873106202 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 864.54,
+      "fitid": "2059298079",
+      "documento": "874284539",
+      "descricao": "Cobranca recebida - fatura nr. 874284539 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -1.5,
+      "fitid": "2059298083",
+      "documento": "874284539",
+      "descricao": "Taxa de boleto - fatura nr. 874284539 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059298093",
+      "documento": "2059298093",
+      "descricao": "Taxa de mensageria - fatura nr. 874284539 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 76.99,
+      "fitid": "2059359924",
+      "documento": "881962548",
+      "descricao": "Cobranca recebida - fatura nr. 881962548 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -1.5,
+      "fitid": "2059359928",
+      "documento": "881962548",
+      "descricao": "Taxa de boleto - fatura nr. 881962548 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059359936",
+      "documento": "2059359936",
+      "descricao": "Taxa de mensageria - fatura nr. 881962548 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 285.61,
+      "fitid": "2059488743",
+      "documento": "905190477",
+      "descricao": "Cobranca recebida - fatura nr. 905190477 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2059488749",
+      "documento": "905190477",
+      "descricao": "Taxa do Pix - fatura nr. 905190477 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059488757",
+      "documento": "2059488757",
+      "descricao": "Taxa de mensageria - fatura nr. 905190477 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 5000,
+      "fitid": "2059971753",
+      "documento": "896771649",
+      "descricao": "Cobranca recebida - fatura nr. 896771649 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2059971756",
+      "documento": "896771649",
+      "descricao": "Taxa do Pix - fatura nr. 896771649 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2059971759",
+      "documento": "2059971759",
+      "descricao": "Taxa de mensageria - fatura nr. 896771649 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-08",
+      "valor": 220.19,
+      "fitid": "2060099177",
+      "documento": "895839466",
+      "descricao": "Cobranca recebida - fatura nr. 895839466 THOMAS THIAGO CALIL",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.8,
+      "fitid": "2060099178",
+      "documento": "895839466",
+      "descricao": "Taxa do Pix - fatura nr. 895839466 THOMAS THIAGO CALIL",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-08",
+      "valor": -0.55,
+      "fitid": "2060099179",
+      "documento": "2060099179",
+      "descricao": "Taxa de mensageria - fatura nr. 895839466 THOMAS THIAGO CALIL",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-09",
+      "valor": -0.35,
+      "fitid": "2060958709",
+      "documento": "2060958709",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 904297935 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-09",
+      "valor": 256.14,
+      "fitid": "2061613299",
+      "documento": "900071191",
+      "descricao": "Cobranca recebida - fatura nr. 900071191 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-09",
+      "valor": -0.8,
+      "fitid": "2061613302",
+      "documento": "900071191",
+      "descricao": "Taxa do Pix - fatura nr. 900071191 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-09",
+      "valor": -0.55,
+      "fitid": "2061613304",
+      "documento": "2061613304",
+      "descricao": "Taxa de mensageria - fatura nr. 900071191 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-09",
+      "valor": -2220,
+      "fitid": "2061676960",
+      "documento": "2061676960",
+      "descricao": "Transacao via Pix com chave para DANILO MARKZANO CAMPOS MACHADO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-09",
+      "valor": 561.98,
+      "fitid": "2062177029",
+      "documento": "896771584",
+      "descricao": "Cobranca recebida - fatura nr. 896771584 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-09",
+      "valor": -1.5,
+      "fitid": "2062177033",
+      "documento": "896771584",
+      "descricao": "Taxa de boleto - fatura nr. 896771584 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-09",
+      "valor": -0.55,
+      "fitid": "2062177042",
+      "documento": "2062177042",
+      "descricao": "Taxa de mensageria - fatura nr. 896771584 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2063381929",
+      "documento": "2063381929",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900757259 MARCUS VINICIUS GUIMARAES FILHO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2063410035",
+      "documento": "2063410035",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896771617 ELVIS MAYCON MALDONADO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2063433094",
+      "documento": "2063433094",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 898256764 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -156.69,
+      "fitid": "2063830295",
+      "documento": "2063830295",
+      "descricao": "Transacao via Pix com QR Code para FERPAM COM DE FERRAMENTAS PARAFUSOS E MAQUINAS LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -12.5,
+      "fitid": "2063865933",
+      "documento": "2063865933",
+      "descricao": "Transacao via Pix com QR Code para DJVL MATERIAIS ELETRICOS E CONSTRUCAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -11.2,
+      "fitid": "2063872586",
+      "documento": "2063872586",
+      "descricao": "Transacao via Pix com chave para PALMAS ENERGIA SOLAR COMERCIO VAREJISTA DE MATERIAL ELETRICO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 209.33,
+      "fitid": "2064120955",
+      "documento": "906907315",
+      "descricao": "Cobranca recebida - fatura nr. 906907315 MARCO ANTONIO PERILLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.8,
+      "fitid": "2064120956",
+      "documento": "906907315",
+      "descricao": "Taxa do Pix - fatura nr. 906907315 MARCO ANTONIO PERILLO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064154041",
+      "documento": "2064154041",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755939 ELVIS MAYCON MALDONADO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064188058",
+      "documento": "2064188058",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900756170 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064190994",
+      "documento": "2064190994",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755863 RODRIGO RIBEIRO ALVES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064201916",
+      "documento": "2064201916",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755918 MAURILIO PINHEIRO CAMARA FILHO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -2000,
+      "fitid": "2064279419",
+      "documento": "2064279419",
+      "descricao": "Transacao via Pix com chave para Sergio Proenca",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -153.9,
+      "fitid": "2064303510",
+      "documento": "2064303510",
+      "descricao": "Transacao via Pix com QR Code para PIX Marketplace",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 4272.84,
+      "fitid": "2064346538",
+      "documento": "906984847",
+      "descricao": "Cobranca recebida - fatura nr. 906984847 Summer Boat Comercio Varejista De Embarcacoes Ltda",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064370322",
+      "documento": "2064370322",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755996 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -9442.13,
+      "fitid": "2064383090",
+      "documento": "2064383090",
+      "descricao": "Transacao via Pix com chave para SUMMER NAUTICA LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064413934",
+      "documento": "2064413934",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900756303 RODRIGO RIBEIRO ALVES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064421845",
+      "documento": "2064421845",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900756245 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064422375",
+      "documento": "2064422375",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755850 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064424159",
+      "documento": "2064424159",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900756153 JUNIOR RODRIGO MALDONATO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.35,
+      "fitid": "2064428252",
+      "documento": "2064428252",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755886 VANESSA LUIZA FERNANDES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 364.5,
+      "fitid": "2064642404",
+      "documento": "904297935",
+      "descricao": "Cobranca recebida - fatura nr. 904297935 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.8,
+      "fitid": "2064642406",
+      "documento": "904297935",
+      "descricao": "Taxa do Pix - fatura nr. 904297935 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.55,
+      "fitid": "2064642409",
+      "documento": "2064642409",
+      "descricao": "Taxa de mensageria - fatura nr. 904297935 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.55,
+      "fitid": "2064694546",
+      "documento": "2064694546",
+      "descricao": "Taxa de mensageria - fatura nr. 906907315 MARCO ANTONIO PERILLO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-10",
+      "valor": -1000,
+      "fitid": "2064709576",
+      "documento": "2064709576",
+      "descricao": "Transacao via Pix com QR Code para P NAUTICA LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 2100,
+      "fitid": "2065241602",
+      "documento": "900756245",
+      "descricao": "Cobranca recebida - fatura nr. 900756245 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -1.5,
+      "fitid": "2065241606",
+      "documento": "900756245",
+      "descricao": "Taxa de boleto - fatura nr. 900756245 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.55,
+      "fitid": "2065241624",
+      "documento": "2065241624",
+      "descricao": "Taxa de mensageria - fatura nr. 900756245 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 550.44,
+      "fitid": "2065244242",
+      "documento": "900755850",
+      "descricao": "Cobranca recebida - fatura nr. 900755850 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -1.5,
+      "fitid": "2065244249",
+      "documento": "900755850",
+      "descricao": "Taxa de boleto - fatura nr. 900755850 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.55,
+      "fitid": "2065244265",
+      "documento": "2065244265",
+      "descricao": "Taxa de mensageria - fatura nr. 900755850 MARCIO HIPOLITO SIMIEMA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-10",
+      "valor": 6000,
+      "fitid": "2066130139",
+      "documento": "898256662",
+      "descricao": "Cobranca recebida - fatura nr. 898256662 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.8,
+      "fitid": "2066130142",
+      "documento": "898256662",
+      "descricao": "Taxa do Pix - fatura nr. 898256662 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-10",
+      "valor": -0.55,
+      "fitid": "2066130145",
+      "documento": "2066130145",
+      "descricao": "Taxa de mensageria - fatura nr. 898256662 WILMA MARCONDES DOS SANTOS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 2083.15,
+      "fitid": "2066352581",
+      "documento": "708927383",
+      "descricao": "Cobranca recebida - fatura nr. 708927383 MARCOS VINICIUS ABRANTES BORGES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -83.15,
+      "fitid": "2066352586",
+      "documento": "708927383",
+      "descricao": "Taxa de cartao - fatura nr. 708927383 MARCOS VINICIUS ABRANTES BORGES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 6296.95,
+      "fitid": "2066477742",
+      "documento": "900756206",
+      "descricao": "Cobranca recebida - fatura nr. 900756206 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -1.5,
+      "fitid": "2066477749",
+      "documento": "900756206",
+      "descricao": "Taxa de boleto - fatura nr. 900756206 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2066477774",
+      "documento": "2066477774",
+      "descricao": "Taxa de mensageria - fatura nr. 900756206 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 550.44,
+      "fitid": "2066485579",
+      "documento": "900755969",
+      "descricao": "Cobranca recebida - fatura nr. 900755969 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -1.5,
+      "fitid": "2066485591",
+      "documento": "900755969",
+      "descricao": "Taxa de boleto - fatura nr. 900755969 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2066485611",
+      "documento": "2066485611",
+      "descricao": "Taxa de mensageria - fatura nr. 900755969 ALBERTO DE DEUS GUERRA NETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 199,
+      "fitid": "2067187169",
+      "documento": "887481077",
+      "descricao": "Cobranca recebida - fatura nr. 887481077 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2067187171",
+      "documento": "887481077",
+      "descricao": "Taxa do Pix - fatura nr. 887481077 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2067187173",
+      "documento": "2067187173",
+      "descricao": "Taxa de mensageria - fatura nr. 887481077 CHARLES COSTA LOPES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.35,
+      "fitid": "2067197456",
+      "documento": "2067197456",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896771617 ELVIS MAYCON MALDONADO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.35,
+      "fitid": "2067228952",
+      "documento": "2067228952",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 898256764 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 555.93,
+      "fitid": "2067270759",
+      "documento": "898256764",
+      "descricao": "Cobranca recebida - fatura nr. 898256764 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2067270761",
+      "documento": "898256764",
+      "descricao": "Taxa do Pix - fatura nr. 898256764 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2067270764",
+      "documento": "2067270764",
+      "descricao": "Taxa de mensageria - fatura nr. 898256764 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.35,
+      "fitid": "2067305246",
+      "documento": "2067305246",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 902827332 RICARDO FERREIRA NOMINATO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-11",
+      "valor": -5711.87,
+      "fitid": "2067348710",
+      "documento": "2067348710",
+      "descricao": "Transacao via Pix com QR Code para MINISTERIO DA FAZENDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 114.54,
+      "fitid": "2067548334",
+      "documento": "907981201",
+      "descricao": "Cobranca recebida - fatura nr. 907981201 PERITO GARCIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2067548337",
+      "documento": "907981201",
+      "descricao": "Taxa do Pix - fatura nr. 907981201 PERITO GARCIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 114.54,
+      "fitid": "2067624166",
+      "documento": "907987463",
+      "descricao": "Cobranca recebida - fatura nr. 907987463 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2067624167",
+      "documento": "907987463",
+      "descricao": "Taxa do Pix - fatura nr. 907987463 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-11",
+      "valor": -10.52,
+      "fitid": "2067735208",
+      "documento": "2067735208",
+      "descricao": "Transacao via Pix com QR Code para FERPAM COM DE FERRAMENTAS PARAFUSOS E MAQUINAS LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-11",
+      "valor": -874.32,
+      "fitid": "2067785941",
+      "documento": "2067785941",
+      "descricao": "Transacao via Pix com chave para SUMMER BOAT COMERCIO VAREJISTA DE EMBARCACOES LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2067837985",
+      "documento": "2067837985",
+      "descricao": "Taxa de mensageria - fatura nr. 907981201 PERITO GARCIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2067839238",
+      "documento": "2067839238",
+      "descricao": "Taxa de mensageria - fatura nr. 907987463 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 57.81,
+      "fitid": "2067855304",
+      "documento": "908045358",
+      "descricao": "Cobranca recebida - fatura nr. 908045358 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2067855305",
+      "documento": "908045358",
+      "descricao": "Taxa do Pix - fatura nr. 908045358 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2067859887",
+      "documento": "2067859887",
+      "descricao": "Taxa de mensageria - fatura nr. 908045358 JOAO VICTOR BRAGA MILHOMEM",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 0.01,
+      "fitid": "2068019193",
+      "documento": "908209593",
+      "descricao": "Cobranca recebida - fatura nr. 908209593 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 57.81,
+      "fitid": "2068148126",
+      "documento": "908039627",
+      "descricao": "Cobranca recebida - fatura nr. 908039627 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2068148127",
+      "documento": "908039627",
+      "descricao": "Taxa do Pix - fatura nr. 908039627 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2068148131",
+      "documento": "2068148131",
+      "descricao": "Taxa de mensageria - fatura nr. 908039627 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 114.54,
+      "fitid": "2068148875",
+      "documento": "907980482",
+      "descricao": "Cobranca recebida - fatura nr. 907980482 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.8,
+      "fitid": "2068148877",
+      "documento": "907980482",
+      "descricao": "Taxa do Pix - fatura nr. 907980482 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-11",
+      "valor": -0.55,
+      "fitid": "2068148884",
+      "documento": "2068148884",
+      "descricao": "Taxa de mensageria - fatura nr. 907980482 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 0.02,
+      "fitid": "2068585063",
+      "documento": "908457984",
+      "descricao": "Cobranca recebida - fatura nr. 908457984 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 0.02,
+      "fitid": "2068601008",
+      "documento": "908463377",
+      "descricao": "Cobranca recebida - fatura nr. 908463377 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-11",
+      "valor": 0.02,
+      "fitid": "2068642379",
+      "documento": "908478127",
+      "descricao": "Cobranca recebida - fatura nr. 908478127 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "DEBIT",
+      "data": "2026-09-11",
+      "valor": -0.02,
+      "fitid": "2068656969",
+      "documento": "908478127",
+      "descricao": "Estorno - fatura nr. 908478127 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 98.93,
+      "fitid": "2069106751",
+      "documento": "908457342",
+      "descricao": "Cobranca recebida - fatura nr. 908457342 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.8,
+      "fitid": "2069106752",
+      "documento": "908457342",
+      "descricao": "Taxa do Pix - fatura nr. 908457342 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.55,
+      "fitid": "2069106753",
+      "documento": "2069106753",
+      "descricao": "Taxa de mensageria - fatura nr. 908457342 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 2289.8,
+      "fitid": "2069108186",
+      "documento": "902827410",
+      "descricao": "Cobranca recebida - fatura nr. 902827410 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.8,
+      "fitid": "2069108187",
+      "documento": "902827410",
+      "descricao": "Taxa do Pix - fatura nr. 902827410 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.55,
+      "fitid": "2069108191",
+      "documento": "2069108191",
+      "descricao": "Taxa de mensageria - fatura nr. 902827410 SILVIO ROBERTO PEREIRA RAMOS JUNIOR",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 65.95,
+      "fitid": "2069364802",
+      "documento": "908975866",
+      "descricao": "Cobranca recebida - fatura nr. 908975866 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.8,
+      "fitid": "2069364804",
+      "documento": "908975866",
+      "descricao": "Taxa do Pix - fatura nr. 908975866 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.55,
+      "fitid": "2069364806",
+      "documento": "2069364806",
+      "descricao": "Taxa de mensageria - fatura nr. 908975866 ALLEFE HENRIQUE NUNES AIRES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 57.81,
+      "fitid": "2069417487",
+      "documento": "908040305",
+      "descricao": "Cobranca recebida - fatura nr. 908040305 PERITO GARCIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.8,
+      "fitid": "2069417488",
+      "documento": "908040305",
+      "descricao": "Taxa do Pix - fatura nr. 908040305 PERITO GARCIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.55,
+      "fitid": "2069417489",
+      "documento": "2069417489",
+      "descricao": "Taxa de mensageria - fatura nr. 908040305 PERITO GARCIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 329.77,
+      "fitid": "2069444350",
+      "documento": "908573136",
+      "descricao": "Cobranca recebida - fatura nr. 908573136 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.8,
+      "fitid": "2069444351",
+      "documento": "908573136",
+      "descricao": "Taxa do Pix - fatura nr. 908573136 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-12",
+      "valor": -0.55,
+      "fitid": "2069444353",
+      "documento": "2069444353",
+      "descricao": "Taxa de mensageria - fatura nr. 908573136 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-12",
+      "valor": 0.01,
+      "fitid": "2069810286",
+      "documento": "909197231",
+      "descricao": "Cobranca recebida - fatura nr. 909197231 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-13",
+      "valor": 23.6,
+      "fitid": "2070035872",
+      "documento": "908453861",
+      "descricao": "Cobranca recebida - fatura nr. 908453861 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.8,
+      "fitid": "2070035873",
+      "documento": "908453861",
+      "descricao": "Taxa do Pix - fatura nr. 908453861 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.55,
+      "fitid": "2070035874",
+      "documento": "2070035874",
+      "descricao": "Taxa de mensageria - fatura nr. 908453861 MATEUS ALVES DA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-13",
+      "valor": 263.82,
+      "fitid": "2070080493",
+      "documento": "909397332",
+      "descricao": "Cobranca recebida - fatura nr. 909397332 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.8,
+      "fitid": "2070080494",
+      "documento": "909397332",
+      "descricao": "Taxa do Pix - fatura nr. 909397332 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.55,
+      "fitid": "2070080495",
+      "documento": "2070080495",
+      "descricao": "Taxa de mensageria - fatura nr. 909397332 MATHEUS LINHARES ANDRADE FARIA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-13",
+      "valor": 395.72,
+      "fitid": "2070527605",
+      "documento": "909627846",
+      "descricao": "Cobranca recebida - fatura nr. 909627846 PABLO ARAUJO MORAES",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.8,
+      "fitid": "2070527606",
+      "documento": "909627846",
+      "descricao": "Taxa do Pix - fatura nr. 909627846 PABLO ARAUJO MORAES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.55,
+      "fitid": "2070527609",
+      "documento": "2070527609",
+      "descricao": "Taxa de mensageria - fatura nr. 909627846 PABLO ARAUJO MORAES",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-13",
+      "valor": 758.47,
+      "fitid": "2070645242",
+      "documento": "909685081",
+      "descricao": "Cobranca recebida - fatura nr. 909685081 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.8,
+      "fitid": "2070645243",
+      "documento": "909685081",
+      "descricao": "Taxa do Pix - fatura nr. 909685081 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-13",
+      "valor": -0.55,
+      "fitid": "2070645244",
+      "documento": "2070645244",
+      "descricao": "Taxa de mensageria - fatura nr. 909685081 PLINIO MARCOS NEGRAO FERREIRA DIAS",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 0.01,
+      "fitid": "2070798583",
+      "documento": "909750856",
+      "descricao": "Cobranca recebida - fatura nr. 909750856 JOSE DINIZ NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-14",
+      "valor": -340,
+      "fitid": "2071681583",
+      "documento": "2071681583",
+      "descricao": "Transacao via Pix com chave para HELIMAX ADMINISTRACAO E GESTAO LTDA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.35,
+      "fitid": "2071754296",
+      "documento": "2071754296",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 896771617 ELVIS MAYCON MALDONADO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.35,
+      "fitid": "2071869035",
+      "documento": "2071869035",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900755918 MAURILIO PINHEIRO CAMARA FILHO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.35,
+      "fitid": "2071886876",
+      "documento": "2071886876",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 900756153 JUNIOR RODRIGO MALDONATO PORTILLA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.35,
+      "fitid": "2071916685",
+      "documento": "2071916685",
+      "descricao": "Taxa de notificacao por WhatsApp da cobranca 909080596 DIOGO FERNANDES COSTA VALDEVINO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 731.85,
+      "fitid": "2072258687",
+      "documento": "904297006",
+      "descricao": "Cobranca recebida - fatura nr. 904297006 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.8,
+      "fitid": "2072258688",
+      "documento": "904297006",
+      "descricao": "Taxa do Pix - fatura nr. 904297006 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.55,
+      "fitid": "2072258690",
+      "documento": "2072258690",
+      "descricao": "Taxa de mensageria - fatura nr. 904297006 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 114.54,
+      "fitid": "2072262498",
+      "documento": "907985814",
+      "descricao": "Cobranca recebida - fatura nr. 907985814 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.8,
+      "fitid": "2072262499",
+      "documento": "907985814",
+      "descricao": "Taxa do Pix - fatura nr. 907985814 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.55,
+      "fitid": "2072262500",
+      "documento": "2072262500",
+      "descricao": "Taxa de mensageria - fatura nr. 907985814 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 57.81,
+      "fitid": "2072264432",
+      "documento": "908044289",
+      "descricao": "Cobranca recebida - fatura nr. 908044289 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.8,
+      "fitid": "2072264433",
+      "documento": "908044289",
+      "descricao": "Taxa do Pix - fatura nr. 908044289 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "FEE",
+      "data": "2026-09-14",
+      "valor": -0.55,
+      "fitid": "2072264436",
+      "documento": "2072264436",
+      "descricao": "Taxa de mensageria - fatura nr. 908044289 RODRIGO RODRIGUES NOLETO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-14",
+      "valor": -120,
+      "fitid": "2072428785",
+      "documento": "2072428785",
+      "descricao": "Transacao via Pix com chave para ARICELIA DA COSTA SILVA",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-14",
+      "valor": -1,
+      "fitid": "2072440927",
+      "documento": "2072440927",
+      "descricao": "Transacao via Pix com chave para JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "DEBITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 0.99,
+      "fitid": "2072447215",
+      "documento": "2072447215",
+      "descricao": "Estorno de transacao via Pix",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "CREDIT",
+      "data": "2026-09-14",
+      "valor": 0.01,
+      "fitid": "2072448855",
+      "documento": "910230233",
+      "descricao": "Cobranca recebida - fatura nr. 910230233 JOAO RICARDO DA SILVA NOVELLO",
+      "tipo_credito_debito": "CREDITO"
+    },
+    {
+      "tipo": "XFER",
+      "data": "2026-09-14",
+      "valor": -8000,
+      "fitid": "2072739209",
+      "documento": "2072739209",
+      "descricao": "Transacao via Pix com chave para VANDILSON FERREIRA DE OLIVEIRA",
+      "tipo_credito_debito": "DEBITO"
+    }
+  ]
+}

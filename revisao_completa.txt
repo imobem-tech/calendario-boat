@@ -1,0 +1,1608 @@
+◇ injected env (10) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+(node:18684) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+========================================================================================================================
+📋 REVISÃO DETALHADA - LANÇAMENTOS QUE SERÃO MODIFICADOS
+========================================================================================================================
+Total: 42 lançamento(s)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 EMPRESA: ALLMAX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ [1] ID: 6 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.02
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [2] ID: 7 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.02
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [3] ID: 8 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.02
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [4] ID: 9 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [5] ID: 121 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [6] ID: 160 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-14
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 1 arquivo(s) do Vercel Blob:
+│       1. 28_160_20260914T030621.jpg (100.32 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/ALLMAX/28_160_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 1 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [7] ID: 172 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -1.00
+│    Data: 2026-09-14
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "camissao jose"
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 2 arquivo(s) do Vercel Blob:
+│       1. 38_172_20260914T162615.jpg (74.91 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/ALLMAX/38_172_20...
+│       2. 38_172_20260914T162633.jpg (71.39 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/ALLMAX/38_172_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 2 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [8] ID: 174 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-14
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 1 arquivo(s) do Vercel Blob:
+│       1. 28_174_20260914T163002.jpg (91.25 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/ALLMAX/28_174_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 1 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 EMPRESA: IMOBEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ [1] ID: 12 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido. Mensagem: teste pix"
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: Outras receitas
+│    Manual: Sim
+│    Classificado por: WhatsApp: 143572351365182@lid
+│    Classificado em: 2026-09-12
+│    Confiança: 100%
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [2] ID: 13 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido. Mensagem: teste pix"
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: Valor despresível
+│    Manual: Sim
+│    Classificado por: WhatsApp: 143572351365182@lid
+│    Classificado em: 2026-09-12
+│    Confiança: 100%
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [3] ID: 15 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.03
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: Outras receitas
+│    Manual: Sim
+│    Classificado por: WhatsApp: 143572351365182@lid
+│    Classificado em: 2026-09-12
+│    Confiança: 100%
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [4] ID: 122 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Não
+│    Classificado por: Usuário - Aprendizado
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [5] ID: 123 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Não
+│    Classificado por: Usuário - Aprendizado
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [6] ID: 124 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [7] ID: 125 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 4 arquivo(s) do Vercel Blob:
+│       1. 28_125_20260913T042334.jpg (175.48 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/28_125_20...
+│       2. 28_125_20260913T042351.pdf (339.65 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/28_125_20...
+│       3. 28_125_20260913T042423.jpg (152.48 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/28_125_20...
+│       4. 28_125_20260913T042423.jpg (153.54 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/28_125_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 4 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [8] ID: 126 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Não
+│    Classificado por: Sistema - Chave aprendida
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [9] ID: 133 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.05
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "TRANSFER_CREATED - N/A"
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 26
+│    Manual: Não
+│    Classificado por: Sistema - Palavra-chave: "*transf*"
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [10] ID: 139 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "TRANSFER_CREATED - N/A"
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 26
+│    Manual: Não
+│    Classificado por: Sistema - Palavra-chave: "*transf*"
+│    Classificado em: 2026-09-13
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [11] ID: 142 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 1 arquivo(s) do Vercel Blob:
+│       1. 38_142_20260914T000546.jpg (108.09 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/38_142_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 1 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [12] ID: 143 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.03
+│    Data: 2026-09-11
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [13] ID: 144 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.02
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 1 arquivo(s) do Vercel Blob:
+│       1. 28_144_20260914T004417.jpg (99.14 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/28_144_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 1 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [14] ID: 145 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.02
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [15] ID: 146 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [16] ID: 147 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [17] ID: 148 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Não
+│    Classificado por: Usuário - Aprendizado
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [18] ID: 149 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [19] ID: 150 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 2 arquivo(s) do Vercel Blob:
+│       1. 38_150_20260914T020912.jpg (166.35 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/38_150_20...
+│       2. 38_150_20260914T021003.jpg (150.64 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/38_150_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 2 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [20] ID: 151 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Não
+│    Classificado por: Usuário - Aprendizado
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [21] ID: 152 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Não
+│    Classificado por: Sistema - Chave aprendida
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [22] ID: 153 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [23] ID: 158 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Não
+│    Classificado por: Sistema - Chave aprendida
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [24] ID: 159 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [25] ID: 162 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ -0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    🗑️  EXCLUIR 1 arquivo(s) do Vercel Blob:
+│       1. 38_162_20260914T033255.jpg (152.48 KB)
+│          URL: https://opwohb5ckmiwk75r.public.blob.vercel-storage.com/recibos/IMOBEM/38_162_20...
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🗑️  Excluir 1 arquivo(s) do Vercel Blob Storage
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 EMPRESA: SUMMER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ [1] ID: 117 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [2] ID: 118 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [3] ID: 119 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [4] ID: 120 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-12
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [5] ID: 154 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [6] ID: 155 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.02
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [7] ID: 156 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: SEM CLASSIFICAÇÃO
+│    Manual: Não
+│    Classificado por: N/A
+│    Classificado em: NUNCA
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [8] ID: 157 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-13
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 38
+│    Manual: Não
+│    Classificado por: Sistema - Chave aprendida
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ [9] ID: 161 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│
+│ 💰 DADOS FINANCEIROS:
+│    Valor: R$ 0.01
+│    Data: 2026-09-14
+│    Banco: Asaas
+│
+│ 📝 DESCRIÇÃO:
+│    ATUAL:  "Cobrança gerada automaticamente a partir de Pix recebido."
+│    NOVA:   "testes"
+│    ➜ SERÁ ALTERADA
+│
+│ 🏷️  CLASSIFICAÇÃO:
+│    Classificação: 28
+│    Manual: Sim
+│    Classificado por: Usuário - WhatsApp
+│    Classificado em: 2026-09-14
+│    Confiança: N/A
+│
+│ 📎 ARQUIVOS:
+│    ℹ️  Sem arquivos no Vercel Blob
+│
+│ 🧹 CAMPOS EXTRAS QUE SERÃO LIMPOS:
+│    Fornecedor: N/A
+│    Documento local: N/A
+│    ➜ TODOS OS CAMPOS EXTRAS SERÃO LIMPOS
+│
+│ ⚡ AÇÕES QUE SERÃO EXECUTADAS:
+│    ✅ Registro permanece na tabela (ID, valor, data, banco preservados)
+│    🧹 recibos_urls → NULL
+│    ✏️  descricao_original → "testes"
+│    🧹 campos_extras → NULL
+│    📝 Criar registro no histórico de classificações
+│
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+========================================================================================================================
+📊 RESUMO FINAL DA REVISÃO
+========================================================================================================================
+
+🏢 ALLMAX:
+   Total: 8 lançamento(s)
+   Com arquivos: 3 (total de 4 arquivo(s) no Blob)
+   Sem arquivos: 5
+
+🏢 IMOBEM:
+   Total: 25 lançamento(s)
+   Com arquivos: 5 (total de 9 arquivo(s) no Blob)
+   Sem arquivos: 20
+
+🏢 SUMMER:
+   Total: 9 lançamento(s)
+   Com arquivos: 0 (total de 0 arquivo(s) no Blob)
+   Sem arquivos: 9
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+📦 Total de lançamentos: 42
+🗑️  Total de arquivos a excluir do Blob: 13
+========================================================================================================================
+
+⚠️  IMPORTANTE:
+   • Os IDs, valores, datas e bancos PERMANECEM intactos
+   • Apenas descrição, arquivos e campos extras serão modificados/limpos
+   • Todas as ações serão registradas no histórico
+   • Esta operação é IRREVERSÍVEL
+
+✅ Revise cada lançamento acima e confirme se pode prosseguir.
+========================================================================================================================
+
