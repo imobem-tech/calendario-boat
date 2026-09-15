@@ -1,7 +1,13 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609142305
+// wpp/routes/banco/extrato-api.js — V.2609150037
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
+//
+// 🔥 FIX V.2609150037: Filtro PENDENTE inclui NULL
+//    - PROBLEMA: 75 registros com status=NULL não apareciam no filtro PENDENTE
+//    - ANTES: WHERE status = 'PENDENTE' (achava só 1 registro)
+//    - AGORA: WHERE (status IS NULL OR status = 'PENDENTE') (acha 76 registros)
+//    - RESULTADO: Filtro Pendentes agora mostra todos os não classificados!
 //
 // ⚡ OTIMIZAÇÃO CRÍTICA (14/09 23:05): Window function SQL para saldo
 //    - ANTES: Buscava TODOS lançamentos históricos + loop JS (LENTO!)
@@ -9,6 +15,7 @@
 //    - RESULTADO: 100x+ mais rápido, sem query extra
 //
 // HISTÓRICO:
+// - V.2609150037: Filtro PENDENTE inclui NULL (fix crítico)
 // - V.2609142305: Otimização window function (performance crítica)
 // - V.2609142025: Filtros data_inicio/data_fim + ORDER BY data DESC
 // - V.2609141825: Geração tokens para acesso seguro anexos
@@ -35,12 +42,13 @@ const pool = new Pool({
  * - empresa: ALLMAX, IMOBEM, IMOBAN, SUMMER (obrigatório)
  * - mes: YYYY-MM (opcional)
  * - status: OK, PENDENTE (opcional)
+ * - somente_nao_classificados: true/false (opcional)
  * - limit: número de registros (padrão 100)
  * - offset: paginação (padrão 0)
  */
 router.get('/listar', async (req, res) => {
   try {
-    const { empresa, mes, data_inicio, data_fim, status, limit = 100, offset = 0 } = req.query;
+    const { empresa, mes, data_inicio, data_fim, status, somente_nao_classificados, limit = 100, offset = 0 } = req.query;
 
     if (!empresa) {
       return res.status(400).json({
@@ -108,10 +116,23 @@ router.get('/listar', async (req, res) => {
     }
 
     // Filtro por status
+    // ✅ FIX: PENDENTE inclui NULL (maioria dos registros pendentes tem status=NULL)
     if (status) {
-      query += ` AND e.status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
+      if (status === 'PENDENTE') {
+        query += ` AND (e.status IS NULL OR e.status = $${paramIndex})`;
+        params.push(status);
+        paramIndex++;
+      } else {
+        query += ` AND e.status = $${paramIndex}`;
+        params.push(status);
+        paramIndex++;
+      }
+    }
+
+    // Filtro: somente não classificados
+    // ✅ Mostra apenas lançamentos sem categoria (classificacao IS NULL OR '')
+    if (somente_nao_classificados === 'true') {
+      query += ` AND (e.classificacao IS NULL OR e.classificacao = '')`;
     }
 
     // Ordenação: data DESC (mais recente primeiro), depois importado_em DESC
@@ -149,9 +170,20 @@ router.get('/listar', async (req, res) => {
       paramIndexTotais++;
     }
 
+    // ✅ FIX: PENDENTE inclui NULL
     if (status) {
-      queryTotais += ` AND status = $${paramIndexTotais}`;
-      paramsTotais.push(status);
+      if (status === 'PENDENTE') {
+        queryTotais += ` AND (status IS NULL OR status = $${paramIndexTotais})`;
+        paramsTotais.push(status);
+      } else {
+        queryTotais += ` AND status = $${paramIndexTotais}`;
+        paramsTotais.push(status);
+      }
+    }
+
+    // ✅ Filtro: somente não classificados
+    if (somente_nao_classificados === 'true') {
+      queryTotais += ` AND (classificacao IS NULL OR classificacao = '')`;
     }
 
     const totaisResult = await pool.query(queryTotais, paramsTotais);

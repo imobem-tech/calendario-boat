@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150035
+    EXTRATO BANCÁRIO - V.2609150037
+
+    ✅ NOVO FILTRO - V.2609150037
+       - Checkbox "Somente não classificados"
+       - Default: desmarcado (mostra todos)
+       - Marcado: mostra apenas lançamentos sem categoria
+       - Integrado com API (parâmetro somente_nao_classificados)
 
     ✅ MODAL COMPLETO - V.2609150035
        - Campo STATUS adicionado (PENDENTE/OK)
@@ -446,6 +452,13 @@
                 </select>
             </div>
 
+            <div class="filter-group" style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="somenteNaoClassificados" style="width: auto; margin: 0;">
+                <label for="somenteNaoClassificados" style="margin: 0; cursor: pointer;">
+                    🚫 Somente não classificados
+                </label>
+            </div>
+
             <div class="filter-group" style="display: flex; align-items: flex-end;">
                 <button class="btn btn-primary" onclick="buscarExtrato()" style="width: 100%;">
                     🔍 Buscar
@@ -556,6 +569,7 @@
 
                 const empresa = document.getElementById('empresaSelect').value;
                 const status = document.getElementById('statusSelect').value;
+                const somenteNaoClassificados = document.getElementById('somenteNaoClassificados').checked;
 
                 let url = 'https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?';
 
@@ -583,6 +597,11 @@
                 // Status
                 if (status !== 'todos') {
                     url += `status=${status}&`;
+                }
+
+                // Somente não classificados
+                if (somenteNaoClassificados) {
+                    url += `somente_nao_classificados=true&`;
                 }
 
                 url += 'limit=1000';
@@ -613,6 +632,7 @@
         async function buscarTodasEmpresas() {
             const empresas = ['ALLMAX', 'IMOBEM', 'IMOBAN', 'SUMMER'];
             const status = document.getElementById('statusSelect').value;
+            const somenteNaoClassificados = document.getElementById('somenteNaoClassificados').checked;
 
             let todosLancamentos = [];
             let totais = {
@@ -637,6 +657,7 @@
                 }
 
                 if (status !== 'todos') url += `status=${status}&`;
+                if (somenteNaoClassificados) url += `somente_nao_classificados=true&`;
                 url += 'limit=1000';
 
                 const response = await fetch(url);
