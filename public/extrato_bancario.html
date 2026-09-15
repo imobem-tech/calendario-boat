@@ -6,11 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150025
+    EXTRATO BANCÁRIO - V.2609150030
 
-    🔍 DEBUG MODAL - V.2609150025
-       - Logs de debug para categorias no modal
-       - Verificar por que combo está vazio
+    ✅ FIX MODAL CATEGORIAS - V.2609150030
+       - Correção crítica: tipo direto (CREDITO/DEBITO)
+       - ANTES: convertia para RECEITA/DESPESA (errado!)
+       - AGORA: usa tipo direto, bate com banco
+       - Resultado: 1 categoria → 10+ categorias
 
     📝 DOCS ENRIQUECER - V.2609150010
        - Documentação atualizada: V.2609150010
@@ -902,8 +904,9 @@
             });
             console.log('📦 Total categorias disponíveis:', categoriasDisponiveis.length);
 
-            // Determinar tipo esperado da categoria baseado no tipo do lançamento
-            const tipoEsperado = lancamento.tipo === 'CREDITO' ? 'RECEITA' : 'DESPESA';
+            // ✅ FIX: Usar tipo direto (CREDITO/DEBITO), não converter para RECEITA/DESPESA
+            // Categorias no banco têm tipo = CREDITO ou DEBITO, não RECEITA/DESPESA
+            const tipoEsperado = lancamento.tipo; // CREDITO ou DEBITO
             console.log('🎯 Tipo esperado categoria:', tipoEsperado);
 
             let categoriasAdicionadas = 0;
