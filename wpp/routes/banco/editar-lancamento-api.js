@@ -1,10 +1,13 @@
 // ============================================================
-// wpp/routes/banco/editar-lancamento-api.js — V.2609142140
+// wpp/routes/banco/editar-lancamento-api.js — V.2609150035
 // API PARA EDITAR LANÇAMENTOS BANCÁRIOS
-// + FIX: Usa bank_categorias (não categorias_bancarias)
-// + FIX: Usa classificacao (não categoria_id)
-// + FIX: JOIN correto (classificacao::INTEGER = c.id)
-// + FIX: GET /categorias retorna campo empresa (para filtro)
+//
+// ✅ V.2609150035: Ordenação + STATUS
+//    - GET /categorias: ORDER BY ordem DESC (maior valor primeiro)
+//    - PUT /lancamento: Aceita status (PENDENTE/OK) explícito
+//
+// HISTÓRICO:
+// + V.2609142140: Usa bank_categorias, classificacao, JOIN correto
 // ============================================================
 
 import express from 'express';
@@ -30,10 +33,11 @@ router.get('/categorias', async (req, res) => {
         icone,
         cor,
         tipo,
-        empresa
+        empresa,
+        ordem
       FROM bank_categorias
       WHERE ativo = true
-      ORDER BY nome
+      ORDER BY ordem DESC NULLS LAST, nome
     `);
 
     res.json({
@@ -55,13 +59,14 @@ router.get('/categorias', async (req, res) => {
  * - categoria_id: number (opcional)
  * - descricao: string (opcional)
  * - observacoes: string (opcional)
+ * - status: string (opcional - PENDENTE/OK)
  */
 router.put('/lancamento/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoria_id, descricao, observacoes } = req.body;
+    const { categoria_id, descricao, observacoes, status } = req.body;
 
-    console.log(`📝 Atualizando lançamento ${id}:`, { categoria_id, descricao, observacoes });
+    console.log(`📝 Atualizando lançamento ${id}:`, { categoria_id, descricao, observacoes, status });
 
     // Montar query dinâmica baseado nos campos fornecidos
     const campos = [];
@@ -87,16 +92,20 @@ router.put('/lancamento/:id', async (req, res) => {
       contador++;
     }
 
+    // ✅ NOVO: Aceitar status explícito (PENDENTE/OK)
+    if (status !== undefined) {
+      campos.push(`status = $${contador}`);
+      valores.push(status);
+      contador++;
+    } else if (categoria_id !== undefined && categoria_id !== null) {
+      // Se categoria foi definida mas status não, marcar como OK automaticamente
+      campos.push(`status = 'OK'`);
+    }
+
     if (campos.length === 0) {
       return res.status(400).json({
         erro: 'Nenhum campo para atualizar'
       });
-    }
-
-    // Adicionar atualização de status
-    // Se categoria foi definida, marcar como OK
-    if (categoria_id !== undefined && categoria_id !== null) {
-      campos.push(`status = 'OK'`);
     }
 
     // Adicionar ID no final

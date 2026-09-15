@@ -6,7 +6,12 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150030
+    EXTRATO BANCÁRIO - V.2609150035
+
+    ✅ MODAL COMPLETO - V.2609150035
+       - Campo STATUS adicionado (PENDENTE/OK)
+       - Categorias ordenadas por campo `ordem` DESC
+       - API aceita status explícito
 
     ✅ FIX MODAL CATEGORIAS - V.2609150030
        - Correção crítica: tipo direto (CREDITO/DEBITO)
@@ -889,6 +894,7 @@
             document.getElementById('editLancamentoId').value = lancamento.id;
             document.getElementById('editDescricao').value = lancamento.descricao;
             document.getElementById('editObservacoes').value = lancamento.observacoes || '';
+            document.getElementById('editStatus').value = lancamento.status || 'PENDENTE';
 
             // Preencher select de categorias (FILTRADO por empresa e tipo)
             const selectCategoria = document.getElementById('editCategoria');
@@ -960,6 +966,7 @@
             const categoriaId = document.getElementById('editCategoria').value;
             const descricao = document.getElementById('editDescricao').value;
             const observacoes = document.getElementById('editObservacoes').value;
+            const status = document.getElementById('editStatus').value;
 
             if (!descricao) {
                 alert('Descrição é obrigatória!');
@@ -978,7 +985,8 @@
                     body: JSON.stringify({
                         categoria_id: categoriaId ? parseInt(categoriaId) : null,
                         descricao,
-                        observacoes
+                        observacoes,
+                        status
                     })
                 });
 
@@ -1299,6 +1307,14 @@
             <div style="margin-bottom: 20px;">
                 <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Observações:</label>
                 <textarea id="editObservacoes" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit;"></textarea>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Status:</label>
+                <select id="editStatus" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    <option value="PENDENTE">⏳ PENDENTE</option>
+                    <option value="OK">✅ OK</option>
+                </select>
             </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
