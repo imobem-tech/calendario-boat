@@ -6,7 +6,12 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150000
+    EXTRATO BANCÁRIO - V.2609150005
+
+    🔧 FIX LOADING - V.2609150005
+       - Loading escondido por padrão (display: none)
+       - Tabela visível por padrão
+       - Sem "Carregando..." ao abrir página
 
     📝 DOCS ATUALIZADAS - V.2609150000
        - Versões reais das APIs no cabeçalho
@@ -452,11 +457,11 @@
 
         <!-- TABELA -->
         <div class="table-container">
-            <div id="loading" class="loading">
+            <div id="loading" class="loading" style="display: none;">
                 <div class="loading-spinner"></div>
                 <p>Carregando extratos...</p>
             </div>
-            <table id="tabelaExtrato" style="display: none;">
+            <table id="tabelaExtrato">
                 <thead>
                     <tr>
                         <th>Data</th>
@@ -1271,7 +1276,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">📝 V.2609150000</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">🔧 V.2609150005</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 🗑️ Excluir
@@ -1281,4 +1286,4 @@
 </body>
 </html>
 
-<!-- V.2609150000 - 📝 Documentação atualizada com versões reais das APIs -->
+<!-- V.2609150005 - 🔧 Fix: Loading escondido por padrão -->
