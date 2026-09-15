@@ -1,10 +1,12 @@
 // ============================================================
-// enriquecer-api.js — V.2609142100
+// enriquecer-api.js — V.2609142200
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
 // + FIX: Usa classificarLancamento() (banco_categorias)
 // + FIX: Salva ID da categoria (não nome)
 // + FIX: Status OK apenas se TUDO encontrado (cliente + CR + classificacao)
 // + FIX: Tolerância valor ±5% com campo Total do CR
+// + FIX: Tolerância data ±10 dias (não ±7)
+// + FIX: Testa TODOS os homônimos até achar CR
 // + NOVO: Filtros data_inicio, data_fim (igual reclassificar)
 // ============================================================
 
@@ -43,7 +45,7 @@ async function buscarCliente(nomeParcial, empresa) {
 }
 
 // Buscar CR (Contas a Receber)
-// Tolerâncias: Data ±7 dias, Valor ±5% (campo Total)
+// Tolerâncias: Data ±10 dias, Valor ±5% (campo Total)
 async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
   const dataStr = dataExtrato instanceof Date
     ? dataExtrato.toISOString().split('T')[0]
@@ -53,7 +55,7 @@ async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
   const valorNum = Math.abs(parseFloat(valorExtrato)); // Valor absoluto
 
   const result = await pool.query(`
-    SELECT "Código_Cliente", "Data_Vencimento", "Total", "Descrição"
+    SELECT "Codigo", "Código_Cliente", "Data_Vencimento", "Total", "Descricao"
     FROM "Contas_Receber"
     WHERE "Código_Cliente" = $1 AND "Empresa" = $2
     ORDER BY "Data_Vencimento"
@@ -66,8 +68,14 @@ async function buscarCR(codigoCliente, dataExtrato, valorExtrato, empresa) {
     const valorCR = parseFloat(cr.Total); // ✅ Campo Total (não Valor!)
     const difValorPercent = Math.abs((valorCR - valorNum) / valorCR);
 
-    // Tolerância: ±7 dias E ±5% do valor
-    if (difDias <= 7 && difValorPercent <= 0.05) return cr;
+    // Tolerância: ±10 dias E ±5% do valor
+    if (difDias <= 10 && difValorPercent <= 0.05) {
+      return {
+        codigo: cr.Codigo,
+        descricao: cr.Descricao,
+        valor: cr.Total
+      };
+    }
   }
   return null;
 }
@@ -119,30 +127,47 @@ router.post('/', async (req, res) => {
         const nomeParcial = extrairNome(reg.descricao_original);
         if (!nomeParcial) continue;
 
-        // 2. Buscar cliente
+        // 2. Buscar cliente(s) - pode ter HOMÔNIMOS!
         const clientes = await buscarCliente(nomeParcial, reg.empresa);
         if (clientes.length === 0) continue;
 
-        const clienteSelecionado = clientes[0];
         stats.clienteEncontrado++;
 
-        // 3. Buscar CR (Contas a Receber)
-        const cr = await buscarCR(
-          clienteSelecionado.Codigo,
-          reg.data,
-          reg.valor,
-          reg.empresa
-        );
+        // 3. TESTAR TODOS OS CLIENTES até achar CR que bate
+        let clienteSelecionado = null;
+        let cr = null;
 
+        for (const cliente of clientes) {
+          const crTeste = await buscarCR(
+            cliente.Codigo,
+            reg.data,
+            reg.valor,
+            reg.empresa
+          );
+
+          if (crTeste) {
+            // Achou CR! Este é o cliente correto
+            clienteSelecionado = cliente;
+            cr = crTeste;
+            break; // Para de testar outros homônimos
+          }
+        }
+
+        // Se não achou nenhuma CR em nenhum cliente, pega o primeiro
+        if (!clienteSelecionado) {
+          clienteSelecionado = clientes[0];
+        }
+
+        // 4. Preencher observacoes com descrição da CR (se encontrou)
         let observacoes = reg.observacoes || '';
         let crEncontrada = false;
         if (cr) {
-          observacoes = cr.Descrição;
+          observacoes = cr.descricao;
           crEncontrada = true;
           stats.crEncontrada++;
         }
 
-        // 4. Classificar automaticamente
+        // 5. Classificar automaticamente
         const textoParaClassificar = observacoes || reg.descricao_original;
         const resultado = await classificarLancamento({
           description: textoParaClassificar,
@@ -160,7 +185,7 @@ router.post('/', async (req, res) => {
           stats.classificado++;
         }
 
-        // 5. Status = OK SOMENTE se encontrou TUDO (cliente + CR + classificacao)
+        // 6. Status = OK SOMENTE se encontrou TUDO (cliente + CR + classificacao)
         const tudoEncontrado = crEncontrada && classificou;
         const novoStatus = tudoEncontrado ? 'OK' : reg.status; // Mantém atual se não completou
 
@@ -168,7 +193,7 @@ router.post('/', async (req, res) => {
           stats.statusOK++;
         }
 
-        // 6. Atualizar registro
+        // 7. Atualizar registro
         await pool.query(`
           UPDATE bank_extratos
           SET nome_origem = $1,

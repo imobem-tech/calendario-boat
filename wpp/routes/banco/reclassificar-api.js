@@ -23,6 +23,7 @@ const { Pool } = pkg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Buscar CR (Conta a Receber) por CPF/valor/data
+// Tolerâncias: Data ±10 dias, Valor ±5% (campo Total)
 async function buscarCR(cpfCnpj, dataExtrato, valorExtrato, empresa) {
   try {
     if (!cpfCnpj) return null;
@@ -48,7 +49,7 @@ async function buscarCR(cpfCnpj, dataExtrato, valorExtrato, empresa) {
 
     const codigoCliente = cliente.rows[0].Codigo;
 
-    // Buscar CR (tolerância: ±7 dias, ±5% valor)
+    // Buscar CR (tolerância: ±10 dias, ±5% valor)
     const result = await pool.query(`
       SELECT "Codigo", "Código_Cliente", "Data_Vencimento", "Total", "Descricao"
       FROM "Contas_Receber"
@@ -64,7 +65,8 @@ async function buscarCR(cpfCnpj, dataExtrato, valorExtrato, empresa) {
       const valorCR = parseFloat(cr.Total);
       const difValorPercent = Math.abs((valorCR - valorNum) / valorCR);
 
-      if (difDias <= 7 && difValorPercent <= 0.05) {
+      // Tolerância: ±10 dias E ±5% do valor
+      if (difDias <= 10 && difValorPercent <= 0.05) {
         return {
           codigo: cr.Codigo,
           descricao: cr.Descricao,
