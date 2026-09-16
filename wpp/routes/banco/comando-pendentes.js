@@ -1,6 +1,8 @@
 // ============================================================
-// wpp/routes/banco/comando-pendentes.js — V.2609140028
+// wpp/routes/banco/comando-pendentes.js — V.2609161600
 // COMANDO "lll" - LISTAR E PROCESSAR LANÇAMENTOS PENDENTES
+// NOVO (16/09 16:00): Avisar quando CPF/CNPJ não encontrado + permitir digitar manual
+// NOVO (16/09 15:30): Permitir descrição personalizada no "aprender"
 // NOVO (13/09 23:02): Exibir nome_origem ao invés de cpf_cnpj_origem
 // NOVO (13/09 23:04): Etapa aprender_pessoa - escolher pessoa específica ou qualquer
 // NOVO (14/09 00:20): Cabeçalho simplificado "LANÇ. PENDENTES: N"
@@ -249,7 +251,7 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
 
       // Primeiro enviar instruções
       await sock.sendMessage(grupoId, {
-        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição abaixo e *COLE*\n   somente o trecho que deve ser comparado\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• Toda descrição (exatamente igual)\n\n${'━'.repeat(16)}\n📝 *DESCRIÇÃO DO LANÇAMENTO:*`
+        text: `🧠 *CRIAR REGRA AUTOMÁTICA*\n\n${'━'.repeat(16)}\n✂️ *COPIE* a descrição abaixo e *COLE*\n   somente o trecho que deve ser comparado\n\n*OU* digite uma descrição personalizada\n\nExemplos:\n• "Hora_MOTOR 586-E2" (embarcação específica)\n• "Hora_MOTOR" (qualquer embarcação)\n• "586-E2" (só código)\n• "Alimentação Funcionários" (personalizado)\n• Toda descrição (exatamente igual)\n\n${'━'.repeat(16)}\n📝 *DESCRIÇÃO DO BANCO:*`
       });
 
       // Depois enviar descrição SOZINHA para facilitar copiar
@@ -257,9 +259,16 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
         text: estado.lancamentoEscolhido.descricao_original
       });
 
-      // Pedir para colar
+      // Mostrar observação se existir (pode ser mais útil que descrição)
+      if (estado.observacao && estado.observacao !== '') {
+        await sock.sendMessage(grupoId, {
+          text: `💬 *OBSERVAÇÃO QUE VOCÊ DIGITOU:*\n${estado.observacao}`
+        });
+      }
+
+      // Pedir para colar ou digitar
       await sock.sendMessage(grupoId, {
-        text: `✏️ Cole o trecho:`
+        text: `✏️ Cole o trecho *OU* digite descrição personalizada:`
       });
 
       return true;
@@ -316,6 +325,15 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
     const nomeCliente = estado.lancamentoEscolhido.nome_origem || 'Cliente';
     const cpfCnpj = estado.lancamentoEscolhido.cpf_cnpj_origem || '';
 
+    // ⚠️ AVISAR se não tiver CPF/CNPJ
+    if (!cpfCnpj || cpfCnpj.trim() === '') {
+      estado.etapa = 'aprender_pessoa_sem_cpf';
+      await sock.sendMessage(grupoId, {
+        text: `⚠️ *ATENÇÃO: CPF/CNPJ NÃO IDENTIFICADO*\n\n${'━'.repeat(16)}\nEste lançamento não possui CPF/CNPJ do beneficiário.\n\nOpções:\n\n1️⃣ *Digitar CPF/CNPJ manualmente*\n   (para pessoa específica)\n\n2️⃣ *Usar "*" (qualquer pessoa)*\n   (regra genérica, qualquer beneficiário)\n\n3️⃣ *Cancelar*\n   (voltar e classificar normalmente)\n\n${'━'.repeat(16)}\n✏️ Digite 1, 2 ou 3:`
+      });
+      return true;
+    }
+
     // Formatar CPF/CNPJ para exibição (só os 3 primeiros dígitos)
     let cpfExibicao = '';
     if (cpfCnpj && cpfCnpj.length >= 3) {
@@ -335,6 +353,62 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 6.5: Aprender - Sem CPF/CNPJ (nova)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aprender_pessoa_sem_cpf') {
+    const escolha = textoLimpo.trim();
+
+    if (escolha === '1') {
+      // Opção 1: Digitar CPF/CNPJ manualmente
+      estado.etapa = 'aprender_digitar_cpf';
+      await sock.sendMessage(grupoId, {
+        text: `📝 *DIGITE O CPF OU CNPJ*\n\n${'━'.repeat(16)}\nDigite apenas os números (sem pontos ou traços)\n\nExemplos:\n• CPF: 12345678901\n• CNPJ: 12345678000195\n\n✏️ Digite o CPF/CNPJ:`
+      });
+      return true;
+    }
+    else if (escolha === '2') {
+      // Opção 2: Usar "*" (qualquer pessoa)
+      estado.cpfCnpjManual = '*';
+      estado.etapa = 'aprender_salvar_final';
+      return await salvarRegraAprendidaFinal(sock, grupoId, estado, pool);
+    }
+    else if (escolha === '3') {
+      // Opção 3: Cancelar
+      await sock.sendMessage(grupoId, {
+        text: `❌ *Aprendizado cancelado*\n\nLançamento volta para PENDENTE.\nUse "lll" para listar novamente.`
+      });
+      estadoPendentes.delete(grupoId);
+      return true;
+    }
+    else {
+      await sock.sendMessage(grupoId, {
+        text: '❌ Digite apenas 1, 2 ou 3'
+      });
+      return true;
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ETAPA 6.6: Aprender - Digitar CPF/CNPJ manualmente
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  else if (estado.etapa === 'aprender_digitar_cpf') {
+    const cpfCnpjDigitado = textoLimpo.replace(/\D/g, ''); // Só números
+
+    // Validar tamanho
+    if (cpfCnpjDigitado.length !== 11 && cpfCnpjDigitado.length !== 14) {
+      await sock.sendMessage(grupoId, {
+        text: `❌ CPF deve ter 11 dígitos ou CNPJ 14 dígitos.\n\nVocê digitou: ${cpfCnpjDigitado.length} dígitos\n\n✏️ Digite novamente:`
+      });
+      return true;
+    }
+
+    // Salvar e prosseguir
+    estado.cpfCnpjManual = cpfCnpjDigitado;
+    estado.etapa = 'aprender_salvar_final';
+    return await salvarRegraAprendidaFinal(sock, grupoId, estado, pool);
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // ETAPA 7: Aprender - Escolher pessoa
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   else if (estado.etapa === 'aprender_pessoa') {
@@ -347,68 +421,13 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
       return true;
     }
 
-    // Definir CPF/CNPJ conforme escolha
-    const cpfCnpj = escolha === '1'
-      ? (estado.lancamentoEscolhido.cpf_cnpj_origem || '*')
+    // Salvar CPF/CNPJ conforme escolha (se opção 1 e não tiver, já foi tratado antes)
+    estado.cpfCnpjManual = escolha === '1'
+      ? estado.lancamentoEscolhido.cpf_cnpj_origem
       : '*';
 
-    // Salvar regra aprendida
-    try {
-      const valorCentavos = Math.round(Math.abs(estado.lancamentoEscolhido.valor) * 100);
-
-      await salvarRegraAprendida({
-        categoriaId: estado.categoriaEscolhida.id,
-        fraseChave: estado.fraseChave,
-        valorCentavos: valorCentavos,
-        toleranciaPercent: estado.tolerancia,
-        cpfCnpj: cpfCnpj,
-        observacao: estado.observacao || ''
-      });
-
-      // Marcar lançamento como OK
-      await pool.query(`
-        UPDATE bank_extratos
-        SET
-          classificacao = $1,
-          observacoes = $2,
-          status = 'OK',
-          classificacao_manual = false,
-          classificado_por = 'Usuário - Aprendizado',
-          classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
-        WHERE id = $3
-      `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
-
-      // Confirmar sucesso com valores em reais
-      const variacaoMax = Math.round(valorCentavos * estado.tolerancia / 100);
-      const valorMin = (valorCentavos - variacaoMax) / 100;
-      const valorMax = (valorCentavos + variacaoMax) / 100;
-
-      const valorFormatado = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      }).format(valorCentavos / 100);
-
-      // Texto sobre pessoa
-      const nomeCliente = estado.lancamentoEscolhido.nome_origem || 'esta pessoa';
-      const textoPessoa = cpfCnpj === '*'
-        ? '👥 Qualquer pessoa'
-        : `🙋 Apenas para ${nomeCliente}`;
-
-      await sock.sendMessage(grupoId, {
-        text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: ${valorFormatado} ± ${estado.tolerancia}%\n${textoPessoa}\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin.toFixed(2)} e R$ ${valorMax.toFixed(2)}\n${cpfCnpj === '*' ? '✅ De qualquer pessoa' : `✅ De ${nomeCliente}`}\n\nVão automaticamente para:\n✅ Categoria: ${estado.categoriaEscolhida.nome}\n✅ Observação: "${estado.observacao || '(vazio)'}"\n✅ Status: OK\n\nNada mais a fazer! 🎉`
-      });
-
-      estadoPendentes.delete(grupoId);
-
-    } catch (err) {
-      console.error('❌ Erro ao salvar regra:', err);
-      console.error('Stack:', err.stack);
-      await sock.sendMessage(grupoId, {
-        text: `❌ Erro ao criar regra:\n${err.message}\n\nTente novamente.`
-      });
-    }
-
-    return true;
+    // Salvar regra usando função auxiliar
+    return await salvarRegraAprendidaFinal(sock, grupoId, estado, pool);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -471,6 +490,73 @@ export async function processarRespostaPendentes(sock, grupoId, mensagem, remete
 /**
  * Processar imagem/PDF de recibo
  */
+/**
+ * Salvar regra aprendida - função auxiliar
+ * Usada por: aprender_pessoa e aprender_pessoa_sem_cpf
+ */
+async function salvarRegraAprendidaFinal(sock, grupoId, estado, pool) {
+  try {
+    // Definir CPF/CNPJ: manual (se foi digitado) OU do lançamento
+    const cpfCnpj = estado.cpfCnpjManual ||
+                    (estado.lancamentoEscolhido.cpf_cnpj_origem || '*');
+
+    const valorCentavos = Math.round(Math.abs(estado.lancamentoEscolhido.valor) * 100);
+
+    await salvarRegraAprendida({
+      categoriaId: estado.categoriaEscolhida.id,
+      fraseChave: estado.fraseChave,
+      valorCentavos: valorCentavos,
+      toleranciaPercent: estado.tolerancia,
+      cpfCnpj: cpfCnpj,
+      observacao: estado.observacao || ''
+    });
+
+    // Marcar lançamento como OK
+    await pool.query(`
+      UPDATE bank_extratos
+      SET
+        classificacao = $1,
+        observacoes = $2,
+        status = 'OK',
+        classificacao_manual = false,
+        classificado_por = 'Usuário - Aprendizado',
+        classificado_em = NOW() AT TIME ZONE 'America/Sao_Paulo'
+      WHERE id = $3
+    `, [estado.categoriaEscolhida.id, estado.observacao || '', estado.lancamentoEscolhido.id]);
+
+    // Confirmar sucesso com valores em reais
+    const variacaoMax = Math.round(valorCentavos * estado.tolerancia / 100);
+    const valorMin = (valorCentavos - variacaoMax) / 100;
+    const valorMax = (valorCentavos + variacaoMax) / 100;
+
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valorCentavos / 100);
+
+    // Texto sobre pessoa
+    const nomeCliente = estado.lancamentoEscolhido.nome_origem || 'esta pessoa';
+    const textoPessoa = cpfCnpj === '*'
+      ? '👥 Qualquer pessoa'
+      : `🙋 Apenas para ${nomeCliente}${cpfCnpj && cpfCnpj !== '*' ? ` (${cpfCnpj})` : ''}`;
+
+    await sock.sendMessage(grupoId, {
+      text: `✅ *REGRA CRIADA COM SUCESSO!*\n\n📌 Categoria: ${estado.categoriaEscolhida.nome}\n🔍 Trecho: "${estado.fraseChave}"\n💰 Valor: ${valorFormatado} ± ${estado.tolerancia}%\n${textoPessoa}\n💬 Observação: "${estado.observacao || '(vazio)'}"\n✨ Status: OK (não precisa recibo)\n\n${'━'.repeat(16)}\n📚 *PRÓXIMAS VEZES:*\n\nLançamentos que tenham:\n✅ "${estado.fraseChave}" na descrição\n✅ Valor entre R$ ${valorMin.toFixed(2)} e R$ ${valorMax.toFixed(2)}\n${cpfCnpj === '*' ? '✅ De qualquer pessoa' : `✅ De ${nomeCliente}`}\n\nVão automaticamente para:\n✅ Categoria: ${estado.categoriaEscolhida.nome}\n✅ Observação: "${estado.observacao || '(vazio)'}"\n✅ Status: OK\n\nNada mais a fazer! 🎉`
+    });
+
+    estadoPendentes.delete(grupoId);
+    return true;
+
+  } catch (err) {
+    console.error('❌ Erro ao salvar regra:', err);
+    console.error('Stack:', err.stack);
+    await sock.sendMessage(grupoId, {
+      text: `❌ Erro ao criar regra:\n${err.message}\n\nTente novamente.`
+    });
+    return true;
+  }
+}
+
 export async function processarImagemPendente(sock, grupoId, mensagem) {
   console.log('🖼️ [processarImagemPendente] Iniciando...');
   console.log('   Grupo:', grupoId);

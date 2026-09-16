@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609141705
+// wpp/routes/banco/asaas-webhook.js — V.2609161545
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
 // ACEITA: payment, transfer, bill, movement, pix
 // NOTIFICAÇÃO WhatsApp para lançamentos PENDENTES
 //
+// NOVO (16/09 15:45):
+//   - Extração de bankAccount.ownerName e cpfCnpj em TRANSFER_CREATED/DONE
+//   - Descrição útil: "PIX - NOME BENEFICIÁRIO" em vez de "TRANSFER_CREATED - N/A"
 // NOVO (13/09 21:21):
 //   - Busca dados do cliente via API Asaas (nome + CPF/CNPJ)
 // FIX CRÍTICO (13/09 23:14):
@@ -275,7 +278,20 @@ export async function handleAsaasWebhook(req, res) {
     const customerId = dadosEvento.customer || dadosEvento.cpfCnpj || null;
     console.log(`🔍 [DEBUG] Customer ID encontrado: ${customerId}`);
 
-    if (customerId && customerId.startsWith('cus_')) {
+    // Para TRANSFERÊNCIAS: dados vêm direto do bankAccount (não tem customer)
+    if (event === 'TRANSFER_CREATED' || event === 'TRANSFER_DONE' || event === 'TRANSFER_FAILED') {
+      if (dadosEvento.bankAccount) {
+        dadosCliente = {
+          nome: dadosEvento.bankAccount.ownerName || null,
+          cpfCnpj: dadosEvento.bankAccount.cpfCnpj || null
+        };
+        console.log('✅ [Transferência] Dados do beneficiário extraídos:', dadosCliente);
+      } else {
+        console.log('⚠️ [Transferência] bankAccount não encontrado no payload');
+      }
+    }
+    // Para OUTROS EVENTOS: buscar via API Asaas
+    else if (customerId && customerId.startsWith('cus_')) {
       console.log('🔍 [DEBUG] Chamando buscarDadosCliente...');
       dadosCliente = await buscarDadosCliente(customerId, empresa);
       console.log(`🔍 [DEBUG] Resultado: ${dadosCliente ? JSON.stringify(dadosCliente) : 'null'}`);
@@ -307,7 +323,19 @@ export async function handleAsaasWebhook(req, res) {
         return valorFinal;
       })(),
 
-      descricao_original: dadosEvento.description || `${event} - ${dadosEvento.billingType || 'N/A'}`,
+      descricao_original: (() => {
+        // Se tem description explícita, usar
+        if (dadosEvento.description) return dadosEvento.description;
+
+        // Para TRANSFERÊNCIAS: usar nome do beneficiário + tipo de operação
+        if ((event === 'TRANSFER_CREATED' || event === 'TRANSFER_DONE') && dadosEvento.bankAccount?.ownerName) {
+          const operationType = dadosEvento.operationType || 'Transferência';
+          return `${operationType} - ${dadosEvento.bankAccount.ownerName}`;
+        }
+
+        // Fallback genérico
+        return `${event} - ${dadosEvento.billingType || dadosEvento.operationType || 'N/A'}`;
+      })(),
       documento: dadosEvento.invoiceNumber || dadosEvento.id || 'N/A',
 
       // IMPORTANTE: tipo baseado no valor JÁ PROCESSADO (não no original)
