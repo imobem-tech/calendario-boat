@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609150037
+    EXTRATO BANCÁRIO - V.2609181940
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1185,6 +1185,17 @@
                 return;
             }
 
+            // Mostrar modal de progresso
+            const modal = document.getElementById('modalProgresso');
+            const modalTitulo = modal.querySelector('h2');
+            const progressoTexto = document.getElementById('progressoTexto');
+            const progressoDetalhe = document.getElementById('progressoDetalhe');
+
+            modal.style.display = 'flex';
+            modalTitulo.textContent = '📥 Importando OFX';
+            progressoTexto.textContent = '📤 Enviando arquivo...';
+            progressoDetalhe.textContent = file.name;
+
             try {
                 const empresa = document.getElementById('empresaSelect').value || 'ALLMAX';
 
@@ -1192,13 +1203,8 @@
                 formData.append('ofx', file);
                 formData.append('empresa', empresa);
 
-                // Desabilitar botão durante upload
-                const btnImportar = event.target.previousElementSibling;
-                const btnTextoOriginal = btnImportar ? btnImportar.textContent : '';
-                if (btnImportar) {
-                    btnImportar.disabled = true;
-                    btnImportar.textContent = '⏳ Importando...';
-                }
+                progressoTexto.textContent = 'Processando arquivo...';
+                progressoDetalhe.textContent = `Empresa: ${empresa}`;
 
                 const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/importar-ofx', {
                     method: 'POST',
@@ -1206,6 +1212,9 @@
                 });
 
                 const data = await response.json();
+
+                // Fechar modal
+                modal.style.display = 'none';
 
                 if (data.sucesso) {
                     alert(`✅ Importação concluída!\n\n📊 Estatísticas:\n` +
@@ -1222,15 +1231,12 @@
                 }
 
             } catch (err) {
+                // Fechar modal em caso de erro
+                modal.style.display = 'none';
+
                 console.error('❌ Erro ao importar:', err);
                 alert('❌ Erro ao importar OFX: ' + err.message);
             } finally {
-                // Restaurar botão
-                const btnImportar = event.target.previousElementSibling;
-                if (btnImportar && btnTextoOriginal) {
-                    btnImportar.disabled = false;
-                    btnImportar.textContent = btnTextoOriginal;
-                }
                 // Limpar input para permitir re-upload do mesmo arquivo
                 event.target.value = '';
             }
