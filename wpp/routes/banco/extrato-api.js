@@ -1,7 +1,13 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609150037
+// wpp/routes/banco/extrato-api.js — V.2609181818
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
+//
+// 🔥 FIX V.2609181818: Token reutilizado atualiza todos_arquivos
+//    - PROBLEMA: Anexos mostravam arquivos antigos (telas em branco)
+//    - CAUSA: Token era reutilizado mas todos_arquivos não era atualizado
+//    - SOLUÇÃO: UPDATE todos_arquivos ao reutilizar token
+//    - RESULTADO: Sempre mostra anexos atuais do extrato!
 //
 // 🔥 FIX V.2609150037: Filtro PENDENTE inclui NULL
 //    - PROBLEMA: 75 registros com status=NULL não apareciam no filtro PENDENTE
@@ -264,8 +270,20 @@ router.get('/listar', async (req, res) => {
       );
 
       if (tokenExistente.rows.length > 0) {
-        // Reutilizar token existente
+        // Reutilizar token existente MAS atualizar todos_arquivos
         tokenExtrato = tokenExistente.rows[0].token;
+
+        // ✅ FIX V.2609181818: Atualizar todos_arquivos com dados atuais
+        await pool.query(
+          `UPDATE file_tokens
+           SET todos_arquivos = $1,
+               descricao = $2,
+               updated_at = NOW() AT TIME ZONE 'America/Sao_Paulo'
+           WHERE token = $3`,
+          [todosArquivos, descricao, tokenExtrato]
+        );
+
+        console.log(`✅ Token ${tokenExtrato} atualizado com ${Object.keys(todosArquivos).length} lançamentos`);
       } else {
         // Gerar novo token
         tokenExtrato = nanoid();
@@ -274,6 +292,8 @@ router.get('/listar', async (req, res) => {
            VALUES ($1, $2, $3, $4, $5)`,
           [tokenExtrato, extratoRef, descricao, todosArquivos, 'API_EXTRATO']
         );
+
+        console.log(`✅ Token ${tokenExtrato} criado com ${Object.keys(todosArquivos).length} lançamentos`);
       }
 
       urlBaseToken = `https://calendario-boat-production.up.railway.app/visualizador/${tokenExtrato}`;
