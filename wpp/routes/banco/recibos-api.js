@@ -247,8 +247,7 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
 
     await pool.query(`
       UPDATE bank_extratos
-      SET recibos_urls = $1,
-          tem_anexo = true
+      SET recibos_urls = $1
       WHERE id = $2
     `, [JSON.stringify(novosRecibos), lancamento_id]);
 
