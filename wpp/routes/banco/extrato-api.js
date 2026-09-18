@@ -1,7 +1,12 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609181818
+// wpp/routes/banco/extrato-api.js — V.2609181832
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
+//
+// 🔥 FIX V.2609181832: Removido updated_at (coluna não existe)
+//    - PROBLEMA: Erro ao buscar extrato após deploy
+//    - CAUSA: UPDATE tentava setar updated_at mas coluna não existe
+//    - SOLUÇÃO: Removido updated_at do UPDATE
 //
 // 🔥 FIX V.2609181818: Token reutilizado atualiza todos_arquivos
 //    - PROBLEMA: Anexos mostravam arquivos antigos (telas em branco)
@@ -273,12 +278,11 @@ router.get('/listar', async (req, res) => {
         // Reutilizar token existente MAS atualizar todos_arquivos
         tokenExtrato = tokenExistente.rows[0].token;
 
-        // ✅ FIX V.2609181818: Atualizar todos_arquivos com dados atuais
+        // ✅ FIX V.2609181832: Atualizar todos_arquivos com dados atuais
         await pool.query(
           `UPDATE file_tokens
            SET todos_arquivos = $1,
-               descricao = $2,
-               updated_at = NOW() AT TIME ZONE 'America/Sao_Paulo'
+               descricao = $2
            WHERE token = $3`,
           [todosArquivos, descricao, tokenExtrato]
         );
