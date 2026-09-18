@@ -1,19 +1,18 @@
 // ============================================================
-// importar-ofx-api.js — V.2609181950
+// importar-ofx-api.js — V.2609182005
+//
+// 🚀 NOVO V.2609182005: Server-Sent Events (SSE) para progresso em tempo real
+//    - Endpoint POST /stream com SSE
+//    - Frontend recebe eventos: progress, complete, error
+//    - Mostra "N de TOTAL" durante importação
 //
 // 🔥 FIX V.2609181950: Verificar duplicatas em TODOS os dias
 //    - PROBLEMA: Dias 01-10 importavam sem verificar duplicatas
 //    - RESULTADO: 143 erros ao tentar importar duplicatas
 //    - SOLUÇÃO: SEMPRE verificar duplicatas antes de importar
-//    - Log detalhado: [n/total] status de cada transação
 //
 // 🔥 FIX V.2609181946: Aceitar conta com dígito verificador
 //    - Adicionado 63271050, 65765935, 63270375 no mapa
-//
-// HISTÓRICO:
-// + V.2609142130: Lê agência/conta do arquivo OFX
-// + V.2609142130: Identifica empresa automaticamente
-// + V.2609142130: Valida empresa vs conta
 // ============================================================
 
 import express from 'express';
@@ -84,12 +83,6 @@ const upload = multer({
 
 // Extrair dados bancários do OFX
 function extrairDadosBancarios(ofxContent) {
-  // <BANKACCTFROM>
-  //   <BANKID>461</BANKID>
-  //   <ACCTID>6327105</ACCTID>
-  //   <ACCTTYPE>CHECKING</ACCTTYPE>
-  // </BANKACCTFROM>
-
   const bankId = ofxContent.match(/<BANKID>(.*?)<\/BANKID>/)?.[1];
   const acctId = ofxContent.match(/<ACCTID>(.*?)<\/ACCTID>/)?.[1];
   const acctType = ofxContent.match(/<ACCTTYPE>(.*?)<\/ACCTTYPE>/)?.[1];
@@ -104,10 +97,7 @@ function extrairDadosBancarios(ofxContent) {
 // Identificar empresa pela conta
 function identificarEmpresa(contaNumero) {
   if (!contaNumero) return null;
-
-  // Remover dígito verificador se houver
   const contaLimpa = contaNumero.split('-')[0];
-
   return CONTA_PARA_EMPRESA[contaLimpa] || null;
 }
 
@@ -169,10 +159,9 @@ async function verificarDuplicata(data, valor, empresa) {
   return result.rows.length > 0;
 }
 
-// Importar transação (com dados bancários corretos)
+// Importar transação
 async function importarTransacao(transacao, empresa, dadosBancarios, client) {
   const hash = gerarHash(transacao.data, transacao.valor, transacao.descricao, empresa, transacao.fitid);
-
   const mesRef = transacao.data.substring(0, 7) + '-01';
   const dataImportacao = transacao.data + ' 00:01:00';
 
@@ -194,57 +183,36 @@ async function importarTransacao(transacao, empresa, dadosBancarios, client) {
   ]);
 }
 
-// ENDPOINT POST /api/banco/importar-ofx
-router.post('/', upload.single('ofx'), async (req, res) => {
+// ============================================================
+// FUNÇÃO AUXILIAR: Processar importação OFX
+// Retorna { sucesso, stats, erro } e chama onProgress(atual, total, status)
+// ============================================================
+async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress = null) {
   try {
-    if (!req.file) {
-      return res.status(400).json({ sucesso: false, erro: 'Nenhum arquivo enviado' });
-    }
-
-    const empresaSelecionada = req.body.empresa || 'ALLMAX';
-    const ofxContent = req.file.buffer.toString('latin1');
-
-    // 1. Extrair dados bancários do arquivo OFX
+    // 1. Extrair dados bancários
     const dadosOFX = extrairDadosBancarios(ofxContent);
-
     if (!dadosOFX.conta) {
-      return res.status(400).json({
-        sucesso: false,
-        erro: 'Não foi possível identificar a conta no arquivo OFX'
-      });
+      throw new Error('Não foi possível identificar a conta no arquivo OFX');
     }
 
-    // 2. Identificar empresa pela conta
+    // 2. Identificar empresa
     const empresaIdentificada = identificarEmpresa(dadosOFX.conta);
-
     if (!empresaIdentificada) {
-      return res.status(400).json({
-        sucesso: false,
-        erro: `Conta ${dadosOFX.conta} não reconhecida! Contas válidas: ${Object.keys(CONTA_PARA_EMPRESA).join(', ')}`
-      });
+      throw new Error(`Conta ${dadosOFX.conta} não reconhecida! Contas válidas: ${Object.keys(CONTA_PARA_EMPRESA).join(', ')}`);
     }
 
-    // 3. Validar se empresa selecionada = empresa identificada
+    // 3. Validar empresa
     if (empresaSelecionada !== empresaIdentificada) {
-      return res.status(400).json({
-        sucesso: false,
-        erro: `❌ CONFLITO! Arquivo é da conta ${empresaIdentificada} (${dadosOFX.conta}), mas você selecionou ${empresaSelecionada}!`,
-        empresaIdentificada,
-        empresaSelecionada,
-        conta: dadosOFX.conta
-      });
+      throw new Error(`❌ CONFLITO! Arquivo é da conta ${empresaIdentificada} (${dadosOFX.conta}), mas você selecionou ${empresaSelecionada}!`);
     }
 
-    // 4. Usar dados bancários corretos da empresa
+    // 4. Dados bancários
     const dadosBancarios = EMPRESAS_ASAAS[empresaIdentificada];
-
-    console.log(`✅ OFX identificado: Empresa ${empresaIdentificada}, Conta ${dadosOFX.conta}`);
 
     // 5. Parse OFX
     const transacoes = parseOFX(ofxContent);
-
     if (transacoes.length === 0) {
-      return res.status(400).json({ sucesso: false, erro: 'Nenhuma transação encontrada no arquivo OFX' });
+      throw new Error('Nenhuma transação encontrada no arquivo OFX');
     }
 
     const stats = {
@@ -259,30 +227,31 @@ router.post('/', upload.single('ofx'), async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // ✅ FIX: SEMPRE verificar duplicatas (em TODOS os dias)
-      // PROBLEMA ANTERIOR: Dias 01-10 não verificavam duplicatas e davam erro
+      // Processar cada transação com callback de progresso
       for (let i = 0; i < transacoes.length; i++) {
         const transacao = transacoes[i];
+        const atual = i + 1;
 
         try {
-          // Verificar duplicata ANTES de importar
           const duplicata = await verificarDuplicata(transacao.data, transacao.valor, empresaIdentificada);
 
           if (duplicata) {
             stats.duplicatas++;
-            console.log(`[${i+1}/${transacoes.length}] Duplicata: ${transacao.data} R$ ${transacao.valor}`);
+            if (onProgress) onProgress(atual, transacoes.length, 'duplicata', stats);
           } else {
             await importarTransacao(transacao, empresaIdentificada, dadosBancarios, client);
             stats.importados++;
-            console.log(`[${i+1}/${transacoes.length}] Importado: ${transacao.data} R$ ${transacao.valor}`);
+            if (onProgress) onProgress(atual, transacoes.length, 'importado', stats);
           }
         } catch (err) {
-          console.error(`[${i+1}/${transacoes.length}] Erro ao processar ${transacao.data}:`, err.message);
           stats.erros++;
+          if (onProgress) onProgress(atual, transacoes.length, 'erro', stats);
+          console.error(`[${atual}/${transacoes.length}] Erro:`, err.message);
         }
       }
 
       await client.query('COMMIT');
+      return { sucesso: true, stats };
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -291,7 +260,30 @@ router.post('/', upload.single('ofx'), async (req, res) => {
       client.release();
     }
 
-    res.json({ sucesso: true, stats });
+  } catch (err) {
+    return { sucesso: false, erro: err.message };
+  }
+}
+
+// ============================================================
+// ENDPOINT POST /api/banco/importar-ofx (SEM SSE - compatibilidade)
+// ============================================================
+router.post('/', upload.single('ofx'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ sucesso: false, erro: 'Nenhum arquivo enviado' });
+    }
+
+    const empresaSelecionada = req.body.empresa || 'ALLMAX';
+    const ofxContent = req.file.buffer.toString('latin1');
+
+    const resultado = await processarImportacaoOFX(ofxContent, empresaSelecionada);
+
+    if (resultado.sucesso) {
+      res.json({ sucesso: true, stats: resultado.stats });
+    } else {
+      res.status(400).json({ sucesso: false, erro: resultado.erro });
+    }
 
   } catch (err) {
     console.error('Erro ao importar OFX:', err);
@@ -299,4 +291,67 @@ router.post('/', upload.single('ofx'), async (req, res) => {
   }
 });
 
+// ============================================================
+// ENDPOINT POST /api/banco/importar-ofx/stream (COM SSE - progresso em tempo real)
+// ============================================================
+router.post('/stream', upload.single('ofx'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ sucesso: false, erro: 'Nenhum arquivo enviado' });
+    }
+
+    // Configurar SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const empresaSelecionada = req.body.empresa || 'ALLMAX';
+    const ofxContent = req.file.buffer.toString('latin1');
+
+    // Callback de progresso via SSE
+    const enviarProgresso = (atual, total, status, stats) => {
+      const percentual = Math.round((atual / total) * 100);
+      res.write(`data: ${JSON.stringify({
+        tipo: 'progress',
+        atual,
+        total,
+        status,
+        percentual,
+        stats
+      })}\n\n`);
+    };
+
+    // Processar com callback
+    const resultado = await processarImportacaoOFX(ofxContent, empresaSelecionada, enviarProgresso);
+
+    // Enviar resultado final
+    if (resultado.sucesso) {
+      res.write(`data: ${JSON.stringify({
+        tipo: 'complete',
+        stats: resultado.stats
+      })}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({
+        tipo: 'error',
+        erro: resultado.erro
+      })}\n\n`);
+    }
+
+    res.end();
+
+  } catch (err) {
+    console.error('Erro ao importar OFX:', err);
+    res.write(`data: ${JSON.stringify({
+      tipo: 'error',
+      erro: err.message
+    })}\n\n`);
+    res.end();
+  }
+});
+
 export default router;
+
+// ============================================================
+// FIM
+// ============================================================

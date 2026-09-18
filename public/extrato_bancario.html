@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609181940
+    EXTRATO BANCÁRIO - V.2609182010
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1198,36 +1198,64 @@
 
             try {
                 const empresa = document.getElementById('empresaSelect').value || 'ALLMAX';
-
                 const formData = new FormData();
                 formData.append('ofx', file);
                 formData.append('empresa', empresa);
 
-                progressoTexto.textContent = 'Processando arquivo...';
-                progressoDetalhe.textContent = `Empresa: ${empresa}`;
-
-                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/importar-ofx', {
+                // 🚀 UPLOAD COM PROGRESSO EM TEMPO REAL (SSE)
+                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/importar-ofx/stream', {
                     method: 'POST',
                     body: formData
                 });
 
-                const data = await response.json();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let statsFinais = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop(); // Última linha incompleta
+
+                    for (const line of lines) {
+                        if (!line.trim() || !line.startsWith('data:')) continue;
+
+                        const jsonData = line.replace('data: ', '').trim();
+                        const evento = JSON.parse(jsonData);
+
+                        if (evento.tipo === 'progress') {
+                            // Atualizar progresso em tempo real
+                            modalTitulo.textContent = `📥 Importando OFX (${evento.percentual}%)`;
+                            progressoTexto.textContent = `Processando ${evento.atual} de ${evento.total}`;
+                            progressoDetalhe.textContent = `✅ ${evento.stats.importados} | 🔄 ${evento.stats.duplicatas} | ❌ ${evento.stats.erros}`;
+                        }
+                        else if (evento.tipo === 'complete') {
+                            statsFinais = evento.stats;
+                        }
+                        else if (evento.tipo === 'error') {
+                            throw new Error(evento.erro);
+                        }
+                    }
+                }
 
                 // Fechar modal
                 modal.style.display = 'none';
 
-                if (data.sucesso) {
+                // Mostrar resultado
+                if (statsFinais) {
                     alert(`✅ Importação concluída!\n\n📊 Estatísticas:\n` +
-                          `• Total no OFX: ${data.stats.totalOFX}\n` +
-                          `• Importados: ${data.stats.importados}\n` +
-                          `• Duplicatas puladas: ${data.stats.duplicatas}\n` +
-                          `• Erros: ${data.stats.erros}\n\n` +
+                          `• Total no OFX: ${statsFinais.totalOFX}\n` +
+                          `• Importados: ${statsFinais.importados}\n` +
+                          `• Duplicatas puladas: ${statsFinais.duplicatas}\n` +
+                          `• Erros: ${statsFinais.erros}\n\n` +
                           `💡 Próximo passo: Click em "🔍 Enriquecer Dados"`);
 
                     // Recarregar extrato
                     buscarExtrato();
-                } else {
-                    alert('❌ Erro: ' + data.erro);
                 }
 
             } catch (err) {
