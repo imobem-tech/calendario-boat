@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/routes/banco/asaas-webhook.js — V.2609161545
+// wpp/routes/banco/asaas-webhook.js — V.2609181105
 // WEBHOOK ASAAS - RECEBE EVENTOS EM TEMPO REAL
 // SUPORTE A MÚLTIPLAS CONTAS ASAAS (parâmetro ?empresa=)
 // CLASSIFICAÇÃO AUTOMÁTICA
 // ACEITA: payment, transfer, bill, movement, pix
 // NOTIFICAÇÃO WhatsApp para lançamentos PENDENTES
 //
+// FIX (18/09 11:05):
+//   - Removido bloco de notificação duplicada quando classificado + PENDENTE
+//   - Agora envia apenas UMA mensagem por webhook (lançamentos sem classificação)
 // NOVO (16/09 15:45):
 //   - Extração de bankAccount.ownerName e cpfCnpj em TRANSFER_CREATED/DONE
 //   - Descrição útil: "PIX - NOME BENEFICIÁRIO" em vez de "TRANSFER_CREATED - N/A"
@@ -602,20 +605,6 @@ async function tentarClassificarAutomatico(hashUnico) {
       console.log(`   Status: ${resultado.status}`);
       if (resultado.observacao_padrao) {
         console.log(`   Observação: ${resultado.observacao_padrao}`);
-      }
-
-      // 📱 NOTIFICAR NO WHATSAPP se status = PENDENTE
-      if (resultado.status === 'PENDENTE' && sockWhatsApp) {
-        console.log('📱 Enviando notificação WhatsApp para lançamento PENDENTE (classificado)...');
-        await perguntarSobreLancamentoAsaas(sockWhatsApp, lanc.empresa, {
-          id: lanc.id,
-          id_transacao: lanc.id_transacao_banco,
-          data: lanc.data || new Date().toISOString().split('T')[0],
-          valor: lanc.valor,
-          descricao_original: lanc.descricao_original
-        }).catch(err => {
-          console.error('❌ Erro ao enviar notificação WhatsApp:', err.message);
-        });
       }
 
     } else {
