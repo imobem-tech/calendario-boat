@@ -49,11 +49,14 @@ const EMPRESAS_ASAAS = {
   }
 };
 
-// Mapa reverso: conta → empresa
+// Mapa reverso: conta → empresa (aceita com ou sem dígito verificador)
 const CONTA_PARA_EMPRESA = {
   '6327105': 'ALLMAX',
+  '63271050': 'ALLMAX',  // ALLMAX com DV
   '6576593': 'IMOBEM',
-  '6327037': 'SUMMER'
+  '65765935': 'IMOBEM',  // IMOBEM com DV
+  '6327037': 'SUMMER',
+  '63270375': 'SUMMER'   // SUMMER com DV
 };
 
 // Configurar multer para upload de arquivos
