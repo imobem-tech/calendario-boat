@@ -19,6 +19,7 @@ import extratoRouter from './extrato-api.js';
 import gerarPdfRouter from './gerar-pdf-api.js';
 import editarLancamentoRouter from './editar-lancamento-api.js';
 import excluirRecibosRouter from './excluir-recibos-api.js';
+import recibosRouter from './recibos-api.js';
 import enriquecerRouter from './enriquecer-api.js';
 import reclassificarRouter from './reclassificar-api.js';
 import importarOfxRouter from './importar-ofx-api.js';
@@ -80,7 +81,10 @@ router.use('/extrato', gerarPdfRouter);
 // Rotas de edição de lançamentos
 router.use('/', editarLancamentoRouter);
 
-// Rotas de exclusão de recibos
+// Rotas de recibos (listagem e upload)
+router.use('/recibos', recibosRouter);
+
+// Rotas de exclusão de recibos (também em /recibos)
 router.use('/recibos', excluirRecibosRouter);
 
 // ============================================================

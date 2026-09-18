@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/routes/banco/recibos-api.js — V.2609140105
+// wpp/routes/banco/recibos-api.js — V.2609181930
 // API PARA ACESSAR RECIBOS SALVOS NO VERCEL BLOB
 // Migrado de filesystem (Railway ephemeral) para Vercel Blob (permanente)
+// NOVO (18/09 19:30): Rota POST /upload para adicionar anexos via web
 // NOVO (14/09 01:05): Endpoint /categorias/todas adicionado
 // ============================================================
 
 import express from 'express';
+import multer from 'multer';
+import { put } from '@vercel/blob';
 import pkg from 'pg';
 const { Pool } = pkg;
 
@@ -13,6 +16,12 @@ const router = express.Router();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
+});
+
+// Configurar multer para upload em memória
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
 /**
@@ -183,6 +192,77 @@ router.get('/categorias/todas', async (req, res) => {
   } catch (err) {
     console.error('❌ Erro ao listar categorias:', err);
     res.status(500).json({ erro: err.message });
+  }
+});
+
+/**
+ * POST /api/banco/recibos/upload
+ * Upload de anexos via web (extrato bancário)
+ */
+router.post('/upload', upload.array('files', 10), async (req, res) => {
+  try {
+    const { empresa, data_lancamento, lancamento_id } = req.body;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ sucesso: false, erro: 'Nenhum arquivo enviado' });
+    }
+
+    if (!lancamento_id) {
+      return res.status(400).json({ sucesso: false, erro: 'lancamento_id é obrigatório' });
+    }
+
+    console.log(`📎 Upload de ${files.length} arquivo(s) para lançamento ${lancamento_id}`);
+
+    const urlsUpload = [];
+
+    // Upload de cada arquivo para Vercel Blob
+    for (const file of files) {
+      const timestamp = Date.now();
+      const nomeArquivo = `${lancamento_id}_${timestamp}_${file.originalname.replace(/\s+/g, '_')}`;
+      const blobPath = `recibos/${empresa}/${nomeArquivo}`;
+
+      console.log(`   Enviando: ${file.originalname} (${(file.size/1024).toFixed(2)} KB)`);
+
+      const blob = await put(blobPath, file.buffer, {
+        access: 'public',
+        addRandomSuffix: false
+      });
+
+      urlsUpload.push(blob.url);
+      console.log(`   ✅ Upload concluído: ${blob.url}`);
+    }
+
+    // Atualizar banco de dados
+    const result = await pool.query(`
+      SELECT recibos_urls FROM bank_extratos WHERE id = $1
+    `, [lancamento_id]);
+
+    let recibosAtuais = [];
+    if (result.rows.length > 0 && result.rows[0].recibos_urls) {
+      recibosAtuais = result.rows[0].recibos_urls;
+    }
+
+    const novosRecibos = [...recibosAtuais, ...urlsUpload];
+
+    await pool.query(`
+      UPDATE bank_extratos
+      SET recibos_urls = $1,
+          tem_anexo = true
+      WHERE id = $2
+    `, [JSON.stringify(novosRecibos), lancamento_id]);
+
+    console.log(`✅ ${files.length} anexo(s) adicionado(s) ao lançamento ${lancamento_id}`);
+
+    res.json({
+      sucesso: true,
+      quantidade: files.length,
+      urls: urlsUpload
+    });
+
+  } catch (err) {
+    console.error('❌ Erro ao fazer upload:', err);
+    res.status(500).json({ sucesso: false, erro: err.message });
   }
 });
 
