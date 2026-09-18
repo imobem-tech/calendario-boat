@@ -1,9 +1,19 @@
 // ============================================================
-// importar-ofx-api.js — V.2609142130
-// ENDPOINT PARA IMPORTAR ARQUIVO OFX VIA UPLOAD
-// + FIX: Lê agência/conta do arquivo OFX
-// + FIX: Identifica empresa automaticamente pela conta
-// + FIX: Valida empresa selecionada vs conta do arquivo
+// importar-ofx-api.js — V.2609181950
+//
+// 🔥 FIX V.2609181950: Verificar duplicatas em TODOS os dias
+//    - PROBLEMA: Dias 01-10 importavam sem verificar duplicatas
+//    - RESULTADO: 143 erros ao tentar importar duplicatas
+//    - SOLUÇÃO: SEMPRE verificar duplicatas antes de importar
+//    - Log detalhado: [n/total] status de cada transação
+//
+// 🔥 FIX V.2609181946: Aceitar conta com dígito verificador
+//    - Adicionado 63271050, 65765935, 63270375 no mapa
+//
+// HISTÓRICO:
+// + V.2609142130: Lê agência/conta do arquivo OFX
+// + V.2609142130: Identifica empresa automaticamente
+// + V.2609142130: Valida empresa vs conta
 // ============================================================
 
 import express from 'express';
@@ -237,17 +247,6 @@ router.post('/', upload.single('ofx'), async (req, res) => {
       return res.status(400).json({ sucesso: false, erro: 'Nenhuma transação encontrada no arquivo OFX' });
     }
 
-    // Separar por período (dias 01-10 e 11-31)
-    const dias01_10 = transacoes.filter(t => {
-      const dia = parseInt(t.data.split('-')[2]);
-      return dia >= 1 && dia <= 10;
-    });
-
-    const diasApos10 = transacoes.filter(t => {
-      const dia = parseInt(t.data.split('-')[2]);
-      return dia > 10;
-    });
-
     const stats = {
       totalOFX: transacoes.length,
       importados: 0,
@@ -260,30 +259,25 @@ router.post('/', upload.single('ofx'), async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Importar dias 01-10 (sem verificar duplicatas)
-      for (const transacao of dias01_10) {
-        try {
-          await importarTransacao(transacao, empresaIdentificada, dadosBancarios, client);
-          stats.importados++;
-        } catch (err) {
-          console.error(`Erro ao importar ${transacao.data}:`, err.message);
-          stats.erros++;
-        }
-      }
+      // ✅ FIX: SEMPRE verificar duplicatas (em TODOS os dias)
+      // PROBLEMA ANTERIOR: Dias 01-10 não verificavam duplicatas e davam erro
+      for (let i = 0; i < transacoes.length; i++) {
+        const transacao = transacoes[i];
 
-      // Importar dias após 10 (verificando duplicatas)
-      for (const transacao of diasApos10) {
         try {
+          // Verificar duplicata ANTES de importar
           const duplicata = await verificarDuplicata(transacao.data, transacao.valor, empresaIdentificada);
 
           if (duplicata) {
             stats.duplicatas++;
+            console.log(`[${i+1}/${transacoes.length}] Duplicata: ${transacao.data} R$ ${transacao.valor}`);
           } else {
             await importarTransacao(transacao, empresaIdentificada, dadosBancarios, client);
             stats.importados++;
+            console.log(`[${i+1}/${transacoes.length}] Importado: ${transacao.data} R$ ${transacao.valor}`);
           }
         } catch (err) {
-          console.error(`Erro ao processar ${transacao.data}:`, err.message);
+          console.error(`[${i+1}/${transacoes.length}] Erro ao processar ${transacao.data}:`, err.message);
           stats.erros++;
         }
       }
