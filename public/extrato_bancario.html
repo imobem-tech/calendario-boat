@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609190135
+    EXTRATO BANCÁRIO - V.2609190145
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -871,6 +871,7 @@
 
             // Buscar saldo de abertura (saldo manual do dia anterior)
             let saldoAbertura = 0;
+            let dadosSaldo = null; // Guardar dados para reusar
             const empresa = document.getElementById('empresaSelect').value;
             const banco = 'Asaas';
 
@@ -881,9 +882,9 @@
                     const resultSaldo = await respSaldo.json();
 
                     if (resultSaldo.sucesso && resultSaldo.saldo) {
-                        saldoAbertura = parseFloat(resultSaldo.saldo.saldo_informado);
-                        const dataSaldo = resultSaldo.saldo.data_referencia;
-                        console.log(`💰 Saldo de abertura: ${dataSaldo} = R$ ${saldoAbertura.toFixed(2)} (final do dia ${dataSaldo})`);
+                        dadosSaldo = resultSaldo.saldo; // GUARDAR para reusar
+                        saldoAbertura = parseFloat(dadosSaldo.saldo_informado);
+                        console.log(`💰 Saldo de abertura: ${dadosSaldo.data_referencia} = R$ ${saldoAbertura.toFixed(2)} (final do dia ${dadosSaldo.data_referencia})`);
                     }
                 } catch (err) {
                     console.log('ℹ️ Saldo inicial não encontrado');
@@ -895,43 +896,39 @@
             let saldoAcumulado = saldoAbertura; // Começa do saldo de abertura
 
             // Inserir linha de AJUSTE DE SALDO se houver saldo inicial
-            if (saldoAbertura !== 0) {
+            if (saldoAbertura !== 0 && dadosSaldo) {
                 try {
-                    const primeiraData = dados.lancamentos[0].data.split('T')[0];
-                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraData}`);
-                    const resultSaldo = await respSaldo.json();
+                    const dataSaldo = dadosSaldo.data_referencia;
+                    const [ano, mes, dia] = dataSaldo.split('-');
+                    const dataAjuste = new Date(ano, mes - 1, dia);
+                    const dataFormatada = dataAjuste.toLocaleDateString('pt-BR');
 
-                    if (resultSaldo.sucesso && resultSaldo.saldo) {
-                        const dataSaldo = resultSaldo.saldo.data_referencia;
-                        const [ano, mes, dia] = dataSaldo.split('-');
-                        const dataAjuste = new Date(ano, mes - 1, dia);
-                        const dataFormatada = dataAjuste.toLocaleDateString('pt-BR');
-
-                        html += `
-                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; border: 2px solid #667eea;">
-                                <td style="padding: 12px;">${dataFormatada}</td>
-                                <td style="font-size: 11px; opacity: 0.9;">-</td>
-                                <td><strong>${empresa}</strong></td>
-                                <td colspan="4" style="padding: 12px;">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-size: 18px;">⚙️</span>
-                                        <div>
-                                            <div style="font-size: 14px; font-weight: 700;">AJUSTE DE SALDO</div>
-                                            <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Saldo final do dia ${dataFormatada}</div>
-                                        </div>
+                    html += `
+                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; border: 2px solid #667eea;">
+                            <td style="padding: 12px;">${dataFormatada}</td>
+                            <td style="font-size: 11px; opacity: 0.9;">-</td>
+                            <td><strong>${empresa}</strong></td>
+                            <td colspan="4" style="padding: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 18px;">⚙️</span>
+                                    <div>
+                                        <div style="font-size: 14px; font-weight: 700;">AJUSTE DE SALDO</div>
+                                        <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Saldo final do dia ${dataFormatada}</div>
                                     </div>
-                                </td>
-                                <td style="text-align:right; opacity: 0.7;">-</td>
-                                <td style="text-align:right; padding: 12px; font-size: 15px;">
-                                    ${saldoAbertura >= 0 ? '' : '-'}R$ ${Math.abs(saldoAbertura).toFixed(2).replace('.', ',')}
-                                </td>
-                                <td style="text-align:center; opacity: 0.7;">-</td>
-                                <td style="text-align:center; opacity: 0.7;">-</td>
-                            </tr>
-                        `;
-                    }
+                                </div>
+                            </td>
+                            <td style="text-align:right; opacity: 0.7;">-</td>
+                            <td style="text-align:right; padding: 12px; font-size: 15px;">
+                                ${saldoAbertura >= 0 ? '' : '-'}R$ ${Math.abs(saldoAbertura).toFixed(2).replace('.', ',')}
+                            </td>
+                            <td style="text-align:center; opacity: 0.7;">-</td>
+                            <td style="text-align:center; opacity: 0.7;">-</td>
+                        </tr>
+                    `;
+
+                    console.log(`✅ Linha de ajuste inserida: ${dataFormatada} = R$ ${saldoAbertura.toFixed(2)}`);
                 } catch (err) {
-                    console.log('ℹ️ Erro ao buscar dados do ajuste:', err.message);
+                    console.error('❌ Erro ao inserir linha de ajuste:', err);
                 }
             }
 
@@ -1931,7 +1928,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190135</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190145</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
