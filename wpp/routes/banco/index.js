@@ -24,6 +24,7 @@ import enriquecerRouter from './enriquecer-api.js';
 import reclassificarRouter from './reclassificar-api.js';
 import importarOfxRouter from './importar-ofx-api.js';
 import debugClassificacaoRouter from './debug-classificacao-api.js';
+import saldoInicialRouter from './saldo-inicial-api.js';
 
 const router = express.Router();
 
@@ -99,6 +100,9 @@ router.use('/enriquecer', enriquecerRouter);
 
 // Rota para reclassificar por palavras-chave
 router.use('/reclassificar', reclassificarRouter);
+
+// Rota para gerenciar saldos iniciais
+router.use('/saldo-inicial', saldoInicialRouter);
 
 // Rota de debug para classificação
 router.use('/debug-classificacao', debugClassificacaoRouter);

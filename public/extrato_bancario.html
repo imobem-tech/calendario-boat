@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609182245
+    EXTRATO BANCÁRIO - V.2609190010
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -516,6 +516,10 @@
                             style="background: #2196F3; color: white; height: fit-content;">
                         🏷️ Reclassificar
                         <span class="tooltip-icon" onclick="event.stopPropagation(); mostrarTooltip('tooltipReclassificar')">?</span>
+                    </button>
+                    <button class="btn" onclick="abrirModalSaldoInicial()"
+                            style="background: #9C27B0; color: white; height: fit-content;">
+                        ⚙️ Saldo Inicial
                     </button>
                     <button class="btn btn-success" id="btnGerarPDF" onclick="gerarPDF()" disabled style="height: fit-content;">
                         📄 Gerar PDF
@@ -1836,11 +1840,106 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609182250</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190010</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
         </p>
+    </div>
+
+    <!-- MODAL SALDO INICIAL -->
+    <div id="modalSaldoInicial" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #667eea;">
+                <h2 style="margin: 0; color: #667eea;">⚙️ Ajustar Saldo Inicial</h2>
+                <button onclick="fecharModalSaldoInicial()" style="background: #f44336; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-size: 20px; font-weight: bold;">×</button>
+            </div>
+
+            <!-- FORMULÁRIO -->
+            <div style="display: grid; gap: 20px; margin-bottom: 25px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 13px;">Empresa *</label>
+                        <select id="saldoEmpresa" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                            <option value="">Selecione...</option>
+                            <option value="ALLMAX">ALLMAX</option>
+                            <option value="IMOBEM">IMOBEM</option>
+                            <option value="SUMMER">SUMMER</option>
+                            <option value="IMOBAN">IMOBAN</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 13px;">Banco *</label>
+                        <select id="saldoBanco" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                            <option value="">Selecione...</option>
+                            <option value="Asaas">Asaas</option>
+                            <option value="Sicredi">Sicredi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 13px;">Data de Referência *</label>
+                        <input type="date" id="saldoData" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 13px;">Saldo Informado (R$) *</label>
+                        <input type="number" id="saldoValor" step="0.01" placeholder="0,00" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 13px;">Observação</label>
+                    <textarea id="saldoObs" rows="2" placeholder="Ex: Ajuste inicial, Correção de duplicata, etc." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <!-- CONFERÊNCIA -->
+            <div id="saldoConferencia" style="display: none; background: #f5f7fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">📊 Conferência</h3>
+                <div style="display: grid; gap: 10px; font-size: 14px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #666;">Saldo informado:</span>
+                        <strong id="confSaldoInformado" style="color: #667eea;">R$ 0,00</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #666;">Saldo calculado:</span>
+                        <strong id="confSaldoCalculado" style="color: #2196F3;">R$ 0,00</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #ddd;">
+                        <span style="color: #666; font-weight: 600;">Diferença:</span>
+                        <strong id="confDiferenca" style="font-size: 16px;">R$ 0,00</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTÕES -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="calcularConferencia()" style="padding: 12px 24px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    🔍 Conferir
+                </button>
+                <button onclick="fecharModalSaldoInicial()" style="padding: 12px 24px; background: #999; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancelar
+                </button>
+                <button onclick="salvarSaldoInicial()" style="padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    💾 Salvar
+                </button>
+            </div>
+
+            <!-- HISTÓRICO -->
+            <div style="margin-top: 30px; padding-top: 25px; border-top: 2px solid #eee;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 16px; color: #333;">📋 Histórico de Ajustes</h3>
+                    <button onclick="carregarHistoricoSaldos()" style="padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        🔄 Atualizar
+                    </button>
+                </div>
+                <div id="historicoSaldos" style="max-height: 200px; overflow-y: auto;">
+                    <p style="text-align: center; color: #999; padding: 20px;">Carregando...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- TOOLTIPS MODAIS -->
@@ -2046,8 +2145,243 @@ conforme critérios selecionados
                 document.querySelectorAll('.tooltip-modal').forEach(modal => {
                     modal.style.display = 'none';
                 });
+                // Fechar modal saldo inicial também
+                fecharModalSaldoInicial();
             }
         });
+
+        // ============================================================
+        // FUNÇÕES SALDO INICIAL
+        // ============================================================
+
+        function abrirModalSaldoInicial() {
+            document.getElementById('modalSaldoInicial').style.display = 'flex';
+
+            // Pré-selecionar empresa do filtro atual
+            const empresaAtual = document.getElementById('empresaSelect').value;
+            if (empresaAtual && empresaAtual !== 'TODAS') {
+                document.getElementById('saldoEmpresa').value = empresaAtual;
+            }
+
+            // Data padrão = primeiro dia do mês atual
+            const hoje = new Date();
+            const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            document.getElementById('saldoData').value = primeiroDia.toISOString().split('T')[0];
+
+            // Carregar histórico
+            carregarHistoricoSaldos();
+        }
+
+        function fecharModalSaldoInicial() {
+            document.getElementById('modalSaldoInicial').style.display = 'none';
+
+            // Limpar formulário
+            document.getElementById('saldoEmpresa').value = '';
+            document.getElementById('saldoBanco').value = '';
+            document.getElementById('saldoData').value = '';
+            document.getElementById('saldoValor').value = '';
+            document.getElementById('saldoObs').value = '';
+
+            // Esconder conferência
+            document.getElementById('saldoConferencia').style.display = 'none';
+        }
+
+        async function calcularConferencia() {
+            const empresa = document.getElementById('saldoEmpresa').value;
+            const banco = document.getElementById('saldoBanco').value;
+            const data = document.getElementById('saldoData').value;
+            const saldoInformado = parseFloat(document.getElementById('saldoValor').value) || 0;
+
+            if (!empresa || !banco || !data) {
+                alert('⚠️ Preencha Empresa, Banco e Data para conferir!');
+                return;
+            }
+
+            try {
+                // Buscar lançamentos a partir da data informada
+                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato?empresa=${empresa}&banco=${banco}&dataInicio=${data}&dataFim=${new Date().toISOString().split('T')[0]}`);
+                const dados = await response.json();
+
+                if (!dados.dados || !dados.dados.extrato) {
+                    throw new Error('Erro ao buscar lançamentos');
+                }
+
+                // Calcular saldo (créditos - débitos)
+                let saldoCalculado = 0;
+                dados.dados.extrato.forEach(lanc => {
+                    if (lanc.tipo === 'CREDITO') {
+                        saldoCalculado += parseFloat(lanc.valor);
+                    } else {
+                        saldoCalculado -= parseFloat(lanc.valor);
+                    }
+                });
+
+                // Mostrar conferência
+                document.getElementById('confSaldoInformado').textContent = `R$ ${saldoInformado.toFixed(2).replace('.', ',')}`;
+                document.getElementById('confSaldoCalculado').textContent = `R$ ${saldoCalculado.toFixed(2).replace('.', ',')}`;
+
+                const diferenca = saldoInformado - saldoCalculado;
+                const difElement = document.getElementById('confDiferenca');
+                difElement.textContent = `R$ ${Math.abs(diferenca).toFixed(2).replace('.', ',')}`;
+
+                if (Math.abs(diferenca) < 0.01) {
+                    difElement.style.color = '#4CAF50';
+                    difElement.textContent = '✅ ' + difElement.textContent + ' (OK)';
+                } else if (diferenca > 0) {
+                    difElement.style.color = '#FF9800';
+                    difElement.textContent = '⬆️ ' + difElement.textContent + ' (maior)';
+                } else {
+                    difElement.style.color = '#f44336';
+                    difElement.textContent = '⬇️ ' + difElement.textContent + ' (menor)';
+                }
+
+                document.getElementById('saldoConferencia').style.display = 'block';
+
+            } catch (err) {
+                console.error('Erro ao calcular conferência:', err);
+                alert('❌ Erro ao calcular: ' + err.message);
+            }
+        }
+
+        async function salvarSaldoInicial() {
+            const empresa = document.getElementById('saldoEmpresa').value;
+            const banco = document.getElementById('saldoBanco').value;
+            const data = document.getElementById('saldoData').value;
+            const saldo = parseFloat(document.getElementById('saldoValor').value);
+            const obs = document.getElementById('saldoObs').value;
+
+            // Validações
+            if (!empresa || !banco || !data || isNaN(saldo)) {
+                alert('⚠️ Preencha todos os campos obrigatórios!');
+                return;
+            }
+
+            if (!confirm(`💾 Salvar saldo inicial?\n\nEmpresa: ${empresa}\nBanco: ${banco}\nData: ${data}\nSaldo: R$ ${saldo.toFixed(2)}`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        empresa,
+                        banco,
+                        data_referencia: data,
+                        saldo_informado: saldo,
+                        observacao: obs,
+                        usuario: 'allmaxtotal@gmail.com'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.sucesso) {
+                    alert('✅ Saldo inicial salvo com sucesso!');
+                    carregarHistoricoSaldos();
+
+                    // Limpar formulário
+                    document.getElementById('saldoValor').value = '';
+                    document.getElementById('saldoObs').value = '';
+                    document.getElementById('saldoConferencia').style.display = 'none';
+                } else {
+                    alert('❌ Erro: ' + result.erro);
+                }
+
+            } catch (err) {
+                console.error('Erro ao salvar:', err);
+                alert('❌ Erro ao salvar: ' + err.message);
+            }
+        }
+
+        async function carregarHistoricoSaldos() {
+            const empresa = document.getElementById('saldoEmpresa').value;
+            const banco = document.getElementById('saldoBanco').value;
+
+            try {
+                let url = 'https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial?';
+                if (empresa) url += `empresa=${empresa}&`;
+                if (banco) url += `banco=${banco}`;
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                const container = document.getElementById('historicoSaldos');
+
+                if (!result.sucesso || result.saldos.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum ajuste encontrado</p>';
+                    return;
+                }
+
+                // Montar tabela
+                let html = `
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                <th style="padding: 8px; text-align: left;">Data</th>
+                                <th style="padding: 8px; text-align: left;">Empresa</th>
+                                <th style="padding: 8px; text-align: left;">Banco</th>
+                                <th style="padding: 8px; text-align: right;">Saldo</th>
+                                <th style="padding: 8px; text-align: left;">Observação</th>
+                                <th style="padding: 8px; text-align: center;">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                result.saldos.forEach(s => {
+                    const dataFormatada = new Date(s.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const saldoFormatado = parseFloat(s.saldo_informado).toFixed(2).replace('.', ',');
+
+                    html += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px;">${dataFormatada}</td>
+                            <td style="padding: 8px;">${s.empresa}</td>
+                            <td style="padding: 8px;">${s.banco}</td>
+                            <td style="padding: 8px; text-align: right; font-weight: 600;">R$ ${saldoFormatado}</td>
+                            <td style="padding: 8px; color: #666;">${s.observacao || '-'}</td>
+                            <td style="padding: 8px; text-align: center;">
+                                <button onclick="excluirSaldo(${s.id})" style="background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                    🗑️ Excluir
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error('Erro ao carregar histórico:', err);
+                document.getElementById('historicoSaldos').innerHTML = '<p style="text-align: center; color: #f44336; padding: 20px;">Erro ao carregar</p>';
+            }
+        }
+
+        async function excluirSaldo(id) {
+            if (!confirm('🗑️ Excluir este ajuste de saldo?\n\nEsta ação não pode ser desfeita!')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.sucesso) {
+                    alert('✅ Saldo excluído com sucesso!');
+                    carregarHistoricoSaldos();
+                } else {
+                    alert('❌ Erro: ' + result.erro);
+                }
+
+            } catch (err) {
+                console.error('Erro ao excluir:', err);
+                alert('❌ Erro ao excluir: ' + err.message);
+            }
+        }
     </script>
 
 </body>
