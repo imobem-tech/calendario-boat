@@ -374,6 +374,122 @@
                 display: none;
             }
         }
+
+        /* TOOLTIPS */
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 6px;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .tooltip-icon:hover {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .tooltip-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .tooltip-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            position: relative;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .tooltip-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f44336;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .tooltip-close:hover {
+            background: #d32f2f;
+            transform: rotate(90deg);
+        }
+
+        .tooltip-content h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 20px;
+            padding-right: 40px;
+        }
+
+        .tooltip-content pre {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #333;
+            border-left: 4px solid #667eea;
+        }
+
+        .tooltip-signature {
+            text-align: right;
+            color: #999;
+            font-size: 11px;
+            margin-top: 15px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -389,14 +505,17 @@
                     <button class="btn" onclick="document.getElementById('fileOFX').click()"
                             style="background: #FF9800; color: white; height: fit-content;">
                         📥 Importar OFX
+                        <span class="tooltip-icon" onclick="event.stopPropagation(); mostrarTooltip('tooltipOFX')">?</span>
                     </button>
                     <button class="btn" id="btnEnriquecer" onclick="enriquecerDados(event)"
                             style="background: #4CAF50; color: white; height: fit-content;">
                         🔍 Enriquecer Dados
+                        <span class="tooltip-icon" onclick="event.stopPropagation(); mostrarTooltip('tooltipEnriquecer')">?</span>
                     </button>
                     <button class="btn" id="btnReclassificar" onclick="reclassificar(event)"
                             style="background: #2196F3; color: white; height: fit-content;">
                         🏷️ Reclassificar
+                        <span class="tooltip-icon" onclick="event.stopPropagation(); mostrarTooltip('tooltipReclassificar')">?</span>
                     </button>
                     <button class="btn btn-success" id="btnGerarPDF" onclick="gerarPDF()" disabled style="height: fit-content;">
                         📄 Gerar PDF
@@ -462,6 +581,7 @@
             <div class="filter-group" style="display: flex; align-items: flex-end;">
                 <button class="btn btn-primary" onclick="buscarExtrato()" style="min-width: 110px; padding: 10px 16px;">
                     🔍 Buscar
+                    <span class="tooltip-icon" onclick="event.stopPropagation(); mostrarTooltip('tooltipBuscar')" style="background: rgba(102, 126, 234, 0.3); border-color: rgba(102, 126, 234, 0.5);">?</span>
                 </button>
             </div>
         </div>
@@ -1716,12 +1836,219 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609181923</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609182250</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
         </p>
     </div>
+
+    <!-- TOOLTIPS MODAIS -->
+    <div id="tooltipOFX" class="tooltip-modal" onclick="fecharTooltip('tooltipOFX')">
+        <div class="tooltip-content" onclick="event.stopPropagation()">
+            <button class="tooltip-close" onclick="fecharTooltip('tooltipOFX')">×</button>
+            <h3>🔄 IMPORTAR OFX</h3>
+            <pre>📌 OBJETIVO:
+Importar lançamentos do arquivo OFX do banco
+(Hoje: Asaas | Futuro: Multibanco)
+
+🛠️ COMO USAR:
+
+1. Clique no botão "Importar OFX"
+2. Selecione o arquivo .ofx baixado do banco
+   (Extrato mensal exportado)
+3. Aguarde o processamento (progresso em tempo real)
+
+✅ RESULTADO:
+• Sistema detecta automaticamente a empresa
+  (ALLMAX, IMOBEM ou SUMMER)
+• Importa APENAS lançamentos NOVOS
+• Duplicatas são ignoradas (by ID + hash)
+• Status inicial: PENDENTE
+
+➡️ PRÓXIMO PASSO:
+Após importar, clique em "🔍 Enriquecer Dados"
+para buscar clientes e vincular Contas a Receber
+
+⚠️ ATENÇÃO:
+• Arquivo deve ser .ofx do Asaas
+• Exporte UMA empresa por vez
+• Recomendado: períodos mensais
+• Duplicatas são automaticamente ignoradas
+  (seguro reimportar o mesmo arquivo)</pre>
+            <div class="tooltip-signature">DZ_18/09/2026</div>
+        </div>
+    </div>
+
+    <div id="tooltipEnriquecer" class="tooltip-modal" onclick="fecharTooltip('tooltipEnriquecer')">
+        <div class="tooltip-content" onclick="event.stopPropagation()">
+            <button class="tooltip-close" onclick="fecharTooltip('tooltipEnriquecer')">×</button>
+            <h3>🔍 ENRIQUECER DADOS</h3>
+            <pre>📌 OBJETIVO:
+Necessário quando importar OFX
+Completar informações dos lançamentos importados:
+• Identificar cliente (nome + CPF/CNPJ)
+• Vincular Conta a Receber correspondente
+• Classificar automaticamente por categoria
+• Definir status (OK ou PENDENTE)
+
+🛠️ COMO USAR:
+
+1. Selecione UMA empresa específica
+   (ALLMAX, IMOBEM ou SUMMER)
+2. Selecione o período (mês ou intervalo de datas)
+3. Clique em "Enriquecer Dados"
+4. Aguarde o processamento (progresso em tempo real)
+
+📊 O QUE É PROCESSADO:
+
+Apenas registros que precisam:
+• Sem nome do cliente
+• Sem classificação
+• Com status PENDENTE
+
+Para cada registro:
+1. Extrai nome da descrição OFX
+2. Busca cliente no cadastro (match parcial)
+3. Busca CR do cliente (±10 dias, ±5% valor)
+4. Classifica por categoria (palavras-chave)
+5. Status OK se TUDO encontrado
+
+✅ RESULTADO:
+• Clientes identificados e vinculados
+• CRs vinculadas automaticamente
+• Categorias classificadas
+• Status atualizado (OK ou PENDENTE)
+
+➡️ PRÓXIMO PASSO:
+Revise os que ficaram PENDENTES
+e complete manualmente se necessário
+
+⚠️ ATENÇÃO:
+• Selecione UMA empresa específica
+• Pode rodar múltiplas vezes (não duplica)
+• Tolerância: ±10 dias e ±5% no valor</pre>
+            <div class="tooltip-signature">DZ_18/09/2026</div>
+        </div>
+    </div>
+
+    <div id="tooltipReclassificar" class="tooltip-modal" onclick="fecharTooltip('tooltipReclassificar')">
+        <div class="tooltip-content" onclick="event.stopPropagation()">
+            <button class="tooltip-close" onclick="fecharTooltip('tooltipReclassificar')">×</button>
+            <h3>🏷️ RECLASSIFICAR</h3>
+            <pre>📌 OBJETIVO:
+Aplicar regras de classificação automática, necessário quando:
+a) Importou OFX e enriqueceu
+b) Incluiu nova palavra-chave ou regra aprendida
+Tentará reatribuir categoria aos lançamentos que ainda NÃO possuem.
+
+🛠️ COMO USAR:
+
+1. Selecione UMA empresa específica
+   (ALLMAX, IMOBEM ou SUMMER)
+2. Selecione o período (mês ou intervalo de datas)
+3. Clique em "Reclassificar"
+4. Aguarde o processamento (progresso em tempo real)
+
+📊 O QUE É PROCESSADO:
+
+Apenas registros SEM classificação:
+• classificacao IS NULL ou vazio
+
+Para cada registro:
+1. Tenta classificar por palavras-chave
+   (Ex: "mens*" → Mensalidade Embarcação)
+2. Se não encontrar, tenta por chave aprendida
+   (frase + valor + tolerância + CPF/CNPJ)
+3. Atualiza a categoria se encontrar match
+
+✅ RESULTADO:
+• Categorias aplicadas automaticamente
+• Status do lançamento NÃO é alterado
+  (mantém PENDENTE ou OK)
+• Estatísticas detalhadas:
+  - Total analisados
+  - Classificados com sucesso
+  - Não classificados (sem regra)
+  - Sem texto para analisar
+
+➡️ PRÓXIMO PASSO:
+Revise os NÃO classificados e:
+• Crie novas regras de palavras-chave, ou
+• Classifique manualmente (editar lançamento)
+
+⚠️ ATENÇÃO:
+• Selecione UMA empresa específica
+• Apenas ATUALIZA classificacao (não muda status)
+• Pode rodar múltiplas vezes (seguro)
+• Usa regras de: bank_categorias</pre>
+            <div class="tooltip-signature">DZ_18/09/2026</div>
+        </div>
+    </div>
+
+    <div id="tooltipBuscar" class="tooltip-modal" onclick="fecharTooltip('tooltipBuscar')">
+        <div class="tooltip-content" onclick="event.stopPropagation()">
+            <button class="tooltip-close" onclick="fecharTooltip('tooltipBuscar')">×</button>
+            <h3>🔍 BUSCAR</h3>
+            <pre>📌 OBJETIVO:
+Filtrar e exibir lançamentos do extrato bancário
+conforme critérios selecionados
+
+🛠️ COMO USAR:
+
+1. Configure os filtros desejados:
+   • Empresa (TODAS ou específica)
+   • Período (mês ou intervalo de datas)
+   • Tipo (TODOS, CREDITO ou DEBITO)
+   • Categoria (TODAS ou específica)
+   • Status (TODOS, PENDENTE ou OK)
+   • Somente não classificados (checkbox)
+
+2. Clique em "Buscar"
+
+✅ RESULTADO:
+• Tabela atualizada com lançamentos filtrados
+• Totalizadores atualizados:
+  - Total de registros
+  - Créditos (soma)
+  - Débitos (soma)
+  - Saldo (créditos - débitos)
+• Opção de editar cada lançamento
+• Opção de visualizar/anexar recibos
+
+➡️ PRÓXIMO PASSO:
+• Revisar lançamentos exibidos
+• Editar os que precisam correção
+• Anexar recibos quando necessário
+• Exportar dados (futuro)
+
+⚠️ ATENÇÃO:
+• Filtros são cumulativos (AND)
+• Limpar filtros = mostrar todos
+• Performance: até 10.000 registros</pre>
+            <div class="tooltip-signature">DZ_18/09/2026</div>
+        </div>
+    </div>
+
+    <script>
+        // Funções de tooltip
+        function mostrarTooltip(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function fecharTooltip(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Fechar tooltip com ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.tooltip-modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+    </script>
 
 </body>
 </html>
