@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609190010
+    EXTRATO BANCÁRIO - V.2609190025
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -778,7 +778,7 @@
                 }
 
                 renderizarTabela(dadosAtuais);
-                atualizarResumo(dadosAtuais);
+                await atualizarResumo(dadosAtuais);
                 document.getElementById('btnGerarPDF').disabled = false;
 
             } catch (err) {
@@ -953,12 +953,36 @@
         }
 
         // Atualizar resumo
-        function atualizarResumo(dados) {
+        async function atualizarResumo(dados) {
             document.getElementById('summary').style.display = 'grid';
             document.getElementById('totalLancamentos').textContent = dados.totais.lancamentos;
             document.getElementById('totalCreditos').textContent = 'R$ ' + dados.totais.creditos.toFixed(2).replace('.', ',');
             document.getElementById('totalDebitos').textContent = 'R$ ' + dados.totais.debitos.toFixed(2).replace('.', ',');
-            document.getElementById('saldoPeriodo').textContent = 'R$ ' + dados.totais.saldo.toFixed(2).replace('.', ',');
+
+            // Buscar saldo inicial (se houver)
+            let saldoFinal = dados.totais.saldo;
+            const empresa = document.getElementById('empresaSelect').value;
+            const banco = 'Asaas'; // Por enquanto fixo, depois pode ser dinâmico
+
+            if (empresa && empresa !== 'TODAS') {
+                try {
+                    const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}`);
+                    const result = await response.json();
+
+                    if (result.sucesso && result.saldo) {
+                        const saldoInicial = parseFloat(result.saldo.saldo_informado);
+                        saldoFinal = saldoInicial + dados.totais.saldo;
+
+                        // Mostrar info do saldo inicial
+                        const dataRef = new Date(result.saldo.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR');
+                        document.getElementById('saldoPeriodo').title = `Saldo inicial em ${dataRef}: R$ ${saldoInicial.toFixed(2).replace('.', ',')}`;
+                    }
+                } catch (err) {
+                    console.log('ℹ️ Saldo inicial não encontrado (normal se não configurado)');
+                }
+            }
+
+            document.getElementById('saldoPeriodo').textContent = 'R$ ' + saldoFinal.toFixed(2).replace('.', ',');
         }
 
         // Mostrar loading
@@ -1840,7 +1864,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190010</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190025</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -2199,16 +2223,16 @@ conforme critérios selecionados
 
             try {
                 // Buscar lançamentos a partir da data informada
-                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato?empresa=${empresa}&banco=${banco}&dataInicio=${data}&dataFim=${new Date().toISOString().split('T')[0]}`);
+                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&banco=${banco}&dataInicio=${data}&dataFim=${new Date().toISOString().split('T')[0]}`);
                 const dados = await response.json();
 
-                if (!dados.dados || !dados.dados.extrato) {
+                if (!dados || !dados.extrato) {
                     throw new Error('Erro ao buscar lançamentos');
                 }
 
                 // Calcular saldo (créditos - débitos)
                 let saldoCalculado = 0;
-                dados.dados.extrato.forEach(lanc => {
+                dados.extrato.forEach(lanc => {
                     if (lanc.tipo === 'CREDITO') {
                         saldoCalculado += parseFloat(lanc.valor);
                     } else {
