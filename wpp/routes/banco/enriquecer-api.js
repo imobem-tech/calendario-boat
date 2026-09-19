@@ -1,6 +1,12 @@
 // ============================================================
-// enriquecer-api.js — V.2609150020
+// enriquecer-api.js — V.2609182055
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
+//
+// 🚀 NOVO V.2609182055: Server-Sent Events (SSE) para progresso em tempo real
+//    - Endpoint POST /stream com SSE
+//    - Frontend recebe eventos a cada 10 registros
+//    - Mostra "N de TOTAL" durante processamento
+//    - Modal atualiza em tempo real
 //
 // ⚡ FIX (15/09 00:20): Remover filtro de empresa em Contas_Receber
 //    - PROBLEMA: CR com empresa diferente não vinculava
@@ -260,6 +266,197 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('❌ Erro ao enriquecer:', err);
     res.status(500).json({ sucesso: false, erro: err.message });
+  }
+});
+
+// ============================================================
+// ENDPOINT POST /api/banco/enriquecer/stream (COM SSE - progresso em tempo real)
+// ============================================================
+router.post('/stream', async (req, res) => {
+  try {
+    const { empresa = 'ALLMAX', data_inicio, data_fim } = req.query;
+
+    // Configurar SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Função para enviar evento SSE
+    const enviarEvento = (tipo, dados) => {
+      res.write(`data: ${JSON.stringify({ tipo, ...dados })}\n\n`);
+    };
+
+    // Montar query com filtros
+    let query = `
+      SELECT id, empresa, data, valor, tipo, descricao_original, nome_origem,
+             observacoes, classificacao, status, cpf_cnpj_origem
+      FROM bank_extratos
+      WHERE tipo_importacao = 'OFX'
+        AND banco = 'Asaas'
+        AND empresa = $1
+        AND (
+          nome_origem IS NULL
+          OR nome_origem = ''
+          OR classificacao IS NULL
+          OR classificacao = ''
+          OR status = 'PENDENTE'
+        )
+    `;
+
+    const params = [empresa];
+    let paramIndex = 2;
+
+    if (data_inicio && data_fim) {
+      query += ` AND data BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      params.push(data_inicio, data_fim);
+      paramIndex += 2;
+    }
+
+    query += ` ORDER BY data, id`;
+
+    const registros = await pool.query(query, params);
+    const total = registros.rows.length;
+
+    const stats = {
+      processados: 0,
+      clienteEncontrado: 0,
+      crEncontrada: 0,
+      classificado: 0,
+      statusOK: 0,
+      erros: 0
+    };
+
+    // Processar cada registro com progresso SSE
+    for (let i = 0; i < registros.rows.length; i++) {
+      const reg = registros.rows[i];
+      const atual = i + 1;
+
+      try {
+        stats.processados++;
+
+        // 1. Extrair nome
+        const nomeParcial = extrairNome(reg.descricao_original);
+        if (!nomeParcial) {
+          // Enviar progresso a cada 10 registros
+          if (atual % 10 === 0 || atual === total) {
+            enviarEvento('progress', {
+              atual,
+              total,
+              percentual: Math.round((atual / total) * 100),
+              stats,
+              mensagem: `Processando ${atual}/${total}`
+            });
+          }
+          continue;
+        }
+
+        // 2. Buscar cliente(s)
+        const clientes = await buscarCliente(nomeParcial, reg.empresa);
+        if (clientes.length === 0) {
+          if (atual % 10 === 0 || atual === total) {
+            enviarEvento('progress', { atual, total, percentual: Math.round((atual / total) * 100), stats });
+          }
+          continue;
+        }
+
+        stats.clienteEncontrado++;
+
+        // 3. Testar clientes até achar CR
+        let clienteSelecionado = null;
+        let cr = null;
+
+        for (const cliente of clientes) {
+          const crTeste = await buscarCR(cliente.Codigo, reg.data, reg.valor, reg.empresa);
+          if (crTeste) {
+            clienteSelecionado = cliente;
+            cr = crTeste;
+            break;
+          }
+        }
+
+        if (!clienteSelecionado) {
+          clienteSelecionado = clientes[0];
+        }
+
+        // 4. Observações
+        let observacoes = reg.observacoes || '';
+        let crEncontrada = false;
+        if (cr) {
+          observacoes = cr.descricao;
+          crEncontrada = true;
+          stats.crEncontrada++;
+        }
+
+        // 5. Classificar
+        const textoParaClassificar = observacoes || reg.descricao_original;
+        const resultado = await classificarLancamento({
+          description: textoParaClassificar,
+          value: Math.abs(reg.valor),
+          tipo: reg.tipo,
+          empresa: reg.empresa,
+          cpfCnpjOrigem: reg.cpf_cnpj_origem || clienteSelecionado.Cliente_CPF
+        });
+
+        let categoriaId = reg.classificacao;
+        let classificou = false;
+        if (resultado && resultado.categoria_id) {
+          categoriaId = resultado.categoria_id;
+          classificou = true;
+          stats.classificado++;
+        }
+
+        // 6. Status
+        const tudoEncontrado = crEncontrada && classificou;
+        const novoStatus = tudoEncontrado ? 'OK' : reg.status;
+
+        if (tudoEncontrado) {
+          stats.statusOK++;
+        }
+
+        // 7. Update
+        await pool.query(`
+          UPDATE bank_extratos
+          SET nome_origem = $1,
+              cpf_cnpj_origem = $2,
+              observacoes = $3,
+              classificacao = $4::TEXT,
+              status = $5
+          WHERE id = $6
+        `, [
+          clienteSelecionado.Cliente_Nome,
+          clienteSelecionado.Cliente_CPF,
+          observacoes,
+          categoriaId,
+          novoStatus,
+          reg.id
+        ]);
+
+        // Enviar progresso a cada 10 registros ou no último
+        if (atual % 10 === 0 || atual === total) {
+          enviarEvento('progress', {
+            atual,
+            total,
+            percentual: Math.round((atual / total) * 100),
+            stats,
+            mensagem: `Enriquecido ${atual}/${total}`
+          });
+        }
+
+      } catch (err) {
+        console.error(`❌ Erro ao processar ID ${reg.id}:`, err);
+        stats.erros++;
+      }
+    }
+
+    // Enviar conclusão
+    enviarEvento('complete', { stats });
+    res.end();
+
+  } catch (err) {
+    console.error('❌ Erro ao enriquecer:', err);
+    res.write(`data: ${JSON.stringify({ tipo: 'error', erro: err.message })}\n\n`);
+    res.end();
   }
 });
 

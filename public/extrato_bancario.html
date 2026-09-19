@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609182010
+    EXTRATO BANCÁRIO - V.2609182055
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1280,6 +1280,17 @@
                 return;
             }
 
+            // Mostrar modal de progresso
+            const modal = document.getElementById('modalProgresso');
+            const modalTitulo = modal.querySelector('h2');
+            const progressoTexto = document.getElementById('progressoTexto');
+            const progressoDetalhe = document.getElementById('progressoDetalhe');
+
+            modal.style.display = 'flex';
+            modalTitulo.textContent = '🔍 Enriquecendo Dados';
+            progressoTexto.textContent = 'Iniciando enriquecimento...';
+            progressoDetalhe.textContent = 'Buscando registros pendentes...';
+
             try {
                 const empresa = document.getElementById('empresaSelect').value || 'ALLMAX';
                 const dataInicio = document.getElementById('dataInicio').value;
@@ -1291,46 +1302,71 @@
                     btn.textContent = '⏳ Processando...';
                 }
 
-                // Mostrar modal de progresso
-                const modal = document.getElementById('modalProgresso');
-                const progressoTexto = document.getElementById('progressoTexto');
-                modal.style.display = 'flex';
-                progressoTexto.textContent = 'Enriquecendo dados do extrato...';
-
                 // Montar URL com filtros
-                let url = `https://calendario-boat-production.up.railway.app/api/banco/enriquecer?empresa=${empresa}`;
+                let url = `https://calendario-boat-production.up.railway.app/api/banco/enriquecer/stream?empresa=${empresa}`;
                 if (dataInicio && dataFim) {
                     url += `&data_inicio=${dataInicio}&data_fim=${dataFim}`;
                 }
 
+                // 🚀 CONSUMIR SSE
                 const response = await fetch(url, {
                     method: 'POST'
                 });
 
-                const data = await response.json();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let statsFinais = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.trim() || !line.startsWith('data:')) continue;
+
+                        const jsonData = line.replace('data: ', '').trim();
+                        const evento = JSON.parse(jsonData);
+
+                        if (evento.tipo === 'progress') {
+                            // Atualizar progresso em tempo real
+                            modalTitulo.textContent = `🔍 Enriquecendo Dados (${evento.percentual}%)`;
+                            progressoTexto.textContent = evento.mensagem || `Processando ${evento.atual} de ${evento.total}`;
+                            progressoDetalhe.textContent = `✅ ${evento.stats.statusOK} OK | 🔄 ${evento.stats.clienteEncontrado} clientes | 📋 ${evento.stats.crEncontrada} CRs`;
+                        }
+                        else if (evento.tipo === 'complete') {
+                            statsFinais = evento.stats;
+                        }
+                        else if (evento.tipo === 'error') {
+                            throw new Error(evento.erro);
+                        }
+                    }
+                }
 
                 // Fechar modal
                 modal.style.display = 'none';
 
-                if (data.sucesso) {
+                // Mostrar resultado
+                if (statsFinais) {
                     alert(`✅ Enriquecimento concluído!\n\n📊 Estatísticas:\n` +
-                          `• Processados: ${data.stats.processados}\n` +
-                          `• Clientes encontrados: ${data.stats.clienteEncontrado}\n` +
-                          `• CRs vinculadas: ${data.stats.crEncontrada}\n` +
-                          `• Classificados: ${data.stats.classificado}\n` +
-                          `• Status OK: ${data.stats.statusOK}\n` +
-                          `• Erros: ${data.stats.erros}`);
+                          `• Processados: ${statsFinais.processados}\n` +
+                          `• Clientes encontrados: ${statsFinais.clienteEncontrado}\n` +
+                          `• CRs vinculadas: ${statsFinais.crEncontrada}\n` +
+                          `• Classificados: ${statsFinais.classificado}\n` +
+                          `• Status OK: ${statsFinais.statusOK}\n` +
+                          `• Erros: ${statsFinais.erros}`);
 
                     // Recarregar extrato
                     buscarExtrato();
-                } else {
-                    alert('❌ Erro: ' + data.erro);
                 }
 
             } catch (err) {
                 console.error('❌ Erro ao enriquecer:', err);
                 // Fechar modal em caso de erro
-                const modal = document.getElementById('modalProgresso');
                 modal.style.display = 'none';
                 alert('❌ Erro ao enriquecer dados: ' + err.message);
             } finally {
