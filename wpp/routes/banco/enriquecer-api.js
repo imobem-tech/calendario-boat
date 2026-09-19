@@ -368,6 +368,9 @@ router.post('/stream', async (req, res) => {
     // Criar índice em memória para lookup O(1)
     const clientesPorNome = new Map();
     todosClientes.rows.forEach(c => {
+      // Pular clientes sem nome
+      if (!c.Cliente_Nome) return;
+
       const nomeNormalizado = c.Cliente_Nome.toUpperCase().trim();
       if (!clientesPorNome.has(nomeNormalizado)) {
         clientesPorNome.set(nomeNormalizado, []);
