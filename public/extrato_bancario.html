@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609182115
+    EXTRATO BANCÁRIO - V.2609182230
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1462,6 +1462,9 @@
                 return;
             }
 
+            // SSE (Server-Sent Events) para progresso em tempo real
+            let eventSource = null;
+
             try {
                 // Mostrar modal de progresso
                 const modal = document.getElementById('modalProgresso');
@@ -1469,60 +1472,107 @@
                 const progressoDetalhe = document.getElementById('progressoDetalhe');
 
                 modal.style.display = 'flex';
-                progressoTexto.textContent = `Analisando registros...`;
+                progressoTexto.textContent = '🏷️ Iniciando reclassificação...';
                 progressoDetalhe.textContent = empresa !== 'TODAS' ?
                     `Empresa: ${empresa}` :
                     'Todas as empresas';
 
-                // Desabilitar botão também
+                // Desabilitar botão
                 if (btn) {
                     btn.disabled = true;
                 }
 
-                // Construir URL com parâmetros
-                let url = `https://calendario-boat-production.up.railway.app/api/banco/reclassificar?empresa=${empresa}`;
+                // Construir URL do SSE
+                let url = `https://calendario-boat-production.up.railway.app/api/banco/reclassificar/stream?empresa=${empresa}`;
                 if (dataInicio && dataFim) {
                     url += `&dataInicio=${dataInicio}&dataFim=${dataFim}`;
                 }
 
-                const response = await fetch(url, {
-                    method: 'POST'
-                });
+                // Conectar ao SSE
+                eventSource = new EventSource(url);
 
-                const data = await response.json();
+                let statsFinais = null;
 
-                // Fechar modal
-                modal.style.display = 'none';
+                eventSource.onmessage = (event) => {
+                    const dados = JSON.parse(event.data);
 
-                if (data.sucesso) {
-                    const taxaSucesso = data.stats.analisados > 0 ?
-                        ((data.stats.classificados/data.stats.analisados)*100).toFixed(1) : '0.0';
+                    if (dados.tipo === 'inicio') {
+                        progressoTexto.textContent = dados.mensagem;
+                    }
+                    else if (dados.tipo === 'progresso') {
+                        progressoTexto.textContent = dados.mensagem;
+                        if (dados.processados !== undefined && dados.total !== undefined) {
+                            progressoDetalhe.textContent = `Processados: ${dados.processados} / ${dados.total}`;
+                        }
+                    }
+                    else if (dados.tipo === 'stats') {
+                        if (dados.categorias !== undefined) {
+                            progressoDetalhe.textContent = `Categorias carregadas: ${dados.categorias}`;
+                        }
+                        if (dados.total !== undefined) {
+                            progressoDetalhe.textContent = `Registros a processar: ${dados.total}`;
+                        }
+                    }
+                    else if (dados.tipo === 'concluido') {
+                        statsFinais = dados.stats;
+                        eventSource.close();
 
-                    alert(`✅ Reclassificação concluída!\n\n📊 Estatísticas:\n` +
-                          `• Analisados: ${data.stats.analisados}\n` +
-                          `• Classificados: ${data.stats.classificados}\n` +
-                          `• Não classificados: ${data.stats.naoClassificados}\n` +
-                          `  └─ Sem texto: ${data.stats.semTexto}\n` +
-                          `  └─ Sem regra: ${data.stats.semRegra}\n` +
-                          `• Taxa de sucesso: ${taxaSucesso}%`);
+                        // Fechar modal
+                        modal.style.display = 'none';
 
-                    // Recarregar extrato
-                    buscarExtrato();
-                } else {
-                    alert('❌ Erro: ' + data.erro);
-                }
+                        // Mostrar resultado
+                        const taxaSucesso = statsFinais.analisados > 0 ?
+                            ((statsFinais.classificados/statsFinais.analisados)*100).toFixed(1) : '0.0';
+
+                        alert(`✅ Reclassificação concluída!\n\n📊 Estatísticas:\n` +
+                              `• Analisados: ${statsFinais.analisados}\n` +
+                              `• Classificados: ${statsFinais.classificados}\n` +
+                              `• Não classificados: ${statsFinais.naoClassificados}\n` +
+                              `  └─ Sem texto: ${statsFinais.semTexto}\n` +
+                              `  └─ Sem regra: ${statsFinais.semRegra}\n` +
+                              `• Taxa de sucesso: ${taxaSucesso}%`);
+
+                        // Recarregar extrato
+                        buscarExtrato();
+
+                        // Restaurar botão
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = btnTextoOriginal;
+                        }
+                    }
+                    else if (dados.tipo === 'erro') {
+                        eventSource.close();
+                        modal.style.display = 'none';
+                        alert('❌ Erro: ' + dados.mensagem);
+
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = btnTextoOriginal;
+                        }
+                    }
+                };
+
+                eventSource.onerror = (err) => {
+                    console.error('❌ Erro SSE:', err);
+                    eventSource.close();
+                    modal.style.display = 'none';
+                    alert('❌ Erro na conexão com o servidor');
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = btnTextoOriginal;
+                    }
+                };
 
             } catch (err) {
-                // Fechar modal em caso de erro
+                // Fechar SSE e modal em caso de erro
+                if (eventSource) eventSource.close();
                 const modal = document.getElementById('modalProgresso');
                 if (modal) modal.style.display = 'none';
 
                 console.error('❌ Erro ao reclassificar:', err);
                 alert('❌ Erro ao reclassificar: ' + err.message);
-            } finally {
-                // Garantir que modal está fechado
-                const modal = document.getElementById('modalProgresso');
-                if (modal) modal.style.display = 'none';
 
                 // Restaurar botão
                 if (btn) {
