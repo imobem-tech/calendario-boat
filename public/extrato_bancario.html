@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609190035
+    EXTRATO BANCÁRIO - V.2609190045
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1864,7 +1864,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190035</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190045</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -2355,7 +2355,16 @@ conforme critérios selecionados
                 `;
 
                 result.saldos.forEach(s => {
-                    const dataFormatada = new Date(s.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR');
+                    // Formatar data com tratamento de erro
+                    let dataFormatada = 'Data inválida';
+                    try {
+                        if (s.data_referencia) {
+                            const data = new Date(s.data_referencia.includes('T') ? s.data_referencia : s.data_referencia + 'T00:00:00');
+                            dataFormatada = data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                        }
+                    } catch (err) {
+                        console.error('Erro ao formatar data:', s.data_referencia, err);
+                    }
                     const saldoFormatado = parseFloat(s.saldo_informado).toFixed(2).replace('.', ',');
 
                     html += `
