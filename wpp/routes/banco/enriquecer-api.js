@@ -326,8 +326,11 @@ router.post('/stream', async (req, res) => {
 
     query += ` ORDER BY data, id`;
 
+    console.log(`🔍 Buscando registros com params:`, params);
     const registros = await pool.query(query, params);
     const total = registros.rows.length;
+
+    console.log(`✅ Encontrados ${total} registros para processar`);
 
     const stats = {
       processados: 0,
