@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609190210
+    EXTRATO BANCÁRIO - V.2609190220
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -911,8 +911,8 @@
                 if (!linhaAjusteInserida && dataSaldoAjuste && dataLanc <= dataSaldoAjuste) {
                     // Próximo lançamento é <= data do saldo → inserir linha ANTES
                     const [ano, mes, dia] = dataSaldoAjuste.split('-');
-                    const dataAjuste = new Date(ano, parseInt(mes) - 1, dia);
-                    const dataFormatada = dataAjuste.toLocaleDateString('pt-BR');
+                    const dataAjuste = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+                    const dataFormatada = dataAjuste.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
                     html += `
                         <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; border: 2px solid #667eea;">
@@ -943,8 +943,9 @@
                     console.log(`✅ Linha ajuste inserida: ${dataFormatada} = R$ ${saldoAbertura.toFixed(2)} | Saldo resetado para R$ 0`);
                 }
 
-                // Calcular saldo DESTA linha
-                saldoAcumulado += parseFloat(lanc.tipo === 'CREDITO' ? lanc.valor : -lanc.valor);
+                // Calcular saldo DESTA linha (usar Math.abs para evitar inversão de sinal)
+                const valorLanc = Math.abs(parseFloat(lanc.valor));
+                saldoAcumulado += lanc.tipo === 'CREDITO' ? valorLanc : -valorLanc;
 
                 // Guardar no cache (só o necessário para edição)
                 lancamentosCache[lanc.id] = lanc;
@@ -1937,7 +1938,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190210</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190220</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
