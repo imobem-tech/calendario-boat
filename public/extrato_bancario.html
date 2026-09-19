@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609182230
+    EXTRATO BANCÁRIO - V.2609182245
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -1320,7 +1320,30 @@
                 return;
             }
 
-            if (!confirm('🔍 Enriquecer dados do extrato?\n\nIsso irá:\n✅ Buscar nome dos clientes\n✅ Buscar CPF/CNPJ\n✅ Vincular Contas a Receber\n✅ Classificar automaticamente\n✅ Status OK se tudo encontrado\n\nDeseja continuar?')) {
+            // Detectar modo (mês ou intervalo de datas)
+            const modoAtual = document.getElementById('btnModoMes').classList.contains('active') ? 'mes' : 'datas';
+
+            let dataInicio, dataFim;
+
+            if (modoAtual === 'mes') {
+                const mes = document.getElementById('mesSelect').value;
+                if (mes) {
+                    dataInicio = `${mes}-01`;
+                    const [ano, mesNum] = mes.split('-');
+                    const ultimoDia = new Date(ano, mesNum, 0).getDate();
+                    dataFim = `${mes}-${ultimoDia}`;
+                }
+            } else {
+                dataInicio = document.getElementById('dataInicio').value;
+                dataFim = document.getElementById('dataFim').value;
+            }
+
+            // Montar mensagem com informações do filtro
+            let mensagemFiltro = '';
+            if (empresa !== 'TODAS') mensagemFiltro += `\n📍 Empresa: ${empresa}`;
+            if (dataInicio && dataFim) mensagemFiltro += `\n📅 Período: ${dataInicio} a ${dataFim}`;
+
+            if (!confirm(`🔍 Enriquecer dados do extrato?\n\nIsso irá:\n✅ Buscar nome dos clientes\n✅ Buscar CPF/CNPJ\n✅ Vincular Contas a Receber\n✅ Classificar automaticamente\n✅ Status OK se tudo encontrado${mensagemFiltro}\n\nDeseja continuar?`)) {
                 return;
             }
 
@@ -1336,9 +1359,6 @@
             progressoDetalhe.textContent = 'Buscando registros pendentes...';
 
             try {
-                const empresa = document.getElementById('empresaSelect').value || 'ALLMAX';
-                const dataInicio = document.getElementById('dataInicio').value;
-                const dataFim = document.getElementById('dataFim').value;
 
                 // Desabilitar botão
                 if (btn) {
