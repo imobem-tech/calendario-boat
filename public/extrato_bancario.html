@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609190110
+    EXTRATO BANCÁRIO - V.2609190125
 
     ✅ NOVO FILTRO - V.2609150037
        - Checkbox "Somente não classificados"
@@ -869,59 +869,36 @@
             // Limpar cache anterior
             lancamentosCache = {};
 
-            // Calcular saldo de abertura (saldo inicial + movimentações intermediárias)
+            // Buscar saldo de abertura (saldo manual do dia anterior)
             let saldoAbertura = 0;
             const empresa = document.getElementById('empresaSelect').value;
-            const banco = 'Asaas'; // Por enquanto fixo
+            const banco = 'Asaas';
 
             if (empresa && empresa !== 'TODAS' && dados.lancamentos.length > 0) {
                 try {
-                    // 1. Buscar primeiro lançamento do período
                     const primeiraData = dados.lancamentos[0].data.split('T')[0];
-
-                    // 2. Buscar saldo inicial vigente (data <= primeira data do período)
                     const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraData}`);
                     const resultSaldo = await respSaldo.json();
 
                     if (resultSaldo.sucesso && resultSaldo.saldo) {
-                        const saldoInicial = parseFloat(resultSaldo.saldo.saldo_informado);
+                        saldoAbertura = parseFloat(resultSaldo.saldo.saldo_informado);
                         const dataSaldo = resultSaldo.saldo.data_referencia;
-
-                        console.log(`💰 Saldo inicial: ${dataSaldo} = R$ ${saldoInicial.toFixed(2)}`);
-
-                        // 3. Buscar movimentações intermediárias (data > dataSaldo E data < primeiraData)
-                        const respMov = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&banco=${banco}&data_inicio=${dataSaldo}&data_fim=${primeiraData}&limit=10000`);
-                        const resultMov = await respMov.json();
-
-                        if (resultMov.sucesso && resultMov.lancamentos) {
-                            // Somar apenas lançamentos DEPOIS da data do saldo (data > dataSaldo)
-                            let movIntermediarias = 0;
-                            resultMov.lancamentos.forEach(lanc => {
-                                const dataLanc = lanc.data.split('T')[0];
-                                if (dataLanc > dataSaldo && dataLanc < primeiraData) {
-                                    movIntermediarias += parseFloat(lanc.tipo === 'CREDITO' ? lanc.valor : -lanc.valor);
-                                }
-                            });
-
-                            saldoAbertura = saldoInicial + movIntermediarias;
-
-                            if (movIntermediarias !== 0) {
-                                console.log(`📊 Movimentações ${dataSaldo} a ${primeiraData}: R$ ${movIntermediarias.toFixed(2)}`);
-                            }
-                            console.log(`🎯 Saldo de abertura em ${primeiraData}: R$ ${saldoAbertura.toFixed(2)}`);
-                        } else {
-                            saldoAbertura = saldoInicial;
-                        }
+                        console.log(`💰 Saldo de abertura: ${dataSaldo} = R$ ${saldoAbertura.toFixed(2)} (final do dia ${dataSaldo})`);
                     }
                 } catch (err) {
-                    console.log('ℹ️ Saldo inicial não encontrado:', err.message);
+                    console.log('ℹ️ Saldo inicial não encontrado');
                 }
             }
 
             // ⚡ OTIMIZAÇÃO: Construir HTML como string (muito mais rápido que appendChild em loop)
             let html = '';
+            let saldoAcumulado = saldoAbertura; // Começa do saldo de abertura
 
             dados.lancamentos.forEach(lanc => {
+                // Calcular saldo DESTA linha (somar/subtrair lançamento ao acumulado)
+                saldoAcumulado += parseFloat(lanc.tipo === 'CREDITO' ? lanc.valor : -lanc.valor);
+
+
                 // Guardar no cache (só o necessário para edição)
                 lancamentosCache[lanc.id] = lanc;
 
@@ -984,8 +961,8 @@
                         <td class="${lanc.valor >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
                             ${lanc.valor >= 0 ? '' : '-'}R$ ${Math.abs(lanc.valor).toFixed(2).replace('.', ',')}
                         </td>
-                        <td class="${(saldoAbertura + lanc.saldo_linha) >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAbertura > 0 ? 'Saldo de abertura: R$ ' + saldoAbertura.toFixed(2).replace('.', ',') : ''}">
-                            ${(saldoAbertura + lanc.saldo_linha) >= 0 ? '' : '-'}R$ ${Math.abs(saldoAbertura + lanc.saldo_linha).toFixed(2).replace('.', ',')}
+                        <td class="${saldoAcumulado >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAbertura > 0 ? 'Saldo de abertura: R$ ' + saldoAbertura.toFixed(2).replace('.', ',') : ''}">
+                            ${saldoAcumulado >= 0 ? '' : '-'}R$ ${Math.abs(saldoAcumulado).toFixed(2).replace('.', ',')}
                         </td>
                         <td style="text-align:center;">${statusHTML}</td>
                         <td style="text-align:center;">
@@ -1913,7 +1890,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190110</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190125</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
