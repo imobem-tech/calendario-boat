@@ -1,5 +1,14 @@
 // ============================================================
-// importar-ofx-api.js — V.2609182005
+// importar-ofx-api.js — V.2609182030
+//
+// 🔥 FIX CRÍTICO V.2609182030: Detecção de duplicatas INTELIGENTE
+//    - PROBLEMA: Só verificava data + valor (perdia lançamentos legítimos!)
+//    - EXEMPLO: 2 clientes, mesmo valor, mesmo dia → 2º marcado como duplicata
+//    - SOLUÇÃO:
+//      1️⃣ Match por ID (fitid = id_transacao_banco) - EXATO
+//      2️⃣ Match por data + valor + início descrição - SEGURO
+//    - Log melhorado: mostra motivo da duplicata (ID_EXATO ou VALOR_DESCRICAO)
+//    - RESULTADO: Nunca perde lançamentos legítimos! ✅
 //
 // 🚀 NOVO V.2609182005: Server-Sent Events (SSE) para progresso em tempo real
 //    - Endpoint POST /stream com SSE
@@ -144,19 +153,55 @@ function gerarHash(data, valor, descricao, empresa, fitid) {
   return crypto.createHash('sha256').update(chave).digest('hex');
 }
 
-// Verificar duplicata
-async function verificarDuplicata(data, valor, empresa) {
-  const result = await pool.query(`
-    SELECT id, descricao_original
-    FROM bank_extratos
-    WHERE empresa = $1
-      AND banco = 'Asaas'
-      AND data = $2
-      AND ABS(valor - $3) < 0.01
-    LIMIT 1
-  `, [empresa, data, valor]);
+// Verificar duplicata (melhorada - V.2609182030)
+// 1️⃣ Tenta match EXATO por ID (fitid = id_transacao_banco)
+// 2️⃣ Se não achar, tenta por data + valor + início da descrição
+async function verificarDuplicata(data, valor, empresa, fitid, descricao) {
+  // ESTRATÉGIA 1: Match por ID único (mais confiável)
+  if (fitid) {
+    const porID = await pool.query(`
+      SELECT id, descricao_original, tipo_importacao
+      FROM bank_extratos
+      WHERE empresa = $1
+        AND banco = 'Asaas'
+        AND id_transacao_banco = $2
+      LIMIT 1
+    `, [empresa, fitid]);
 
-  return result.rows.length > 0;
+    if (porID.rows.length > 0) {
+      return {
+        duplicata: true,
+        motivo: 'ID_EXATO',
+        tipo_original: porID.rows[0].tipo_importacao
+      };
+    }
+  }
+
+  // ESTRATÉGIA 2: Match por data + valor + início da descrição (mais seguro que só valor)
+  // Compara primeiros 40 caracteres da descrição para evitar falsos positivos
+  if (descricao) {
+    const porValorDesc = await pool.query(`
+      SELECT id, descricao_original, tipo_importacao
+      FROM bank_extratos
+      WHERE empresa = $1
+        AND banco = 'Asaas'
+        AND data = $2
+        AND ABS(valor - $3) < 0.01
+        AND LEFT(descricao_original, 40) = LEFT($4, 40)
+      LIMIT 1
+    `, [empresa, data, valor, descricao]);
+
+    if (porValorDesc.rows.length > 0) {
+      return {
+        duplicata: true,
+        motivo: 'VALOR_DESCRICAO',
+        tipo_original: porValorDesc.rows[0].tipo_importacao
+      };
+    }
+  }
+
+  // Não encontrou duplicata
+  return { duplicata: false };
 }
 
 // Importar transação
@@ -233,14 +278,23 @@ async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress
         const atual = i + 1;
 
         try {
-          const duplicata = await verificarDuplicata(transacao.data, transacao.valor, empresaIdentificada);
+          // ✅ Verificar duplicata com ID + descrição (mais preciso)
+          const resultado = await verificarDuplicata(
+            transacao.data,
+            transacao.valor,
+            empresaIdentificada,
+            transacao.fitid,
+            transacao.descricao
+          );
 
-          if (duplicata) {
+          if (resultado.duplicata) {
             stats.duplicatas++;
+            console.log(`[${atual}/${transacoes.length}] Duplicata (${resultado.motivo}): ${transacao.data} R$ ${transacao.valor}`);
             if (onProgress) onProgress(atual, transacoes.length, 'duplicata', stats);
           } else {
             await importarTransacao(transacao, empresaIdentificada, dadosBancarios, client);
             stats.importados++;
+            console.log(`[${atual}/${transacoes.length}] Importado: ${transacao.data} R$ ${transacao.valor}`);
             if (onProgress) onProgress(atual, transacoes.length, 'importado', stats);
           }
         } catch (err) {
