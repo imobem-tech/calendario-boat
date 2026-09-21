@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211037
+    EXTRATO BANCÁRIO - V.2609211145
+
+    ✅ TARJA SALDO INICIAL - V.2609211145
+       - Card roxo no resumo mostrando saldo inicial da consulta
+       - Exibe o saldo final do dia anterior ao período
+       - Mostra a data de referência do saldo
+       - Indica quando não há saldo cadastrado
 
     ✅ MELHORIAS UX - V.2609211037
        - Ordem invertida: data MENOR para MAIOR (crescente)
@@ -617,6 +623,11 @@
                 <label>Saldo do Período</label>
                 <div class="value" id="saldoPeriodo">R$ 0,00</div>
             </div>
+            <div class="summary-card saldo-inicial" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <label style="color: rgba(255,255,255,0.9);">⚙️ Saldo Inicial da Consulta</label>
+                <div class="value" id="saldoInicialConsulta" style="font-size: 24px;">R$ 0,00</div>
+                <div style="font-size: 11px; opacity: 0.9; margin-top: 5px;" id="dataSaldoInicial">-</div>
+            </div>
         </div>
 
         <!-- TABELA -->
@@ -1059,10 +1070,26 @@
                         // Mostrar info do saldo inicial
                         const dataRef = new Date(result.saldo.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR');
                         document.getElementById('saldoPeriodo').title = `Saldo inicial em ${dataRef}: R$ ${saldoInicial.toFixed(2).replace('.', ',')}`;
+
+                        // EXIBIR SALDO INICIAL DA CONSULTA
+                        document.getElementById('saldoInicialConsulta').textContent =
+                            (saldoInicial >= 0 ? '' : '-') + 'R$ ' + Math.abs(saldoInicial).toFixed(2).replace('.', ',');
+                        document.getElementById('dataSaldoInicial').textContent =
+                            `Saldo final de ${dataRef}`;
+                    } else {
+                        // Sem saldo cadastrado
+                        document.getElementById('saldoInicialConsulta').textContent = 'R$ 0,00';
+                        document.getElementById('dataSaldoInicial').textContent = 'Nenhum saldo cadastrado';
                     }
                 } catch (err) {
                     console.log('ℹ️ Saldo inicial não encontrado (normal se não configurado)');
+                    document.getElementById('saldoInicialConsulta').textContent = 'R$ 0,00';
+                    document.getElementById('dataSaldoInicial').textContent = 'Nenhum saldo cadastrado';
                 }
+            } else {
+                // Empresa "TODAS" - não mostrar saldo inicial
+                document.getElementById('saldoInicialConsulta').textContent = '-';
+                document.getElementById('dataSaldoInicial').textContent = 'Selecione uma empresa específica';
             }
 
             document.getElementById('saldoPeriodo').textContent = 'R$ ' + saldoFinal.toFixed(2).replace('.', ',');
