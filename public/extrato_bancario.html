@@ -6,7 +6,11 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211402
+    EXTRATO BANCÁRIO - V.2609211413
+
+    🔧 FIX VARIÁVEL - V.2609211413
+       - Corrigida referência a variável antiga saldoAbertura → saldoAnterior
+       - Linha 1156: title do tooltip agora usa variável correta
 
     ✨ NOVA LÓGICA COMPLETA - V.2609211402
        - Implementada lógica de saldos manuais conforme especificação do usuário
@@ -1153,7 +1157,7 @@
                         <td class="${lanc.valor >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
                             ${formatarValor(lanc.valor)}
                         </td>
-                        <td class="${saldoAcumulado >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAbertura > 0 ? 'Saldo de abertura: ' + formatarValor(saldoAbertura) : ''}">
+                        <td class="${saldoAcumulado >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAnterior > 0 ? 'Saldo anterior: ' + formatarValor(saldoAnterior) : ''}">
                             ${formatarValor(saldoAcumulado)}
                         </td>
                         <td style="text-align:center;">${statusHTML}</td>
@@ -2139,7 +2143,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211402</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211413</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
