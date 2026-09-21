@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211145
+    EXTRATO BANCÁRIO - V.2609211220
+
+    🔧 FIX CRÍTICO SALDO - V.2609211220
+       - Calcula saldo REAL do dia anterior (não mais o cadastrado)
+       - Busca TODOS lançamentos entre saldo manual e período
+       - Resolve erro de saldo incorreto em consultas futuras
+       - Exemplo: Jan→Jul agora considera todos os lançamentos intermediários
 
     ✅ TARJA SALDO INICIAL - V.2609211145
        - Card roxo no resumo mostrando saldo inicial da consulta
@@ -889,7 +895,7 @@
             // Limpar cache anterior
             lancamentosCache = {};
 
-            // Buscar saldo de abertura (saldo manual do dia anterior)
+            // Calcular saldo REAL do dia anterior ao primeiro lançamento visível
             let saldoAbertura = 0;
             let dataSaldoAjuste = null;
             const empresa = document.getElementById('empresaSelect').value;
@@ -897,18 +903,42 @@
 
             if (empresa && empresa !== 'TODAS' && dados.lancamentos.length > 0) {
                 try {
-                    // Buscar última data do período para pegar saldo vigente
-                    const ultimaData = dados.lancamentos[dados.lancamentos.length - 1].data.split('T')[0];
-                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${ultimaData}`);
+                    // 1. Buscar saldo manual cadastrado
+                    const primeiraDataVisivel = dados.lancamentos[0].data.split('T')[0];
+                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraDataVisivel}`);
                     const resultSaldo = await respSaldo.json();
 
                     if (resultSaldo.sucesso && resultSaldo.saldo) {
-                        saldoAbertura = parseFloat(resultSaldo.saldo.saldo_informado);
-                        dataSaldoAjuste = resultSaldo.saldo.data_referencia;
-                        console.log(`💰 Saldo cadastrado: ${dataSaldoAjuste} = R$ ${saldoAbertura.toFixed(2)} (final do dia)`);
+                        const saldoManual = parseFloat(resultSaldo.saldo.saldo_informado);
+                        const dataSaldoManual = resultSaldo.saldo.data_referencia;
+                        console.log(`💰 Saldo manual cadastrado: ${dataSaldoManual} = R$ ${saldoManual.toFixed(2)}`);
+
+                        // 2. Buscar TODOS os lançamentos entre saldo manual e dia anterior ao primeiro visível
+                        const dataAnterior = new Date(primeiraDataVisivel);
+                        dataAnterior.setDate(dataAnterior.getDate() - 1);
+                        const dataAnteriorStr = dataAnterior.toISOString().split('T')[0];
+
+                        const respLancamentos = await fetch(
+                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataSaldoManual}&data_fim=${dataAnteriorStr}&limit=10000`
+                        );
+                        const resultLancamentos = await respLancamentos.json();
+
+                        // 3. Calcular saldo acumulado
+                        let saldoCalculado = saldoManual;
+                        if (resultLancamentos.sucesso && resultLancamentos.lancamentos) {
+                            resultLancamentos.lancamentos.forEach(lanc => {
+                                const valor = Math.abs(parseFloat(lanc.valor));
+                                saldoCalculado += lanc.tipo === 'CREDITO' ? valor : -valor;
+                            });
+                            console.log(`📊 Lançamentos entre ${dataSaldoManual} e ${dataAnteriorStr}: ${resultLancamentos.lancamentos.length}`);
+                        }
+
+                        saldoAbertura = saldoCalculado;
+                        dataSaldoAjuste = dataAnteriorStr; // Dia anterior ao primeiro visível
+                        console.log(`✅ Saldo CALCULADO do dia anterior (${dataSaldoAjuste}): R$ ${saldoAbertura.toFixed(2)}`);
                     }
                 } catch (err) {
-                    console.log('ℹ️ Saldo inicial não encontrado');
+                    console.log('ℹ️ Erro ao calcular saldo inicial:', err);
                 }
             }
 
@@ -1058,38 +1088,61 @@
             const empresa = document.getElementById('empresaSelect').value;
             const banco = 'Asaas'; // Por enquanto fixo, depois pode ser dinâmico
 
-            if (empresa && empresa !== 'TODAS') {
+            if (empresa && empresa !== 'TODAS' && dados.lancamentos && dados.lancamentos.length > 0) {
                 try {
-                    const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}`);
-                    const result = await response.json();
+                    // 1. Buscar saldo manual cadastrado
+                    const primeiraDataVisivel = dados.lancamentos[0].data.split('T')[0];
+                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraDataVisivel}`);
+                    const resultSaldo = await respSaldo.json();
 
-                    if (result.sucesso && result.saldo) {
-                        const saldoInicial = parseFloat(result.saldo.saldo_informado);
-                        saldoFinal = saldoInicial + dados.totais.saldo;
+                    if (resultSaldo.sucesso && resultSaldo.saldo) {
+                        const saldoManual = parseFloat(resultSaldo.saldo.saldo_informado);
+                        const dataSaldoManual = resultSaldo.saldo.data_referencia;
 
-                        // Mostrar info do saldo inicial
-                        const dataRef = new Date(result.saldo.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR');
-                        document.getElementById('saldoPeriodo').title = `Saldo inicial em ${dataRef}: R$ ${saldoInicial.toFixed(2).replace('.', ',')}`;
+                        // 2. Buscar TODOS os lançamentos entre saldo manual e dia anterior ao primeiro visível
+                        const dataAnterior = new Date(primeiraDataVisivel);
+                        dataAnterior.setDate(dataAnterior.getDate() - 1);
+                        const dataAnteriorStr = dataAnterior.toISOString().split('T')[0];
 
-                        // EXIBIR SALDO INICIAL DA CONSULTA
+                        const respLancamentos = await fetch(
+                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataSaldoManual}&data_fim=${dataAnteriorStr}&limit=10000`
+                        );
+                        const resultLancamentos = await respLancamentos.json();
+
+                        // 3. Calcular saldo acumulado
+                        let saldoInicialCalculado = saldoManual;
+                        if (resultLancamentos.sucesso && resultLancamentos.lancamentos) {
+                            resultLancamentos.lancamentos.forEach(lanc => {
+                                const valor = Math.abs(parseFloat(lanc.valor));
+                                saldoInicialCalculado += lanc.tipo === 'CREDITO' ? valor : -valor;
+                            });
+                        }
+
+                        saldoFinal = saldoInicialCalculado + dados.totais.saldo;
+
+                        // Mostrar info
+                        const dataRef = new Date(dataAnteriorStr + 'T00:00:00').toLocaleDateString('pt-BR');
+                        document.getElementById('saldoPeriodo').title = `Saldo inicial calculado em ${dataRef}: R$ ${saldoInicialCalculado.toFixed(2).replace('.', ',')}`;
+
+                        // EXIBIR SALDO INICIAL DA CONSULTA (calculado)
                         document.getElementById('saldoInicialConsulta').textContent =
-                            (saldoInicial >= 0 ? '' : '-') + 'R$ ' + Math.abs(saldoInicial).toFixed(2).replace('.', ',');
+                            (saldoInicialCalculado >= 0 ? '' : '-') + 'R$ ' + Math.abs(saldoInicialCalculado).toFixed(2).replace('.', ',');
                         document.getElementById('dataSaldoInicial').textContent =
-                            `Saldo final de ${dataRef}`;
+                            `Saldo final de ${dataRef} (calculado)`;
                     } else {
                         // Sem saldo cadastrado
                         document.getElementById('saldoInicialConsulta').textContent = 'R$ 0,00';
                         document.getElementById('dataSaldoInicial').textContent = 'Nenhum saldo cadastrado';
                     }
                 } catch (err) {
-                    console.log('ℹ️ Saldo inicial não encontrado (normal se não configurado)');
+                    console.log('ℹ️ Erro ao calcular saldo:', err);
                     document.getElementById('saldoInicialConsulta').textContent = 'R$ 0,00';
-                    document.getElementById('dataSaldoInicial').textContent = 'Nenhum saldo cadastrado';
+                    document.getElementById('dataSaldoInicial').textContent = 'Erro ao calcular';
                 }
             } else {
-                // Empresa "TODAS" - não mostrar saldo inicial
+                // Empresa "TODAS" ou sem lançamentos
                 document.getElementById('saldoInicialConsulta').textContent = '-';
-                document.getElementById('dataSaldoInicial').textContent = 'Selecione uma empresa específica';
+                document.getElementById('dataSaldoInicial').textContent = empresa === 'TODAS' ? 'Selecione uma empresa específica' : 'Sem lançamentos';
             }
 
             document.getElementById('saldoPeriodo').textContent = 'R$ ' + saldoFinal.toFixed(2).replace('.', ',');
