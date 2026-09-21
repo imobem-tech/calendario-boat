@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211141
+    EXTRATO BANCÁRIO - V.2609211152
+
+    🔧 FIX CRÍTICO CÁLCULO - V.2609211152
+       - Corrigido erro de duplicação de lançamentos
+       - Busca agora começa do dia SEGUINTE ao saldo manual
+       - Saldo manual = final do dia, então +1 dia para início
+       - Versão visível atualizada no rodapé
 
     ✨ FORMATAÇÃO VALORES - V.2609211141
        - Removido símbolo "R$" de todos os valores
@@ -936,13 +942,17 @@
                         const dataSaldoManual = resultSaldo.saldo.data_referencia;
                         console.log(`💰 Saldo manual cadastrado: ${dataSaldoManual} = R$ ${saldoManual.toFixed(2)}`);
 
-                        // 2. Buscar TODOS os lançamentos entre saldo manual e dia anterior ao primeiro visível
+                        // 2. Buscar TODOS os lançamentos DEPOIS do saldo manual até dia anterior ao primeiro visível
+                        const diaSeguinteSaldo = new Date(dataSaldoManual);
+                        diaSeguinteSaldo.setDate(diaSeguinteSaldo.getDate() + 1);
+                        const dataInicioStr = diaSeguinteSaldo.toISOString().split('T')[0];
+
                         const dataAnterior = new Date(primeiraDataVisivel);
                         dataAnterior.setDate(dataAnterior.getDate() - 1);
                         const dataAnteriorStr = dataAnterior.toISOString().split('T')[0];
 
                         const respLancamentos = await fetch(
-                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataSaldoManual}&data_fim=${dataAnteriorStr}&limit=10000`
+                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataInicioStr}&data_fim=${dataAnteriorStr}&limit=10000`
                         );
                         const resultLancamentos = await respLancamentos.json();
 
@@ -953,7 +963,7 @@
                                 const valor = Math.abs(parseFloat(lanc.valor));
                                 saldoCalculado += lanc.tipo === 'CREDITO' ? valor : -valor;
                             });
-                            console.log(`📊 Lançamentos entre ${dataSaldoManual} e ${dataAnteriorStr}: ${resultLancamentos.lancamentos.length}`);
+                            console.log(`📊 Lançamentos entre ${dataInicioStr} e ${dataAnteriorStr}: ${resultLancamentos.lancamentos.length}`);
                         }
 
                         saldoAbertura = saldoCalculado;
@@ -1122,13 +1132,17 @@
                         const saldoManual = parseFloat(resultSaldo.saldo.saldo_informado);
                         const dataSaldoManual = resultSaldo.saldo.data_referencia;
 
-                        // 2. Buscar TODOS os lançamentos entre saldo manual e dia anterior ao primeiro visível
+                        // 2. Buscar TODOS os lançamentos DEPOIS do saldo manual até dia anterior ao primeiro visível
+                        const diaSeguinteSaldo = new Date(dataSaldoManual);
+                        diaSeguinteSaldo.setDate(diaSeguinteSaldo.getDate() + 1);
+                        const dataInicioStr = diaSeguinteSaldo.toISOString().split('T')[0];
+
                         const dataAnterior = new Date(primeiraDataVisivel);
                         dataAnterior.setDate(dataAnterior.getDate() - 1);
                         const dataAnteriorStr = dataAnterior.toISOString().split('T')[0];
 
                         const respLancamentos = await fetch(
-                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataSaldoManual}&data_fim=${dataAnteriorStr}&limit=10000`
+                            `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataInicioStr}&data_fim=${dataAnteriorStr}&limit=10000`
                         );
                         const resultLancamentos = await respLancamentos.json();
 
@@ -2049,7 +2063,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609190220</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211152</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
