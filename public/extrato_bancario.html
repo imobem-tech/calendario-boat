@@ -6,7 +6,14 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211533
+    EXTRATO BANCÁRIO - V.2609211536
+
+    📄 PDF ESPELHO DA TELA - V.2609211536
+       - Função gerarPDF() reescrita para usar nova rota GET
+       - Chama /api/banco/extrato/gerar-pdf-url com query params
+       - Puppeteer captura página real (mesma que usuário vê)
+       - PDF = espelho perfeito da tela (saldo anterior + resets + resumo categorias)
+       - Qualquer mudança no HTML → automática no PDF ✅
 
     📊 RESUMO CATEGORIAS COMPLETO - V.2609211533
        - Adicionado modal para ver categorias na tela
@@ -1362,7 +1369,9 @@
             document.getElementById('tabelaExtrato').style.display = show ? 'none' : 'table';
         }
 
-        // Gerar PDF
+        // ============================================================
+        // Gerar PDF - NOVA VERSÃO (captura página real)
+        // ============================================================
         async function gerarPDF() {
             if (!dadosAtuais || !dadosAtuais.lancamentos || dadosAtuais.lancamentos.length === 0) {
                 alert('Não há dados para gerar PDF');
@@ -1374,34 +1383,38 @@
                 document.getElementById('btnGerarPDF').textContent = '⏳ Gerando PDF...';
 
                 const empresa = document.getElementById('empresaSelect').value;
-                const mes = modoFiltro === 'mes' ? document.getElementById('mesSelect').value : null;
 
-                // Criar descrição do filtro
-                let descricao = `Extrato Bancário - ${empresa}`;
-                if (mes) {
-                    descricao += ` - ${mes}`;
-                } else if (modoFiltro === 'datas') {
-                    const dataInicio = document.getElementById('dataInicio').value;
-                    const dataFim = document.getElementById('dataFim').value;
-                    if (dataInicio && dataFim) {
-                        descricao += ` - ${dataInicio} a ${dataFim}`;
-                    }
+                // Pegar datas do filtro
+                let dataInicio, dataFim;
+
+                if (modoFiltro === 'mes') {
+                    const mes = document.getElementById('mesSelect').value;
+                    const [ano, mesNum] = mes.split('-');
+                    dataInicio = `${ano}-${mesNum}-01`;
+                    const ultimoDia = new Date(ano, mesNum, 0).getDate();
+                    dataFim = `${ano}-${mesNum}-${String(ultimoDia).padStart(2, '0')}`;
+                } else {
+                    dataInicio = document.getElementById('dataInicio').value;
+                    dataFim = document.getElementById('dataFim').value;
                 }
 
-                // Chamar endpoint de geração de PDF
-                const response = await fetch('https://calendario-boat-production.up.railway.app/api/banco/extrato/gerar-pdf', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        empresa: empresa,
-                        mes: mes,
-                        data_inicio: modoFiltro === 'datas' ? document.getElementById('dataInicio').value : null,
-                        data_fim: modoFiltro === 'datas' ? document.getElementById('dataFim').value : null,
-                        descricao: descricao,
-                        dados: dadosAtuais
-                    })
+                if (!dataInicio || !dataFim) {
+                    alert('Selecione o período primeiro');
+                    return;
+                }
+
+                console.log('📄 Gerando PDF:', { empresa, dataInicio, dataFim });
+
+                // Chamar NOVA rota GET que captura a página real
+                const params = new URLSearchParams({
+                    empresa: empresa,
+                    data_inicio: dataInicio,
+                    data_fim: dataFim,
+                    banco: 'Asaas'
+                });
+
+                const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato/gerar-pdf-url?${params}`, {
+                    method: 'GET'
                 });
 
                 if (response.ok) {
@@ -1410,21 +1423,21 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `extrato_${empresa}_${Date.now()}.pdf`;
+                    a.download = `extrato_${empresa}_${dataInicio}_${dataFim}.pdf`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
 
-                    alert('PDF gerado com sucesso!');
+                    alert('✅ PDF gerado com sucesso!\n\n📊 Resumo de categorias incluído automaticamente!');
                 } else {
                     const erro = await response.json();
-                    alert('Erro ao gerar PDF: ' + (erro.erro || 'Erro desconhecido'));
+                    alert('❌ Erro ao gerar PDF: ' + (erro.erro || 'Erro desconhecido'));
                 }
 
             } catch (err) {
-                console.error('Erro ao gerar PDF:', err);
-                alert('Erro ao gerar PDF: ' + err.message);
+                console.error('❌ Erro ao gerar PDF:', err);
+                alert('❌ Erro ao gerar PDF: ' + err.message);
             } finally {
                 document.getElementById('btnGerarPDF').disabled = false;
                 document.getElementById('btnGerarPDF').textContent = '📄 Gerar PDF';
@@ -2235,7 +2248,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211533</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211536</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir

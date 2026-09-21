@@ -1,6 +1,10 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2609141905
+// wpp/routes/banco/gerar-pdf-api.js — V.2609211536
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO
+//
+// ROTAS:
+// - POST /gerar-pdf     → Método antigo (gera HTML customizado)
+// - GET  /gerar-pdf-url → Método novo (captura página real)
 // ============================================================
 
 import express from 'express';
@@ -333,6 +337,97 @@ function gerarHTMLPDF(dados, empresa, descricao, mes, data_inicio, data_fim) {
 </body>
 </html>`;
 }
+
+/**
+ * GET /api/banco/extrato/gerar-pdf-url
+ * NOVA ROTA: Gera PDF capturando a página real (espelho da tela)
+ *
+ * Query params:
+ * - empresa: string (ex: ALLMAX)
+ * - data_inicio: string (YYYY-MM-DD)
+ * - data_fim: string (YYYY-MM-DD)
+ * - banco: string (opcional, default: Asaas)
+ */
+router.get('/gerar-pdf-url', async (req, res) => {
+  try {
+    const { empresa, data_inicio, data_fim, banco = 'Asaas' } = req.query;
+
+    console.log('📄 Gerando PDF da página real:', { empresa, data_inicio, data_fim });
+
+    // Validações
+    if (!empresa || !data_inicio || !data_fim) {
+      return res.status(400).json({
+        erro: 'Parâmetros obrigatórios: empresa, data_inicio, data_fim'
+      });
+    }
+
+    // Montar URL da página real
+    const baseURL = process.env.FRONTEND_URL || 'https://calendario-boat-production.up.railway.app';
+    const pageURL = `${baseURL}/extrato_bancario.html?empresa=${encodeURIComponent(empresa)}&data_inicio=${data_inicio}&data_fim=${data_fim}&banco=${encodeURIComponent(banco)}`;
+
+    console.log('🌐 URL da página:', pageURL);
+
+    // Abrir página com Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    // Viewport maior para capturar tudo
+    await page.setViewport({ width: 1200, height: 800 });
+
+    // Navegar para a página
+    await page.goto(pageURL, {
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
+
+    // Aguardar tabela carregar
+    await page.waitForSelector('#corpoTabela', { timeout: 10000 });
+
+    // Aguardar mais um pouco para garantir que tudo carregou
+    await page.waitForTimeout(2000);
+
+    console.log('✅ Página carregada, gerando PDF...');
+
+    // Gerar PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '10mm',
+        right: '10mm',
+        bottom: '10mm',
+        left: '10mm'
+      }
+    });
+
+    await browser.close();
+
+    // Retornar PDF
+    const nomeArquivo = `extrato_${empresa}_${data_inicio}_${data_fim}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+    res.send(pdfBuffer);
+
+    console.log('✅ PDF gerado com sucesso!');
+
+  } catch (err) {
+    console.error('❌ Erro ao gerar PDF:', err);
+    res.status(500).json({
+      erro: err.message,
+      detalhes: 'Erro ao capturar página ou gerar PDF'
+    });
+  }
+});
 
 export default router;
 
