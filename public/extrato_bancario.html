@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211220
+    EXTRATO BANCÁRIO - V.2609211141
+
+    ✨ FORMATAÇÃO VALORES - V.2609211141
+       - Removido símbolo "R$" de todos os valores
+       - Adicionado separador de milhar (1.000,00)
+       - Reduzida altura das linhas em mais 20% (5px)
+       - Função formatarValor() centralizada
 
     🔧 FIX CRÍTICO SALDO - V.2609211220
        - Calcula saldo REAL do dia anterior (não mais o cadastrado)
@@ -308,7 +314,7 @@
         }
 
         td {
-            padding: 6px 8px;
+            padding: 5px 8px;
             border-bottom: 2px dotted #333;
         }
 
@@ -880,6 +886,23 @@
             return cpf_cnpj;
         }
 
+        // Formatar valor monetário (sem R$, com separador de milhar)
+        function formatarValor(valor) {
+            const valorAbs = Math.abs(valor);
+            const sinal = valor < 0 ? '-' : '';
+
+            // Formatar com 2 decimais
+            const valorFormatado = valorAbs.toFixed(2);
+
+            // Separar parte inteira e decimal
+            const [inteiro, decimal] = valorFormatado.split('.');
+
+            // Adicionar separador de milhar
+            const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+            return `${sinal}${inteiroFormatado},${decimal}`;
+        }
+
         // Renderizar tabela
         // Cache para os dados completos dos lançamentos (evitar JSON.stringify no DOM)
         let lancamentosCache = {};
@@ -979,8 +1002,8 @@
                                 </div>
                             </td>
                             <td style="text-align:right; opacity: 0.7;">-</td>
-                            <td style="text-align:right; padding: 6px 8px; font-size: 15px;">
-                                ${saldoAbertura >= 0 ? '' : '-'}R$ ${Math.abs(saldoAbertura).toFixed(2).replace('.', ',')}
+                            <td style="text-align:right; padding: 5px 8px; font-size: 15px;">
+                                ${formatarValor(saldoAbertura)}
                             </td>
                             <td style="text-align:center; opacity: 0.7;">-</td>
                             <td style="text-align:center; opacity: 0.7;">-</td>
@@ -1057,10 +1080,10 @@
                         <td>${origemHTML}</td>
                         <td style="font-size: 12px; color: #666;">${lanc.observacoes || '-'}</td>
                         <td class="${lanc.valor >= 0 ? 'credito' : 'debito'}" style="text-align:right;">
-                            ${lanc.valor >= 0 ? '' : '-'}R$ ${Math.abs(lanc.valor).toFixed(2).replace('.', ',')}
+                            ${formatarValor(lanc.valor)}
                         </td>
-                        <td class="${saldoAcumulado >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAbertura > 0 ? 'Saldo de abertura: R$ ' + saldoAbertura.toFixed(2).replace('.', ',') : ''}">
-                            ${saldoAcumulado >= 0 ? '' : '-'}R$ ${Math.abs(saldoAcumulado).toFixed(2).replace('.', ',')}
+                        <td class="${saldoAcumulado >= 0 ? 'credito' : 'debito'}" style="text-align:right;" title="${saldoAbertura > 0 ? 'Saldo de abertura: ' + formatarValor(saldoAbertura) : ''}">
+                            ${formatarValor(saldoAcumulado)}
                         </td>
                         <td style="text-align:center;">${statusHTML}</td>
                         <td style="text-align:center;">
@@ -1080,8 +1103,8 @@
         async function atualizarResumo(dados) {
             document.getElementById('summary').style.display = 'grid';
             document.getElementById('totalLancamentos').textContent = dados.totais.lancamentos;
-            document.getElementById('totalCreditos').textContent = 'R$ ' + dados.totais.creditos.toFixed(2).replace('.', ',');
-            document.getElementById('totalDebitos').textContent = 'R$ ' + dados.totais.debitos.toFixed(2).replace('.', ',');
+            document.getElementById('totalCreditos').textContent = formatarValor(dados.totais.creditos);
+            document.getElementById('totalDebitos').textContent = formatarValor(dados.totais.debitos);
 
             // Buscar saldo inicial (se houver)
             let saldoFinal = dados.totais.saldo;
@@ -1122,11 +1145,10 @@
 
                         // Mostrar info
                         const dataRef = new Date(dataAnteriorStr + 'T00:00:00').toLocaleDateString('pt-BR');
-                        document.getElementById('saldoPeriodo').title = `Saldo inicial calculado em ${dataRef}: R$ ${saldoInicialCalculado.toFixed(2).replace('.', ',')}`;
+                        document.getElementById('saldoPeriodo').title = `Saldo inicial calculado em ${dataRef}: ${formatarValor(saldoInicialCalculado)}`;
 
                         // EXIBIR SALDO INICIAL DA CONSULTA (calculado)
-                        document.getElementById('saldoInicialConsulta').textContent =
-                            (saldoInicialCalculado >= 0 ? '' : '-') + 'R$ ' + Math.abs(saldoInicialCalculado).toFixed(2).replace('.', ',');
+                        document.getElementById('saldoInicialConsulta').textContent = formatarValor(saldoInicialCalculado);
                         document.getElementById('dataSaldoInicial').textContent =
                             `Saldo final de ${dataRef} (calculado)`;
                     } else {
@@ -1145,7 +1167,7 @@
                 document.getElementById('dataSaldoInicial').textContent = empresa === 'TODAS' ? 'Selecione uma empresa específica' : 'Sem lançamentos';
             }
 
-            document.getElementById('saldoPeriodo').textContent = 'R$ ' + saldoFinal.toFixed(2).replace('.', ',');
+            document.getElementById('saldoPeriodo').textContent = formatarValor(saldoFinal);
         }
 
         // Mostrar loading
