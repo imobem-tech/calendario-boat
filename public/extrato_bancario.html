@@ -6,7 +6,15 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211514
+    EXTRATO BANCÁRIO - V.2609211533
+
+    📊 RESUMO CATEGORIAS COMPLETO - V.2609211533
+       - Adicionado modal para ver categorias na tela
+       - JavaScript calcula resumo automaticamente
+       - Preenche seção print (@media print) para PDF
+       - Card verde mostra total de categorias
+       - Ordena por valor absoluto (maior → menor)
+       - Próximo: modificar API do PDF para capturar página real
 
     📊 RESUMO CATEGORIAS (WIP) - V.2609211514
        - Adicionada seção de resumo por categorias (escondida na tela)
@@ -924,6 +932,7 @@
 
                 await renderizarTabela(dadosAtuais);
                 await atualizarResumo(dadosAtuais);
+                preencherResumoCategorias(); // Preencher resumo para PDF
                 document.getElementById('btnGerarPDF').disabled = false;
 
             } catch (err) {
@@ -2226,7 +2235,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211514</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211533</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -2778,7 +2787,101 @@ conforme critérios selecionados
                 alert('❌ Erro ao excluir: ' + err.message);
             }
         }
+
+        // ============================================================
+        // RESUMO POR CATEGORIAS
+        // ============================================================
+        function calcularResumoCategorias() {
+            if (!dadosAtuais || !dadosAtuais.lancamentos) return null;
+
+            const resumo = {};
+
+            dadosAtuais.lancamentos.forEach(lanc => {
+                const categoria = lanc.categoria
+                    ? `${lanc.categoria.icone} ${lanc.categoria.nome}`
+                    : '⚠️ Não classificado';
+
+                if (!resumo[categoria]) {
+                    resumo[categoria] = 0;
+                }
+
+                resumo[categoria] += parseFloat(lanc.valor);
+            });
+
+            return resumo;
+        }
+
+        function preencherResumoCategorias() {
+            const resumo = calcularResumoCategorias();
+            if (!resumo) return;
+
+            // Ordenar por valor absoluto (maior para menor)
+            const categoriasOrdenadas = Object.entries(resumo)
+                .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+
+            // Preencher seção PRINT (para PDF)
+            const conteudoPrint = document.getElementById('resumoCategoriasConteudo');
+            conteudoPrint.innerHTML = categoriasOrdenadas.map(([nome, valor]) => `
+                <div class="categoria-item">
+                    <span class="categoria-nome">${nome}</span>
+                    <span class="categoria-valor ${valor >= 0 ? 'credito' : 'debito'}">
+                        ${valor >= 0 ? '' : '-'}${formatarValor(Math.abs(valor))}
+                    </span>
+                </div>
+            `).join('');
+
+            // Atualizar card do resumo
+            const totalCat = document.getElementById('totalCategorias');
+            if (totalCat) {
+                totalCat.textContent = `${categoriasOrdenadas.length} categorias`;
+            }
+        }
+
+        function abrirModalCategorias() {
+            const resumo = calcularResumoCategorias();
+            if (!resumo) {
+                alert('Nenhum dado para exibir');
+                return;
+            }
+
+            // Ordenar por valor absoluto (maior para menor)
+            const categoriasOrdenadas = Object.entries(resumo)
+                .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+
+            // Preencher modal
+            const conteudo = document.getElementById('modalCategoriasConteudo');
+            conteudo.innerHTML = categoriasOrdenadas.map(([nome, valor]) => `
+                <div class="categoria-item">
+                    <span class="categoria-nome">${nome}</span>
+                    <span class="categoria-valor ${valor >= 0 ? 'credito' : 'debito'}">
+                        ${valor >= 0 ? '' : '-'}${formatarValor(Math.abs(valor))}
+                    </span>
+                </div>
+            `).join('');
+
+            // Mostrar modal
+            document.getElementById('modalCategorias').style.display = 'flex';
+        }
+
+        function fecharModalCategorias() {
+            document.getElementById('modalCategorias').style.display = 'none';
+        }
     </script>
+
+    <!-- ============================================================ -->
+    <!-- MODAL RESUMO POR CATEGORIAS -->
+    <!-- ============================================================ -->
+    <div id="modalCategorias" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 12px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #667eea; padding-bottom: 15px;">
+                <h2 style="margin: 0; color: #374151; font-size: 22px;">📊 Resumo por Categoria</h2>
+                <button onclick="fecharModalCategorias()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">✕ Fechar</button>
+            </div>
+            <div id="modalCategoriasConteudo" style="display: grid; gap: 10px;">
+                <!-- Preenchido via JavaScript -->
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
