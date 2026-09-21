@@ -6,6 +6,15 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
+    EXTRATO BANCÁRIO - V.2609211037
+
+    ✅ MELHORIAS UX - V.2609211037
+       - Ordem invertida: data MENOR para MAIOR (crescente)
+       - Linhas mais compactas: padding reduzido de 12px para 6px
+       - Bordas pontilhadas pretas mais grossas (2px dotted #333)
+       - Lógica de saldo ajustada para ordem crescente
+
+    ============================================================
     EXTRATO BANCÁRIO - V.2609190220
 
     ✅ NOVO FILTRO - V.2609150037
@@ -287,8 +296,8 @@
         }
 
         td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #f1f3f5;
+            padding: 6px 8px;
+            border-bottom: 2px dotted #333;
         }
 
         tbody tr:hover {
@@ -896,30 +905,30 @@
             const lancamentosOrdenados = [...dados.lancamentos].sort((a, b) => {
                 const dataA = a.data.split('T')[0];
                 const dataB = b.data.split('T')[0];
-                return dataB.localeCompare(dataA); // Decrescente (mais recente primeiro)
+                return dataA.localeCompare(dataB); // Crescente (mais antiga primeiro)
             });
 
             // ⚡ OTIMIZAÇÃO: Construir HTML como string
             let html = '';
-            let saldoAcumulado = saldoAbertura; // Começa do saldo de abertura (para lançamentos futuros)
+            let saldoAcumulado = 0; // ORDEM CRESCENTE: Começa de zero para lançamentos antigos
             let linhaAjusteInserida = false;
 
             lancamentosOrdenados.forEach((lanc, index) => {
                 const dataLanc = lanc.data.split('T')[0];
 
-                // INSERIR linha de ajuste NO LUGAR CERTO (entre <= dataSaldo e > dataSaldo)
-                if (!linhaAjusteInserida && dataSaldoAjuste && dataLanc <= dataSaldoAjuste) {
-                    // Próximo lançamento é <= data do saldo → inserir linha ANTES
+                // INSERIR linha de ajuste NO LUGAR CERTO (ORDEM CRESCENTE: entre <= e >)
+                if (!linhaAjusteInserida && dataSaldoAjuste && dataLanc > dataSaldoAjuste) {
+                    // Próximo lançamento é > data do saldo → inserir linha ANTES
                     const [ano, mes, dia] = dataSaldoAjuste.split('-');
                     const dataAjuste = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
                     const dataFormatada = dataAjuste.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
                     html += `
                         <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; border: 2px solid #667eea;">
-                            <td style="padding: 12px;">${dataFormatada}</td>
+                            <td style="padding: 6px 8px;">${dataFormatada}</td>
                             <td style="font-size: 11px; opacity: 0.9;">-</td>
                             <td><strong>${empresa}</strong></td>
-                            <td colspan="4" style="padding: 12px;">
+                            <td colspan="4" style="padding: 6px 8px;">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span style="font-size: 18px;">⚙️</span>
                                     <div>
@@ -929,7 +938,7 @@
                                 </div>
                             </td>
                             <td style="text-align:right; opacity: 0.7;">-</td>
-                            <td style="text-align:right; padding: 12px; font-size: 15px;">
+                            <td style="text-align:right; padding: 6px 8px; font-size: 15px;">
                                 ${saldoAbertura >= 0 ? '' : '-'}R$ ${Math.abs(saldoAbertura).toFixed(2).replace('.', ',')}
                             </td>
                             <td style="text-align:center; opacity: 0.7;">-</td>
@@ -937,10 +946,10 @@
                         </tr>
                     `;
 
-                    // RESETAR saldo para ZERO (lançamentos <= dataSaldo começam de zero)
-                    saldoAcumulado = 0;
+                    // SETAR saldo para o valor de abertura (lançamentos > dataSaldo começam daqui)
+                    saldoAcumulado = saldoAbertura;
                     linhaAjusteInserida = true;
-                    console.log(`✅ Linha ajuste inserida: ${dataFormatada} = R$ ${saldoAbertura.toFixed(2)} | Saldo resetado para R$ 0`);
+                    console.log(`✅ Linha ajuste inserida: ${dataFormatada} = R$ ${saldoAbertura.toFixed(2)} | Saldo setado para R$ ${saldoAbertura.toFixed(2)}`);
                 }
 
                 // Calcular saldo DESTA linha (usar Math.abs para evitar inversão de sinal)
