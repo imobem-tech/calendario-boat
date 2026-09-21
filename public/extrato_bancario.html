@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211413
+    EXTRATO BANCÁRIO - V.2609211444
+
+    🔧 FIX LÓGICA RESET - V.2609211444
+       - Linha de reset agora aparece APÓS os lançamentos do mesmo dia
+       - Saldo manual do dia 31/07 = FINAL do dia (já inclui lançamentos)
+       - Reset só afeta dias SEGUINTES (01/08 em diante)
+       - Lógica: processar lançamentos → verificar se é último do dia → inserir reset
 
     🔧 FIX VARIÁVEL - V.2609211413
        - Corrigida referência a variável antiga saldoAbertura → saldoAnterior
@@ -1053,45 +1059,7 @@
             lancamentosOrdenados.forEach((lanc, index) => {
                 const dataLanc = lanc.data.split('T')[0];
 
-                // ===== VERIFICAR SE HÁ SALDO MANUAL NESTA DATA =====
-                const saldoManualHoje = saldosManuaisPeriodo.find(s => s.data === dataLanc);
-
-                if (saldoManualHoje && dataLanc !== dataUltimoReset) {
-                    // INSERIR LINHA DE RESET!
-                    const [ano, mes, dia] = dataLanc.split('-');
-                    const dataObj = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-                    const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-
-                    html += `
-                        <tr style="background: linear-gradient(135deg, #FF6B6B 0%, #C92A2A 100%); color: white; font-weight: bold; border: 3px solid #FF6B6B;">
-                            <td style="padding: 6px 8px;">${dataFormatada}</td>
-                            <td style="font-size: 11px; opacity: 0.9;">-</td>
-                            <td><strong>${empresa}</strong></td>
-                            <td colspan="4" style="padding: 6px 8px;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 20px;">⚙️</span>
-                                    <div>
-                                        <div style="font-size: 15px; font-weight: 800;">SALDO MANUAL</div>
-                                        <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Reset em ${dataFormatada}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td style="text-align:right; opacity: 0.7;">-</td>
-                            <td style="text-align:right; padding: 5px 8px; font-size: 16px; font-weight: 800;">
-                                ${formatarValor(saldoManualHoje.valor)}
-                            </td>
-                            <td style="text-align:center; opacity: 0.7;">-</td>
-                            <td style="text-align:center; opacity: 0.7;">-</td>
-                        </tr>
-                    `;
-
-                    // RESETAR saldo para o valor manual!
-                    saldoAcumulado = saldoManualHoje.valor;
-                    dataUltimoReset = dataLanc;
-                    console.log(`🔄 RESET! Saldo manual em ${dataFormatada}: R$ ${saldoManualHoje.valor.toFixed(2)}`);
-                }
-
-                // Calcular saldo DESTA linha (valor já vem com sinal correto)
+                // Calcular saldo DESTA linha (processar ANTES do reset!)
                 const valorLanc = Math.abs(parseFloat(lanc.valor));
                 saldoAcumulado += lanc.tipo === 'CREDITO' ? valorLanc : -valorLanc;
 
@@ -1168,6 +1136,48 @@
                         </td>
                     </tr>
                 `;
+
+                // ===== VERIFICAR SE É O ÚLTIMO LANÇAMENTO DESTA DATA =====
+                const proximoLanc = lancamentosOrdenados[index + 1];
+                const proximaData = proximoLanc ? proximoLanc.data.split('T')[0] : null;
+                const isUltimoDestadata = !proximaData || proximaData !== dataLanc;
+
+                // Se é o último lançamento do dia E há saldo manual, INSERIR RESET
+                const saldoManualHoje = saldosManuaisPeriodo.find(s => s.data === dataLanc);
+
+                if (isUltimoDestadata && saldoManualHoje && dataLanc !== dataUltimoReset) {
+                    const [ano, mes, dia] = dataLanc.split('-');
+                    const dataObj = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+                    const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+
+                    html += `
+                        <tr style="background: linear-gradient(135deg, #FF6B6B 0%, #C92A2A 100%); color: white; font-weight: bold; border: 3px solid #FF6B6B;">
+                            <td style="padding: 6px 8px;">${dataFormatada}</td>
+                            <td style="font-size: 11px; opacity: 0.9;">-</td>
+                            <td><strong>${empresa}</strong></td>
+                            <td colspan="4" style="padding: 6px 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">⚙️</span>
+                                    <div>
+                                        <div style="font-size: 15px; font-weight: 800;">SALDO MANUAL</div>
+                                        <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Saldo final do dia ${dataFormatada}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="text-align:right; opacity: 0.7;">-</td>
+                            <td style="text-align:right; padding: 5px 8px; font-size: 16px; font-weight: 800;">
+                                ${formatarValor(saldoManualHoje.valor)}
+                            </td>
+                            <td style="text-align:center; opacity: 0.7;">-</td>
+                            <td style="text-align:center; opacity: 0.7;">-</td>
+                        </tr>
+                    `;
+
+                    // RESETAR saldo para o próximo dia!
+                    saldoAcumulado = saldoManualHoje.valor;
+                    dataUltimoReset = dataLanc;
+                    console.log(`🔄 RESET! Saldo manual final do dia ${dataFormatada}: R$ ${saldoManualHoje.valor.toFixed(2)}`);
+                }
             });
 
             // ⚡ Uma única operação de innerHTML (muito mais rápido!)
@@ -2143,7 +2153,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211413</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211444</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
