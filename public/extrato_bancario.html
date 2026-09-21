@@ -6,7 +6,14 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211207
+    EXTRATO BANCÁRIO - V.2609211231
+
+    🔧 FIX ORDEM EXECUÇÃO - V.2609211231
+       - CRÍTICO: Movida ordenação ANTES do cálculo de saldo
+       - Problema: pegava dados.lancamentos[0] (ordem DESC = última data)
+       - Agora: ordena primeiro, depois pega lancamentosOrdenados[0] (primeira data real)
+       - Resultado: comparação correta entre saldo manual e período
+       - Exemplo: saldo 31/07 vs período 30/07 (não mais vs 04/08!)
 
     🔧 FIX TIMEZONE/LÓGICA SALDO - V.2609211207
        - Corrigido erro quando saldo manual está DENTRO do período consultado
@@ -932,16 +939,25 @@
             // Limpar cache anterior
             lancamentosCache = {};
 
+            // ⚡ IMPORTANTE: ORDENAR PRIMEIRO antes de calcular saldo!
+            // Lançamentos vêm do servidor em ordem DECRESCENTE (mais recente primeiro)
+            // Precisamos da data MENOR (mais antiga) para calcular o saldo corretamente
+            const lancamentosOrdenados = [...dados.lancamentos].sort((a, b) => {
+                const dataA = a.data.split('T')[0];
+                const dataB = b.data.split('T')[0];
+                return dataA.localeCompare(dataB); // Crescente (mais antiga primeiro)
+            });
+
             // Calcular saldo REAL do dia anterior ao primeiro lançamento visível
             let saldoAbertura = 0;
             let dataSaldoAjuste = null;
             const empresa = document.getElementById('empresaSelect').value;
             const banco = 'Asaas';
 
-            if (empresa && empresa !== 'TODAS' && dados.lancamentos.length > 0) {
+            if (empresa && empresa !== 'TODAS' && lancamentosOrdenados.length > 0) {
                 try {
-                    // 1. Buscar saldo manual cadastrado
-                    const primeiraDataVisivel = dados.lancamentos[0].data.split('T')[0];
+                    // 1. Buscar saldo manual cadastrado (usando lançamentos JÁ ORDENADOS!)
+                    const primeiraDataVisivel = lancamentosOrdenados[0].data.split('T')[0];
                     const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraDataVisivel}`);
                     const resultSaldo = await respSaldo.json();
 
@@ -1012,14 +1028,8 @@
                 }
             }
 
-            // ORDENAR lançamentos por DATA (não por importação!)
-            const lancamentosOrdenados = [...dados.lancamentos].sort((a, b) => {
-                const dataA = a.data.split('T')[0];
-                const dataB = b.data.split('T')[0];
-                return dataA.localeCompare(dataB); // Crescente (mais antiga primeiro)
-            });
-
             // ⚡ OTIMIZAÇÃO: Construir HTML como string
+            // (lançamentos já foram ordenados no início da função)
             let html = '';
             let saldoAcumulado = 0; // ORDEM CRESCENTE: Começa de zero para lançamentos antigos
             let linhaAjusteInserida = false;
@@ -2100,7 +2110,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211207</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211231</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
