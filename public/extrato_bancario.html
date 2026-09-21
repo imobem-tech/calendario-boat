@@ -6,7 +6,16 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211231
+    EXTRATO BANCÁRIO - V.2609211402
+
+    ✨ NOVA LÓGICA COMPLETA - V.2609211402
+       - Implementada lógica de saldos manuais conforme especificação do usuário
+       - Saldo ANTERIOR: busca último saldo antes do período + calcula intermediários
+       - Saldos DENTRO: busca todos saldos manuais dentro do período
+       - Linha de RESET: insere automaticamente quando encontra saldo manual
+       - Card roxo: mostra "Saldo Anterior" ao invés de "Saldo Inicial"
+       - Novo endpoint API: /api/banco/saldo-inicial/periodo
+       - Exemplos: período 30/07-04/08, saldo 29/07 ou 15/07, com/sem resets
 
     🔧 FIX ORDEM EXECUÇÃO - V.2609211231
        - CRÍTICO: Movida ordenação ANTES do cálculo de saldo
@@ -657,9 +666,9 @@
                 <div class="value" id="saldoPeriodo">R$ 0,00</div>
             </div>
             <div class="summary-card saldo-inicial" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <label style="color: rgba(255,255,255,0.9);">⚙️ Saldo Inicial da Consulta</label>
-                <div class="value" id="saldoInicialConsulta" style="font-size: 24px;">R$ 0,00</div>
-                <div style="font-size: 11px; opacity: 0.9; margin-top: 5px;" id="dataSaldoInicial">-</div>
+                <label style="color: rgba(255,255,255,0.9);">💡 Saldo Anterior</label>
+                <div class="value" id="saldoInicialConsulta" style="font-size: 24px;">-</div>
+                <div style="font-size: 11px; opacity: 0.9; margin-top: 5px;" id="dataSaldoInicial">Selecione uma empresa específica</div>
             </div>
         </div>
 
@@ -948,132 +957,137 @@
                 return dataA.localeCompare(dataB); // Crescente (mais antiga primeiro)
             });
 
-            // Calcular saldo REAL do dia anterior ao primeiro lançamento visível
-            let saldoAbertura = 0;
-            let dataSaldoAjuste = null;
+            // ============================================================
+            // NOVA LÓGICA: Calcular saldo anterior + buscar saldos intermediários
+            // ============================================================
+            let saldoAnterior = 0;
+            let dataSaldoAnterior = null;
+            let saldosManuaisPeriodo = []; // Array de saldos manuais DENTRO do período
             const empresa = document.getElementById('empresaSelect').value;
             const banco = 'Asaas';
 
             if (empresa && empresa !== 'TODAS' && lancamentosOrdenados.length > 0) {
                 try {
-                    // 1. Buscar saldo manual cadastrado (usando lançamentos JÁ ORDENADOS!)
                     const primeiraDataVisivel = lancamentosOrdenados[0].data.split('T')[0];
-                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${primeiraDataVisivel}`);
+                    const ultimaDataVisivel = lancamentosOrdenados[lancamentosOrdenados.length - 1].data.split('T')[0];
+
+                    // ===== PASSO 1: Buscar último saldo ANTES do período =====
+                    // Buscar saldo <= dia ANTERIOR à primeira data
+                    const [anoP, mesP, diaP] = primeiraDataVisivel.split('-').map(Number);
+                    const objPrimeiraData = new Date(anoP, mesP - 1, diaP);
+                    objPrimeiraData.setDate(objPrimeiraData.getDate() - 1);
+                    const diaAnteriorPeriodo = `${objPrimeiraData.getFullYear()}-${String(objPrimeiraData.getMonth() + 1).padStart(2, '0')}-${String(objPrimeiraData.getDate()).padStart(2, '0')}`;
+
+                    const respSaldo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/atual?empresa=${empresa}&banco=${banco}&data=${diaAnteriorPeriodo}`);
                     const resultSaldo = await respSaldo.json();
 
                     if (resultSaldo.sucesso && resultSaldo.saldo) {
                         const saldoManual = parseFloat(resultSaldo.saldo.saldo_informado);
-                        const dataSaldoManual = resultSaldo.saldo.data_referencia;
-                        console.log(`💰 Saldo manual cadastrado: ${dataSaldoManual} = R$ ${saldoManual.toFixed(2)}`);
+                        const dataSaldoManual = resultSaldo.saldo.data_referencia.split('T')[0];
 
-                        // 2. Verificar se saldo está ANTES ou DENTRO do período
-                        const dataSaldoStr = dataSaldoManual.split('T')[0]; // YYYY-MM-DD
-                        const primeiraDataStr = primeiraDataVisivel; // Já é YYYY-MM-DD
+                        console.log(`💰 Saldo manual encontrado: ${dataSaldoManual} = R$ ${saldoManual.toFixed(2)}`);
+                        console.log(`📅 Período consultado: ${primeiraDataVisivel} até ${ultimaDataVisivel}`);
 
-                        console.log(`🔍 Comparação: saldo ${dataSaldoStr} vs período ${primeiraDataStr}`);
-
-                        if (dataSaldoStr < primeiraDataStr) {
-                            // CASO 1: Saldo ANTES do período → buscar lançamentos intermediários
-                            console.log(`📅 CASO 1: Saldo ANTES do período`);
-
-                            // Calcular dia seguinte ao saldo (manipulando string para evitar timezone)
-                            const [anoS, mesS, diaS] = dataSaldoStr.split('-').map(Number);
+                        // Se saldo é do dia anterior ao período, usar direto
+                        if (dataSaldoManual === diaAnteriorPeriodo) {
+                            saldoAnterior = saldoManual;
+                            dataSaldoAnterior = dataSaldoManual;
+                            console.log(`✅ Saldo anterior (${dataSaldoAnterior}): R$ ${saldoAnterior.toFixed(2)} [DIRETO]`);
+                        } else {
+                            // Saldo é ANTES do dia anterior → calcular lançamentos intermediários
+                            const [anoS, mesS, diaS] = dataSaldoManual.split('-').map(Number);
                             const objDataSaldo = new Date(anoS, mesS - 1, diaS);
                             objDataSaldo.setDate(objDataSaldo.getDate() + 1);
-                            const dataInicioStr = `${objDataSaldo.getFullYear()}-${String(objDataSaldo.getMonth() + 1).padStart(2, '0')}-${String(objDataSaldo.getDate()).padStart(2, '0')}`;
+                            const dataInicioInterm = `${objDataSaldo.getFullYear()}-${String(objDataSaldo.getMonth() + 1).padStart(2, '0')}-${String(objDataSaldo.getDate()).padStart(2, '0')}`;
 
-                            // Calcular dia anterior ao primeiro visível
-                            const [anoP, mesP, diaP] = primeiraDataStr.split('-').map(Number);
-                            const objPrimeiraData = new Date(anoP, mesP - 1, diaP);
-                            objPrimeiraData.setDate(objPrimeiraData.getDate() - 1);
-                            const dataAnteriorStr = `${objPrimeiraData.getFullYear()}-${String(objPrimeiraData.getMonth() + 1).padStart(2, '0')}-${String(objPrimeiraData.getDate()).padStart(2, '0')}`;
+                            console.log(`📊 Calculando lançamentos intermediários de ${dataInicioInterm} até ${diaAnteriorPeriodo}`);
 
-                            console.log(`📊 Buscando lançamentos de ${dataInicioStr} até ${dataAnteriorStr}`);
+                            const respInterm = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataInicioInterm}&data_fim=${diaAnteriorPeriodo}&limit=10000`);
+                            const resultInterm = await respInterm.json();
 
-                            const respLancamentos = await fetch(
-                                `https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?empresa=${empresa}&data_inicio=${dataInicioStr}&data_fim=${dataAnteriorStr}&limit=10000`
-                            );
-                            const resultLancamentos = await respLancamentos.json();
-
-                            // Calcular saldo acumulado
                             let saldoCalculado = saldoManual;
-                            if (resultLancamentos.sucesso && resultLancamentos.lancamentos) {
-                                resultLancamentos.lancamentos.forEach(lanc => {
+                            if (resultInterm.sucesso && resultInterm.lancamentos) {
+                                resultInterm.lancamentos.forEach(lanc => {
                                     const valor = Math.abs(parseFloat(lanc.valor));
                                     saldoCalculado += lanc.tipo === 'CREDITO' ? valor : -valor;
                                 });
-                                console.log(`✅ ${resultLancamentos.lancamentos.length} lançamentos encontrados`);
+                                console.log(`✅ ${resultInterm.lancamentos.length} lançamentos intermediários processados`);
                             }
 
-                            saldoAbertura = saldoCalculado;
-                            dataSaldoAjuste = dataAnteriorStr;
-                            console.log(`✅ Saldo CALCULADO do dia anterior (${dataSaldoAjuste}): R$ ${saldoAbertura.toFixed(2)}`);
-                        } else {
-                            // CASO 2: Saldo DENTRO ou IGUAL ao período → usar saldo manual direto
-                            console.log(`📅 CASO 2: Saldo DENTRO do período → usando saldo manual`);
-
-                            // Calcular dia anterior ao saldo manual
-                            const [anoS, mesS, diaS] = dataSaldoStr.split('-').map(Number);
-                            const objDataSaldo = new Date(anoS, mesS - 1, diaS);
-                            objDataSaldo.setDate(objDataSaldo.getDate() - 1);
-                            const dataAnteriorStr = `${objDataSaldo.getFullYear()}-${String(objDataSaldo.getMonth() + 1).padStart(2, '0')}-${String(objDataSaldo.getDate()).padStart(2, '0')}`;
-
-                            saldoAbertura = saldoManual;
-                            dataSaldoAjuste = dataAnteriorStr;
-                            console.log(`✅ Saldo MANUAL do dia anterior (${dataSaldoAjuste}): R$ ${saldoAbertura.toFixed(2)}`);
+                            saldoAnterior = saldoCalculado;
+                            dataSaldoAnterior = diaAnteriorPeriodo;
+                            console.log(`✅ Saldo anterior (${dataSaldoAnterior}): R$ ${saldoAnterior.toFixed(2)} [CALCULADO]`);
                         }
                     }
+
+                    // ===== PASSO 2: Buscar saldos manuais DENTRO do período =====
+                    const respPeriodo = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/saldo-inicial/periodo?empresa=${empresa}&banco=${banco}&data_inicio=${primeiraDataVisivel}&data_fim=${ultimaDataVisivel}`);
+                    const resultPeriodo = await respPeriodo.json();
+
+                    if (resultPeriodo.sucesso && resultPeriodo.saldos && resultPeriodo.saldos.length > 0) {
+                        saldosManuaisPeriodo = resultPeriodo.saldos.map(s => ({
+                            data: s.data_referencia.split('T')[0],
+                            valor: parseFloat(s.saldo_informado)
+                        }));
+                        console.log(`🔄 ${saldosManuaisPeriodo.length} saldo(s) manual(is) dentro do período:`, saldosManuaisPeriodo);
+                    }
+
                 } catch (err) {
-                    console.log('ℹ️ Erro ao calcular saldo inicial:', err);
+                    console.log('ℹ️ Erro ao calcular saldo:', err);
                 }
             }
 
-            // ⚡ OTIMIZAÇÃO: Construir HTML como string
-            // (lançamentos já foram ordenados no início da função)
+            // ============================================================
+            // NOVA EXIBIÇÃO: Começar do saldo anterior + inserir resets
+            // ============================================================
             let html = '';
-            let saldoAcumulado = 0; // ORDEM CRESCENTE: Começa de zero para lançamentos antigos
-            let linhaAjusteInserida = false;
+            let saldoAcumulado = saldoAnterior; // Começa do saldo anterior calculado!
+            let dataUltimoReset = null; // Controlar para não duplicar reset
+
+            console.log(`🎯 Iniciando exibição com saldo anterior: R$ ${saldoAcumulado.toFixed(2)}`);
 
             lancamentosOrdenados.forEach((lanc, index) => {
                 const dataLanc = lanc.data.split('T')[0];
 
-                // INSERIR linha de ajuste NO LUGAR CERTO (ORDEM CRESCENTE: entre <= e >)
-                if (!linhaAjusteInserida && dataSaldoAjuste && dataLanc > dataSaldoAjuste) {
-                    // Próximo lançamento é > data do saldo → inserir linha ANTES
-                    const [ano, mes, dia] = dataSaldoAjuste.split('-');
-                    const dataAjuste = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-                    const dataFormatada = dataAjuste.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                // ===== VERIFICAR SE HÁ SALDO MANUAL NESTA DATA =====
+                const saldoManualHoje = saldosManuaisPeriodo.find(s => s.data === dataLanc);
+
+                if (saldoManualHoje && dataLanc !== dataUltimoReset) {
+                    // INSERIR LINHA DE RESET!
+                    const [ano, mes, dia] = dataLanc.split('-');
+                    const dataObj = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+                    const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
                     html += `
-                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; border: 2px solid #667eea;">
+                        <tr style="background: linear-gradient(135deg, #FF6B6B 0%, #C92A2A 100%); color: white; font-weight: bold; border: 3px solid #FF6B6B;">
                             <td style="padding: 6px 8px;">${dataFormatada}</td>
                             <td style="font-size: 11px; opacity: 0.9;">-</td>
                             <td><strong>${empresa}</strong></td>
                             <td colspan="4" style="padding: 6px 8px;">
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 18px;">⚙️</span>
+                                    <span style="font-size: 20px;">⚙️</span>
                                     <div>
-                                        <div style="font-size: 14px; font-weight: 700;">AJUSTE DE SALDO</div>
-                                        <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Saldo final do dia ${dataFormatada}</div>
+                                        <div style="font-size: 15px; font-weight: 800;">SALDO MANUAL</div>
+                                        <div style="font-size: 11px; opacity: 0.9; font-weight: normal;">Reset em ${dataFormatada}</div>
                                     </div>
                                 </div>
                             </td>
                             <td style="text-align:right; opacity: 0.7;">-</td>
-                            <td style="text-align:right; padding: 5px 8px; font-size: 15px;">
-                                ${formatarValor(saldoAbertura)}
+                            <td style="text-align:right; padding: 5px 8px; font-size: 16px; font-weight: 800;">
+                                ${formatarValor(saldoManualHoje.valor)}
                             </td>
                             <td style="text-align:center; opacity: 0.7;">-</td>
                             <td style="text-align:center; opacity: 0.7;">-</td>
                         </tr>
                     `;
 
-                    // SETAR saldo para o valor de abertura (lançamentos > dataSaldo começam daqui)
-                    saldoAcumulado = saldoAbertura;
-                    linhaAjusteInserida = true;
-                    console.log(`✅ Linha ajuste inserida: ${dataFormatada} = R$ ${saldoAbertura.toFixed(2)} | Saldo setado para R$ ${saldoAbertura.toFixed(2)}`);
+                    // RESETAR saldo para o valor manual!
+                    saldoAcumulado = saldoManualHoje.valor;
+                    dataUltimoReset = dataLanc;
+                    console.log(`🔄 RESET! Saldo manual em ${dataFormatada}: R$ ${saldoManualHoje.valor.toFixed(2)}`);
                 }
 
-                // Calcular saldo DESTA linha (usar Math.abs para evitar inversão de sinal)
+                // Calcular saldo DESTA linha (valor já vem com sinal correto)
                 const valorLanc = Math.abs(parseFloat(lanc.valor));
                 saldoAcumulado += lanc.tipo === 'CREDITO' ? valorLanc : -valorLanc;
 
@@ -1154,6 +1168,21 @@
 
             // ⚡ Uma única operação de innerHTML (muito mais rápido!)
             tbody.innerHTML = html;
+
+            // ===== ATUALIZAR CARD DO SALDO ANTERIOR =====
+            if (dataSaldoAnterior && saldoAnterior !== 0) {
+                const [ano, mes, dia] = dataSaldoAnterior.split('-');
+                const dataObj = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+                const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+
+                document.getElementById('saldoInicialConsulta').textContent = formatarValor(saldoAnterior);
+                document.getElementById('dataSaldoInicial').textContent = `Saldo final de ${dataFormatada}`;
+
+                console.log(`📊 Card atualizado: Saldo anterior ${dataFormatada} = R$ ${saldoAnterior.toFixed(2)}`);
+            } else if (empresa && empresa !== 'TODAS') {
+                document.getElementById('saldoInicialConsulta').textContent = '-';
+                document.getElementById('dataSaldoInicial').textContent = 'Nenhum saldo cadastrado';
+            }
         }
 
         // Atualizar resumo
@@ -2110,7 +2139,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211231</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211402</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir

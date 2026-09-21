@@ -1,12 +1,13 @@
 // ============================================================
-// saldo-inicial-api.js — V.2609182305
+// saldo-inicial-api.js — V.2609211402
 // API para gerenciar saldos iniciais
 //
 // ENDPOINTS:
-// - POST /api/banco/saldo-inicial      → Salvar/atualizar saldo
-// - GET  /api/banco/saldo-inicial      → Listar histórico
-// - GET  /api/banco/saldo-inicial/atual → Buscar saldo vigente
-// - DELETE /api/banco/saldo-inicial/:id → Excluir ajuste
+// - POST /api/banco/saldo-inicial         → Salvar/atualizar saldo
+// - GET  /api/banco/saldo-inicial         → Listar histórico
+// - GET  /api/banco/saldo-inicial/atual   → Buscar saldo vigente
+// - GET  /api/banco/saldo-inicial/periodo → Buscar saldos dentro de período
+// - DELETE /api/banco/saldo-inicial/:id   → Excluir ajuste
 // ============================================================
 
 import express from 'express';
@@ -168,6 +169,47 @@ router.get('/atual', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Erro ao buscar saldo atual:', err);
+    res.status(500).json({
+      sucesso: false,
+      erro: err.message
+    });
+  }
+});
+
+// ============================================================
+// GET /api/banco/saldo-inicial/periodo
+// Buscar TODOS os saldos dentro de um período
+// Query params: empresa, banco, data_inicio, data_fim
+// ============================================================
+router.get('/periodo', async (req, res) => {
+  try {
+    const { empresa, banco, data_inicio, data_fim } = req.query;
+
+    if (!empresa || !banco || !data_inicio || !data_fim) {
+      return res.status(400).json({
+        sucesso: false,
+        erro: 'Parâmetros obrigatórios: empresa, banco, data_inicio, data_fim'
+      });
+    }
+
+    // Buscar TODOS os saldos dentro do período (inclusive nas bordas)
+    const result = await pool.query(`
+      SELECT *
+      FROM bank_saldos_iniciais
+      WHERE empresa = $1
+        AND banco = $2
+        AND data_referencia >= $3
+        AND data_referencia <= $4
+      ORDER BY data_referencia ASC
+    `, [empresa, banco, data_inicio, data_fim]);
+
+    res.json({
+      sucesso: true,
+      saldos: result.rows
+    });
+
+  } catch (err) {
+    console.error('❌ Erro ao buscar saldos do período:', err);
     res.status(500).json({
       sucesso: false,
       erro: err.message
