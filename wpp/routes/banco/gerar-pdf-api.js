@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2609211542
+// wpp/routes/banco/gerar-pdf-api.js — V.2609211549
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO
 //
 // ROTAS:
@@ -389,13 +389,18 @@ router.get('/gerar-pdf-url', async (req, res) => {
       timeout: 30000
     });
 
-    // Aguardar tabela carregar
+    // Aguardar tabela EXISTIR
     await page.waitForSelector('#corpoTabela', { timeout: 10000 });
+    console.log('⏳ Tabela existe, aguardando dados...');
 
-    // Aguardar mais um pouco para garantir que tudo carregou
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Aguardar DADOS aparecerem (primeira linha da tabela)
+    await page.waitForSelector('#corpoTabela > tr', { timeout: 15000 });
+    console.log('⏳ Primeira linha carregada, aguardando estabilização...');
 
-    console.log('✅ Página carregada, gerando PDF...');
+    // Aguardar um pouco mais para garantir que CSS e tudo estabilizou
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    console.log('✅ Página carregada com dados, gerando PDF...');
 
     // Gerar PDF
     const pdfBuffer = await page.pdf({
