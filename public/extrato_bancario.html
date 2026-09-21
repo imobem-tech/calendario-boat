@@ -6,7 +6,13 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211444
+    EXTRATO BANCÁRIO - V.2609211514
+
+    📊 RESUMO CATEGORIAS (WIP) - V.2609211514
+       - Adicionada seção de resumo por categorias (escondida na tela)
+       - CSS @media print para mostrar só no PDF
+       - Card "📊 Resumo Categorias" no resumo principal
+       - Próximo: adicionar modal e JavaScript para calcular
 
     🔧 FIX LÓGICA RESET - V.2609211444
        - Linha de reset agora aparece APÓS os lançamentos do mesmo dia
@@ -557,6 +563,56 @@
             margin-top: 15px;
             font-style: italic;
         }
+
+        /* ===== RESUMO DE CATEGORIAS (só no PDF) ===== */
+        .resumo-categorias-print {
+            display: none; /* Escondido na tela */
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            page-break-before: auto;
+        }
+
+        .categoria-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .categoria-nome {
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .categoria-valor {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .categoria-valor.credito {
+            color: #10b981;
+        }
+
+        .categoria-valor.debito {
+            color: #ef4444;
+        }
+
+        /* Mostrar APENAS ao imprimir/gerar PDF */
+        @media print {
+            .resumo-categorias-print {
+                display: block !important;
+            }
+
+            /* Esconder botões e controles na impressão */
+            .controls, .btn, button {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -680,6 +736,11 @@
                 <div class="value" id="saldoInicialConsulta" style="font-size: 24px;">-</div>
                 <div style="font-size: 11px; opacity: 0.9; margin-top: 5px;" id="dataSaldoInicial">Selecione uma empresa específica</div>
             </div>
+            <div class="summary-card" style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white; cursor: pointer;" onclick="abrirModalCategorias()">
+                <label style="color: rgba(255,255,255,0.9);">📊 Resumo Categorias</label>
+                <div style="font-size: 16px; margin-top: 10px; font-weight: 500;">Clique para ver</div>
+                <div style="font-size: 11px; opacity: 0.9; margin-top: 5px;" id="totalCategorias">-</div>
+            </div>
         </div>
 
         <!-- TABELA -->
@@ -708,6 +769,18 @@
                 <tbody id="corpoTabela">
                 </tbody>
             </table>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- RESUMO POR CATEGORIA - Visível só no PDF (@media print)     -->
+        <!-- ============================================================ -->
+        <div id="resumoCategorias" class="resumo-categorias-print">
+            <h2 style="font-size: 18px; color: #374151; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+                📊 Resumo por Categoria
+            </h2>
+            <div id="resumoCategoriasConteudo" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+                <!-- Preenchido via JavaScript -->
+            </div>
         </div>
     </div>
 
@@ -2153,7 +2226,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211444</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2609211514</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
