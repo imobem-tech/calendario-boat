@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2609211549
+    EXTRATO BANCÁRIO - V.2609220007
 
     📄 PDF ESPELHO DA TELA - V.2609211536
        - Função gerarPDF() reescrita para usar nova rota GET
@@ -854,6 +854,41 @@
 
             // Mostrar mensagem inicial
             mostrarMensagemInicial();
+
+            // ============================================================
+            // AUTO-BUSCAR: Se URL tem parâmetros, buscar automaticamente
+            // (usado pelo Puppeteer para gerar PDF)
+            // ============================================================
+            const urlParams = new URLSearchParams(window.location.search);
+            const empresaURL = urlParams.get('empresa');
+            const dataInicioURL = urlParams.get('data_inicio');
+            const dataFimURL = urlParams.get('data_fim');
+
+            if (empresaURL && dataInicioURL && dataFimURL) {
+                console.log('🤖 AUTO-BUSCAR: Parâmetros detectados na URL!');
+                console.log('   Empresa:', empresaURL);
+                console.log('   Período:', dataInicioURL, 'até', dataFimURL);
+
+                // Preencher campos automaticamente
+                document.getElementById('empresaSelect').value = empresaURL;
+
+                // Mudar para modo período
+                modoFiltro = 'periodo';
+                document.getElementById('filtroMes').style.display = 'none';
+                document.getElementById('filtroPeriodo').style.display = 'flex';
+                document.getElementById('btnFiltroMes').classList.remove('active');
+                document.getElementById('btnFiltroPeriodo').classList.add('active');
+
+                // Preencher datas
+                document.getElementById('dataInicio').value = dataInicioURL;
+                document.getElementById('dataFim').value = dataFimURL;
+
+                // Aguardar 500ms e buscar automaticamente
+                setTimeout(() => {
+                    console.log('🤖 Executando busca automática...');
+                    carregarExtratos();
+                }, 500);
+            }
         });
 
         // Mostrar mensagem inicial
