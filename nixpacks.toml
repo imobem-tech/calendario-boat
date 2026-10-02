@@ -1,10 +1,43 @@
 # ============================================================
-# nixpacks.toml — V.2609140032
-# Configuração do Railway para instalar PostgreSQL tools
+# nixpacks.toml — V.2610020800
+# Configuração do Railway para instalar PostgreSQL + Puppeteer
 # ============================================================
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "postgresql"]
+nixPkgs = [
+  "nodejs_20",
+  "postgresql",
+  "chromium"
+]
+
+nixLibs = [
+  "nss",
+  "freetype",
+  "harfbuzz",
+  "fontconfig",
+  "alsa-lib",
+  "atk",
+  "at-spi2-atk",
+  "cups",
+  "cairo",
+  "dbus",
+  "expat",
+  "glib",
+  "gtk3",
+  "libdrm",
+  "mesa.drivers",
+  "nspr",
+  "pango",
+  "xorg.libX11",
+  "xorg.libXcomposite",
+  "xorg.libXdamage",
+  "xorg.libXext",
+  "xorg.libXfixes",
+  "xorg.libXrandr",
+  "xorg.libxcb",
+  "xorg.libxkbcommon",
+  "libxshmfence"
+]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -13,4 +46,4 @@ cmds = ["npm ci"]
 cmds = ["echo 'Build concluído'"]
 
 [start]
-cmd = "npm start"
+cmd = "PUPPETEER_EXECUTABLE_PATH=$(which chromium) npm start"
