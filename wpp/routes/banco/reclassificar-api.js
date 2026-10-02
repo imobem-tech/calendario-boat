@@ -1,6 +1,11 @@
 // ============================================================
-// reclassificar-api.js — V.2609182225
+// reclassificar-api.js — V.2610011155
 // ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
+//
+// ✅ PROTEÇÃO CLASSIFICAÇÃO MANUAL (01/10 11:55):
+//    - NÃO sobrescreve registros com classificacao_manual = true
+//    - Só atualiza se classificacao estiver NULL ou vazia
+//    - Marca classificacao_manual = false ao classificar automaticamente
 //
 // ✅ OTIMIZAÇÃO BATCH + CACHE + SSE (18/09 22:25):
 //    - CACHE: Carrega TODAS categorias UMA VEZ (palavras_chave + chave_aprendida)
@@ -218,11 +223,13 @@ router.post('/', async (req, res) => {
     console.log(`📦 Categorias carregadas: ${categorias.rows.length}`);
 
     // 2. Buscar registros não classificados
+    // ✅ PROTEGE classificacao_manual = true
     let query = `
       SELECT id, empresa, descricao_original, observacoes, classificacao, status, valor, tipo, cpf_cnpj_origem
       FROM bank_extratos
       WHERE banco = 'Asaas'
         AND (classificacao IS NULL OR classificacao = '')
+        AND (classificacao_manual IS NULL OR classificacao_manual = false)
     `;
 
     const params = [];
@@ -300,12 +307,15 @@ router.post('/', async (req, res) => {
       await pool.query(`
         UPDATE bank_extratos AS e
         SET classificacao = u.categoria_id::TEXT,
-            classificado_em = NOW()
+            classificado_em = NOW(),
+            classificacao_manual = false
         FROM (
           SELECT unnest($1::INTEGER[]) AS id,
                  unnest($2::INTEGER[]) AS categoria_id
         ) AS u
         WHERE e.id = u.id
+          AND (e.classificacao IS NULL OR e.classificacao = '')
+          AND (e.classificacao_manual IS NULL OR e.classificacao_manual = false)
       `, [ids, categoriaIds]);
 
       console.log(`✅ Batch UPDATE: ${updates.length} registros`);
@@ -366,6 +376,7 @@ router.get('/stream', async (req, res) => {
       FROM bank_extratos
       WHERE banco = 'Asaas'
         AND (classificacao IS NULL OR classificacao = '')
+        AND (classificacao_manual IS NULL OR classificacao_manual = false)
     `;
 
     const params = [];
@@ -463,12 +474,15 @@ router.get('/stream', async (req, res) => {
       await pool.query(`
         UPDATE bank_extratos AS e
         SET classificacao = u.categoria_id::TEXT,
-            classificado_em = NOW()
+            classificado_em = NOW(),
+            classificacao_manual = false
         FROM (
           SELECT unnest($1::INTEGER[]) AS id,
                  unnest($2::INTEGER[]) AS categoria_id
         ) AS u
         WHERE e.id = u.id
+          AND (e.classificacao IS NULL OR e.classificacao = '')
+          AND (e.classificacao_manual IS NULL OR e.classificacao_manual = false)
       `, [ids, categoriaIds]);
     }
 

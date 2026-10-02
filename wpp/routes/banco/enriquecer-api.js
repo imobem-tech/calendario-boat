@@ -1,6 +1,13 @@
 // ============================================================
-// enriquecer-api.js — V.2609182105
+// enriquecer-api.js — V.2610011200
 // ENDPOINT PARA ENRIQUECER DADOS DO EXTRATO
+//
+// ✅ PROTEÇÃO E ACUMULAÇÃO (01/10 12:00):
+//    - CAMPOS DE TEXTO: ACUMULA em vez de sobrescrever (nome_origem, cpf, observacoes)
+//    - CLASSIFICAÇÃO: Só atualiza se NULL/vazio E não for manual
+//    - STATUS: Só muda de PENDENTE → OK, nunca sobrescreve OK
+//    - Marca classificacao_manual = false ao classificar automaticamente
+//    - Preserva histórico completo das informações
 //
 // 🚀 OTIMIZAÇÃO CRÍTICA V.2609182105: BATCH + CACHE (100x mais rápido!)
 //    - PROBLEMA: 1829 registros = 17 MINUTOS! (5.487 queries)
@@ -238,14 +245,39 @@ router.post('/', async (req, res) => {
           stats.statusOK++;
         }
 
-        // 7. Atualizar registro
+        // 7. Atualizar registro (ACUMULA em vez de sobrescrever)
+        // ⚠️ IMPORTANTE: NÃO atualiza recibos_urls - preserva anexos!
         await pool.query(`
           UPDATE bank_extratos
-          SET nome_origem = $1,
-              cpf_cnpj_origem = $2,
-              observacoes = $3,
-              classificacao = $4::TEXT,
-              status = $5
+          SET nome_origem = CASE
+                WHEN nome_origem IS NULL OR nome_origem = '' THEN $1
+                WHEN nome_origem NOT LIKE '%' || $1 || '%' THEN nome_origem || ' | ' || $1
+                ELSE nome_origem
+              END,
+              cpf_cnpj_origem = CASE
+                WHEN cpf_cnpj_origem IS NULL OR cpf_cnpj_origem = '' THEN $2
+                WHEN cpf_cnpj_origem != $2 THEN cpf_cnpj_origem || ' | ' || $2
+                ELSE cpf_cnpj_origem
+              END,
+              observacoes = CASE
+                WHEN observacoes IS NULL OR observacoes = '' THEN $3
+                WHEN observacoes NOT LIKE '%' || $3 || '%' THEN observacoes || ' | ' || $3
+                ELSE observacoes
+              END,
+              classificacao = CASE
+                WHEN (classificacao IS NULL OR classificacao = '')
+                  AND (classificacao_manual IS NULL OR classificacao_manual = false) THEN $4::TEXT
+                ELSE classificacao
+              END,
+              classificacao_manual = CASE
+                WHEN (classificacao IS NULL OR classificacao = '')
+                  AND (classificacao_manual IS NULL OR classificacao_manual = false) THEN false
+                ELSE COALESCE(classificacao_manual, false)
+              END,
+              status = CASE
+                WHEN (status = 'PENDENTE' OR status IS NULL) AND $5 = 'OK' THEN 'OK'
+                ELSE status
+              END
           WHERE id = $6
         `, [
           clienteSelecionado.Cliente_Nome,
@@ -570,14 +602,39 @@ router.post('/stream', async (req, res) => {
         statuses.push(u.status);
       });
 
-      // Executar batch update usando unnest
+      // Executar batch update usando unnest (ACUMULA dados)
+      // ⚠️ IMPORTANTE: NÃO atualiza recibos_urls - preserva anexos!
       await pool.query(`
         UPDATE bank_extratos AS e
-        SET nome_origem = u.nome,
-            cpf_cnpj_origem = u.cpf,
-            observacoes = u.obs,
-            classificacao = u.classif::TEXT,
-            status = u.status
+        SET nome_origem = CASE
+              WHEN e.nome_origem IS NULL OR e.nome_origem = '' THEN u.nome
+              WHEN e.nome_origem NOT LIKE '%' || u.nome || '%' THEN e.nome_origem || ' | ' || u.nome
+              ELSE e.nome_origem
+            END,
+            cpf_cnpj_origem = CASE
+              WHEN e.cpf_cnpj_origem IS NULL OR e.cpf_cnpj_origem = '' THEN u.cpf
+              WHEN e.cpf_cnpj_origem != u.cpf THEN e.cpf_cnpj_origem || ' | ' || u.cpf
+              ELSE e.cpf_cnpj_origem
+            END,
+            observacoes = CASE
+              WHEN e.observacoes IS NULL OR e.observacoes = '' THEN u.obs
+              WHEN e.observacoes NOT LIKE '%' || u.obs || '%' THEN e.observacoes || ' | ' || u.obs
+              ELSE e.observacoes
+            END,
+            classificacao = CASE
+              WHEN (e.classificacao IS NULL OR e.classificacao = '')
+                AND (e.classificacao_manual IS NULL OR e.classificacao_manual = false) THEN u.classif::TEXT
+              ELSE e.classificacao
+            END,
+            classificacao_manual = CASE
+              WHEN (e.classificacao IS NULL OR e.classificacao = '')
+                AND (e.classificacao_manual IS NULL OR e.classificacao_manual = false) THEN false
+              ELSE COALESCE(e.classificacao_manual, false)
+            END,
+            status = CASE
+              WHEN (e.status = 'PENDENTE' OR e.status IS NULL) AND u.status = 'OK' THEN 'OK'
+              ELSE e.status
+            END
         FROM (
           SELECT
             unnest($1::INTEGER[]) AS id,

@@ -1,8 +1,9 @@
 // ============================================================
-// wpp/routes/banco/index.js — V.2609141738
+// wpp/routes/banco/index.js — V.2610011235
 // ROTAS PRINCIPAIS DE INTEGRAÇÃO BANCÁRIA
 // + Sistema de Backup Automático (Railway + Vercel Blob)
 // + API de Exclusão de Recibos (Vercel Blob + Banco)
+// + API de Divergências de Data (Detecção e Resolução)
 // ============================================================
 
 import express from 'express';
@@ -25,6 +26,9 @@ import reclassificarRouter from './reclassificar-api.js';
 import importarOfxRouter from './importar-ofx-api.js';
 import debugClassificacaoRouter from './debug-classificacao-api.js';
 import saldoInicialRouter from './saldo-inicial-api.js';
+import divergenciasDataRouter from './divergencias-data-api.js';
+import verificarRecibosRouter from './verificar-recibos-api.js';
+import corrigirMesRouter from './corrigir-mes-api.js';
 
 const router = express.Router();
 
@@ -100,6 +104,15 @@ router.use('/enriquecer', enriquecerRouter);
 
 // Rota para reclassificar por palavras-chave
 router.use('/reclassificar', reclassificarRouter);
+
+// Rota para gerenciar divergências de data
+router.use('/divergencias-data', divergenciasDataRouter);
+
+// Rota para verificar integridade de recibos/anexos
+router.use('/recibos', verificarRecibosRouter);
+
+// Rota para corrigir e auditar mês específico
+router.use('/corrigir-mes', corrigirMesRouter);
 
 // Rota para gerenciar saldos iniciais
 router.use('/saldo-inicial', saldoInicialRouter);

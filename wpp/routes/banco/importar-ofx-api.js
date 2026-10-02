@@ -1,5 +1,11 @@
 // ============================================================
-// importar-ofx-api.js — V.2609182045
+// importar-ofx-api.js — V.2610011220
+//
+// ✅ DETECÇÃO DE DIVERGÊNCIAS DE DATA (01/10 12:20):
+//    - Detecta lançamentos com mesma descrição/valor mas data diferente (±7 dias)
+//    - Reporta divergências para o operador decidir
+//    - NÃO importa automaticamente quando há divergência
+//    - Operador escolhe qual data assumir via API /divergencias-data/resolver
 //
 // 🚀 OTIMIZAÇÃO CRÍTICA V.2609182045: Batch Operations (600x mais rápido!)
 //    - PROBLEMA: 626 transações = 1.252+ queries = 3 MINUTOS! 🐌
@@ -163,14 +169,15 @@ function gerarHash(data, valor, descricao, empresa, fitid) {
   return crypto.createHash('sha256').update(chave).digest('hex');
 }
 
-// Verificar duplicata (melhorada - V.2609182030)
+// Verificar duplicata (melhorada - V.2610011215)
 // 1️⃣ Tenta match EXATO por ID (fitid = id_transacao_banco)
 // 2️⃣ Se não achar, tenta por data + valor + início da descrição
+// 3️⃣ Detecta DIVERGÊNCIA de data (mesmo valor/desc, data diferente ±7 dias)
 async function verificarDuplicata(data, valor, empresa, fitid, descricao) {
   // ESTRATÉGIA 1: Match por ID único (mais confiável)
   if (fitid) {
     const porID = await pool.query(`
-      SELECT id, descricao_original, tipo_importacao
+      SELECT id, data, descricao_original, tipo_importacao
       FROM bank_extratos
       WHERE empresa = $1
         AND banco = 'Asaas'
@@ -179,10 +186,15 @@ async function verificarDuplicata(data, valor, empresa, fitid, descricao) {
     `, [empresa, fitid]);
 
     if (porID.rows.length > 0) {
+      const reg = porID.rows[0];
       return {
         duplicata: true,
         motivo: 'ID_EXATO',
-        tipo_original: porID.rows[0].tipo_importacao
+        tipo_original: reg.tipo_importacao,
+        id_existente: reg.id,
+        data_banco: reg.data,
+        data_ofx: data,
+        divergencia_data: reg.data.toISOString().split('T')[0] !== data
       };
     }
   }
@@ -191,7 +203,7 @@ async function verificarDuplicata(data, valor, empresa, fitid, descricao) {
   // Compara primeiros 40 caracteres da descrição para evitar falsos positivos
   if (descricao) {
     const porValorDesc = await pool.query(`
-      SELECT id, descricao_original, tipo_importacao
+      SELECT id, data, descricao_original, tipo_importacao
       FROM bank_extratos
       WHERE empresa = $1
         AND banco = 'Asaas'
@@ -205,12 +217,47 @@ async function verificarDuplicata(data, valor, empresa, fitid, descricao) {
       return {
         duplicata: true,
         motivo: 'VALOR_DESCRICAO',
-        tipo_original: porValorDesc.rows[0].tipo_importacao
+        tipo_original: porValorDesc.rows[0].tipo_importacao,
+        id_existente: porValorDesc.rows[0].id
       };
     }
   }
 
-  // Não encontrou duplicata
+  // ESTRATÉGIA 3: Detectar DIVERGÊNCIA de data (possível duplicata com data diferente)
+  if (descricao) {
+    const comDivergencia = await pool.query(`
+      SELECT id, data, descricao_original, valor, status, classificacao
+      FROM bank_extratos
+      WHERE empresa = $1
+        AND banco = 'Asaas'
+        AND data != $2
+        AND ABS(EXTRACT(DAY FROM (data - $2::DATE))) BETWEEN 1 AND 7
+        AND ABS(valor - $3) < 0.01
+        AND LEFT(descricao_original, 40) = LEFT($4, 40)
+      LIMIT 1
+    `, [empresa, data, valor, descricao]);
+
+    if (comDivergencia.rows.length > 0) {
+      const reg = comDivergencia.rows[0];
+      return {
+        duplicata: false,
+        divergencia_detectada: true,
+        motivo: 'DIVERGENCIA_DATA',
+        registro_existente: {
+          id: reg.id,
+          data_banco: reg.data.toISOString().split('T')[0],
+          data_ofx: data,
+          diferenca_dias: Math.abs((new Date(reg.data) - new Date(data)) / (1000 * 60 * 60 * 24)),
+          descricao: reg.descricao_original,
+          valor: parseFloat(reg.valor),
+          status: reg.status,
+          classificacao: reg.classificacao
+        }
+      };
+    }
+  }
+
+  // Não encontrou duplicata nem divergência
   return { duplicata: false };
 }
 
@@ -274,8 +321,12 @@ async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress
       totalOFX: transacoes.length,
       importados: 0,
       duplicatas: 0,
+      divergencias: 0,
       erros: 0
     };
+
+    // Array para coletar divergências de data detectadas
+    const divergenciasDetectadas = [];
 
     const client = await pool.connect();
 
@@ -304,15 +355,16 @@ async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress
       const idsExistentes = new Set(duplicatasResult.rows.map(r => r.id_transacao_banco));
       console.log(`✅ ${idsExistentes.size} duplicatas encontradas`);
 
-      // 2️⃣ PROCESSAR EM MEMÓRIA (super rápido)
+      // 2️⃣ PROCESSAR EM MEMÓRIA E DETECTAR DIVERGÊNCIAS
       const transacoesParaImportar = [];
+      const transacoesParaVerificarDivergencia = [];
 
       for (let i = 0; i < transacoes.length; i++) {
         const transacao = transacoes[i];
         const atual = i + 1;
 
         if (idsExistentes.has(transacao.fitid)) {
-          // É duplicata
+          // É duplicata por ID
           stats.duplicatas++;
 
           // Enviar progresso a cada 50 para não sobrecarregar SSE
@@ -320,12 +372,47 @@ async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress
             onProgress(atual, transacoes.length, 'duplicata', stats);
           }
         } else {
-          // Não é duplicata - adicionar para importação
+          // Não é duplicata por ID - pode ter divergência de data
+          transacoesParaVerificarDivergencia.push(transacao);
           transacoesParaImportar.push(transacao);
         }
       }
 
-      console.log(`📊 Processamento: ${stats.duplicatas} duplicatas, ${transacoesParaImportar.length} novas`);
+      console.log(`📊 Processamento inicial: ${stats.duplicatas} duplicatas por ID, ${transacoesParaVerificarDivergencia.length} para verificar divergências`);
+
+      // 2.5️⃣ VERIFICAR DIVERGÊNCIAS DE DATA nas transações não duplicadas
+      if (transacoesParaVerificarDivergencia.length > 0) {
+        console.log(`🔍 Verificando divergências de data em ${transacoesParaVerificarDivergencia.length} transações...`);
+
+        for (const transacao of transacoesParaVerificarDivergencia) {
+          const verificacao = await verificarDuplicata(
+            transacao.data,
+            transacao.valor,
+            empresaIdentificada,
+            null, // Não passa fitid pois já verificamos
+            transacao.descricao
+          );
+
+          if (verificacao.divergencia_detectada) {
+            stats.divergencias++;
+            divergenciasDetectadas.push({
+              transacao_ofx: {
+                data: transacao.data,
+                valor: transacao.valor,
+                descricao: transacao.descricao,
+                fitid: transacao.fitid
+              },
+              registro_banco: verificacao.registro_existente
+            });
+          }
+        }
+
+        if (divergenciasDetectadas.length > 0) {
+          console.log(`⚠️  ${divergenciasDetectadas.length} divergências de data detectadas!`);
+        }
+      }
+
+      console.log(`📊 Processamento completo: ${stats.duplicatas} duplicatas, ${transacoesParaImportar.length} novas, ${stats.divergencias} divergências`);
 
       // 3️⃣ BULK INSERT (1 query para todas as novas transações)
       if (transacoesParaImportar.length > 0) {
@@ -378,7 +465,11 @@ async function processarImportacaoOFX(ofxContent, empresaSelecionada, onProgress
       }
 
       await client.query('COMMIT');
-      return { sucesso: true, stats };
+      return {
+        sucesso: true,
+        stats,
+        divergencias: divergenciasDetectadas
+      };
 
     } catch (err) {
       await client.query('ROLLBACK');
