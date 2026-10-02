@@ -37,6 +37,7 @@ import retornoRoutes from './msg_externa.js'
 import bancoRouter, { inicializarSistemaBancario } from './routes/banco/index.js'
 import fileTokensRouter from './routes/banco/file-tokens-api.js'
 import visualizadorTokenRouter from './routes/visualizador-token.js'
+import wppApiRouter from './wpp-api.js'
 import {
   ehComandoListarPendentes,
   estaProcessandoPendentes,
@@ -126,6 +127,7 @@ app.use('/msg_externa', retornoRoutes)
 app.use('/api/banco', bancoRouter)
 app.use('/api/banco/tokens', fileTokensRouter)
 app.use('/visualizador', visualizadorTokenRouter)
+app.use('/api/wpp', wppApiRouter)
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -134,6 +136,13 @@ const pool = new Pool({
 let sock = null
 let qrAtual = null
 let conectado = false
+
+// Disponibilizar sock e conectado para as rotas da API
+app.use((req, res, next) => {
+  req.app.locals.sock = sock
+  req.app.locals.conectado = conectado
+  next()
+})
 let iniciando = false
 
 let ultimoEvento = null
