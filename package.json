@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node wpp/server.js"
+    "start": "node wpp/server.js",
+    "build": "echo 'Build concluído - Nenhuma compilação necessária'"
   },
   "dependencies": {
     "@vercel/blob": "^0.19.0",
