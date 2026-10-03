@@ -1,11 +1,16 @@
 // ============================================================
-// wpp/previsao.js — V.2606052005
+// wpp/previsao.js — V.2610020855
 // Allmax Gestão de Cotas — Marujo⚓
 // Previsão de navegação via open-meteo.com
 //
-// FIX V.2606052005:
-// - Removido emoji 🎉 do cabeçalho feliz
-// - Nova função: enviarPrevisaoPosAgendamento() para agendamentos do mesmo dia
+// FIX V.2610020855:
+// - Cache movido para banco de dados (tabela wpp_previsao_enviada)
+// - Evita duplicatas mesmo com múltiplas instâncias rodando
+// - Usa funções ja_enviou_previsao() e registrar_envio_previsao()
+// - Detecta race conditions entre instâncias
+//
+// HISTÓRICO:
+// - V.2606052005: Removido emoji do cabeçalho + envio pós-agendamento
 // ============================================================
 
 const LAT      = '-10.212911'
@@ -256,9 +261,6 @@ export async function obterPrevisaoNavegacao(diasAFrente = 0, forcarManha = fals
 // Chama de server.js no setInterval
 // ============================================================
 
-// Cache para evitar envio duplicado no mesmo dia
-const gruposEnviados = new Map() // key: "grupowppid-YYYY-MM-DD"
-
 export async function enviarPrevisaoDiaria(pool, sock, conectado) {
   if (!conectado || !sock) return
 
@@ -290,30 +292,36 @@ export async function enviarPrevisaoDiaria(pool, sock, conectado) {
 
     for (const row of rs.rows) {
       try {
-        const chaveCache = `${row.grupowppid}-${hoje}`
+        // Verificar se já foi enviado hoje (via banco de dados)
+        const jaEnviou = await pool.query(
+          `SELECT public.ja_enviou_previsao($1, $2::date, 'diaria')`,
+          [row.grupowppid, hoje]
+        )
 
-        // Verificar se já foi enviado hoje
-        if (gruposEnviados.has(chaveCache)) {
-          console.log(`[PREVISAO] ⚠️ Pulando ${row.grupowppid} - já enviado hoje às ${gruposEnviados.get(chaveCache)}`)
+        if (jaEnviou.rows[0].ja_enviou_previsao) {
+          console.log(`[PREVISAO] ⚠️ Pulando ${row.grupowppid} - já enviado hoje (verificado no BD)`)
           continue
         }
 
+        // Tentar registrar o envio (retorna false se já existe)
+        const registrou = await pool.query(
+          `SELECT public.registrar_envio_previsao($1, $2::date, 'diaria')`,
+          [row.grupowppid, hoje]
+        )
+
+        if (!registrou.rows[0].registrar_envio_previsao) {
+          console.log(`[PREVISAO] ⚠️ Pulando ${row.grupowppid} - outra instância já enviou (race condition detectada)`)
+          continue
+        }
+
+        // Enviar mensagem
         await sock.sendMessage(row.grupowppid, { text: previsao })
 
         const horaEnvio = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-        gruposEnviados.set(chaveCache, horaEnvio)
-
         console.log(`[PREVISAO] ✅ Enviada para ${row.grupowppid} às ${horaEnvio}`)
         await new Promise(r => setTimeout(r, 2000))
       } catch (err) {
         console.error(`[PREVISAO] ❌ Falha ao enviar para ${row.grupowppid}:`, err.message)
-      }
-    }
-
-    // Limpar cache de dias anteriores (manter apenas hoje)
-    for (const [chave] of gruposEnviados) {
-      if (!chave.endsWith(`-${hoje}`)) {
-        gruposEnviados.delete(chave)
       }
     }
   } catch (err) {
