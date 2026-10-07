@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2610072007
+    EXTRATO BANCÁRIO - V.2610072024
 
     📄 PDF ESPELHO DA TELA - V.2609211536
        - Função gerarPDF() reescrita para usar nova rota GET
@@ -564,6 +564,27 @@
             /* Quebra de página inteligente */
             tr {
                 page-break-inside: avoid;
+            }
+
+            /* ========================================
+               LINKS DE ANEXO NO PDF
+               - Garantir que sejam clicáveis
+               - Destaque visual forte
+               - Sem quebra de linha
+               ======================================== */
+            .anexo-link {
+                color: #0066cc !important;
+                text-decoration: underline !important;
+                font-weight: 700 !important;
+                font-size: 9px !important;
+                white-space: nowrap !important;
+                display: inline-block !important;
+            }
+
+            /* Garantir que links sejam clicáveis no PDF */
+            a[href] {
+                color: #0066cc !important;
+                text-decoration: underline !important;
             }
 
             /* Loading e modais ocultos */
@@ -3155,4 +3176,4 @@ conforme critérios selecionados
 </body>
 </html>
 
-<!-- V.2610072007 - 🎨 OTIMIZAÇÃO: Layout PDF profissional (paisagem, cards compactos, fonte 9px) -->
+<!-- V.2610072024 - 🔗 FIX: Links de anexo clicáveis no PDF (azul, underline, bold) -->
