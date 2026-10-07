@@ -1,7 +1,13 @@
 // ============================================================
-// wpp/routes/banco/extrato-api.js — V.2609181832
+// wpp/routes/banco/extrato-api.js — V.2610071742
 // API PARA RELATÓRIO DE EXTRATO BANCÁRIO
 // Visão gerencial completa dos lançamentos
+//
+// ✨ NOVO V.2610071742: Filtro por categoria_id
+//    - ANTES: Só tinha filtro somente_nao_classificados (sim/não)
+//    - AGORA: Aceita categoria_id para filtrar categoria específica
+//    - FILTROS: categoria_id=XXX (específica), NAO_CLASSIFICADAS, TODAS
+//    - APLICADO: Query principal E query de totais
 //
 // 🔥 FIX V.2609181832: Removido updated_at (coluna não existe)
 //    - PROBLEMA: Erro ao buscar extrato após deploy
@@ -54,12 +60,13 @@ const pool = new Pool({
  * - mes: YYYY-MM (opcional)
  * - status: OK, PENDENTE (opcional)
  * - somente_nao_classificados: true/false (opcional)
+ * - categoria_id: ID da categoria para filtrar (opcional)
  * - limit: número de registros (padrão 100)
  * - offset: paginação (padrão 0)
  */
 router.get('/listar', async (req, res) => {
   try {
-    const { empresa, mes, data_inicio, data_fim, status, somente_nao_classificados, limit = 100, offset = 0 } = req.query;
+    const { empresa, mes, data_inicio, data_fim, status, somente_nao_classificados, categoria_id, limit = 100, offset = 0 } = req.query;
 
     if (!empresa) {
       return res.status(400).json({
@@ -146,6 +153,13 @@ router.get('/listar', async (req, res) => {
       query += ` AND (e.classificacao IS NULL OR e.classificacao = '')`;
     }
 
+    // Filtro: por categoria específica
+    if (categoria_id && categoria_id !== 'TODAS' && categoria_id !== 'NAO_CLASSIFICADAS') {
+      query += ` AND e.classificacao = $${paramIndex}`;
+      params.push(categoria_id);
+      paramIndex++;
+    }
+
     // Ordenação: data DESC (mais recente primeiro), depois importado_em DESC
     query += `
       ORDER BY e.data DESC, e.importado_em DESC, e.id DESC
@@ -195,6 +209,13 @@ router.get('/listar', async (req, res) => {
     // ✅ Filtro: somente não classificados
     if (somente_nao_classificados === 'true') {
       queryTotais += ` AND (classificacao IS NULL OR classificacao = '')`;
+    }
+
+    // Filtro: por categoria específica
+    if (categoria_id && categoria_id !== 'TODAS' && categoria_id !== 'NAO_CLASSIFICADAS') {
+      queryTotais += ` AND classificacao = $${paramIndexTotais}`;
+      paramsTotais.push(categoria_id);
+      paramIndexTotais++;
     }
 
     const totaisResult = await pool.query(queryTotais, paramsTotais);
