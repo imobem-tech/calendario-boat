@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2610071610
+    EXTRATO BANCÁRIO - V.2610071725
 
     📄 PDF ESPELHO DA TELA - V.2609211536
        - Função gerarPDF() reescrita para usar nova rota GET
@@ -717,11 +717,13 @@
                 </select>
             </div>
 
-            <div class="filter-group" style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="somenteNaoClassificados" style="width: auto; margin: 0;">
-                <label for="somenteNaoClassificados" style="margin: 0; cursor: pointer;">
-                    Ñ classificado
-                </label>
+            <div class="filter-group">
+                <label>Categoria</label>
+                <select id="categoriaSelect">
+                    <option value="TODAS" selected>📋 TODAS</option>
+                    <option value="NAO_CLASSIFICADAS">⚠️ Não classificadas</option>
+                    <!-- Categorias carregadas dinamicamente via JavaScript -->
+                </select>
             </div>
 
             <div class="filter-group" style="display: flex; align-items: flex-end;">
@@ -852,6 +854,9 @@
             // Adicionar listener para mudança de empresa
             document.getElementById('empresaSelect').addEventListener('change', atualizarBotoesEmpresa);
 
+            // Carregar categorias no filtro
+            carregarCategoriasFiltro();
+
             // Mostrar mensagem inicial
             mostrarMensagemInicial();
 
@@ -929,7 +934,7 @@
 
                 const empresa = document.getElementById('empresaSelect').value;
                 const status = document.getElementById('statusSelect').value;
-                const somenteNaoClassificados = document.getElementById('somenteNaoClassificados').checked;
+                const categoria = document.getElementById('categoriaSelect').value;
 
                 let url = 'https://calendario-boat-production.up.railway.app/api/banco/extrato/listar?';
 
@@ -959,9 +964,11 @@
                     url += `status=${status}&`;
                 }
 
-                // Somente não classificados
-                if (somenteNaoClassificados) {
+                // Categoria
+                if (categoria === 'NAO_CLASSIFICADAS') {
                     url += `somente_nao_classificados=true&`;
+                } else if (categoria !== 'TODAS') {
+                    url += `categoria_id=${categoria}&`;
                 }
 
                 url += 'limit=1000';
@@ -994,7 +1001,7 @@
         async function buscarTodasEmpresas() {
             const empresas = ['ALLMAX', 'IMOBEM', 'IMOBAN', 'SUMMER'];
             const status = document.getElementById('statusSelect').value;
-            const somenteNaoClassificados = document.getElementById('somenteNaoClassificados').checked;
+            const categoria = document.getElementById('categoriaSelect').value;
 
             let todosLancamentos = [];
             let totais = {
@@ -1019,7 +1026,14 @@
                 }
 
                 if (status !== 'todos') url += `status=${status}&`;
-                if (somenteNaoClassificados) url += `somente_nao_classificados=true&`;
+
+                // Categoria
+                if (categoria === 'NAO_CLASSIFICADAS') {
+                    url += `somente_nao_classificados=true&`;
+                } else if (categoria !== 'TODAS') {
+                    url += `categoria_id=${categoria}&`;
+                }
+
                 url += 'limit=1000';
 
                 const response = await fetch(url);
@@ -1567,6 +1581,33 @@
                 }
             } catch (err) {
                 console.error('❌ Erro ao carregar categorias:', err);
+            }
+        }
+
+        // Carregar categorias no filtro de busca
+        async function carregarCategoriasFiltro() {
+            await carregarCategorias();
+
+            const selectCategoria = document.getElementById('categoriaSelect');
+
+            // Limpar opções dinâmicas (manter apenas TODAS e Não classificadas)
+            const opcoesPadrao = Array.from(selectCategoria.options).slice(0, 2);
+            selectCategoria.innerHTML = '';
+            opcoesPadrao.forEach(opt => selectCategoria.appendChild(opt));
+
+            // Adicionar categorias dinamicamente
+            if (categoriasDisponiveis && categoriasDisponiveis.length > 0) {
+                // Ordenar por nome
+                const categoriasOrdenadas = [...categoriasDisponiveis].sort((a, b) =>
+                    a.nome.localeCompare(b.nome)
+                );
+
+                categoriasOrdenadas.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = `${cat.icone} ${cat.nome}`;
+                    selectCategoria.appendChild(option);
+                });
             }
         }
 
@@ -2350,7 +2391,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610071610</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610071725</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
