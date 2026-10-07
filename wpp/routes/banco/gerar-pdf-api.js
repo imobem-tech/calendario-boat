@@ -1,6 +1,6 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2609211549
-// API PARA GERAR PDF DO EXTRATO BANCÁRIO
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072039
+// API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
 //
 // ROTAS:
 // - POST /gerar-pdf     → Método antigo (gera HTML customizado)
@@ -367,25 +367,49 @@ router.get('/gerar-pdf-url', async (req, res) => {
 
     console.log('🌐 URL da página:', pageURL);
 
-    // Abrir página com Puppeteer
+    // Abrir página com Puppeteer OTIMIZADO
     const browser = await puppeteer.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-dev-tools'
       ]
     });
 
     const page = await browser.newPage();
 
-    // Viewport maior para capturar tudo
-    await page.setViewport({ width: 1200, height: 800 });
+    // ============================================================
+    // OTIMIZAÇÃO: Bloquear recursos desnecessários
+    // ============================================================
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      const url = request.url();
+
+      // Bloquear fontes externas (usar fontes do sistema)
+      if (resourceType === 'font' && !url.includes('calendario-boat')) {
+        request.abort();
+      }
+      // Bloquear imagens externas (se houver)
+      else if (resourceType === 'image' && !url.includes('calendario-boat')) {
+        request.abort();
+      }
+      // Permitir tudo do próprio domínio
+      else {
+        request.continue();
+      }
+    });
+
+    // Viewport otimizado para paisagem A4 (297mm x 210mm)
+    await page.setViewport({ width: 1400, height: 990 });
 
     // Navegar para a página
     await page.goto(pageURL, {
-      waitUntil: 'networkidle0',
+      waitUntil: 'domcontentloaded', // Mais rápido que networkidle0
       timeout: 30000
     });
 
@@ -402,10 +426,19 @@ router.get('/gerar-pdf-url', async (req, res) => {
 
     console.log('✅ Página carregada com dados, gerando PDF...');
 
-    // Gerar PDF
+    // ============================================================
+    // GERAR PDF OTIMIZADO
+    // - preferCSSPageSize: usa orientação do CSS (@page landscape)
+    // - scale: 0.95 para compactar levemente
+    // - landscape: true como fallback
+    // ============================================================
     const pdfBuffer = await page.pdf({
       format: 'A4',
+      landscape: true,               // Fallback caso CSS não funcione
+      preferCSSPageSize: true,       // ✅ Usa @page { size: landscape } do CSS
       printBackground: true,
+      displayHeaderFooter: false,    // ✅ Reduz tamanho
+      scale: 0.95,                   // ✅ Compacta 5%
       margin: {
         top: '10mm',
         right: '10mm',
