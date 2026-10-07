@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072039
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072048
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
 //
 // ROTAS:
@@ -408,8 +408,9 @@ router.get('/gerar-pdf-url', async (req, res) => {
     await page.setViewport({ width: 1400, height: 990 });
 
     // Navegar para a página
+    // networkidle2: espera apenas 2 conexões ativas (melhor que networkidle0)
     await page.goto(pageURL, {
-      waitUntil: 'domcontentloaded', // Mais rápido que networkidle0
+      waitUntil: 'networkidle2',
       timeout: 30000
     });
 
