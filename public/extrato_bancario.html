@@ -984,7 +984,7 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             // Definir mês atual como padrão
             const hoje = new Date();
             const mesAtual = hoje.toISOString().substring(0, 7);
@@ -1000,7 +1000,59 @@
             });
 
             // Carregar categorias no filtro
-            carregarCategoriasFiltro();
+            await carregarCategoriasFiltro();
+
+            // ============================================================
+            // 🤖 AUTO-BUSCAR PARA GERAÇÃO DE PDF
+            // ============================================================
+            // Detectar parâmetros da URL (usado pelo Puppeteer)
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoBuscar = urlParams.get('auto_buscar');
+
+            if (autoBuscar === 'true') {
+                console.log('🤖 AUTO-BUSCAR ativado - Preenchendo filtros e buscando...');
+
+                // Preencher filtros com parâmetros da URL
+                const empresaURL = urlParams.get('empresa');
+                const dataInicioURL = urlParams.get('data_inicio');
+                const dataFimURL = urlParams.get('data_fim');
+                const categoriaURL = urlParams.get('categoria_id');
+                const naoClassificadosURL = urlParams.get('somente_nao_classificados');
+
+                if (empresaURL) {
+                    document.getElementById('empresaSelect').value = empresaURL;
+                }
+
+                // Mudar para modo "Por Datas"
+                modoFiltro = 'datas';
+                document.getElementById('filtroMes').classList.remove('active');
+                document.getElementById('filtroDatas').classList.add('active');
+                document.getElementById('porMes').style.display = 'none';
+                document.getElementById('porDatas').style.display = 'block';
+
+                if (dataInicioURL) {
+                    document.getElementById('dataInicio').value = dataInicioURL;
+                }
+                if (dataFimURL) {
+                    document.getElementById('dataFim').value = dataFimURL;
+                }
+
+                // Preencher categoria
+                if (naoClassificadosURL === 'true') {
+                    document.getElementById('categoriaSelect').value = 'NAO_CLASSIFICADAS';
+                } else if (categoriaURL && categoriaURL !== 'TODAS') {
+                    document.getElementById('categoriaSelect').value = categoriaURL;
+                }
+
+                // Aguardar um pouco para garantir que tudo foi preenchido
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // BUSCAR AUTOMATICAMENTE
+                console.log('🔍 Executando busca automática...');
+                await buscarExtratos();
+                console.log('✅ Busca automática concluída!');
+            }
+            // ============================================================
 
             // Mostrar mensagem inicial
             mostrarMensagemInicial();
@@ -2525,7 +2577,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610072024</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610072200</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -3176,6 +3228,4 @@ conforme critérios selecionados
 </body>
 </html>
 
-<!-- V.2610072024 - 🔗 FIX: Links de anexo clicáveis no PDF (azul, underline, bold) -->
-
-<!-- FORCE UPDATE: 2610072119 -->
+<!-- V.2610072200 - 🤖 FIX: PDF auto-buscar com todos os parâmetros (categoria, filtros) -->

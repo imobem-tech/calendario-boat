@@ -350,9 +350,9 @@ function gerarHTMLPDF(dados, empresa, descricao, mes, data_inicio, data_fim) {
  */
 router.get('/gerar-pdf-url', async (req, res) => {
   try {
-    const { empresa, data_inicio, data_fim, banco = 'Asaas' } = req.query;
+    const { empresa, data_inicio, data_fim, banco = 'Asaas', categoria_id, somente_nao_classificados } = req.query;
 
-    console.log('📄 Gerando PDF da página real:', { empresa, data_inicio, data_fim });
+    console.log('📄 Gerando PDF da página real:', { empresa, data_inicio, data_fim, categoria_id, somente_nao_classificados });
 
     // Validações
     if (!empresa || !data_inicio || !data_fim) {
@@ -361,9 +361,27 @@ router.get('/gerar-pdf-url', async (req, res) => {
       });
     }
 
-    // Montar URL da página real
+    // Montar URL da página real COM TODOS OS PARÂMETROS
     const baseURL = process.env.FRONTEND_URL || 'https://calendario-boat-production.up.railway.app';
-    const pageURL = `${baseURL}/extrato_bancario.html?empresa=${encodeURIComponent(empresa)}&data_inicio=${data_inicio}&data_fim=${data_fim}&banco=${encodeURIComponent(banco)}`;
+    const params = new URLSearchParams({
+      empresa,
+      data_inicio,
+      data_fim,
+      banco,
+      auto_buscar: 'true'  // ✅ FLAG para buscar automaticamente ao carregar
+    });
+
+    // Adicionar categoria_id se fornecido
+    if (categoria_id && categoria_id !== 'TODAS') {
+      params.append('categoria_id', categoria_id);
+    }
+
+    // Adicionar flag de não classificados se fornecido
+    if (somente_nao_classificados === 'true') {
+      params.append('somente_nao_classificados', 'true');
+    }
+
+    const pageURL = `${baseURL}/extrato_bancario.html?${params.toString()}`;
 
     console.log('🌐 URL da página:', pageURL);
 
