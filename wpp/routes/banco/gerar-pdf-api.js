@@ -1,10 +1,11 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072048
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072212
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
 //
 // ROTAS:
 // - POST /gerar-pdf     → Método antigo (gera HTML customizado)
 // - GET  /gerar-pdf-url → Método novo (captura página real)
+// FIX: Aumentar timeouts para aguardar auto-buscar carregar dados
 // ============================================================
 
 import express from 'express';
@@ -429,21 +430,27 @@ router.get('/gerar-pdf-url', async (req, res) => {
     // networkidle2: espera apenas 2 conexões ativas (melhor que networkidle0)
     await page.goto(pageURL, {
       waitUntil: 'networkidle2',
-      timeout: 30000
+      timeout: 60000  // ✅ Aumentado para 60s (busca pode demorar)
     });
 
+    console.log('⏳ Página aberta, aguardando auto-buscar executar...');
+
     // Aguardar tabela EXISTIR
-    await page.waitForSelector('#corpoTabela', { timeout: 10000 });
-    console.log('⏳ Tabela existe, aguardando dados...');
+    await page.waitForSelector('#corpoTabela', { timeout: 20000 });
+    console.log('⏳ Tabela existe, aguardando dados carregarem...');
 
-    // Aguardar DADOS aparecerem (primeira linha da tabela)
-    await page.waitForSelector('#corpoTabela > tr', { timeout: 15000 });
-    console.log('⏳ Primeira linha carregada, aguardando estabilização...');
+    // ============================================================
+    // ESTRATÉGIA: Aguardar dados REALMENTE carregarem
+    // Auto-buscar demora ~5-10s para buscar dados da API
+    // Aguardar até 60s pela primeira linha aparecer
+    // ============================================================
+    await page.waitForSelector('#corpoTabela > tr', { timeout: 60000 });
+    console.log('✅ Primeira linha carregada!');
 
-    // Aguardar um pouco mais para garantir que CSS e tudo estabilizou
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Aguardar estabilização (renderização completa, CSS aplicado)
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    console.log('✅ Página carregada com dados, gerando PDF...');
+    console.log('✅ Página totalmente carregada, gerando PDF...');
 
     // ============================================================
     // GERAR PDF OTIMIZADO
