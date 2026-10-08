@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072323
+// wpp/routes/banco/gerar-pdf-api.js — V.2609211549
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO
 //
 // ROTAS:

@@ -6,7 +6,7 @@
     <title>Extrato Bancário</title>
     <!--
     ============================================================
-    EXTRATO BANCÁRIO - V.2610072024
+    EXTRATO BANCÁRIO - V.2610071754
 
     📄 PDF ESPELHO DA TELA - V.2609211536
        - Função gerarPDF() reescrita para usar nova rota GET
@@ -454,158 +454,12 @@
             border-color: #667eea;
         }
 
-        /* ============================================================
-           CSS PARA IMPRESSÃO / PDF - V.2610072007
-           - Orientação paisagem
-           - Cards compactos
-           - Fonte reduzida (13px → 9px)
-           - Todas as colunas visíveis
-           ============================================================ */
         @media print {
-            /* Orientação paisagem para caber mais colunas */
-            @page {
-                size: landscape;
-                margin: 10mm;
-            }
-
             body {
                 background: white;
-                margin: 0;
-                padding: 0;
             }
-
-            /* Ocultar filtros e botões */
             .filters, .actions {
-                display: none !important;
-            }
-
-            /* Header compacto */
-            .header {
-                padding: 10px 20px !important;
-                margin-bottom: 10px !important;
-            }
-
-            .header h1 {
-                font-size: 20px !important;
-                margin: 0 !important;
-            }
-
-            .header p {
-                font-size: 11px !important;
-                margin: 5px 0 0 0 !important;
-            }
-
-            /* Cards de resumo MUITO compactos */
-            .summary-grid {
-                padding: 0 20px 10px 20px !important;
-                gap: 6px !important;
-                margin-bottom: 10px !important;
-            }
-
-            .summary-card {
-                padding: 6px 10px !important;
-                border-radius: 4px !important;
-                page-break-inside: avoid;
-            }
-
-            .summary-card label {
-                font-size: 8px !important;
-                margin-right: 4px !important;
-            }
-
-            .summary-card .value {
-                font-size: 12px !important;
-            }
-
-            .summary-card small {
-                font-size: 7px !important;
-            }
-
-            /* Tabela compacta */
-            .table-container {
-                padding: 0 20px !important;
-            }
-
-            table {
-                font-size: 8px !important;
-                width: 100% !important;
-            }
-
-            th {
-                padding: 4px 3px !important;
-                font-size: 7px !important;
-                border-bottom: 1px solid #dee2e6 !important;
-            }
-
-            td {
-                padding: 3px 3px !important;
-                font-size: 8px !important;
-                border-bottom: 1px dotted #ddd !important;
-            }
-
-            /* Ajustar larguras das colunas */
-            th:nth-child(1), td:nth-child(1) { width: 7%; }  /* DATA */
-            th:nth-child(2), td:nth-child(2) { width: 7%; }  /* IMPORTADO */
-            th:nth-child(3), td:nth-child(3) { width: 7%; }  /* EMPRESA */
-            th:nth-child(4), td:nth-child(4) { width: 12%; } /* CATEGORIA */
-            th:nth-child(5), td:nth-child(5) { width: 25%; } /* DESCRIÇÃO */
-            th:nth-child(6), td:nth-child(6) { width: 3%; }  /* % */
-            th:nth-child(7), td:nth-child(7) { width: 12%; } /* ORIGEM */
-            th:nth-child(8), td:nth-child(8) { width: 12%; } /* OBSERVAÇÕES */
-            th:nth-child(9), td:nth-child(9) { width: 7%; }  /* VALOR */
-            th:nth-child(10), td:nth-child(10) { width: 7%; } /* SALDO */
-            th:nth-child(11), td:nth-child(11) { width: 1%; } /* STATUS */
-
-            /* Ocultar coluna AÇÕES no PDF */
-            th:last-child, td:last-child {
-                display: none !important;
-            }
-
-            /* Quebra de página inteligente */
-            tr {
-                page-break-inside: avoid;
-            }
-
-            /* ========================================
-               LINKS DE ANEXO NO PDF
-               - Garantir que sejam clicáveis
-               - Destaque visual forte
-               - Sem quebra de linha
-               ======================================== */
-            .anexo-link {
-                color: #0066cc !important;
-                text-decoration: underline !important;
-                font-weight: 700 !important;
-                font-size: 9px !important;
-                white-space: nowrap !important;
-                display: inline-block !important;
-            }
-
-            /* Garantir que links sejam clicáveis no PDF */
-            a[href] {
-                color: #0066cc !important;
-                text-decoration: underline !important;
-            }
-
-            /* Loading e modais ocultos */
-            #loading, .modal, .tooltip-modal {
-                display: none !important;
-            }
-
-            /* Seção de resumo por categorias (se existir) */
-            #resumoCategoriasSection {
-                page-break-before: always;
-                padding: 20px;
-            }
-
-            #resumoCategoriasSection h3 {
-                font-size: 14px !important;
-                margin-bottom: 10px !important;
-            }
-
-            #resumoCategoriasLista .categoria-item {
-                font-size: 9px !important;
-                padding: 4px 8px !important;
+                display: none;
             }
         }
 
@@ -984,7 +838,7 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', async () => {
+        window.addEventListener('DOMContentLoaded', () => {
             // Definir mês atual como padrão
             const hoje = new Date();
             const mesAtual = hoje.toISOString().substring(0, 7);
@@ -1000,62 +854,56 @@
             });
 
             // Carregar categorias no filtro
-            await carregarCategoriasFiltro();
-
-            // ============================================================
-            // 🤖 AUTO-BUSCAR PARA GERAÇÃO DE PDF
-            // ============================================================
-            // Detectar parâmetros da URL (usado pelo Puppeteer)
-            const urlParams = new URLSearchParams(window.location.search);
-            const autoBuscar = urlParams.get('auto_buscar');
-
-            if (autoBuscar === 'true') {
-                console.log('🤖 AUTO-BUSCAR ativado - Preenchendo filtros e buscando...');
-
-                // Preencher filtros com parâmetros da URL
-                const empresaURL = urlParams.get('empresa');
-                const dataInicioURL = urlParams.get('data_inicio');
-                const dataFimURL = urlParams.get('data_fim');
-                const categoriaURL = urlParams.get('categoria_id');
-                const naoClassificadosURL = urlParams.get('somente_nao_classificados');
-
-                if (empresaURL) {
-                    document.getElementById('empresaSelect').value = empresaURL;
-                }
-
-                // Mudar para modo "Por Datas"
-                modoFiltro = 'datas';
-                document.getElementById('filtroMes').classList.remove('active');
-                document.getElementById('filtroDatas').classList.add('active');
-                document.getElementById('porMes').style.display = 'none';
-                document.getElementById('porDatas').style.display = 'block';
-
-                if (dataInicioURL) {
-                    document.getElementById('dataInicio').value = dataInicioURL;
-                }
-                if (dataFimURL) {
-                    document.getElementById('dataFim').value = dataFimURL;
-                }
-
-                // Preencher categoria
-                if (naoClassificadosURL === 'true') {
-                    document.getElementById('categoriaSelect').value = 'NAO_CLASSIFICADAS';
-                } else if (categoriaURL && categoriaURL !== 'TODAS') {
-                    document.getElementById('categoriaSelect').value = categoriaURL;
-                }
-
-                // Aguardar um pouco para garantir que tudo foi preenchido
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // BUSCAR AUTOMATICAMENTE
-                console.log('🔍 Executando busca automática...');
-                await buscarExtrato();  // ✅ CORRIGIDO: era buscarExtratos() (plural)
-                console.log('✅ Busca automática concluída!');
-            }
-            // ============================================================
+            carregarCategoriasFiltro();
 
             // Mostrar mensagem inicial
             mostrarMensagemInicial();
+
+            // ============================================================
+            // AUTO-BUSCAR: Se URL tem parâmetros, buscar automaticamente
+            // (usado pelo Puppeteer para gerar PDF)
+            // ============================================================
+            const urlParams = new URLSearchParams(window.location.search);
+            const empresaURL = urlParams.get('empresa');
+            const dataInicioURL = urlParams.get('data_inicio');
+            const dataFimURL = urlParams.get('data_fim');
+            const categoriaURL = urlParams.get('categoria');
+
+            if (empresaURL && dataInicioURL && dataFimURL) {
+                console.log('🤖 AUTO-BUSCAR: Parâmetros detectados na URL!');
+                console.log('   Empresa:', empresaURL);
+                console.log('   Período:', dataInicioURL, 'até', dataFimURL);
+                console.log('   Categoria:', categoriaURL || 'TODAS');
+
+                // Preencher campos automaticamente
+                document.getElementById('empresaSelect').value = empresaURL;
+
+                // Mudar para modo datas (período)
+                modoFiltro = 'datas';
+                document.getElementById('filtroMes').style.display = 'none';
+                document.getElementById('filtroDataInicio').style.display = 'flex';
+                document.getElementById('filtroDataFim').style.display = 'flex';
+                document.getElementById('btnModoMes').classList.remove('active');
+                document.getElementById('btnModoDatas').classList.add('active');
+
+                // Preencher datas
+                document.getElementById('dataInicio').value = dataInicioURL;
+                document.getElementById('dataFim').value = dataFimURL;
+
+                // Aguardar categorias carregarem e preencher categoria
+                setTimeout(async () => {
+                    // Aguardar categorias carregarem
+                    await carregarCategoriasFiltro();
+
+                    // Preencher categoria se informada
+                    if (categoriaURL) {
+                        document.getElementById('categoriaSelect').value = categoriaURL;
+                    }
+
+                    console.log('🤖 Executando busca automática...');
+                    buscarExtrato();
+                }, 800);
+            }
         });
 
         // Mostrar mensagem inicial
@@ -1631,11 +1479,9 @@
                     banco: 'Asaas'
                 });
 
-                // Adicionar filtro de categoria
-                if (categoria === 'NAO_CLASSIFICADAS') {
-                    params.append('somente_nao_classificados', 'true');
-                } else if (categoria && categoria !== 'TODAS') {
-                    params.append('categoria_id', categoria);
+                // Adicionar categoria se não for TODAS
+                if (categoria && categoria !== 'TODAS') {
+                    params.append('categoria', categoria);
                 }
 
                 const response = await fetch(`https://calendario-boat-production.up.railway.app/api/banco/extrato/gerar-pdf-url?${params}`, {
@@ -2531,7 +2377,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610072302</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610071754</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -3182,4 +3028,4 @@ conforme critérios selecionados
 </body>
 </html>
 
-<!-- V.2610072302 - RESTORE: Voltar para f5e63f2 (20:25) que FUNCIONAVA + categoria -->
+<!-- V.2609181923 - 📋 Modal edição: layout 2 colunas + dados do registro -->
