@@ -1,11 +1,11 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072238
-// API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072246
+// API PARA GERAR PDF DO EXTRATO BANCÁRIO
 //
 // ROTAS:
 // - POST /gerar-pdf     → Método antigo (gera HTML customizado)
 // - GET  /gerar-pdf-url → Método novo (captura página real)
-// SIMPLIFICAÇÃO: Aguardar tempo fixo (20s+20s) - sem complexidade
+// REVERTIDO: Voltando à versão que FUNCIONAVA (sem otimizações)
 // ============================================================
 
 import express from 'express';
@@ -353,7 +353,7 @@ router.get('/gerar-pdf-url', async (req, res) => {
   try {
     const { empresa, data_inicio, data_fim, banco = 'Asaas', categoria_id, somente_nao_classificados } = req.query;
 
-    console.log('📄 Gerando PDF da página real:', { empresa, data_inicio, data_fim, categoria_id, somente_nao_classificados });
+    console.log('📄 Gerando PDF da página real:', { empresa, data_inicio, data_fim, categoria_id });
 
     // Validações
     if (!empresa || !data_inicio || !data_fim) {
@@ -369,15 +369,13 @@ router.get('/gerar-pdf-url', async (req, res) => {
       data_inicio,
       data_fim,
       banco,
-      auto_buscar: 'true'  // ✅ FLAG para buscar automaticamente ao carregar
+      auto_buscar: 'true'  // ✅ Auto-buscar ao carregar
     });
 
-    // Adicionar categoria_id se fornecido
+    // Adicionar categoria se fornecida
     if (categoria_id && categoria_id !== 'TODAS') {
       params.append('categoria_id', categoria_id);
     }
-
-    // Adicionar flag de não classificados se fornecido
     if (somente_nao_classificados === 'true') {
       params.append('somente_nao_classificados', 'true');
     }
@@ -386,95 +384,45 @@ router.get('/gerar-pdf-url', async (req, res) => {
 
     console.log('🌐 URL da página:', pageURL);
 
-    // Abrir página com Puppeteer OTIMIZADO
+    // Abrir página com Puppeteer
     const browser = await puppeteer.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-dev-tools'
+        '--disable-gpu'
       ]
     });
 
     const page = await browser.newPage();
 
-    // ============================================================
-    // OTIMIZAÇÃO: Bloquear recursos desnecessários
-    // ============================================================
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      const resourceType = request.resourceType();
-      const url = request.url();
-
-      // Bloquear fontes externas (usar fontes do sistema)
-      if (resourceType === 'font' && !url.includes('calendario-boat')) {
-        request.abort();
-      }
-      // Bloquear imagens externas (se houver)
-      else if (resourceType === 'image' && !url.includes('calendario-boat')) {
-        request.abort();
-      }
-      // Permitir tudo do próprio domínio
-      else {
-        request.continue();
-      }
-    });
-
-    // Viewport otimizado para paisagem A4 (297mm x 210mm)
-    await page.setViewport({ width: 1400, height: 990 });
+    // Viewport maior para capturar tudo
+    await page.setViewport({ width: 1200, height: 800 });
 
     // Navegar para a página
-    // networkidle2: espera apenas 2 conexões ativas (melhor que networkidle0)
     await page.goto(pageURL, {
-      waitUntil: 'networkidle2',
-      timeout: 60000  // ✅ Aumentado para 60s (busca pode demorar)
+      waitUntil: 'networkidle0',
+      timeout: 30000
     });
 
-    console.log('⏳ Página aberta, aguardando auto-buscar executar...');
+    // Aguardar tabela EXISTIR
+    await page.waitForSelector('#corpoTabela', { timeout: 10000 });
+    console.log('⏳ Tabela existe, aguardando dados...');
 
-    // ============================================================
-    // ESTRATÉGIA ULTRA-SIMPLES: AGUARDAR TEMPO FIXO
-    // Complexidade estava causando problemas - voltando ao básico!
-    // ============================================================
+    // Aguardar DADOS aparecerem (primeira linha da tabela)
+    await page.waitForSelector('#corpoTabela > tr', { timeout: 15000 });
+    console.log('⏳ Primeira linha carregada, aguardando estabilização...');
 
-    console.log('⏳ Aguardando 20 segundos para auto-buscar executar e dados carregarem...');
-    await new Promise(resolve => setTimeout(resolve, 20000));  // 20s fixos
+    // Aguardar um pouco mais para garantir que CSS e tudo estabilizou
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    console.log('⏳ Verificando se dados carregaram...');
+    console.log('✅ Página carregada com dados, gerando PDF...');
 
-    // Tentar encontrar dados na tabela
-    const temDados = await page.evaluate(() => {
-      const tbody = document.getElementById('corpoTabela');
-      const linhas = tbody ? tbody.querySelectorAll('tr') : [];
-      console.log('📊 Linhas encontradas:', linhas.length);
-      return linhas.length > 0;
-    });
-
-    console.log(`📊 Tem dados? ${temDados}`);
-
-    if (!temDados) {
-      console.log('⚠️ Nenhum dado encontrado após 20s, aguardando mais 20s...');
-      await new Promise(resolve => setTimeout(resolve, 20000));  // Mais 20s
-    }
-
-    console.log('✅ Gerando PDF...');
-
-    // ============================================================
-    // GERAR PDF OTIMIZADO
-    // - preferCSSPageSize: usa orientação do CSS (@page landscape)
-    // - scale: 0.95 para compactar levemente
-    // - landscape: true como fallback
-    // ============================================================
+    // Gerar PDF
     const pdfBuffer = await page.pdf({
       format: 'A4',
-      landscape: true,               // Fallback caso CSS não funcione
-      preferCSSPageSize: true,       // ✅ Usa @page { size: landscape } do CSS
       printBackground: true,
-      displayHeaderFooter: false,    // ✅ Reduz tamanho
-      scale: 0.95,                   // ✅ Compacta 5%
       margin: {
         top: '10mm',
         right: '10mm',
