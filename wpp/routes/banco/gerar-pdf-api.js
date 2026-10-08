@@ -1,11 +1,11 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072231
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072238
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
 //
 // ROTAS:
 // - POST /gerar-pdf     → Método antigo (gera HTML customizado)
 // - GET  /gerar-pdf-url → Método novo (captura página real)
-// FIX: Aguardar loading desaparecer ao invés de primeira linha
+// SIMPLIFICAÇÃO: Aguardar tempo fixo (20s+20s) - sem complexidade
 // ============================================================
 
 import express from 'express';
@@ -436,36 +436,31 @@ router.get('/gerar-pdf-url', async (req, res) => {
     console.log('⏳ Página aberta, aguardando auto-buscar executar...');
 
     // ============================================================
-    // NOVA ESTRATÉGIA: Aguardar LOADING DESAPARECER
-    // Mais confiável que aguardar primeira linha!
+    // ESTRATÉGIA ULTRA-SIMPLES: AGUARDAR TEMPO FIXO
+    // Complexidade estava causando problemas - voltando ao básico!
     // ============================================================
 
-    // 1. Aguardar loading APARECER (se aparecer)
-    try {
-      await page.waitForSelector('#loading[style*="display: block"]', { timeout: 5000 });
-      console.log('⏳ Loading apareceu, aguardando busca finalizar...');
-    } catch (e) {
-      console.log('⏳ Loading não apareceu, pode já ter carregado...');
+    console.log('⏳ Aguardando 20 segundos para auto-buscar executar e dados carregarem...');
+    await new Promise(resolve => setTimeout(resolve, 20000));  // 20s fixos
+
+    console.log('⏳ Verificando se dados carregaram...');
+
+    // Tentar encontrar dados na tabela
+    const temDados = await page.evaluate(() => {
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = tbody ? tbody.querySelectorAll('tr') : [];
+      console.log('📊 Linhas encontradas:', linhas.length);
+      return linhas.length > 0;
+    });
+
+    console.log(`📊 Tem dados? ${temDados}`);
+
+    if (!temDados) {
+      console.log('⚠️ Nenhum dado encontrado após 20s, aguardando mais 20s...');
+      await new Promise(resolve => setTimeout(resolve, 20000));  // Mais 20s
     }
 
-    // 2. Aguardar loading DESAPARECER (display: none)
-    await page.waitForFunction(
-      () => {
-        const loading = document.getElementById('loading');
-        return loading && window.getComputedStyle(loading).display === 'none';
-      },
-      { timeout: 90000 }  // 90s para buscar e carregar dados
-    );
-    console.log('✅ Loading desapareceu!');
-
-    // 3. Confirmar que tabela tem dados
-    await page.waitForSelector('#corpoTabela > tr', { timeout: 10000 });
-    console.log('✅ Dados confirmados na tabela!');
-
-    // Aguardar estabilização (renderização completa, CSS aplicado)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    console.log('✅ Página totalmente carregada, gerando PDF...');
+    console.log('✅ Gerando PDF...');
 
     // ============================================================
     // GERAR PDF OTIMIZADO
