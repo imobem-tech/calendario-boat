@@ -1056,52 +1056,6 @@
 
             // Mostrar mensagem inicial
             mostrarMensagemInicial();
-
-            // ============================================================
-            // AUTO-BUSCAR: Se URL tem parâmetros, buscar automaticamente
-            // (usado pelo Puppeteer para gerar PDF)
-            // ============================================================
-            const urlParams = new URLSearchParams(window.location.search);
-            const empresaURL = urlParams.get('empresa');
-            const dataInicioURL = urlParams.get('data_inicio');
-            const dataFimURL = urlParams.get('data_fim');
-            const categoriaURL = urlParams.get('categoria');
-
-            if (empresaURL && dataInicioURL && dataFimURL) {
-                console.log('🤖 AUTO-BUSCAR: Parâmetros detectados na URL!');
-                console.log('   Empresa:', empresaURL);
-                console.log('   Período:', dataInicioURL, 'até', dataFimURL);
-                console.log('   Categoria:', categoriaURL || 'TODAS');
-
-                // Preencher campos automaticamente
-                document.getElementById('empresaSelect').value = empresaURL;
-
-                // Mudar para modo datas (período)
-                modoFiltro = 'datas';
-                document.getElementById('filtroMes').style.display = 'none';
-                document.getElementById('filtroDataInicio').style.display = 'flex';
-                document.getElementById('filtroDataFim').style.display = 'flex';
-                document.getElementById('btnModoMes').classList.remove('active');
-                document.getElementById('btnModoDatas').classList.add('active');
-
-                // Preencher datas
-                document.getElementById('dataInicio').value = dataInicioURL;
-                document.getElementById('dataFim').value = dataFimURL;
-
-                // Aguardar categorias carregarem e preencher categoria
-                setTimeout(async () => {
-                    // Aguardar categorias carregarem
-                    await carregarCategoriasFiltro();
-
-                    // Preencher categoria se informada
-                    if (categoriaURL) {
-                        document.getElementById('categoriaSelect').value = categoriaURL;
-                    }
-
-                    console.log('🤖 Executando busca automática...');
-                    buscarExtrato();
-                }, 800);
-            }
         });
 
         // Mostrar mensagem inicial
@@ -2577,7 +2531,7 @@
     <div style="text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 40px; background: #fafafa;">
         <p style="margin: 5px 0;">
             <strong>Extrato Bancário Allmax</strong> •
-            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610072200</span>
+            <span style="font-family: monospace; background: white; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; color: #667eea; font-weight: 600;">⚡ V.2610072207</span>
         </p>
         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">
             📥 Importar OFX • 🔍 Enriquecer • 🏷️ Reclassificar • ✏️ Editar • 📎 Gestão Anexos • 🗑️ Excluir
@@ -3228,4 +3182,4 @@ conforme critérios selecionados
 </body>
 </html>
 
-<!-- V.2610072200 - 🤖 FIX: PDF auto-buscar com todos os parâmetros (categoria, filtros) -->
+<!-- V.2610072207 - 🐛 FIX: Remover código duplicado que quebrava botões de filtro -->
