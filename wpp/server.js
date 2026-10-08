@@ -1,11 +1,12 @@
 // ============================================================
-// wpp/server.js — V.2609140120
+// wpp/server.js — V.2610072111
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
 // CORREÇÃO (14/09 01:20): Comentar TODAS as chamadas de funções geo
 // + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
+// FORCE DEPLOY: 07/10/2026 21:11 - Atualizar arquivos estáticos
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
