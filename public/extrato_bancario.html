@@ -455,11 +455,129 @@
         }
 
         @media print {
+            /* Orientação paisagem para caber mais colunas */
+            @page {
+                size: landscape;
+                margin: 10mm;
+            }
+
             body {
                 background: white;
+                margin: 0;
+                padding: 0;
             }
+
+            /* Ocultar filtros e botões */
             .filters, .actions {
-                display: none;
+                display: none !important;
+            }
+
+            /* Header compacto */
+            .header {
+                padding: 10px 20px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .header h1 {
+                font-size: 20px !important;
+                margin: 0 !important;
+            }
+
+            .header p {
+                font-size: 11px !important;
+                margin: 5px 0 0 0 !important;
+            }
+
+            /* Cards de resumo MUITO compactos */
+            .summary-grid {
+                padding: 0 20px 10px 20px !important;
+                gap: 6px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .summary-card {
+                padding: 6px 10px !important;
+                border-radius: 4px !important;
+                page-break-inside: avoid;
+            }
+
+            .summary-card label {
+                font-size: 8px !important;
+                margin-right: 4px !important;
+            }
+
+            .summary-card .value {
+                font-size: 12px !important;
+            }
+
+            .summary-card small {
+                font-size: 7px !important;
+            }
+
+            /* Tabela compacta */
+            .table-container {
+                padding: 0 20px !important;
+            }
+
+            table {
+                font-size: 8px !important;
+                width: 100% !important;
+            }
+
+            th {
+                padding: 4px 3px !important;
+                font-size: 7px !important;
+                border-bottom: 1px solid #dee2e6 !important;
+            }
+
+            td {
+                padding: 3px 3px !important;
+                font-size: 8px !important;
+                border-bottom: 1px dotted #ddd !important;
+            }
+
+            /* Ajustar larguras das colunas */
+            th:nth-child(1), td:nth-child(1) { width: 7%; }  /* DATA */
+            th:nth-child(2), td:nth-child(2) { width: 7%; }  /* IMPORTADO */
+            th:nth-child(3), td:nth-child(3) { width: 7%; }  /* EMPRESA */
+            th:nth-child(4), td:nth-child(4) { width: 12%; } /* CATEGORIA */
+            th:nth-child(5), td:nth-child(5) { width: 25%; } /* DESCRIÇÃO */
+            th:nth-child(6), td:nth-child(6) { width: 3%; }  /* % */
+            th:nth-child(7), td:nth-child(7) { width: 12%; } /* ORIGEM */
+            th:nth-child(8), td:nth-child(8) { width: 12%; } /* OBSERVAÇÕES */
+            th:nth-child(9), td:nth-child(9) { width: 7%; }  /* VALOR */
+            th:nth-child(10), td:nth-child(10) { width: 7%; } /* SALDO */
+            th:nth-child(11), td:nth-child(11) { width: 1%; } /* STATUS */
+
+            /* Ocultar coluna AÇÕES no PDF */
+            th:last-child, td:last-child {
+                display: none !important;
+            }
+
+            /* Quebra de página inteligente */
+            tr {
+                page-break-inside: avoid;
+            }
+
+            /* Loading e modais ocultos */
+            #loading, .modal, .tooltip-modal {
+                display: none !important;
+            }
+
+            /* Seção de resumo por categorias (se existir) */
+            #resumoCategoriasSection {
+                page-break-before: always;
+                padding: 20px;
+            }
+
+            #resumoCategoriasSection h3 {
+                font-size: 14px !important;
+                margin-bottom: 10px !important;
+            }
+
+            #resumoCategoriasLista .categoria-item {
+                font-size: 9px !important;
+                padding: 4px 8px !important;
             }
         }
 
