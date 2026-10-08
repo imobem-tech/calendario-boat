@@ -1,12 +1,12 @@
 // ============================================================
-// wpp/server.js — V.2610072137
+// wpp/server.js — V.2610072147
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
 // CORREÇÃO (14/09 01:20): Comentar TODAS as chamadas de funções geo
 // + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
-// FIX: Headers anti-cache para Railway Edge/CDN (07/10/2026 21:37)
+// DEBUG: Rota /versao-html para verificar arquivo servido (07/10/2026 21:47)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -835,6 +835,29 @@ app.get('/reset', async (req, res) => {
   await limparSessao()
   setTimeout(iniciarBot, 1000)
   res.send('<h2>Sessão resetada. Aguarde e abra /qr novamente.</h2>')
+})
+
+// Rota de debug para verificar versão do HTML servido
+app.get('/versao-html', (req, res) => {
+  try {
+    const htmlPath = path.join(__dirname, '..', 'public', 'extrato_bancario.html')
+    const conteudo = fs.readFileSync(htmlPath, 'utf-8')
+
+    // Extrair todas as versões
+    const versoes = conteudo.match(/V\.\d{12}/g) || []
+    const forceUpdate = conteudo.match(/FORCE UPDATE: (\d+)/)
+
+    res.json({
+      arquivo: htmlPath,
+      versoes_encontradas: versoes,
+      force_update: forceUpdate ? forceUpdate[1] : null,
+      tamanho_bytes: conteudo.length,
+      primeiras_linhas: conteudo.split('\n').slice(0, 5),
+      ultimas_linhas: conteudo.split('\n').slice(-5)
+    })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
 })
 
 app.get('/grupos', async (req, res) => {
