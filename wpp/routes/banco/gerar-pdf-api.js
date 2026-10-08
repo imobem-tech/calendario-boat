@@ -1,11 +1,11 @@
 // ============================================================
-// wpp/routes/banco/gerar-pdf-api.js — V.2610072212
+// wpp/routes/banco/gerar-pdf-api.js — V.2610072231
 // API PARA GERAR PDF DO EXTRATO BANCÁRIO OTIMIZADO
 //
 // ROTAS:
 // - POST /gerar-pdf     → Método antigo (gera HTML customizado)
 // - GET  /gerar-pdf-url → Método novo (captura página real)
-// FIX: Aumentar timeouts para aguardar auto-buscar carregar dados
+// FIX: Aguardar loading desaparecer ao invés de primeira linha
 // ============================================================
 
 import express from 'express';
@@ -435,17 +435,32 @@ router.get('/gerar-pdf-url', async (req, res) => {
 
     console.log('⏳ Página aberta, aguardando auto-buscar executar...');
 
-    // Aguardar tabela EXISTIR
-    await page.waitForSelector('#corpoTabela', { timeout: 20000 });
-    console.log('⏳ Tabela existe, aguardando dados carregarem...');
+    // ============================================================
+    // NOVA ESTRATÉGIA: Aguardar LOADING DESAPARECER
+    // Mais confiável que aguardar primeira linha!
+    // ============================================================
 
-    // ============================================================
-    // ESTRATÉGIA: Aguardar dados REALMENTE carregarem
-    // Auto-buscar demora ~5-10s para buscar dados da API
-    // Aguardar até 60s pela primeira linha aparecer
-    // ============================================================
-    await page.waitForSelector('#corpoTabela > tr', { timeout: 60000 });
-    console.log('✅ Primeira linha carregada!');
+    // 1. Aguardar loading APARECER (se aparecer)
+    try {
+      await page.waitForSelector('#loading[style*="display: block"]', { timeout: 5000 });
+      console.log('⏳ Loading apareceu, aguardando busca finalizar...');
+    } catch (e) {
+      console.log('⏳ Loading não apareceu, pode já ter carregado...');
+    }
+
+    // 2. Aguardar loading DESAPARECER (display: none)
+    await page.waitForFunction(
+      () => {
+        const loading = document.getElementById('loading');
+        return loading && window.getComputedStyle(loading).display === 'none';
+      },
+      { timeout: 90000 }  // 90s para buscar e carregar dados
+    );
+    console.log('✅ Loading desapareceu!');
+
+    // 3. Confirmar que tabela tem dados
+    await page.waitForSelector('#corpoTabela > tr', { timeout: 10000 });
+    console.log('✅ Dados confirmados na tabela!');
 
     // Aguardar estabilização (renderização completa, CSS aplicado)
     await new Promise(resolve => setTimeout(resolve, 2000));
