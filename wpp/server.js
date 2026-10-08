@@ -1,12 +1,12 @@
 // ============================================================
-// wpp/server.js — V.2610072111
+// wpp/server.js — V.2610072137
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
 // CORREÇÃO (14/09 01:20): Comentar TODAS as chamadas de funções geo
 // + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
-// FORCE DEPLOY: 07/10/2026 21:11 - Atualizar arquivos estáticos
+// FIX: Headers anti-cache para Railway Edge/CDN (07/10/2026 21:37)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -109,6 +109,27 @@ const publicPath = path.join(__dirname, '..', 'public')
 console.log('📁 Working directory:', process.cwd())
 console.log('📁 __dirname:', __dirname)
 console.log('📁 Servindo arquivos estáticos de:', publicPath)
+
+// ============================================================
+// 🚫 MIDDLEWARE ANTI-CACHE (Railway Edge/CDN fix)
+// ============================================================
+// Railway estava cacheando arquivos .html através do Railway Edge,
+// causando versões antigas sendo servidas mesmo após deploy.
+// Este middleware força NO-CACHE para todos os arquivos HTML.
+// ============================================================
+app.use((req, res, next) => {
+  // Aplicar apenas para arquivos .html
+  if (req.path.endsWith('.html')) {
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    })
+  }
+  next()
+})
+
 app.use(express.static(publicPath))
 
 app.use(express.json())
