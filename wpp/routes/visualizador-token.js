@@ -137,7 +137,7 @@ router.get('/:token', async (req, res) => {
     res.redirect(visualizadorUrl);
 
   } catch (err) {
-    console.error('❌ Erro ao processar token:', err);
+    console.error('❌ Erro ao processar token:', err.message);
     res.status(500).send(`
       <!DOCTYPE html>
       <html lang="pt-BR">

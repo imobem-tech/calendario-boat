@@ -35,7 +35,7 @@ async function limparSimulacao() {
     console.log(`\n✅ SIMULAÇÃO LIMPA!\n`)
 
   } catch (erro) {
-    console.error('❌ Erro ao limpar:', erro)
+    console.error('❌ Erro ao limpar:', erro.message)
   } finally {
     await pool.end()
   }

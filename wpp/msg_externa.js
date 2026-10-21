@@ -89,7 +89,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("ERRO /api/msg_externa:", err);
+    console.error("ERRO /api/msg_externa:", err.message);
 
     return res.status(500).json({
       erro: err.message

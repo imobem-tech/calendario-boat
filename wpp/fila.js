@@ -47,7 +47,7 @@ export async function processarFila(pool, sock, conectado, callbacks = {}) {
     }
 
   } catch (err) {
-    console.error('Erro geral ao processar fila:', err)
+    console.error('Erro geral ao processar fila:', err.message)
   } finally {
     processandoFila = false
   }

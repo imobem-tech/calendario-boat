@@ -30,7 +30,7 @@ export function inicializarBackupCron() {
         await backupDiario();
         console.log('✅ CRON: Backup diário concluído com sucesso');
       } catch (err) {
-        console.error('❌ CRON: Erro no backup diário:', err);
+        console.error('❌ CRON: Erro no backup diário:', err.message);
       }
     },
     {
@@ -58,7 +58,7 @@ export function inicializarBackupCron() {
         await backupSemanal();
         console.log('✅ CRON: Backup semanal concluído com sucesso');
       } catch (err) {
-        console.error('❌ CRON: Erro no backup semanal:', err);
+        console.error('❌ CRON: Erro no backup semanal:', err.message);
       }
     },
     {

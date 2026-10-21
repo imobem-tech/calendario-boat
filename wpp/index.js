@@ -39,7 +39,7 @@ app.post('/enviar', async (req, res) => {
         await chat.sendMessage(mensagem);
         res.send('Mensagem enviada');
     } catch (err) {
-        console.error(err);
+        console.error('Erro ao enviar:', err.message);
         res.status(500).send('Erro ao enviar');
     }
 });

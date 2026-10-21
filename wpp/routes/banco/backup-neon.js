@@ -157,7 +157,8 @@ export async function backupDiario() {
     };
 
   } catch (err) {
-    console.error('❌ Erro no backup diário:', err);
+    console.error('❌ Erro no backup diário:', err.message);
+    console.error('Stack trace:', err.stack);
     throw err;
   }
 }
@@ -278,7 +279,8 @@ export async function backupSemanal() {
     };
 
   } catch (err) {
-    console.error('❌ Erro no backup semanal:', err);
+    console.error('❌ Erro no backup semanal:', err.message);
+    console.error('Stack trace:', err.stack);
     throw err;
   }
 }

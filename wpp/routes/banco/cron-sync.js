@@ -39,7 +39,7 @@ export function iniciarSincronizacaoAutomatica() {
       console.log(`✅ Sincronização concluída em ${new Date().toLocaleString('pt-BR')}`);
 
     } catch (err) {
-      console.error('❌ Erro na sincronização automática:', err);
+      console.error('❌ Erro na sincronização automática:', err.message);
     } finally {
       ultimaSincronizacao.executando = false;
     }
@@ -53,7 +53,7 @@ export function iniciarSincronizacaoAutomatica() {
       await sincronizarSicredi(null, null);
       ultimaSincronizacao.sicredi = new Date();
     } catch (err) {
-      console.error('❌ Erro na primeira sincronização:', err);
+      console.error('❌ Erro na primeira sincronização:', err.message);
     } finally {
       ultimaSincronizacao.executando = false;
     }

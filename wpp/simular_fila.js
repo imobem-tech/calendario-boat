@@ -137,7 +137,7 @@ async function simularFila() {
     console.log(`\n⚠️  LIMPAR DEPOIS: node wpp/limpar_simulacao.js\n`)
 
   } catch (erro) {
-    console.error('❌ Erro na simulação:', erro)
+    console.error('❌ Erro na simulação:', erro.message)
   } finally {
     await pool.end()
   }
