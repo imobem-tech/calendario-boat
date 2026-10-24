@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241620
+// wpp/comandos/orcamentos.js — V.2610241635
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2331,7 +2331,8 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
         os.taxa_servico_valor,
         os.valor_total,
         e."Num_PB" as numero_pb,
-        e."Nome_Embar" as nome_embarcacao
+        e."Nome_Embar" as nome_embarcacao,
+        e."Cod_Cliente" as cod_cliente
       FROM "orcamento_servico" os
       JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
       WHERE os.id_orcamento = $1
@@ -2347,16 +2348,23 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
     const orc = orcResult.rows[0];
 
     // Buscar cotistas da embarcação
+    // IMPORTANTE: O relacionamento é por Num_PB, não por Código!
+    // P_BOAT_4_Autorizados.Cod_Embarcacao = P_BOAT_1_Embarcacao.Num_PB
     const cotistasResult = await pool.query(`
       SELECT
-        "Código" as id_autorizado,
-        "Gropo_letra" as grupo_letra,
-        "Cod_Pessoa" as cod_pessoa
-      FROM "P_BOAT_4_Autorizados"
-      WHERE "Cod_Embarcacao" = $1
-        AND "Dt_Desautorizacao" IS NULL
-      ORDER BY "Gropo_letra"
-    `, [orc.id_embarcacao]);
+        a."Código" as id_autorizado,
+        a."Gropo_letra" as grupo_letra,
+        a."Cod_Pessoa" as cod_pessoa
+      FROM "P_BOAT_1_Embarcacao" e
+      INNER JOIN "P_BOAT_4_Autorizados" a
+        ON e."Num_PB" = a."Cod_Embarcacao"
+      WHERE e."Código" = $1
+        AND e."Cod_Cliente" = $2
+        AND a."Dt_Desautorizacao" IS NULL
+        AND a."Dt_Cancelamento" IS NULL
+        AND a."Cod_Pessoa" NOT IN (3327, 4135, 4138, 3678)
+      ORDER BY a."Gropo_letra"
+    `, [orc.id_embarcacao, orc.cod_cliente]);
 
     if (cotistasResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
