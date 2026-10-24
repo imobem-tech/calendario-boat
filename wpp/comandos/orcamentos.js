@@ -615,7 +615,7 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
         "status",
         "id_grupo",
         "data_cadastro"
-      ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, 'ABERTO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
+      ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, 'RASCUNHO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
       RETURNING "id_orcamento"
     `, [
       numeroOrcamento,
