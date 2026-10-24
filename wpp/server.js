@@ -64,6 +64,7 @@ import { tratarComandoHoraMotor } from './comandos/hora_motor.js'
 import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
+import { mostrarMenuOrcamentos, processarMensagemOrcamentos } from './comandos/orcamentos.js'
 // GEOLOCALIZAÇÃO DESABILITADA (14/09/2026) - Até segunda ordem
 // import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
@@ -418,6 +419,23 @@ async function iniciarBot() {
           // ============================================================
           if (ehGrupoAdm(grupoId)) {
             await tratarComandoAdmin(sock, pool, grupoId, remetente, texto)
+            continue
+          }
+
+          // ============================================================
+          // Grupo ORÇAMENTOS — sistema de orçamentos
+          // ID: 120363412373130577@g.us
+          // ============================================================
+          const GRUPO_ORCAMENTOS = '120363412373130577@g.us'
+          if (grupoId === GRUPO_ORCAMENTOS) {
+            // Comando "menu" ou "mmm" abre o menu principal
+            if (/^(menu|mmm)$/i.test(texto.trim())) {
+              await mostrarMenuOrcamentos(sock, remetente, grupoId)
+              continue
+            }
+
+            // Processar demais mensagens do fluxo de orçamentos
+            await processarMensagemOrcamentos(sock, remetente, grupoId, texto)
             continue
           }
 
