@@ -588,10 +588,23 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
   try {
     await client.query('BEGIN');
 
+    // Gerar número único do orçamento (formato: ORC-YYMMDDHHMMSS)
+    const agora = new Date();
+    const ano = String(agora.getFullYear()).slice(-2);
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    const hora = String(agora.getHours()).padStart(2, '0');
+    const min = String(agora.getMinutes()).padStart(2, '0');
+    const seg = String(agora.getSeconds()).padStart(2, '0');
+    const numeroOrcamento = `ORC-${ano}${mes}${dia}${hora}${min}${seg}`;
+
+    console.log(`📝 [ORCAMENTOS] Criando orçamento número: ${numeroOrcamento}`);
+
     // 1. Criar orçamento_servico
     // Usar campos existentes: descricao, valor_servicos, taxa_servico_perc, taxa_servico_valor, data_cadastro
     const orcamentoResult = await client.query(`
       INSERT INTO "orcamento_servico" (
+        "numero",
         "id_empresa",
         "id_embarcacao",
         "descricao",
@@ -602,9 +615,10 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
         "status",
         "id_grupo",
         "data_cadastro"
-      ) VALUES (1, $1, $2, $3, $4, $5, $6, 'ABERTO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
+      ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, 'ABERTO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
       RETURNING "id_orcamento"
     `, [
+      numeroOrcamento,
       orcamento.id_embarcacao,
       orcamento.titulo,
       orcamento.subtotal,
