@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241728
+// wpp/comandos/orcamentos.js — V.2610241738
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2916,14 +2916,22 @@ async function aprovarOrcamento(sock, userId, groupId, idOrcamento) {
       return;
     }
 
-    // Verificar se tem rateio
+    // Buscar rateio completo
     const rateioResult = await pool.query(`
-      SELECT COUNT(*) as qtd
-      FROM orcamento_rateio
-      WHERE id_orcamento = $1
+      SELECT
+        r.qtd_cotas,
+        r.percentual,
+        r.valor_cotista,
+        a."Gropo_letra" as grupo_letra,
+        c."Cliente_Nome" as nome_pessoa
+      FROM orcamento_rateio r
+      LEFT JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      LEFT JOIN "Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+      WHERE r.id_orcamento = $1
+      ORDER BY r.id_rateio
     `, [idOrcamento]);
 
-    if (parseInt(rateioResult.rows[0].qtd) === 0) {
+    if (rateioResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
         text: `⚠️ *RATEIO PENDENTE*
 
@@ -2937,10 +2945,105 @@ Voltando aos detalhes...`
       return;
     }
 
+    // Verificar se é rateio proporcional ou manual
+    const rateio = rateioResult.rows;
+    const ehProporcional = rateio.every(r => r.qtd_cotas > 0);
+
+    // Montar mensagem de confirmação
+    let mensagem = `⚠️ *CONFIRMAR APROVAÇÃO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${orc.numero}
+🚤 ${orc.numero_pb}
+💰 ${formatarMoeda(orc.valor_total)}
+
+━━━━━━━━━━━━━━━━
+
+`;
+
+    if (ehProporcional) {
+      // Agrupar por percentual
+      const grupos = {};
+      rateio.forEach(r => {
+        const perc = r.percentual.toFixed(2);
+        if (!grupos[perc]) {
+          grupos[perc] = {
+            percentual: perc,
+            qtd_pessoas: 0,
+            valor_por_pessoa: r.valor_cotista
+          };
+        }
+        grupos[perc].qtd_pessoas++;
+      });
+
+      mensagem += `*RATEIO PROPORCIONAL:*
+
+`;
+      Object.values(grupos).forEach(g => {
+        const qtdTexto = g.qtd_pessoas === 1 ? '1 cota' : `${g.qtd_pessoas} cotas`;
+        mensagem += `${qtdTexto} a ${g.percentual}% → ${formatarMoeda(g.valor_por_pessoa)} cada
+`;
+      });
+    } else {
+      // Rateio manual - lista individual
+      mensagem += `*RATEIO MANUAL:*
+
+`;
+      rateio.forEach(r => {
+        const nome = r.nome_pessoa ? r.nome_pessoa.split(/\s+/).slice(0, 2).join(' ').toUpperCase() : '';
+        const nomeExibir = nome ? ` - ${nome}` : '';
+        mensagem += `${r.grupo_letra}${nomeExibir}: ${formatarMoeda(r.valor_cotista)} (${r.percentual.toFixed(2)}%)
+`;
+      });
+    }
+
+    mensagem += `
+━━━━━━━━━━━━━━━━
+
+⚠️ *ATENÇÃO:*
+Após aprovação, NENHUM dado poderá ser alterado!
+
+1️⃣ ✅ Confirmar aprovação
+0️⃣ Cancelar
+━━━━━━━━━━━━━━━━`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMAR_APROVACAO',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao aprovar orçamento:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao aprovar orçamento.\n\n${error.message}`
+    });
+  }
+}
+
+async function confirmarAprovacaoOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    // Buscar dados do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.numero,
+        os.valor_total,
+        e."Num_PB" as numero_pb
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = orcResult.rows[0];
+
     // Atualizar status
     await pool.query(`
       UPDATE "orcamento_servico"
-      SET status = 'APROVADO'
+      SET status = 'APROVADO',
+          data_aprovacao = CURRENT_DATE,
+          aprovado_em = CURRENT_TIMESTAMP,
+          aprovado_por = NULL
       WHERE id_orcamento = $1
     `, [idOrcamento]);
 
@@ -2959,7 +3062,9 @@ Voltando aos detalhes...`
 🚤 ${orc.numero_pb}
 💰 ${formatarMoeda(orc.valor_total)}
 
-O orçamento já pode ser cobrado!
+✅ Status alterado para APROVADO
+✅ Rateio travado (não pode ser alterado)
+📊 O orçamento já pode ser cobrado!
 
 Voltando aos detalhes...`
     });
@@ -3477,6 +3582,24 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
     await sock.sendMessage(groupId, {
       text: '❌ Opção inválida! Digite 1, 2 ou 0.'
+    });
+    return;
+  }
+
+  // Confirmar aprovação
+  if (estado.etapa === 'CONFIRMAR_APROVACAO') {
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1') {
+      await confirmarAprovacaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
     });
     return;
   }
