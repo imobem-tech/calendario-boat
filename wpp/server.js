@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2610241620
+// wpp/server.js — V.2610241915
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
@@ -411,7 +411,30 @@ async function iniciarBot() {
           }
 
           // ============================================================
-          // Verificar se tem texto (após processar imagens financeiras)
+          // Grupo ORÇAMENTOS — sistema de orçamentos
+          // ID: 120363412373130577@g.us
+          // IMPORTANTE: Processar ANTES da verificação de texto
+          // para permitir envio de imagens/anexos sem legenda!
+          // ============================================================
+          const GRUPO_ORCAMENTOS = '120363412373130577@g.us'
+          if (grupoId === GRUPO_ORCAMENTOS) {
+            console.log('📊 [ORCAMENTOS] Grupo orçamentos detectado:', grupoId)
+
+            // Comando "menu" ou "mmm" abre o menu principal
+            if (texto && /^(menu|mmm)$/i.test(texto.trim())) {
+              await mostrarMenuOrcamentos(sock, remetente, grupoId)
+              continue
+            }
+
+            // Processar demais mensagens do fluxo de orçamentos
+            // Passa msg (mensagem completa) para suportar anexos/mídia
+            console.log('📦 [ORCAMENTOS] Estrutura msg.message:', JSON.stringify(Object.keys(msg.message || {})))
+            await processarMensagemOrcamentos(sock, remetente, grupoId, texto, msg)
+            continue
+          }
+
+          // ============================================================
+          // Verificar se tem texto (após processar imagens financeiras e orçamentos)
           // ============================================================
           if (!texto) continue
 
@@ -420,24 +443,6 @@ async function iniciarBot() {
           // ============================================================
           if (ehGrupoAdm(grupoId)) {
             await tratarComandoAdmin(sock, pool, grupoId, remetente, texto)
-            continue
-          }
-
-          // ============================================================
-          // Grupo ORÇAMENTOS — sistema de orçamentos
-          // ID: 120363412373130577@g.us
-          // ============================================================
-          const GRUPO_ORCAMENTOS = '120363412373130577@g.us'
-          if (grupoId === GRUPO_ORCAMENTOS) {
-            // Comando "menu" ou "mmm" abre o menu principal
-            if (/^(menu|mmm)$/i.test(texto.trim())) {
-              await mostrarMenuOrcamentos(sock, remetente, grupoId)
-              continue
-            }
-
-            // Processar demais mensagens do fluxo de orçamentos
-            // Passa msg (mensagem completa) para suportar anexos/mídia
-            await processarMensagemOrcamentos(sock, remetente, grupoId, texto, msg)
             continue
           }
 
