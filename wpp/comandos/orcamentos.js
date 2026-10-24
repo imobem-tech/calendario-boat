@@ -169,14 +169,13 @@ async function listarEmbarcacoes(sock, userId, groupId) {
     console.log('🔌 [ORCAMENTOS] Database URL:', process.env.POSTGRES_URL ? 'Configurado' : 'NÃO configurado');
 
     // Buscar apenas embarcações ALLMAX (Cod_Cliente = 4255)
+    // Campos verificados em wpp/comandos/saida.js linha 292
     const result = await pool.query(`
       SELECT
-        "Código" as id,
         "Num_PB" as numero_pb,
         "Nome_Embar" as nome
       FROM "P_BOAT_1_Embarcacao"
-      WHERE "Ativo" = TRUE
-        AND "Cod_Cliente" = 4255
+      WHERE "Cod_Cliente" = 4255
       ORDER BY "Num_PB"
     `);
 
