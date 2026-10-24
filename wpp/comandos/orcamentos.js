@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241544
+// wpp/comandos/orcamentos.js — V.2610241551
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1323,17 +1323,38 @@ Digite *menu* para voltar ao menu principal.`;
 /**
  * Adiciona entrada no log do orçamento
  * @param {number} idOrcamento - ID do orçamento
- * @param {string} mensagem - Mensagem do log
- * @param {string} usuario - Telefone do usuário (sem @s.whatsapp.net)
+ * @param {string} acao - Tipo de ação (ORCAMENTO_CRIADO, ITEM_ADICIONADO, etc)
+ * @param {string} descricao - Descrição da ação
+ * @param {string} usuario - UserId do WhatsApp (pode ser LID ou telefone)
  */
 async function adicionarLog(idOrcamento, acao, descricao, usuario) {
   try {
-    // Limpar telefone: remover @s.whatsapp.net e caracteres não numéricos
-    let telefone = usuario.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    let identificacao = 'Sistema';
 
-    // Se tiver mais de 11 dígitos, pegar apenas os últimos 11 (padrão BR: DDD + número)
-    if (telefone.length > 11) {
-      telefone = telefone.slice(-11);
+    // Verificar se é LID (@lid) ou telefone normal (@s.whatsapp.net)
+    if (usuario.includes('@lid')) {
+      // É um LID - buscar nome na tabela wpp_colaboradores
+      const result = await pool.query(`
+        SELECT "Nome" FROM wpp_colaboradores
+        WHERE "Lid" = $1 AND "Ativo" = 'S'
+      `, [usuario]);
+
+      if (result.rows.length > 0) {
+        identificacao = result.rows[0].Nome;
+      } else {
+        // LID não encontrado, usar o número limpo
+        identificacao = usuario.replace('@lid', '').replace(/\D/g, '');
+      }
+    } else {
+      // É telefone normal - limpar e formatar
+      let telefone = usuario.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+
+      // Se tiver mais de 11 dígitos, pegar apenas os últimos 11 (padrão BR: DDD + número)
+      if (telefone.length > 11) {
+        telefone = telefone.slice(-11);
+      }
+
+      identificacao = telefone;
     }
 
     await pool.query(`
@@ -1344,9 +1365,9 @@ async function adicionarLog(idOrcamento, acao, descricao, usuario) {
         "data_hora",
         "ip_origem"
       ) VALUES ($1, $2, $3, NOW() AT TIME ZONE 'America/Sao_Paulo', $4)
-    `, [idOrcamento, acao, descricao, telefone]);
+    `, [idOrcamento, acao, descricao, identificacao]);
 
-    console.log(`📝 [LOG] Orçamento #${idOrcamento}: ${acao}`);
+    console.log(`📝 [LOG] Orçamento #${idOrcamento}: ${acao} - ${identificacao}`);
   } catch (error) {
     console.error('❌ [LOG] Erro ao adicionar log:', error);
   }
@@ -2116,10 +2137,28 @@ Voltando ao menu...`
 
 async function salvarAnexoBanco(idOrcamento, dados, userId) {
   try {
-    // Limpar telefone
-    let telefone = userId.replace('@s.whatsapp.net', '').replace(/\D/g, '');
-    if (telefone.length > 11) {
-      telefone = telefone.slice(-11);
+    let identificacao = 'Sistema';
+
+    // Verificar se é LID (@lid) ou telefone normal (@s.whatsapp.net)
+    if (userId.includes('@lid')) {
+      // É um LID - buscar nome na tabela wpp_colaboradores
+      const result = await pool.query(`
+        SELECT "Nome" FROM wpp_colaboradores
+        WHERE "Lid" = $1 AND "Ativo" = 'S'
+      `, [userId]);
+
+      if (result.rows.length > 0) {
+        identificacao = result.rows[0].Nome;
+      } else {
+        identificacao = userId.replace('@lid', '').replace(/\D/g, '');
+      }
+    } else {
+      // É telefone normal
+      let telefone = userId.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+      if (telefone.length > 11) {
+        telefone = telefone.slice(-11);
+      }
+      identificacao = telefone;
     }
 
     const result = await pool.query(`
@@ -2142,7 +2181,7 @@ async function salvarAnexoBanco(idOrcamento, dados, userId) {
       dados.visivel_cliente,
       dados.tipo_arquivo,
       dados.tamanho,
-      telefone
+      identificacao
     ]);
 
     // Adicionar LOG
@@ -2749,4 +2788,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241544
+// V.2610241551
