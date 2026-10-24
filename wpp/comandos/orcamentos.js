@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241109
+// wpp/comandos/orcamentos.js — V.2610241238
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -170,8 +170,10 @@ async function listarEmbarcacoes(sock, userId, groupId) {
 
     // Buscar apenas embarcações ALLMAX (Cod_Cliente = 4255)
     // Campos verificados em wpp/comandos/saida.js linha 292
+    // IMPORTANTE: FK orcamento_servico.id_embarcacao → P_BOAT_1_Embarcacao.Código
     const result = await pool.query(`
       SELECT
+        "Código" as codigo,
         "Num_PB" as numero_pb,
         "Nome_Embar" as nome
       FROM "P_BOAT_1_Embarcacao"
@@ -243,7 +245,9 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
   const embarcacao = estado.embarcacoes[index];
 
   // Atualizar orçamento com embarcação selecionada
-  estado.orcamento.id_embarcacao = embarcacao.numero_pb;
+  // IMPORTANTE: Salvar Código (FK) mas mostrar Num_PB (interface)
+  estado.orcamento.id_embarcacao = embarcacao.codigo; // FK para banco
+  estado.orcamento.numero_pb = embarcacao.numero_pb;  // Exibição
   estado.orcamento.nome_embarcacao = embarcacao.nome;
   estado.etapa = 'TITULO';
 
@@ -309,7 +313,7 @@ async function pedirDescricaoItem(sock, userId, groupId) {
   const estado = obterEstado(userId);
   const numeroItem = estado.orcamento.itens.length + 1;
 
-  const mensagem = `✅ Embarcação: ${estado.orcamento.id_embarcacao} (${estado.orcamento.nome_embarcacao})
+  const mensagem = `✅ Embarcação: ${estado.orcamento.numero_pb} (${estado.orcamento.nome_embarcacao})
 ✅ Título: ${estado.orcamento.titulo}
 
 ━━━━━━━━━━━━━━━━
@@ -512,7 +516,7 @@ async function mostrarResumoFinal(sock, userId, groupId) {
 
   let mensagem = `📋 *RESUMO DO ORÇAMENTO*
 
-🚤 Embarcação: ${orcamento.id_embarcacao} (${orcamento.nome_embarcacao})
+🚤 Embarcação: ${orcamento.numero_pb} (${orcamento.nome_embarcacao})
 📌 Título: ${orcamento.titulo}
 
 ━━━━━━━━━━━━━━━━
@@ -649,7 +653,7 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
     const mensagem = `✅ *ORÇAMENTO CRIADO COM SUCESSO!*
 
 🆔 Número: #${idOrcamento}
-🚤 Embarcação: ${orcamento.id_embarcacao}
+🚤 Embarcação: ${orcamento.numero_pb}
 💰 Valor Total: ${formatarMoeda(orcamento.valor_total)}
 
 ━━━━━━━━━━━━━━━━
