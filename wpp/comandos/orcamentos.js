@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241924
+// wpp/comandos/orcamentos.js — V.2610241931
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2028,6 +2028,31 @@ Envie o arquivo que deseja anexar ao orçamento:
   });
 }
 
+// ============================================================
+// HELPER: Mapear extensão para tipo aceito pela constraint
+// ============================================================
+function mapearTipoArquivo(extensao) {
+  const ext = extensao.toLowerCase();
+
+  // Imagens
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+    return 'FOTO';
+  }
+
+  // PDFs
+  if (ext === 'pdf') {
+    return 'PDF';
+  }
+
+  // Documentos
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'odt', 'ods'].includes(ext)) {
+    return 'DOCUMENTO';
+  }
+
+  // Outros
+  return 'OUTRO';
+}
+
 async function processarAnexoOrcamento(sock, userId, groupId, mensagem) {
   try {
     const estado = obterEstado(userId);
@@ -2145,7 +2170,7 @@ async function finalizarUploadAnexo(sock, userId, groupId, estado, visivelClient
       nome_arquivo: nomeArquivo,
       url: blob.url,
       visivel_cliente: visivelCliente,
-      tipo_arquivo: estado.anexo_extensao,
+      tipo_arquivo: mapearTipoArquivo(estado.anexo_extensao),
       tamanho_bytes: estado.anexo_tamanho
     };
 
