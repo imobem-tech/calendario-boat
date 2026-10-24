@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241654
+// wpp/comandos/orcamentos.js — V.2610241728
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2416,7 +2416,31 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
       };
     });
 
-    // Montar mensagem
+    // Verificar se já existe rateio salvo no banco
+    const rateioSalvoResult = await pool.query(`
+      SELECT COUNT(*) as qtd FROM orcamento_rateio WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const jaRealizado = parseInt(rateioSalvoResult.rows[0].qtd) > 0;
+    const statusTexto = jaRealizado ? 'JÁ REALIZADA' : 'NÃO REALIZADA';
+
+    // Agrupar rateio por percentual (proporcional)
+    const grupos = {};
+    rateio.forEach(r => {
+      const perc = r.percentual.toFixed(2);
+      if (!grupos[perc]) {
+        grupos[perc] = {
+          percentual: perc,
+          qtd_pessoas: 0,
+          valor_por_pessoa: r.valor_cotista,
+          qtd_cotas_total: 0
+        };
+      }
+      grupos[perc].qtd_pessoas++;
+      grupos[perc].qtd_cotas_total += r.qtd_cotas;
+    });
+
+    // Montar mensagem com resumo agrupado
     let mensagem = `📊 *RATEIO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
 🆔 ${orc.numero}
@@ -2424,26 +2448,35 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
 💰 Total: ${formatarMoeda(valorTotal)}
 ━━━━━━━━━━━━━━━━
 
-*DIVISÃO PROPORCIONAL:*
+*PROPORCIONAL - ${statusTexto}:*
 
 `;
 
-    rateio.forEach(r => {
-      const cotaTexto = r.qtd_cotas === 1 ? '1 cota' : `${r.qtd_cotas} cotas`;
-      const nomeExibir = r.nome_resumido ? ` - ${r.nome_resumido}` : '';
-
-      mensagem += `${r.grupo_letra} (${cotaTexto})${nomeExibir}
-   ${formatarMoeda(r.valor_cotista)} (${r.percentual.toFixed(2)}%)
-
+    // Listar grupos
+    Object.values(grupos).forEach(g => {
+      const qtdTexto = g.qtd_pessoas === 1 ? '1 cota' : `${g.qtd_pessoas} cotas`;
+      mensagem += `${qtdTexto} a ${g.percentual}% → ${formatarMoeda(g.valor_por_pessoa)} cada
 `;
     });
 
-    mensagem += `━━━━━━━━━━━━━━━━
+    mensagem += `
+━━━━━━━━━━━━━━━━
 Total cotas: ${totalCotas}
 
-1️⃣ ✅ Confirmar e salvar
+`;
+
+    // Opções conforme status
+    if (jaRealizado) {
+      mensagem += `1️⃣ ✅ Confirmar e salvar
 2️⃣ 📝 Outra distribuição
-0️⃣ Cancelar
+0️⃣ Cancelar`;
+    } else {
+      mensagem += `1️⃣ ✅ Distribuir proporcional
+2️⃣ 📝 Outra distribuição
+0️⃣ Voltar`;
+    }
+
+    mensagem += `
 ━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(groupId, { text: mensagem });
@@ -2453,7 +2486,8 @@ Total cotas: ${totalCotas}
       id_orcamento: idOrcamento,
       rateio: rateio,
       valor_total: valorTotal,
-      cotistas_disponiveis: cotistas
+      cotistas_disponiveis: cotistas,
+      ja_realizado: jaRealizado
     });
 
   } catch (error) {
@@ -2600,24 +2634,26 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
     // Verificar se completou 100%
     if (Math.abs(novoRestante) < 0.01) {
       // Completou!
-      let mensagem = `✅ *DISTRIBUIÇÃO COMPLETA!*
+      let mensagem = `📊 *RATEIO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
 
 💰 Total: ${formatarMoeda(estado.valor_total)}
+
+*MANUAL - NÃO REALIZADA:*
 
 `;
 
       novaDistribuicao.forEach(d => {
         const nomeExibir = d.nome_resumido ? ` - ${d.nome_resumido}` : '';
-        mensagem += `${d.grupo_letra}${nomeExibir}
-   ${formatarMoeda(d.valor)} (${d.percentual.toFixed(2)}%)
-
+        mensagem += `${d.grupo_letra}${nomeExibir}: ${formatarMoeda(d.valor)} (${d.percentual.toFixed(2)}%)
 `;
       });
 
-      mensagem += `━━━━━━━━━━━━━━━━
+      mensagem += `
+━━━━━━━━━━━━━━━━
 1️⃣ ✅ Salvar
-0️⃣ Cancelar`;
+0️⃣ Cancelar
+━━━━━━━━━━━━━━━━`;
 
       await sock.sendMessage(groupId, { text: mensagem });
 
@@ -2631,7 +2667,8 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
           valor_servico: d.valor,
           valor_taxa: 0,
           valor_cotista: d.valor
-        }))
+        })),
+        ja_realizado: false
       });
 
     } else {
