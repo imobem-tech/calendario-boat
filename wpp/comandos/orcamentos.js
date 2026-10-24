@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241754
+// wpp/comandos/orcamentos.js — V.2610241757
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -147,9 +147,9 @@ export async function mostrarMenuOrcamentos(sock, userId, groupId) {
 Escolha uma opção:
 
 1️⃣ ➕ Criar Novo Orçamento
-2️⃣ 📋 Consultar Orçamentos Abertos
-3️⃣ ✅ Consultar Orçamentos Fechados
-4️⃣ 🚤 Orçamentos por Embarcação
+2️⃣ 📋 Consultar Orç. Abertos
+3️⃣ ✅ Consultar Orç. Fechados
+4️⃣ 🚤 Orç. por Embarcação
 5️⃣ ⏰ Pendentes de Aprovação
 6️⃣ 💵 Pendentes de cobrança
 0️⃣ 🔙 Voltar ao Menu Principal
