@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241958
+// wpp/comandos/orcamentos.js — V.2610242009
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2382,9 +2382,9 @@ Este orçamento já foi APROVADO!
 
 ⚠️ O rateio não pode mais ser alterado.
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
       });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
@@ -2791,9 +2791,9 @@ async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
 
 ID Cobrança: ${orc.id_cobranca}
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
       });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
@@ -2908,10 +2908,9 @@ Aguarde...`
 
 📅 Vencimento: +30 dias
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
       });
-
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
 
     } catch (error) {
       await client.query('ROLLBACK');
@@ -3110,10 +3109,9 @@ async function confirmarAprovacaoOrcamento(sock, userId, groupId, idOrcamento) {
 ✅ Rateio travado (não pode ser alterado)
 📊 O orçamento já pode ser cobrado!
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
     });
-
-    await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao aprovar:', error);
@@ -3167,9 +3165,9 @@ Este orçamento já foi APROVADO!
 
 ❌ Não é possível alterar o percentual de gestão após aprovação.
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
       });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
@@ -3306,10 +3304,9 @@ Taxa gestão (${novoPercentual}%): ${formatarMoeda(novaTaxa)}
 
 ${temRateio ? '✅ Rateio recalculado automaticamente' : ''}
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
     });
-
-    await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao processar novo percentual:', error);
@@ -3402,10 +3399,9 @@ ${url}
 Não compartilhe este link publicamente.
 Envie apenas para pessoas autorizadas a visualizar este orçamento.
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
     });
-
-    await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao gerar link:', error);
@@ -3491,10 +3487,9 @@ Este orçamento já foi APROVADO!
 
 O orçamento já pode ser aprovado!
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
     });
-
-    await verDetalhesOrcamento(sock, userId, groupId, id_orcamento);
 
   } catch (error) {
     await client.query('ROLLBACK');
