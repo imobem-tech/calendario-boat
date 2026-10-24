@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241757
+// wpp/comandos/orcamentos.js — V.2610241903
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3095,6 +3095,202 @@ Voltando aos detalhes...`
   }
 }
 
+// ============================================================
+// ALTERAR PERCENTUAL DE GESTÃO
+// ============================================================
+
+async function alterarPercentualGestao(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`⚙️ [ORCAMENTOS] Alterando % gestão do orçamento #${idOrcamento}...`);
+
+    // Buscar orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.status,
+        os.valor_servicos,
+        os.taxa_servico_perc,
+        os.taxa_servico_valor,
+        os.valor_total,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado!'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Verificar se já foi aprovado
+    if (orc.status === 'APROVADO') {
+      await sock.sendMessage(groupId, {
+        text: `🔒 *ALTERAÇÃO BLOQUEADA*
+
+Este orçamento já foi APROVADO!
+
+❌ Não é possível alterar o percentual de gestão após aprovação.
+
+Voltando aos detalhes...`
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // Mostrar percentual atual e pedir novo
+    const mensagem = `⚙️ *ALTERAR % DE GESTÃO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${orc.numero}
+📝 ${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+💰 *VALORES ATUAIS:*
+
+Subtotal serviços: ${formatarMoeda(orc.valor_servicos)}
+Taxa gestão: *${orc.taxa_servico_perc}%* (${formatarMoeda(orc.taxa_servico_valor)})
+Total: ${formatarMoeda(orc.valor_total)}
+
+━━━━━━━━━━━━━━━━
+
+Digite o novo percentual (ex: 15, 20, 25)
+ou 0 para cancelar:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Atualizar estado
+    atualizarEstado(userId, {
+      etapa: 'ALTERAR_PERCENTUAL_GESTAO',
+      id_orcamento: idOrcamento,
+      orcamento: {
+        valor_servicos: parseFloat(orc.valor_servicos),
+        percentual_atual: parseFloat(orc.taxa_servico_perc)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao alterar % gestão:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao alterar percentual.\n\n${error.message}`
+    });
+  }
+}
+
+async function processarNovoPercentualGestao(sock, userId, groupId, texto) {
+  try {
+    const estado = obterEstado(userId);
+
+    if (!estado || !estado.id_orcamento) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Erro: estado perdido. Voltando ao menu...'
+      });
+      await mostrarMenuOrcamentos(sock, userId, groupId);
+      return;
+    }
+
+    // Cancelar
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Validar número
+    const novoPercentual = parseFloat(texto.replace(',', '.'));
+
+    if (isNaN(novoPercentual) || novoPercentual < 0 || novoPercentual > 100) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Percentual inválido!\n\nDigite um número entre 0 e 100 (ex: 15, 20, 25)\nou 0 para cancelar.'
+      });
+      return;
+    }
+
+    // Calcular novos valores
+    const valorServicos = estado.orcamento.valor_servicos;
+    const novaTaxa = valorServicos * (novoPercentual / 100);
+    const novoTotal = valorServicos + novaTaxa;
+
+    // Atualizar no banco
+    await pool.query(`
+      UPDATE "orcamento_servico"
+      SET
+        taxa_servico_perc = $1,
+        taxa_servico_valor = $2,
+        valor_total = $3
+      WHERE id_orcamento = $4
+    `, [novoPercentual, novaTaxa, novoTotal, estado.id_orcamento]);
+
+    // Registrar LOG
+    await registrarLog(
+      estado.id_orcamento,
+      'PERCENTUAL_ALTERADO',
+      `% de gestão alterado: ${estado.orcamento.percentual_atual}% → ${novoPercentual}%`,
+      userId
+    );
+
+    // Se tem rateio definido, atualizar os valores
+    const rateioResult = await pool.query(`
+      SELECT COUNT(*) as total
+      FROM orcamento_rateio
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    const temRateio = parseInt(rateioResult.rows[0].total) > 0;
+
+    if (temRateio) {
+      // Recalcular rateio com novo percentual
+      await pool.query(`
+        UPDATE orcamento_rateio r
+        SET
+          valor_servico = ($1 * (r.percentual / 100)),
+          valor_taxa = ($2 * (r.percentual / 100)),
+          valor_cotista = ($3 * (r.percentual / 100))
+        WHERE r.id_orcamento = $4
+      `, [valorServicos, novaTaxa, novoTotal, estado.id_orcamento]);
+
+      await registrarLog(
+        estado.id_orcamento,
+        'RATEIO_RECALCULADO',
+        `Rateio recalculado com novo percentual de ${novoPercentual}%`,
+        userId
+      );
+    }
+
+    // Mensagem de sucesso
+    await sock.sendMessage(groupId, {
+      text: `✅ *PERCENTUAL ALTERADO!*
+
+⚙️ ${estado.orcamento.percentual_atual}% → ${novoPercentual}%
+
+━━━━━━━━━━━━━━━━
+💰 *NOVOS VALORES:*
+
+Subtotal: ${formatarMoeda(valorServicos)}
+Taxa gestão (${novoPercentual}%): ${formatarMoeda(novaTaxa)}
+*TOTAL: ${formatarMoeda(novoTotal)}*
+
+${temRateio ? '✅ Rateio recalculado automaticamente' : ''}
+
+Voltando aos detalhes...`
+    });
+
+    await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao processar novo percentual:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao processar percentual.\n\n${error.message}`
+    });
+  }
+}
+
 async function salvarRateio(sock, userId, groupId, estado) {
   const client = await pool.connect();
 
@@ -3282,6 +3478,7 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 3️⃣ 📊 Definir rateio
 4️⃣ ✅ Aprovar orçamento
 5️⃣ 💵 Enviar cobrança
+6️⃣ ⚙️ Alterar % Gestão
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
@@ -3483,9 +3680,13 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
+      case '6': // Alterar % Gestão
+        await alterarPercentualGestao(sock, userId, groupId, estado.id_orcamento);
+        break;
+
       default:
         await sock.sendMessage(groupId, {
-          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5 ou 0.'
+          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6 ou 0.'
         });
     }
     return;
@@ -3646,6 +3847,12 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     await sock.sendMessage(groupId, {
       text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
     });
+    return;
+  }
+
+  // Alterar percentual de gestão
+  if (estado.etapa === 'ALTERAR_PERCENTUAL_GESTAO') {
+    await processarNovoPercentualGestao(sock, userId, groupId, texto);
     return;
   }
 
