@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241646
+// wpp/comandos/orcamentos.js — V.2610241654
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2585,6 +2585,7 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
     const novaDistribuicao = [
       ...estado.distribuicao_manual,
       {
+        id_autorizado: estado.cotista_atual.id_autorizado,
         grupo_letra: estado.cotista_atual.grupo_letra,
         cod_pessoa: estado.cotista_atual.cod_pessoa,
         nome_resumido: estado.cotista_atual.nome_resumido,
@@ -2625,6 +2626,7 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
         etapa: 'CONFIRMAR_DIST_MANUAL',
         rateio: novaDistribuicao.map(d => ({
           ...d,
+          qtd_cotas: 0,
           total_cotas: 0,
           valor_servico: d.valor,
           valor_taxa: 0,
