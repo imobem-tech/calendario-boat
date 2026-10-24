@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241551
+// wpp/comandos/orcamentos.js — V.2610241603
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2279,6 +2279,466 @@ ou 0 para voltar.`;
 }
 
 // ============================================================
+// SISTEMA DE RATEIO
+// ============================================================
+
+async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`📊 [ORCAMENTOS] Iniciando rateio do orçamento #${idOrcamento}...`);
+
+    // Buscar dados do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.id_embarcacao,
+        os.valor_servicos as subtotal,
+        os.taxa_servico_valor,
+        os.valor_total,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Buscar cotistas da embarcação
+    const cotistasResult = await pool.query(`
+      SELECT
+        "Código" as id_autorizado,
+        "Gropo_letra" as grupo_letra,
+        "Cod_Pessoa" as cod_pessoa
+      FROM "P_BOAT_4_Autorizados"
+      WHERE "Cod_Embarcacao" = $1
+        AND "Dt_Desautorizacao" IS NULL
+      ORDER BY "Gropo_letra"
+    `, [orc.id_embarcacao]);
+
+    if (cotistasResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Nenhum cotista encontrado para esta embarcação!'
+      });
+      return;
+    }
+
+    // Calcular rateio proporcional
+    const cotistas = cotistasResult.rows.map(cot => {
+      const match = cot.grupo_letra.match(/(\d+)/);
+      const qtdCotas = match ? parseInt(match[1]) : 1;
+      return {
+        ...cot,
+        qtd_cotas: qtdCotas,
+        percentual: qtdCotas * 6.25
+      };
+    });
+
+    const totalCotas = cotistas.reduce((sum, c) => sum + c.qtd_cotas, 0);
+    const valorTotal = parseFloat(orc.valor_total);
+    const subtotal = parseFloat(orc.subtotal);
+    const taxaTotal = parseFloat(orc.taxa_servico_valor);
+
+    const rateio = cotistas.map(cotista => {
+      const percentual = cotista.percentual;
+      const valorCotista = valorTotal * (percentual / 100);
+      const valorServico = subtotal * (percentual / 100);
+      const valorTaxa = taxaTotal * (percentual / 100);
+
+      return {
+        ...cotista,
+        total_cotas: totalCotas,
+        valor_servico: valorServico,
+        valor_taxa: valorTaxa,
+        valor_cotista: valorCotista
+      };
+    });
+
+    // Montar mensagem
+    let mensagem = `📊 *RATEIO DO ORÇAMENTO*
+━━━━━━━━━━━━━━━━
+🆔 ${orc.numero}
+🚤 ${orc.numero_pb}
+💰 Total: ${formatarMoeda(valorTotal)}
+━━━━━━━━━━━━━━━━
+
+*DIVISÃO PROPORCIONAL:*
+
+`;
+
+    rateio.forEach(r => {
+      mensagem += `${r.grupo_letra} (${r.qtd_cotas} cota${r.qtd_cotas > 1 ? 's' : ''})
+   ${formatarMoeda(r.valor_cotista)} (${r.percentual.toFixed(2)}%)
+
+`;
+    });
+
+    mensagem += `━━━━━━━━━━━━━━━━
+Total cotas: ${totalCotas}
+
+1️⃣ ✅ Confirmar e salvar
+0️⃣ Cancelar
+━━━━━━━━━━━━━━━━`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMAR_RATEIO',
+      id_orcamento: idOrcamento,
+      rateio: rateio
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao definir rateio:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao calcular rateio.\n\n${error.message}`
+    });
+  }
+}
+
+async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`💵 [ORCAMENTOS] Enviando cobrança do orçamento #${idOrcamento}...`);
+
+    // Buscar dados do orçamento com rateio
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.status,
+        os.valor_total,
+        os.id_cobranca,
+        e."Código" as id_embarcacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Verificar se está aprovado
+    if (orc.status !== 'APROVADO') {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *ORÇAMENTO NÃO APROVADO*
+
+Status atual: ${orc.status}
+
+O orçamento precisa estar APROVADO antes de gerar cobrança!
+
+Voltando aos detalhes...`
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // Verificar se já tem cobrança
+    if (orc.id_cobranca) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ Este orçamento já possui cobrança gerada!
+
+ID Cobrança: ${orc.id_cobranca}
+
+Voltando aos detalhes...`
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // Buscar rateio
+    const rateioResult = await pool.query(`
+      SELECT
+        r.*,
+        a."Gropo_letra" as grupo_letra,
+        a."Cod_Pessoa" as cod_pessoa
+      FROM orcamento_rateio r
+      JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      WHERE r.id_orcamento = $1
+        AND r.participando = true
+      ORDER BY a."Gropo_letra"
+    `, [idOrcamento]);
+
+    if (rateioResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Rateio não encontrado! Defina o rateio primeiro.'
+      });
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: `⏳ Gerando cobranças...
+
+📊 ${rateioResult.rows.length} cotista(s) a cobrar
+
+Aguarde...`
+    });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Criar contas a receber para cada cotista
+      let cobrancasCriadas = 0;
+
+      for (const rateio of rateioResult.rows) {
+        // Gerar código único para a conta
+        const codResult = await client.query(`
+          SELECT COALESCE(MAX("Codigo"), 0) + 1 as novo_codigo
+          FROM "Contas_Receber"
+        `);
+        const novoCodigo = codResult.rows[0].novo_codigo;
+
+        // Criar conta a receber
+        await client.query(`
+          INSERT INTO "Contas_Receber" (
+            "Codigo",
+            "Código_Cliente",
+            "Valor",
+            "Total",
+            "Data_Emissao",
+            "Data_Vencimento",
+            "Observações"
+          ) VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', $5)
+        `, [
+          novoCodigo,
+          rateio.cod_pessoa,
+          rateio.valor_cotista,
+          rateio.valor_cotista,
+          `ORÇAMENTO ${orc.numero} - ${orc.descricao} - ${rateio.grupo_letra}`
+        ]);
+
+        cobrancasCriadas++;
+      }
+
+      // Atualizar orçamento com ID da primeira cobrança
+      await client.query(`
+        UPDATE "orcamento_servico"
+        SET id_cobranca = 1
+        WHERE id_orcamento = $1
+      `, [idOrcamento]);
+
+      // Log
+      await adicionarLog(
+        idOrcamento,
+        'COBRANCA_GERADA',
+        `${cobrancasCriadas} cobrança(s) criada(s) em Contas a Receber`,
+        userId
+      );
+
+      await client.query('COMMIT');
+
+      await sock.sendMessage(groupId, {
+        text: `✅ *COBRANÇAS GERADAS!*
+
+🆔 ${orc.numero}
+💰 ${formatarMoeda(orc.valor_total)}
+📋 ${cobrancasCriadas} conta(s) a receber criada(s)
+
+📅 Vencimento: +30 dias
+
+Voltando aos detalhes...`
+      });
+
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao gerar cobrança:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao gerar cobrança.\n\n${error.message}`
+    });
+  }
+}
+
+async function aprovarOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`✅ [ORCAMENTOS] Aprovando orçamento #${idOrcamento}...`);
+
+    // Buscar dados do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.numero,
+        os.status,
+        os.valor_total,
+        e."Num_PB" as numero_pb
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Verificar se já está aprovado
+    if (orc.status === 'APROVADO') {
+      await sock.sendMessage(groupId, {
+        text: '⚠️ Este orçamento já está aprovado!'
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // Verificar se tem rateio
+    const rateioResult = await pool.query(`
+      SELECT COUNT(*) as qtd
+      FROM orcamento_rateio
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (parseInt(rateioResult.rows[0].qtd) === 0) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *RATEIO PENDENTE*
+
+Este orçamento ainda não tem rateio definido!
+
+Por favor, defina o rateio antes de aprovar.
+
+Voltando aos detalhes...`
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // Atualizar status
+    await pool.query(`
+      UPDATE "orcamento_servico"
+      SET status = 'APROVADO'
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    // Log
+    await adicionarLog(
+      idOrcamento,
+      'ORCAMENTO_APROVADO',
+      `Valor: ${formatarMoeda(orc.valor_total)}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *ORÇAMENTO APROVADO!*
+
+🆔 ${orc.numero}
+🚤 ${orc.numero_pb}
+💰 ${formatarMoeda(orc.valor_total)}
+
+O orçamento já pode ser cobrado!
+
+Voltando aos detalhes...`
+    });
+
+    await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao aprovar:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao aprovar orçamento.\n\n${error.message}`
+    });
+  }
+}
+
+async function salvarRateio(sock, userId, groupId, estado) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id_orcamento, rateio } = estado;
+
+    // Apagar rateio anterior se existir
+    await client.query(`
+      DELETE FROM orcamento_rateio
+      WHERE id_orcamento = $1
+    `, [id_orcamento]);
+
+    // Inserir novo rateio
+    for (const item of rateio) {
+      await client.query(`
+        INSERT INTO orcamento_rateio (
+          id_orcamento,
+          id_cliente,
+          id_autorizado,
+          qtd_cotas,
+          total_cotas,
+          percentual,
+          valor_servico,
+          valor_taxa,
+          valor_cotista,
+          participando
+        ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, true)
+      `, [
+        id_orcamento,
+        item.id_autorizado,
+        item.qtd_cotas,
+        item.total_cotas,
+        item.percentual,
+        item.valor_servico,
+        item.valor_taxa,
+        item.valor_cotista
+      ]);
+    }
+
+    // Log
+    await adicionarLog(
+      id_orcamento,
+      'RATEIO_DEFINIDO',
+      `Rateio definido para ${rateio.length} cotista(s)`,
+      userId
+    );
+
+    await client.query('COMMIT');
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *RATEIO SALVO COM SUCESSO!*
+
+📊 ${rateio.length} cotista(s) configurado(s)
+
+O orçamento já pode ser aprovado!
+
+Voltando aos detalhes...`
+    });
+
+    await verDetalhesOrcamento(sock, userId, groupId, id_orcamento);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ [ORCAMENTOS] Erro ao salvar rateio:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao salvar rateio.\n\n${error.message}`
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// ============================================================
 // DETALHES DO ORÇAMENTO
 // ============================================================
 
@@ -2538,21 +2998,15 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         break;
 
       case '3': // Definir rateio
-        await sock.sendMessage(groupId, {
-          text: '🚧 *Definir rateio* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
-        });
+        await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       case '4': // Aprovar orçamento
-        await sock.sendMessage(groupId, {
-          text: '🚧 *Aprovar orçamento* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
-        });
+        await aprovarOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       case '5': // Enviar cobrança
-        await sock.sendMessage(groupId, {
-          text: '🚧 *Enviar cobrança* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
-        });
+        await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       default:
@@ -2680,6 +3134,24 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     return;
   }
 
+  // Confirmar rateio
+  if (estado.etapa === 'CONFIRMAR_RATEIO') {
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1') {
+      await salvarRateio(sock, userId, groupId, estado);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
+    });
+    return;
+  }
+
   // Fluxo de criação
   switch (estado.etapa) {
     case 'SELECIONAR_EMBARCACAO':
@@ -2788,4 +3260,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241551
+// V.2610241603
