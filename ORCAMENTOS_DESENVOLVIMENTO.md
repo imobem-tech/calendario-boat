@@ -1,7 +1,7 @@
 # 📊 SISTEMA DE ORÇAMENTOS VIA WHATSAPP - DOCUMENTAÇÃO
 
-**Versão:** V.2610241646  
-**Última Atualização:** 24/10/2026 16:46  
+**Versão:** V.2610241757  
+**Última Atualização:** 24/10/2026 17:57  
 **Status:** ✅ OPERACIONAL
 
 ---
@@ -332,6 +332,83 @@ if (usuario.includes('@lid')) {
 
 ---
 
+### ✅ **Bloqueio de Rateio Aprovado (V.2610241751)**
+
+**Recurso de Segurança:**
+- Orçamentos APROVADOS não podem mais ter rateio alterado
+- Previne mudanças acidentais após aprovação
+
+**Implementação:**
+```javascript
+if (orc.status === 'APROVADO') {
+  await sock.sendMessage(groupId, {
+    text: '🔒 RATEIO BLOQUEADO\n\nEste orçamento já foi APROVADO!'
+  });
+  return;
+}
+```
+
+**Benefício:**
+- Integridade dos dados garantida
+- Evita alterações após aprovação formal
+- Cobrança gerada permanece consistente com rateio aprovado
+
+---
+
+### ✅ **Correção Erro de Aprovação (V.2610241754)**
+
+**Problema Corrigido:**
+- Erro: `r.percentual.toFixed is not a function`
+- Ocorria ao tentar aprovar orçamento
+- Campo `percentual` vem do banco como string, não número
+
+**Solução:**
+```javascript
+// ANTES (ERRO):
+const perc = r.percentual.toFixed(2);  // ❌ string.toFixed()
+
+// DEPOIS (CORRETO):
+const perc = parseFloat(r.percentual).toFixed(2);  // ✅
+```
+
+**Locais Corrigidos:**
+- `definirRateioOrcamento()` - linha 2446
+- `aprovarOrcamento()` - linha 2984
+
+---
+
+### ✅ **Menu Inicial Encurtado (V.2610241757)**
+
+**Melhoria UX:**
+- Descrições do menu inicial mais compactas
+- Melhor visualização em telas pequenas
+
+**Mudanças:**
+```
+2️⃣ Consultar Orçamentos Abertos → Consultar Orç. Abertos
+3️⃣ Consultar Orçamentos Fechados → Consultar Orç. Fechados
+4️⃣ Orçamentos por Embarcação → Orç. por Embarcação
+```
+
+---
+
+### 🔍 **Debug Upload de Anexos (V.2610241752)**
+
+**Logs de Diagnóstico:**
+- Adicionados logs extensivos para investigar bug de upload
+- Rastreiam estado, tipo de mensagem e objeto recebido
+
+**Logs Ativos:**
+```javascript
+console.log(`[ORCAMENTOS DEBUG] Estado atual: ${estado?.etapa}`);
+console.log(`[ORCAMENTOS DEBUG] MensagemCompleta recebida: ${mensagemCompleta ? 'SIM' : 'NÃO'}`);
+console.log(`[ORCAMENTOS DEBUG] Tipos de mensagem: ${Object.keys(mensagemCompleta.message)}`);
+```
+
+**Status:** Em investigação - aguardando testes em produção
+
+---
+
 ## 📝 PENDÊNCIAS
 
 ### **BAIXA PRIORIDADE:**
@@ -349,7 +426,7 @@ if (usuario.includes('@lid')) {
 ### **wpp/comandos/orcamentos.js**
 Arquivo principal com todas as funções.
 
-**Versão atual:** V.2610241646
+**Versão atual:** V.2610241757
 
 **Principais funções:**
 - `mostrarMenuOrcamentos()` - Menu principal
@@ -374,20 +451,23 @@ Todos os backups com timestamp e cabeçalho documentado:
 - `2610241635_orcamentos.js` - Relacionamento cotistas
 - `2610241642_orcamentos.js` - Nomes no rateio
 - `2610241646_orcamentos.js` - Distribuição manual
+- `2610241754_orcamentos.js` - Menu encurtado
 
 ---
 
 ## 🎯 PRÓXIMOS PASSOS
 
-1. **Testes em produção:**
-   - Criar orçamento completo
-   - Testar rateio automático
-   - Testar rateio manual
-   - Aprovar e gerar cobrança
-   - Upload de anexos
+1. **Testes CRÍTICOS em produção:**
+   - ✅ Criar orçamento completo
+   - ✅ Testar rateio automático
+   - ✅ Testar rateio manual
+   - ⚠️ **APROVAR orçamento** (testar correção parseFloat)
+   - ⚠️ **UPLOAD de anexos** (verificar se funciona)
+   - ⚠️ **BLOQUEAR rateio** após aprovação (testar segurança)
 
-2. **Monitoramento:**
-   - Verificar LOGs de erro
+2. **Monitoramento Railway:**
+   - Procurar mensagens `[ORCAMENTOS DEBUG]` nos logs
+   - Verificar se upload detecta mensagens de mídia
    - Validar integridade das cobranças
    - Confirmar criação de Contas a Receber
 
@@ -403,6 +483,10 @@ Todos os backups com timestamp e cabeçalho documentado:
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| V.2610241757 | 24/10/26 17:57 | Menu inicial encurtado (UX) |
+| V.2610241754 | 24/10/26 17:54 | Correção erro parseFloat ao aprovar |
+| V.2610241752 | 24/10/26 17:52 | Logs de debug para upload de anexos |
+| V.2610241751 | 24/10/26 17:51 | Bloqueio de rateio após aprovação (segurança) |
 | V.2610241646 | 24/10/26 16:46 | Distribuição manual de rateio |
 | V.2610241642 | 24/10/26 16:42 | Nomes dos cotistas no rateio |
 | V.2610241635 | 24/10/26 16:35 | Correção relacionamento cotistas |
@@ -419,4 +503,4 @@ Todos os backups com timestamp e cabeçalho documentado:
 
 ---
 
-## V.2610241646
+## V.2610241757
