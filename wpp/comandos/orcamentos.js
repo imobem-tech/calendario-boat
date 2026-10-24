@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241903
+// wpp/comandos/orcamentos.js — V.2610241924
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2143,10 +2143,10 @@ async function finalizarUploadAnexo(sock, userId, groupId, estado, visivelClient
     const dados = {
       nome_amigavel: estado.anexo_nome_amigavel,
       nome_arquivo: nomeArquivo,
-      url_arquivo: blob.url,
+      url: blob.url,
       visivel_cliente: visivelCliente,
       tipo_arquivo: estado.anexo_extensao,
-      tamanho: estado.anexo_tamanho
+      tamanho_bytes: estado.anexo_tamanho
     };
 
     await salvarAnexoBanco(estado.id_orcamento, dados, userId);
@@ -2201,10 +2201,10 @@ async function salvarAnexoBanco(idOrcamento, dados, userId) {
         id_orcamento,
         nome_amigavel,
         nome_arquivo,
-        url_arquivo,
+        url,
         visivel_cliente,
         tipo_arquivo,
-        tamanho,
+        tamanho_bytes,
         usuario_upload
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id_anexo
@@ -2212,10 +2212,10 @@ async function salvarAnexoBanco(idOrcamento, dados, userId) {
       idOrcamento,
       dados.nome_amigavel,
       dados.nome_arquivo,
-      dados.url_arquivo,
+      dados.url,
       dados.visivel_cliente,
       dados.tipo_arquivo,
-      dados.tamanho,
+      dados.tamanho_bytes,
       identificacao
     ]);
 
@@ -2243,10 +2243,10 @@ async function listarAnexosOrcamento(sock, userId, groupId, idOrcamento) {
         id_anexo,
         nome_amigavel,
         nome_arquivo,
-        url_arquivo,
+        url,
         visivel_cliente,
         tipo_arquivo,
-        tamanho,
+        tamanho_bytes,
         data_upload,
         usuario_upload
       FROM orcamento_anexo
@@ -2283,12 +2283,12 @@ Digite 0 para voltar.`
     result.rows.forEach((anexo, index) => {
       const data = new Date(anexo.data_upload).toLocaleDateString('pt-BR');
       const visibilidade = anexo.visivel_cliente ? '👁️ Visível' : '🔒 Privado';
-      const tamanhoKB = (anexo.tamanho / 1024).toFixed(1);
+      const tamanhoKB = (anexo.tamanho_bytes / 1024).toFixed(1);
 
       mensagem += `${index + 1}️⃣ ${anexo.nome_amigavel}
    ${visibilidade} | ${tamanhoKB} KB
    📅 ${data}
-   🔗 ${anexo.url_arquivo}
+   🔗 ${anexo.url}
 
 `;
     });
