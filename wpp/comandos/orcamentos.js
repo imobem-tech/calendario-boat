@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241422
+// wpp/comandos/orcamentos.js — V.2610241503
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -500,6 +500,621 @@ ou escolha:
   await sock.sendMessage(groupId, { text: mensagem });
   estado.etapa = 'EDITAR_ITENS';
   atualizarEstado(userId, estado);
+}
+
+// Editar itens de orçamento já salvo no banco
+async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`✏️ [ORCAMENTOS] Editando itens do orçamento #${idOrcamento}...`);
+
+    // Buscar dados do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.status,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Verificar se orçamento pode ser editado
+    if (orc.status === 'APROVADO' || orc.status === 'CONCLUIDO') {
+      await sock.sendMessage(groupId, {
+        text: `❌ *Orçamento não pode ser editado*\n\nStatus: ${orc.status}\n\nApenas orçamentos em RASCUNHO ou ENVIADO podem ser editados.\n\nDigite 0 para voltar.`
+      });
+      return;
+    }
+
+    // Buscar itens atuais
+    const itensResult = await pool.query(`
+      SELECT
+        id_item,
+        ordem,
+        descricao,
+        quantidade,
+        valor_unitario,
+        valor_total
+      FROM "orcamento_item"
+      WHERE id_orcamento = $1
+      ORDER BY ordem
+    `, [idOrcamento]);
+
+    if (itensResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `📦 *EDITAR ITENS*\n━━━━━━━━━━━━━━━━\n🆔 Orçamento: ${orc.numero}\n━━━━━━━━━━━━━━━━\n\n❌ Nenhum item cadastrado.\n\n➕ Digite *A* para adicionar item\n0️⃣ Voltar`
+      });
+
+      atualizarEstado(userId, {
+        etapa: 'EDITAR_ITENS_BANCO',
+        id_orcamento: idOrcamento,
+        itens: []
+      });
+      return;
+    }
+
+    let mensagem = `📦 *EDITAR ITENS*
+━━━━━━━━━━━━━━━━
+🆔 Orçamento: ${orc.numero}
+🚤 ${orc.numero_pb}
+━━━━━━━━━━━━━━━━
+
+`;
+
+    itensResult.rows.forEach(item => {
+      mensagem += `${item.ordem}. ${item.descricao}\n   💰 ${formatarMoeda(item.valor_total)}\n\n`;
+    });
+
+    mensagem += `━━━━━━━━━━━━━━━━
+
+*OPÇÕES:*
+
+Digite o número do item para editar
+➕ *A* - Adicionar novo item
+🗑️ *E[número]* - Excluir (ex: E2)
+✅ *S* - Salvar e voltar
+
+0️⃣ Cancelar
+━━━━━━━━━━━━━━━━`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'EDITAR_ITENS_BANCO',
+      id_orcamento: idOrcamento,
+      itens: itensResult.rows
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao editar itens:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao carregar itens.\n\n${error.message}`
+    });
+  }
+}
+
+// Adicionar item em orçamento já salvo
+async function iniciarAdicaoItemBanco(sock, userId, groupId, estado) {
+  const numeroItem = estado.itens.length + 1;
+
+  const mensagem = `➕ *ADICIONAR ITEM*
+━━━━━━━━━━━━━━━━
+🆔 Orçamento: #${estado.id_orcamento}
+
+*Item #${numeroItem}* - Digite a descrição:
+
+💡 Exemplo: Troca de óleo do motor
+
+0️⃣ Cancelar`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'ADICIONAR_ITEM_DESCRICAO',
+    item_novo: { descricao: null, valor: null }
+  });
+}
+
+async function receberDescricaoItemBanco(sock, userId, groupId, estado, descricao) {
+  if (descricao === '0') {
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  // Validar descrição (mesma lógica da criação)
+  if (!validarDescricao(descricao)) {
+    const mensagem = `❌ *Descrição inválida!*
+
+O item deve ter no mínimo *2 palavras de 3 ou mais caracteres* cada.
+
+💡 Exemplo: Troca de óleo
+
+Digite novamente:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+    return;
+  }
+
+  const numeroItem = estado.itens.length + 1;
+
+  const mensagem = `✅ Item #${numeroItem}: ${descricao}
+
+━━━━━━━━━━━━━━━━
+💰 *VALOR DO ITEM*
+━━━━━━━━━━━━━━━━
+
+Digite o valor (R$) ou "pular":
+
+💡 Formatos aceitos:
+• 500
+• 500,50
+• 5.000,50
+• 5000,5
+
+⏭️ Digite "pular" para definir depois
+
+0️⃣ Cancelar`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'ADICIONAR_ITEM_VALOR',
+    item_novo: { descricao, valor: null }
+  });
+}
+
+async function salvarNovoItemBanco(sock, userId, groupId, estado, valorTexto) {
+  if (valorTexto === '0') {
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  const valor = formatarValor(valorTexto);
+
+  if (valor === 'ERRO_FORMATO') {
+    const mensagem = `❌ *Formato inválido!*
+
+Use *VÍRGULA* para separar centavos.
+
+💡 Correto: 5000,50
+❌ Errado: 5000.50
+
+Digite novamente ou "pular":`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+    return;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const numeroItem = estado.itens.length + 1;
+
+    // Inserir novo item
+    await client.query(`
+      INSERT INTO "orcamento_item" (
+        id_orcamento,
+        ordem,
+        descricao,
+        quantidade,
+        valor_unitario,
+        valor_total
+      ) VALUES ($1, $2, $3, 1, $4, $4)
+    `, [estado.id_orcamento, numeroItem, estado.item_novo.descricao, valor || 0]);
+
+    // Recalcular total do orçamento
+    const totalResult = await client.query(`
+      SELECT COALESCE(SUM(valor_total), 0) as total_itens
+      FROM "orcamento_item"
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    const totalItens = parseFloat(totalResult.rows[0].total_itens);
+    const taxaPerc = 20;
+    const taxaValor = totalItens * (taxaPerc / 100);
+    const valorTotal = totalItens + taxaValor;
+
+    await client.query(`
+      UPDATE "orcamento_servico"
+      SET
+        valor_servicos = $1,
+        taxa_servico_valor = $2,
+        valor_total = $3
+      WHERE id_orcamento = $4
+    `, [totalItens, taxaValor, valorTotal, estado.id_orcamento]);
+
+    await client.query('COMMIT');
+
+    // Registrar no log
+    await adicionarLog(
+      estado.id_orcamento,
+      'ITEM_ADICIONADO',
+      `Item #${numeroItem}: ${estado.item_novo.descricao} - ${formatarMoeda(valor || 0)}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Item adicionado com sucesso!*
+
+📦 Item #${numeroItem}: ${estado.item_novo.descricao}
+💰 ${formatarMoeda(valor || 0)}
+
+Carregando lista atualizada...`
+    });
+
+    // Recarregar lista de itens
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ [ORCAMENTOS] Erro ao adicionar item:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao adicionar item.\n\n${error.message}`
+    });
+  } finally {
+    client.release();
+  }
+}
+
+// Editar item específico
+async function iniciarEdicaoItemBanco(sock, userId, groupId, estado, numeroItem) {
+  const item = estado.itens.find(i => i.ordem === numeroItem);
+
+  if (!item) {
+    await sock.sendMessage(groupId, {
+      text: `❌ Item #${numeroItem} não encontrado.`
+    });
+    return;
+  }
+
+  const mensagem = `✏️ *EDITAR ITEM #${numeroItem}*
+━━━━━━━━━━━━━━━━
+
+*Atual:*
+📦 ${item.descricao}
+💰 ${formatarMoeda(item.valor_total)}
+
+━━━━━━━━━━━━━━━━
+
+*OPÇÕES:*
+
+1️⃣ Editar descrição
+2️⃣ Editar valor
+0️⃣ Cancelar
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'EDITAR_ITEM_MENU',
+    item_editando: item
+  });
+}
+
+async function escolherCampoEdicao(sock, userId, groupId, estado, opcao) {
+  if (opcao === '0') {
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  const item = estado.item_editando;
+
+  switch (opcao) {
+    case '1': // Editar descrição
+      const mensagemDesc = `✏️ *EDITAR DESCRIÇÃO*
+━━━━━━━━━━━━━━━━
+Item #${item.ordem}
+
+*Descrição atual:*
+${item.descricao}
+
+━━━━━━━━━━━━━━━━
+
+Digite a nova descrição:
+
+💡 Exemplo: Troca de óleo do motor
+
+0️⃣ Cancelar`;
+
+      await sock.sendMessage(groupId, { text: mensagemDesc });
+
+      atualizarEstado(userId, {
+        ...estado,
+        etapa: 'EDITAR_ITEM_DESCRICAO'
+      });
+      break;
+
+    case '2': // Editar valor
+      const mensagemValor = `✏️ *EDITAR VALOR*
+━━━━━━━━━━━━━━━━
+Item #${item.ordem}
+${item.descricao}
+
+*Valor atual:*
+${formatarMoeda(item.valor_total)}
+
+━━━━━━━━━━━━━━━━
+
+Digite o novo valor:
+
+💡 Formatos aceitos:
+• 500
+• 500,50
+• 5.000,50
+• 5000,5
+
+0️⃣ Cancelar`;
+
+      await sock.sendMessage(groupId, { text: mensagemValor });
+
+      atualizarEstado(userId, {
+        ...estado,
+        etapa: 'EDITAR_ITEM_VALOR'
+      });
+      break;
+
+    default:
+      await sock.sendMessage(groupId, {
+        text: '❌ Opção inválida! Digite 1, 2 ou 0.'
+      });
+  }
+}
+
+async function salvarDescricaoItemBanco(sock, userId, groupId, estado, novaDescricao) {
+  if (novaDescricao === '0') {
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  // Validar descrição
+  if (!validarDescricao(novaDescricao)) {
+    const mensagem = `❌ *Descrição inválida!*
+
+O item deve ter no mínimo *2 palavras de 3 ou mais caracteres* cada.
+
+💡 Exemplo: Troca de óleo
+
+Digite novamente:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+    return;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const item = estado.item_editando;
+    const descricaoAnterior = item.descricao;
+
+    // Atualizar descrição
+    await client.query(`
+      UPDATE "orcamento_item"
+      SET descricao = $1
+      WHERE id_item = $2
+    `, [novaDescricao, item.id_item]);
+
+    await client.query('COMMIT');
+
+    // Registrar no log
+    await adicionarLog(
+      estado.id_orcamento,
+      'ITEM_EDITADO',
+      `Item #${item.ordem}: Descrição alterada de "${descricaoAnterior}" para "${novaDescricao}"`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Descrição atualizada!*
+
+*Antes:* ${descricaoAnterior}
+*Depois:* ${novaDescricao}
+
+Carregando lista...`
+    });
+
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ [ORCAMENTOS] Erro ao editar descrição:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao atualizar descrição.\n\n${error.message}`
+    });
+  } finally {
+    client.release();
+  }
+}
+
+async function salvarValorItemBanco(sock, userId, groupId, estado, valorTexto) {
+  if (valorTexto === '0') {
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  const valor = formatarValor(valorTexto);
+
+  if (valor === 'ERRO_FORMATO') {
+    const mensagem = `❌ *Formato inválido!*
+
+Use *VÍRGULA* para separar centavos.
+
+💡 Correto: 5000,50
+❌ Errado: 5000.50
+
+Digite novamente:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+    return;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const item = estado.item_editando;
+    const valorAnterior = item.valor_total;
+
+    // Atualizar valor (tanto unitário quanto total, já que qtd = 1)
+    await client.query(`
+      UPDATE "orcamento_item"
+      SET
+        valor_unitario = $1,
+        valor_total = $1
+      WHERE id_item = $2
+    `, [valor, item.id_item]);
+
+    // Recalcular total do orçamento
+    const totalResult = await client.query(`
+      SELECT COALESCE(SUM(valor_total), 0) as total_itens
+      FROM "orcamento_item"
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    const totalItens = parseFloat(totalResult.rows[0].total_itens);
+    const taxaPerc = 20;
+    const taxaValor = totalItens * (taxaPerc / 100);
+    const valorTotal = totalItens + taxaValor;
+
+    await client.query(`
+      UPDATE "orcamento_servico"
+      SET
+        valor_servicos = $1,
+        taxa_servico_valor = $2,
+        valor_total = $3
+      WHERE id_orcamento = $4
+    `, [totalItens, taxaValor, valorTotal, estado.id_orcamento]);
+
+    await client.query('COMMIT');
+
+    // Registrar no log
+    await adicionarLog(
+      estado.id_orcamento,
+      'ITEM_EDITADO',
+      `Item #${item.ordem}: Valor alterado de ${formatarMoeda(valorAnterior)} para ${formatarMoeda(valor)}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Valor atualizado!*
+
+📦 ${item.descricao}
+
+*Antes:* ${formatarMoeda(valorAnterior)}
+*Depois:* ${formatarMoeda(valor)}
+
+Carregando lista...`
+    });
+
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ [ORCAMENTOS] Erro ao editar valor:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao atualizar valor.\n\n${error.message}`
+    });
+  } finally {
+    client.release();
+  }
+}
+
+async function excluirItemOrcamento(sock, userId, groupId, estado, numeroItem) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const item = estado.itens.find(i => i.ordem === numeroItem);
+
+    if (!item) {
+      await sock.sendMessage(groupId, {
+        text: `❌ Item #${numeroItem} não encontrado.`
+      });
+      return;
+    }
+
+    // Excluir item
+    await client.query(`
+      DELETE FROM "orcamento_item"
+      WHERE id_item = $1
+    `, [item.id_item]);
+
+    // Reordenar itens restantes
+    await client.query(`
+      UPDATE "orcamento_item"
+      SET ordem = ordem - 1
+      WHERE id_orcamento = $1
+        AND ordem > $2
+    `, [estado.id_orcamento, numeroItem]);
+
+    // Recalcular total do orçamento
+    const totalResult = await client.query(`
+      SELECT COALESCE(SUM(valor_total), 0) as total_itens
+      FROM "orcamento_item"
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    const totalItens = parseFloat(totalResult.rows[0].total_itens);
+    const taxaPerc = 20; // Taxa fixa de 20%
+    const taxaValor = totalItens * (taxaPerc / 100);
+    const valorTotal = totalItens + taxaValor;
+
+    await client.query(`
+      UPDATE "orcamento_servico"
+      SET
+        valor_servicos = $1,
+        taxa_servico_valor = $2,
+        valor_total = $3
+      WHERE id_orcamento = $4
+    `, [totalItens, taxaValor, valorTotal, estado.id_orcamento]);
+
+    await client.query('COMMIT');
+
+    // Registrar no log
+    await adicionarLog(
+      estado.id_orcamento,
+      'ITEM_EXCLUIDO',
+      `Item #${numeroItem}: ${item.descricao} - ${formatarMoeda(item.valor_total)}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Item excluído com sucesso!*\n\n📦 Item #${numeroItem}: ${item.descricao}\n\nCarregando lista atualizada...`
+    });
+
+    // Recarregar lista de itens
+    await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ [ORCAMENTOS] Erro ao excluir item:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao excluir item.\n\n${error.message}`
+    });
+  } finally {
+    client.release();
+  }
 }
 
 // ============================================================
@@ -1233,6 +1848,60 @@ ou 0 para voltar ao menu.`;
   }
 }
 
+async function mostrarHistoricoOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`📋 [ORCAMENTOS] Buscando histórico do orçamento #${idOrcamento}...`);
+
+    // Buscar dados básicos do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.numero,
+        os.status,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+    const logs = await buscarLogs(idOrcamento);
+
+    const mensagem = `━━━━━━━━━━━━━━━━
+📋 *HISTÓRICO (LOG)*
+━━━━━━━━━━━━━━━━
+🆔 Orçamento: ${orc.numero}
+🚤 Embarcação: ${orc.numero_pb}
+━━━━━━━━━━━━━━━━
+
+${logs}
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes.`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Manter estado no submenu, mas indicar que está visualizando log
+    atualizarEstado(userId, {
+      etapa: 'VISUALIZAR_LOG',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao buscar histórico:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao buscar histórico.\n\n${error.message}`
+    });
+  }
+}
+
 async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
   try {
     console.log(`🔍 [ORCAMENTOS] Buscando detalhes do orçamento #${idOrcamento}...`);
@@ -1290,47 +1959,53 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
     let mensagem = `━━━━━━━━━━━━━━━━
 📋 *DETALHES DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 🆔 Número: ${orc.numero}
 ${statusEmoji} Status: ${orc.status}
 🚤 Embarcação: ${orc.numero_pb} - ${orc.nome_embarcacao}
 📅 Data: ${data}
-
 ━━━━━━━━━━━━━━━━
 📌 *TÍTULO:*
 ${orc.titulo}
-
 ━━━━━━━━━━━━━━━━
 📦 *ITENS:*
-
 `;
 
     if (itensResult.rows.length === 0) {
-      mensagem += '(nenhum item cadastrado)\n\n';
+      mensagem += '(nenhum item cadastrado)\n';
     } else {
       itensResult.rows.forEach(item => {
         mensagem += `${item.ordem}. ${item.descricao}\n`;
-        mensagem += `   ${formatarMoeda(item.valor_total)}\n\n`;
+        mensagem += `   ${formatarMoeda(item.valor_total)}\n`;
       });
     }
 
     mensagem += `━━━━━━━━━━━━━━━━
 💰 *VALORES:*
-
 Subtotal: ${formatarMoeda(orc.subtotal)}
 Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor)}
-
 *TOTAL: ${formatarMoeda(orc.valor_total)}*
+━━━━━━━━━━━━━━━━
+
+*OPÇÕES:*
+
+1️⃣ 📋 Acessar HISTÓRICO (LOG)
+2️⃣ ✏️ Editar itens
+3️⃣ 📊 Definir rateio
+4️⃣ ✅ Aprovar orçamento
+5️⃣ 💵 Enviar cobrança
+0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
-📋 *HISTÓRICO (LOG):*
-
-${await buscarLogs(idOrcamento)}
-
-━━━━━━━━━━━━━━━━
-Digite *menu* para voltar.`;
+Digite o número da opção:`;
 
     await sock.sendMessage(groupId, { text: mensagem });
+
+    // Atualizar estado para processar submenu
+    atualizarEstado(userId, {
+      etapa: 'SUBMENU_DETALHES',
+      id_orcamento: idOrcamento,
+      orcamento_dados: orc
+    });
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao buscar detalhes:', error);
@@ -1452,6 +2127,60 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     return;
   }
 
+  // Submenu de detalhes do orçamento
+  if (estado.etapa === 'SUBMENU_DETALHES') {
+    if (texto === '0') {
+      await mostrarMenuOrcamentos(sock, userId, groupId);
+      return;
+    }
+
+    switch (texto) {
+      case '1': // Acessar HISTÓRICO (LOG)
+        await mostrarHistoricoOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '2': // Editar itens
+        await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '3': // Definir rateio
+        await sock.sendMessage(groupId, {
+          text: '🚧 *Definir rateio* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
+        });
+        break;
+
+      case '4': // Aprovar orçamento
+        await sock.sendMessage(groupId, {
+          text: '🚧 *Aprovar orçamento* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
+        });
+        break;
+
+      case '5': // Enviar cobrança
+        await sock.sendMessage(groupId, {
+          text: '🚧 *Enviar cobrança* - Funcionalidade em desenvolvimento.\n\nDigite 0 para voltar.'
+        });
+        break;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5 ou 0.'
+        });
+    }
+    return;
+  }
+
+  // Visualizar LOG
+  if (estado.etapa === 'VISUALIZAR_LOG') {
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+    await sock.sendMessage(groupId, {
+      text: '❌ Digite 0 para voltar aos detalhes do orçamento.'
+    });
+    return;
+  }
+
   // Fluxo de criação
   switch (estado.etapa) {
     case 'SELECIONAR_EMBARCACAO':
@@ -1475,12 +2204,84 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       break;
 
     case 'EDITAR_ITENS':
-      // TODO: Implementar edição de itens
+      // TODO: Implementar edição de itens (durante criação)
       await sock.sendMessage(groupId, { text: '🚧 Edição em desenvolvimento. Digite F para finalizar.' });
+      break;
+
+    case 'EDITAR_ITENS_BANCO':
+      // Edição de itens de orçamento já salvo
+      const textoUpper = texto.toUpperCase();
+
+      if (texto === '0') {
+        await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+        return;
+      }
+
+      // Adicionar item
+      if (textoUpper === 'A') {
+        await iniciarAdicaoItemBanco(sock, userId, groupId, estado);
+        break;
+      }
+
+      // Salvar e voltar
+      if (textoUpper === 'S') {
+        await sock.sendMessage(groupId, {
+          text: '✅ Alterações salvas!\n\nCarregando detalhes...'
+        });
+        await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+      }
+
+      // Excluir item (Ex: E2)
+      if (textoUpper.startsWith('E')) {
+        const numeroStr = textoUpper.substring(1);
+        const numero = parseInt(numeroStr);
+
+        if (isNaN(numero) || numero < 1) {
+          await sock.sendMessage(groupId, {
+            text: '❌ Formato inválido!\n\nUse: E[número]\nExemplo: E2 para excluir item 2'
+          });
+          break;
+        }
+
+        await excluirItemOrcamento(sock, userId, groupId, estado, numero);
+        break;
+      }
+
+      // Editar item (número do item)
+      const numeroItem = parseInt(texto);
+      if (!isNaN(numeroItem) && numeroItem >= 1 && numeroItem <= estado.itens.length) {
+        await iniciarEdicaoItemBanco(sock, userId, groupId, estado, numeroItem);
+        break;
+      }
+
+      await sock.sendMessage(groupId, {
+        text: '❌ Opção inválida!\n\nDigite:\n• Número do item para editar\n• A para adicionar\n• E[número] para excluir\n• S para salvar\n• 0 para voltar'
+      });
       break;
 
     case 'CONFIRMAR':
       await processarConfirmacao(sock, userId, groupId, texto);
+      break;
+
+    case 'ADICIONAR_ITEM_DESCRICAO':
+      await receberDescricaoItemBanco(sock, userId, groupId, estado, texto);
+      break;
+
+    case 'ADICIONAR_ITEM_VALOR':
+      await salvarNovoItemBanco(sock, userId, groupId, estado, texto);
+      break;
+
+    case 'EDITAR_ITEM_MENU':
+      await escolherCampoEdicao(sock, userId, groupId, estado, texto);
+      break;
+
+    case 'EDITAR_ITEM_DESCRICAO':
+      await salvarDescricaoItemBanco(sock, userId, groupId, estado, texto);
+      break;
+
+    case 'EDITAR_ITEM_VALOR':
+      await salvarValorItemBanco(sock, userId, groupId, estado, texto);
       break;
 
     default:
@@ -1488,4 +2289,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241109
+// V.2610241503
