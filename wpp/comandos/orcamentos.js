@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241238
+// wpp/comandos/orcamentos.js — V.2610241245
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -680,6 +680,251 @@ Digite *menu* para voltar ao menu principal.`;
 }
 
 // ============================================================
+// CONSULTAR ORÇAMENTOS
+// ============================================================
+
+async function listarOrcamentosAbertos(sock, userId, groupId) {
+  try {
+    console.log('📋 [ORCAMENTOS] Listando orçamentos abertos...');
+
+    const result = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao as titulo,
+        os.valor_total,
+        os.status,
+        os.data_orcamento,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.status IN ('RASCUNHO', 'ENVIADO')
+        AND os.id_grupo = 1
+      ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
+      LIMIT 20
+    `);
+
+    if (result.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `📋 *ORÇAMENTOS ABERTOS*\n\n❌ Nenhum orçamento aberto encontrado.\n\nDigite *menu* para voltar.`
+      });
+      return;
+    }
+
+    let mensagem = `━━━━━━━━━━━━━━━━
+📋 *ORÇAMENTOS ABERTOS*
+━━━━━━━━━━━━━━━━
+
+Total: ${result.rows.length} orçamento(s)
+
+`;
+
+    result.rows.forEach((orc, index) => {
+      const data = new Date(orc.data_orcamento).toLocaleDateString('pt-BR');
+      const statusEmoji = orc.status === 'RASCUNHO' ? '📝' : '📤';
+
+      mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   ${statusEmoji} ${orc.status}\n`;
+      mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
+      mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
+      mensagem += `   📅 ${data}\n\n`;
+    });
+
+    mensagem += `━━━━━━━━━━━━━━━━
+Digite o número para ver detalhes
+ou 0 para voltar ao menu.`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Atualizar estado
+    atualizarEstado(userId, {
+      etapa: 'LISTAR_ABERTOS',
+      orcamentos: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao listar abertos:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao buscar orçamentos abertos.\n\n${error.message}`
+    });
+  }
+}
+
+async function listarOrcamentosFechados(sock, userId, groupId) {
+  try {
+    console.log('✅ [ORCAMENTOS] Listando orçamentos fechados...');
+
+    const result = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao as titulo,
+        os.valor_total,
+        os.status,
+        os.data_orcamento,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.status IN ('APROVADO', 'RECUSADO', 'CONCLUIDO', 'CANCELADO')
+        AND os.id_grupo = 1
+      ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
+      LIMIT 20
+    `);
+
+    if (result.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `✅ *ORÇAMENTOS FECHADOS*\n\n❌ Nenhum orçamento fechado encontrado.\n\nDigite *menu* para voltar.`
+      });
+      return;
+    }
+
+    let mensagem = `━━━━━━━━━━━━━━━━
+✅ *ORÇAMENTOS FECHADOS*
+━━━━━━━━━━━━━━━━
+
+Total: ${result.rows.length} orçamento(s)
+
+`;
+
+    result.rows.forEach((orc, index) => {
+      const data = new Date(orc.data_orcamento).toLocaleDateString('pt-BR');
+      let statusEmoji = '✅';
+      if (orc.status === 'RECUSADO') statusEmoji = '❌';
+      if (orc.status === 'CANCELADO') statusEmoji = '🚫';
+      if (orc.status === 'CONCLUIDO') statusEmoji = '✅';
+
+      mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   ${statusEmoji} ${orc.status}\n`;
+      mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
+      mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
+      mensagem += `   📅 ${data}\n\n`;
+    });
+
+    mensagem += `━━━━━━━━━━━━━━━━
+Digite o número para ver detalhes
+ou 0 para voltar ao menu.`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Atualizar estado
+    atualizarEstado(userId, {
+      etapa: 'LISTAR_FECHADOS',
+      orcamentos: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao listar fechados:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao buscar orçamentos fechados.\n\n${error.message}`
+    });
+  }
+}
+
+async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`🔍 [ORCAMENTOS] Buscando detalhes do orçamento #${idOrcamento}...`);
+
+    // Buscar cabeçalho
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao as titulo,
+        os.valor_servicos as subtotal,
+        os.taxa_servico_perc,
+        os.taxa_servico_valor,
+        os.valor_total,
+        os.status,
+        os.data_orcamento,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Buscar itens
+    const itensResult = await pool.query(`
+      SELECT
+        ordem,
+        descricao,
+        quantidade,
+        valor_unitario,
+        valor_total
+      FROM "orcamento_item"
+      WHERE id_orcamento = $1
+      ORDER BY ordem
+    `, [idOrcamento]);
+
+    // Montar mensagem
+    const data = new Date(orc.data_orcamento).toLocaleDateString('pt-BR');
+    let statusEmoji = '📝';
+    if (orc.status === 'ENVIADO') statusEmoji = '📤';
+    if (orc.status === 'APROVADO') statusEmoji = '✅';
+    if (orc.status === 'RECUSADO') statusEmoji = '❌';
+    if (orc.status === 'CONCLUIDO') statusEmoji = '✅';
+    if (orc.status === 'CANCELADO') statusEmoji = '🚫';
+
+    let mensagem = `━━━━━━━━━━━━━━━━
+📋 *DETALHES DO ORÇAMENTO*
+━━━━━━━━━━━━━━━━
+
+🆔 Número: ${orc.numero}
+${statusEmoji} Status: ${orc.status}
+🚤 Embarcação: ${orc.numero_pb} - ${orc.nome_embarcacao}
+📅 Data: ${data}
+
+━━━━━━━━━━━━━━━━
+📌 *TÍTULO:*
+${orc.titulo}
+
+━━━━━━━━━━━━━━━━
+📦 *ITENS:*
+
+`;
+
+    if (itensResult.rows.length === 0) {
+      mensagem += '(nenhum item cadastrado)\n\n';
+    } else {
+      itensResult.rows.forEach(item => {
+        mensagem += `${item.ordem}. ${item.descricao}\n`;
+        mensagem += `   ${formatarMoeda(item.valor_total)}\n\n`;
+      });
+    }
+
+    mensagem += `━━━━━━━━━━━━━━━━
+💰 *VALORES:*
+
+Subtotal: ${formatarMoeda(orc.subtotal)}
+Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor)}
+
+*TOTAL: ${formatarMoeda(orc.valor_total)}*
+
+━━━━━━━━━━━━━━━━
+Digite *menu* para voltar.`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao buscar detalhes:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao buscar detalhes.\n\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
 // PROCESSADOR PRINCIPAL DE MENSAGENS
 // ============================================================
 
@@ -694,12 +939,10 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await listarEmbarcacoes(sock, userId, groupId);
         break;
       case '2':
-        // TODO: Consultar orçamentos abertos
-        await sock.sendMessage(groupId, { text: '🚧 Em desenvolvimento...' });
+        await listarOrcamentosAbertos(sock, userId, groupId);
         break;
       case '3':
-        // TODO: Consultar orçamentos fechados
-        await sock.sendMessage(groupId, { text: '🚧 Em desenvolvimento...' });
+        await listarOrcamentosFechados(sock, userId, groupId);
         break;
       case '0':
         limparEstado(userId);
@@ -708,6 +951,26 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       default:
         await sock.sendMessage(groupId, { text: '❌ Opção inválida! Digite 1, 2, 3 ou 0.' });
     }
+    return;
+  }
+
+  // Listagens de orçamentos
+  if (estado.etapa === 'LISTAR_ABERTOS' || estado.etapa === 'LISTAR_FECHADOS') {
+    if (texto === '0') {
+      await mostrarMenuOrcamentos(sock, userId, groupId);
+      return;
+    }
+
+    const index = parseInt(texto) - 1;
+    if (isNaN(index) || index < 0 || index >= estado.orcamentos.length) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Opção inválida! Digite o número do orçamento ou 0 para voltar.'
+      });
+      return;
+    }
+
+    const orcamento = estado.orcamentos[index];
+    await verDetalhesOrcamento(sock, userId, groupId, orcamento.id_orcamento);
     return;
   }
 
