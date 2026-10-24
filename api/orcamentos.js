@@ -322,4 +322,183 @@ export async function criarOrcamento(req, res) {
   }
 }
 
-// V.2606210825
+// ============================================================
+// GET /api/orcamentos/visualizar/:token
+// Busca orçamento completo por token de visualização
+// ============================================================
+export async function visualizarOrcamento(req, res) {
+  try {
+    const { token } = req.params;
+
+    console.log(`👁️ Visualizando orçamento com token: ${token}`);
+
+    // 1. Buscar orçamento pelo token
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.status,
+        os.valor_servicos,
+        os.taxa_servico_perc,
+        os.taxa_servico_valor,
+        os.valor_total,
+        os.data_orcamento,
+        os.data_aprovacao,
+        os.token_visualizacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM orcamento_servico os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.token_visualizacao = $1
+    `, [token]);
+
+    if (orcResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orçamento não encontrado ou token inválido'
+      });
+    }
+
+    const orcamento = orcResult.rows[0];
+
+    // 2. Buscar itens do orçamento
+    const itensResult = await pool.query(`
+      SELECT
+        ordem,
+        descricao,
+        valor_total
+      FROM orcamento_item
+      WHERE id_orcamento = $1
+      ORDER BY ordem
+    `, [orcamento.id_orcamento]);
+
+    // 3. Buscar rateio
+    const rateioResult = await pool.query(`
+      SELECT
+        r.qtd_cotas,
+        r.percentual,
+        r.valor_cotista,
+        a."Gropo_letra" as grupo_letra,
+        c."Cliente_Nome" as nome_pessoa
+      FROM orcamento_rateio r
+      LEFT JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      LEFT JOIN "Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+      WHERE r.id_orcamento = $1
+      ORDER BY a."Gropo_letra"
+    `, [orcamento.id_orcamento]);
+
+    res.json({
+      success: true,
+      orcamento: {
+        ...orcamento,
+        itens: itensResult.rows,
+        rateio: rateioResult.rows
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao visualizar orçamento:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao visualizar orçamento',
+      message: error.message
+    });
+  }
+}
+
+// ============================================================
+// GET /api/orcamentos/visualizar/:token/anexos
+// Lista anexos VISÍVEIS do orçamento
+// ============================================================
+export async function listarAnexosVisiveis(req, res) {
+  try {
+    const { token } = req.params;
+
+    console.log(`📎 Listando anexos visíveis do token: ${token}`);
+
+    // 1. Buscar ID do orçamento pelo token
+    const orcResult = await pool.query(`
+      SELECT id_orcamento
+      FROM orcamento_servico
+      WHERE token_visualizacao = $1
+    `, [token]);
+
+    if (orcResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orçamento não encontrado'
+      });
+    }
+
+    const idOrcamento = orcResult.rows[0].id_orcamento;
+
+    // 2. Buscar anexos visíveis
+    const anexosResult = await pool.query(`
+      SELECT
+        nome_amigavel,
+        tipo_arquivo,
+        url,
+        tamanho_bytes,
+        data_upload
+      FROM orcamento_anexo
+      WHERE id_orcamento = $1
+        AND visivel_cliente = true
+      ORDER BY data_upload DESC
+    `, [idOrcamento]);
+
+    res.json({
+      success: true,
+      total: anexosResult.rows.length,
+      anexos: anexosResult.rows
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao listar anexos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao listar anexos',
+      message: error.message
+    });
+  }
+}
+
+// ============================================================
+// POST /api/orcamentos/:id/gerar-token
+// Gera token de visualização para um orçamento
+// ============================================================
+export async function gerarTokenVisualizacao(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Gerar token único
+    const token = Buffer.from(`${id}-${Date.now()}-${Math.random()}`).toString('base64')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .substring(0, 32);
+
+    // Atualizar orçamento com o token
+    await pool.query(`
+      UPDATE orcamento_servico
+      SET token_visualizacao = $1
+      WHERE id_orcamento = $2
+    `, [token, id]);
+
+    const url = `${req.protocol}://${req.get('host')}/visualizar-orcamento.html?token=${token}`;
+
+    res.json({
+      success: true,
+      token,
+      url
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao gerar token',
+      message: error.message
+    });
+  }
+}
+
+// V.2610241950

@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241948
+// wpp/comandos/orcamentos.js — V.2610241958
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3319,6 +3319,102 @@ Voltando aos detalhes...`
   }
 }
 
+// ============================================================
+// GERAR LINK DE VISUALIZAÇÃO
+// ============================================================
+
+async function gerarLinkVisualizacao(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`🔗 [ORCAMENTOS] Gerando link de visualização para orçamento #${idOrcamento}...`);
+
+    // Verificar se orçamento existe
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.token_visualizacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado!'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Gerar novo token se não existir ou gerar um novo sempre
+    const token = Buffer.from(`${idOrcamento}-${Date.now()}-${Math.random()}`)
+      .toString('base64')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .substring(0, 32);
+
+    // Atualizar token no banco
+    await pool.query(`
+      UPDATE "orcamento_servico"
+      SET token_visualizacao = $1
+      WHERE id_orcamento = $2
+    `, [token, idOrcamento]);
+
+    // URL de produção
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://calendario-boat.vercel.app';
+
+    const url = `${baseUrl}/visualizar-orcamento.html?token=${token}`;
+
+    // Registrar LOG
+    await adicionarLog(
+      idOrcamento,
+      'LINK_GERADO',
+      `Link de visualização gerado`,
+      userId
+    );
+
+    // Enviar mensagem com o link
+    await sock.sendMessage(groupId, {
+      text: `🔗 *LINK DE VISUALIZAÇÃO GERADO*
+
+📋 ${orc.numero}
+🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}
+
+━━━━━━━━━━━━━━━━
+
+*Link para visualização:*
+
+${url}
+
+━━━━━━━━━━━━━━━━
+
+✅ Link válido e seguro
+📱 Funciona em qualquer dispositivo
+👁️ Mostra apenas informações públicas
+
+📎 Anexos visíveis podem ser acessados pelo cabeçalho
+
+⚠️ *IMPORTANTE:*
+Não compartilhe este link publicamente.
+Envie apenas para pessoas autorizadas a visualizar este orçamento.
+
+Voltando aos detalhes...`
+    });
+
+    await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao gerar link:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao gerar link de visualização.\n\n${error.message}`
+    });
+  }
+}
+
 async function salvarRateio(sock, userId, groupId, estado) {
   const client = await pool.connect();
 
@@ -3507,6 +3603,7 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 4️⃣ ✅ Aprovar orçamento
 5️⃣ 💵 Enviar cobrança
 6️⃣ ⚙️ Alterar % Gestão
+7️⃣ 🔗 Gerar Link de Visualização
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
@@ -3712,9 +3809,13 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await alterarPercentualGestao(sock, userId, groupId, estado.id_orcamento);
         break;
 
+      case '7': // Gerar Link de Visualização
+        await gerarLinkVisualizacao(sock, userId, groupId, estado.id_orcamento);
+        break;
+
       default:
         await sock.sendMessage(groupId, {
-          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6 ou 0.'
+          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6, 7 ou 0.'
         });
     }
     return;
