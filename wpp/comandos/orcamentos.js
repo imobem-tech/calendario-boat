@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241642
+// wpp/comandos/orcamentos.js — V.2610241646
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2442,6 +2442,7 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
 Total cotas: ${totalCotas}
 
 1️⃣ ✅ Confirmar e salvar
+2️⃣ 📝 Outra distribuição
 0️⃣ Cancelar
 ━━━━━━━━━━━━━━━━`;
 
@@ -2450,13 +2451,225 @@ Total cotas: ${totalCotas}
     atualizarEstado(userId, {
       etapa: 'CONFIRMAR_RATEIO',
       id_orcamento: idOrcamento,
-      rateio: rateio
+      rateio: rateio,
+      valor_total: valorTotal,
+      cotistas_disponiveis: cotistas
     });
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao definir rateio:', error);
     await sock.sendMessage(groupId, {
       text: `❌ Erro ao calcular rateio.\n\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
+// DISTRIBUIÇÃO MANUAL DE RATEIO
+// ============================================================
+
+async function iniciarDistribuicaoManual(sock, userId, groupId, estado) {
+  try {
+    const mensagem = `📝 *DISTRIBUIÇÃO MANUAL*
+━━━━━━━━━━━━━━━━
+
+💰 Valor total: ${formatarMoeda(estado.valor_total)}
+📊 Valor restante: ${formatarMoeda(estado.valor_total)}
+
+*COTISTAS DISPONÍVEIS:*
+
+${estado.cotistas_disponiveis.map(c => {
+  const nomeExibir = c.nome_resumido ? ` - ${c.nome_resumido}` : '';
+  return `${c.grupo_letra}${nomeExibir}`;
+}).join('\n')}
+
+━━━━━━━━━━━━━━━━
+Digite o código do cotista (ex: E1)
+ou 0 para cancelar`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      ...estado,
+      etapa: 'DIST_MANUAL_CODIGO',
+      distribuicao_manual: [],
+      valor_distribuido: 0
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao iniciar distribuição manual:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao iniciar distribuição manual.\n\n${error.message}`
+    });
+  }
+}
+
+async function processarCodigoCotistaManual(sock, userId, groupId, estado, codigo) {
+  try {
+    const codigoUpper = codigo.trim().toUpperCase();
+
+    // Verificar se o código é válido
+    const cotista = estado.cotistas_disponiveis.find(c => c.grupo_letra === codigoUpper);
+
+    if (!cotista) {
+      await sock.sendMessage(groupId, {
+        text: `❌ Código inválido! Use um dos códigos listados (ex: E1, W1).`
+      });
+      return;
+    }
+
+    // Verificar se já foi adicionado
+    const jaAdicionado = estado.distribuicao_manual.find(d => d.grupo_letra === codigoUpper);
+    if (jaAdicionado) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ ${codigoUpper} já foi adicionado com ${formatarMoeda(jaAdicionado.valor)}!\n\nDigite outro código.`
+      });
+      return;
+    }
+
+    const valorRestante = estado.valor_total - estado.valor_distribuido;
+    const nomeExibir = cotista.nome_resumido ? ` - ${cotista.nome_resumido}` : '';
+
+    await sock.sendMessage(groupId, {
+      text: `✅ ${codigoUpper}${nomeExibir}
+
+Digite o valor para este cotista:
+
+💰 Total do orçamento: ${formatarMoeda(estado.valor_total)}
+📊 Já distribuído: ${formatarMoeda(estado.valor_distribuido)}
+📌 Falta distribuir: ${formatarMoeda(valorRestante)}
+
+ou 0 para cancelar`
+    });
+
+    atualizarEstado(userId, {
+      ...estado,
+      etapa: 'DIST_MANUAL_VALOR',
+      cotista_atual: cotista
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao processar código:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao processar código.\n\n${error.message}`
+    });
+  }
+}
+
+async function processarValorCotistaManual(sock, userId, groupId, estado, textoValor) {
+  try {
+    const valor = parseFloat(textoValor.replace(',', '.'));
+
+    if (isNaN(valor) || valor <= 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Valor inválido! Digite um número maior que zero.'
+      });
+      return;
+    }
+
+    const valorRestante = estado.valor_total - estado.valor_distribuido;
+
+    if (valor > valorRestante) {
+      await sock.sendMessage(groupId, {
+        text: `❌ Valor excede o restante!
+
+💰 Falta distribuir: ${formatarMoeda(valorRestante)}
+⚠️ Você digitou: ${formatarMoeda(valor)}
+
+Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
+      });
+      return;
+    }
+
+    // Adicionar à distribuição
+    const novaDistribuicao = [
+      ...estado.distribuicao_manual,
+      {
+        grupo_letra: estado.cotista_atual.grupo_letra,
+        cod_pessoa: estado.cotista_atual.cod_pessoa,
+        nome_resumido: estado.cotista_atual.nome_resumido,
+        valor: valor,
+        percentual: (valor / estado.valor_total) * 100
+      }
+    ];
+
+    const novoValorDistribuido = estado.valor_distribuido + valor;
+    const novoRestante = estado.valor_total - novoValorDistribuido;
+
+    // Verificar se completou 100%
+    if (Math.abs(novoRestante) < 0.01) {
+      // Completou!
+      let mensagem = `✅ *DISTRIBUIÇÃO COMPLETA!*
+━━━━━━━━━━━━━━━━
+
+💰 Total: ${formatarMoeda(estado.valor_total)}
+
+`;
+
+      novaDistribuicao.forEach(d => {
+        const nomeExibir = d.nome_resumido ? ` - ${d.nome_resumido}` : '';
+        mensagem += `${d.grupo_letra}${nomeExibir}
+   ${formatarMoeda(d.valor)} (${d.percentual.toFixed(2)}%)
+
+`;
+      });
+
+      mensagem += `━━━━━━━━━━━━━━━━
+1️⃣ ✅ Salvar
+0️⃣ Cancelar`;
+
+      await sock.sendMessage(groupId, { text: mensagem });
+
+      atualizarEstado(userId, {
+        ...estado,
+        etapa: 'CONFIRMAR_DIST_MANUAL',
+        rateio: novaDistribuicao.map(d => ({
+          ...d,
+          total_cotas: 0,
+          valor_servico: d.valor,
+          valor_taxa: 0,
+          valor_cotista: d.valor
+        }))
+      });
+
+    } else {
+      // Ainda falta distribuir
+      const nomeExibir = estado.cotista_atual.nome_resumido ? ` - ${estado.cotista_atual.nome_resumido}` : '';
+
+      let mensagem = `✅ ${estado.cotista_atual.grupo_letra}${nomeExibir}: ${formatarMoeda(valor)}
+
+📊 *RESUMO ATUAL:*
+`;
+
+      novaDistribuicao.forEach(d => {
+        const nomeD = d.nome_resumido ? ` - ${d.nome_resumido}` : '';
+        mensagem += `   ${d.grupo_letra}${nomeD}: ${formatarMoeda(d.valor)}\n`;
+      });
+
+      mensagem += `
+━━━━━━━━━━━━━━━━
+💰 Total: ${formatarMoeda(estado.valor_total)}
+✅ Distribuído: ${formatarMoeda(novoValorDistribuido)}
+⏳ Falta: ${formatarMoeda(novoRestante)}
+━━━━━━━━━━━━━━━━
+
+Digite o próximo código de cotista
+ou 0 para cancelar`;
+
+      await sock.sendMessage(groupId, { text: mensagem });
+
+      atualizarEstado(userId, {
+        ...estado,
+        etapa: 'DIST_MANUAL_CODIGO',
+        distribuicao_manual: novaDistribuicao,
+        valor_distribuido: novoValorDistribuido
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao processar valor:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao processar valor.\n\n${error.message}`
     });
   }
 }
@@ -3218,8 +3431,53 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       return;
     }
 
+    if (texto === '2') {
+      await iniciarDistribuicaoManual(sock, userId, groupId, estado);
+      return;
+    }
+
     await sock.sendMessage(groupId, {
-      text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
+      text: '❌ Opção inválida! Digite 1, 2 ou 0.'
+    });
+    return;
+  }
+
+  // Distribuição manual - aguardando código do cotista
+  if (estado.etapa === 'DIST_MANUAL_CODIGO') {
+    if (texto === '0') {
+      await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await processarCodigoCotistaManual(sock, userId, groupId, estado, texto);
+    return;
+  }
+
+  // Distribuição manual - aguardando valor
+  if (estado.etapa === 'DIST_MANUAL_VALOR') {
+    if (texto === '0') {
+      await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await processarValorCotistaManual(sock, userId, groupId, estado, texto);
+    return;
+  }
+
+  // Confirmar distribuição manual
+  if (estado.etapa === 'CONFIRMAR_DIST_MANUAL') {
+    if (texto === '0') {
+      await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1') {
+      await salvarRateio(sock, userId, groupId, estado);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 para salvar ou 0 para cancelar.'
     });
     return;
   }
