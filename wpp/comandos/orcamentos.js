@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241738
+// wpp/comandos/orcamentos.js — V.2610241747
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2327,6 +2327,7 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
         os.id_orcamento,
         os.numero,
         os.id_embarcacao,
+        os.status,
         os.valor_servicos as subtotal,
         os.taxa_servico_valor,
         os.valor_total,
@@ -2346,6 +2347,21 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
     }
 
     const orc = orcResult.rows[0];
+
+    // Verificar se orçamento já foi aprovado
+    if (orc.status === 'APROVADO') {
+      await sock.sendMessage(groupId, {
+        text: `🔒 *RATEIO BLOQUEADO*
+
+Este orçamento já foi APROVADO!
+
+⚠️ O rateio não pode mais ser alterado.
+
+Voltando aos detalhes...`
+      });
+      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
 
     // Buscar cotistas da embarcação
     // IMPORTANTE: O relacionamento é por Num_PB, não por Código!
@@ -3086,6 +3102,24 @@ async function salvarRateio(sock, userId, groupId, estado) {
     await client.query('BEGIN');
 
     const { id_orcamento, rateio } = estado;
+
+    // Verificar se orçamento já foi aprovado
+    const statusCheck = await client.query(`
+      SELECT status FROM "orcamento_servico" WHERE id_orcamento = $1
+    `, [id_orcamento]);
+
+    if (statusCheck.rows[0]?.status === 'APROVADO') {
+      await client.query('ROLLBACK');
+      await sock.sendMessage(groupId, {
+        text: `🔒 *RATEIO BLOQUEADO*
+
+Este orçamento já foi APROVADO!
+
+⚠️ O rateio não pode mais ser alterado.`
+      });
+      client.release();
+      return;
+    }
 
     // Apagar rateio anterior se existir
     await client.query(`
