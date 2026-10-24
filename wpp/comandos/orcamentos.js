@@ -28,10 +28,13 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 
+// Usar mesma configuração do server.js
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
+
+console.log('🔌 Pool de conexão orçamentos inicializado');
 
 // ============================================================
 // GERENCIAMENTO DE ESTADO
@@ -162,6 +165,9 @@ Digite o número da opção:`;
 
 async function listarEmbarcacoes(sock, userId, groupId) {
   try {
+    console.log('🔍 [ORCAMENTOS] Buscando embarcações ALLMAX...');
+    console.log('🔌 [ORCAMENTOS] Database URL:', process.env.POSTGRES_URL ? 'Configurado' : 'NÃO configurado');
+
     // Buscar apenas embarcações ALLMAX (Cod_Cliente = 4255)
     const result = await pool.query(`
       SELECT
@@ -174,7 +180,10 @@ async function listarEmbarcacoes(sock, userId, groupId) {
       ORDER BY "Num_PB"
     `);
 
+    console.log(`✅ [ORCAMENTOS] ${result.rows.length} embarcações encontradas`);
+
     if (result.rows.length === 0) {
+      console.log('⚠️ [ORCAMENTOS] Nenhuma embarcação ALLMAX ativa');
       await sock.sendMessage(groupId, {
         text: '❌ Nenhuma embarcação ALLMAX encontrada.'
       });
@@ -205,9 +214,12 @@ Escolha a embarcação:
     });
 
   } catch (error) {
-    console.error('❌ Erro ao listar embarcações:', error);
+    console.error('❌ [ORCAMENTOS] Erro ao listar embarcações:', error);
+    console.error('❌ [ORCAMENTOS] Stack:', error.stack);
+    console.error('❌ [ORCAMENTOS] Mensagem:', error.message);
+
     await sock.sendMessage(groupId, {
-      text: '❌ Erro ao buscar embarcações. Tente novamente.'
+      text: `❌ Erro ao buscar embarcações.\n\n*Detalhes técnicos:*\n${error.message}\n\nTente novamente ou contate o suporte.`
     });
   }
 }
