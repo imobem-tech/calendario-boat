@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610242009
+// wpp/comandos/orcamentos.js — V.2610242053
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3362,7 +3362,7 @@ async function gerarLinkVisualizacao(sock, userId, groupId, idOrcamento) {
     // URL de produção
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : 'https://calendario-boat.vercel.app';
+      : 'https://allmaxcalendar.vercel.app';
 
     const url = `${baseUrl}/visualizar-orcamento.html?token=${token}`;
 
@@ -3668,6 +3668,16 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   const texto = mensagem.trim ? mensagem.trim() : String(mensagem);
 
+  // ============================================================
+  // HANDLER GLOBAL: Voltar aos detalhes do orçamento com "0"
+  // ============================================================
+  // REGRA: Se digitou "0" e está em um estado derivado do menu de detalhes
+  // (tem id_orcamento e NÃO está no menu principal), volta aos detalhes
+  if (texto === '0' && estado.id_orcamento && estado.etapa !== 'MENU') {
+    await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
   // Menu principal
   if (estado.etapa === 'MENU') {
     switch (texto) {
@@ -3774,10 +3784,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Submenu de detalhes do orçamento
   if (estado.etapa === 'SUBMENU_DETALHES') {
-    if (texto === '0') {
-      await mostrarMenuOrcamentos(sock, userId, groupId);
-      return;
-    }
+    // Handler de "0" agora é global (volta aos detalhes se tem id_orcamento)
 
     switch (texto) {
       case '1': // Acessar HISTÓRICO (LOG)
@@ -3818,10 +3825,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Menu de histórico e anexos
   if (estado.etapa === 'MENU_HISTORICO') {
-    if (texto === '0') {
-      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     switch (texto) {
       case '1': // Ver LOG
@@ -3856,10 +3860,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Visualizar LOG
   if (estado.etapa === 'VISUALIZAR_LOG') {
-    if (texto === '0') {
-      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
     await sock.sendMessage(groupId, {
       text: '❌ Digite 0 para voltar ao menu.'
     });
@@ -3868,10 +3869,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Registrar observação privada
   if (estado.etapa === 'REGISTRAR_OBSERVACAO') {
-    if (texto === '0') {
-      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     // Salvar observação como LOG
     await adicionarLog(
@@ -3891,10 +3889,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Aguardando nome do anexo
   if (estado.etapa === 'AGUARDANDO_NOME_ANEXO') {
-    if (texto === '0') {
-      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     await solicitarVisibilidadeAnexo(sock, userId, groupId, estado, texto);
     return;
@@ -3902,10 +3897,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Aguardando visibilidade do anexo
   if (estado.etapa === 'AGUARDANDO_VISIBILIDADE_ANEXO') {
-    if (texto === '0') {
-      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     if (texto === '1' || texto === '2') {
       const visivelCliente = texto === '1';
@@ -3921,10 +3913,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Ver anexos
   if (estado.etapa === 'VER_ANEXOS' || estado.etapa === 'VER_ANEXOS_VAZIO') {
-    if (texto === '0') {
-      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     // TODO: Implementar opções de anexo individual (baixar, deletar, etc)
     await sock.sendMessage(groupId, {
@@ -3935,10 +3924,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Confirmar rateio
   if (estado.etapa === 'CONFIRMAR_RATEIO') {
-    if (texto === '0') {
-      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     if (texto === '1') {
       await salvarRateio(sock, userId, groupId, estado);
@@ -3958,10 +3944,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
   // Confirmar aprovação
   if (estado.etapa === 'CONFIRMAR_APROVACAO') {
-    if (texto === '0') {
-      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-      return;
-    }
+    // Handler de "0" é global (volta aos detalhes)
 
     if (texto === '1') {
       await confirmarAprovacaoOrcamento(sock, userId, groupId, estado.id_orcamento);
@@ -4071,10 +4054,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       // Edição de itens de orçamento já salvo
       const textoUpper = texto.toUpperCase();
 
-      if (texto === '0') {
-        await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-        return;
-      }
+      // Handler de "0" é global (volta aos detalhes)
 
       // Adicionar item
       if (textoUpper === 'A') {
