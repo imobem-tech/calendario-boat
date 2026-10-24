@@ -173,7 +173,7 @@ async function listarEmbarcacoes(sock, userId, groupId) {
       SELECT
         "Código" as id,
         "Num_PB" as numero_pb,
-        "Nome_Embarcação" as nome
+        "Nome_Embar" as nome
       FROM "P_BOAT_1_Embarcacao"
       WHERE "Ativo" = TRUE
         AND "Cod_Cliente" = 4255
