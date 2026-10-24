@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241603
+// wpp/comandos/orcamentos.js — V.2610241607
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1041,6 +1041,41 @@ Carregando lista...`
   }
 }
 
+async function confirmarExclusaoItem(sock, userId, groupId, estado, numeroItem) {
+  const item = estado.itens.find(i => i.ordem === numeroItem);
+
+  if (!item) {
+    await sock.sendMessage(groupId, {
+      text: `❌ Item #${numeroItem} não encontrado.`
+    });
+    return;
+  }
+
+  const mensagem = `⚠️ *CONFIRMAR EXCLUSÃO*
+━━━━━━━━━━━━━━━━
+
+Deseja realmente excluir este item?
+
+📦 Item #${numeroItem}
+${item.descricao}
+💰 ${formatarMoeda(item.valor_total)}
+
+━━━━━━━━━━━━━━━━
+
+1️⃣ ✅ SIM - Excluir
+0️⃣ ❌ NÃO - Cancelar
+
+━━━━━━━━━━━━━━━━`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'CONFIRMAR_EXCLUSAO_ITEM',
+    item_excluir: numeroItem
+  });
+}
+
 async function excluirItemOrcamento(sock, userId, groupId, estado, numeroItem) {
   const client = await pool.connect();
 
@@ -1097,7 +1132,7 @@ async function excluirItemOrcamento(sock, userId, groupId, estado, numeroItem) {
     await adicionarLog(
       estado.id_orcamento,
       'ITEM_EXCLUIDO',
-      `Item #${numeroItem}: ${item.descricao} - ${formatarMoeda(item.valor_total)}`,
+      `Item #${numeroItem} excluído: ${item.descricao} - ${formatarMoeda(item.valor_total)}`,
       userId
     );
 
@@ -3152,6 +3187,26 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     return;
   }
 
+  // Confirmar exclusão de item
+  if (estado.etapa === 'CONFIRMAR_EXCLUSAO_ITEM') {
+    if (texto === '0') {
+      // Cancelar - volta para edição de itens
+      await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1') {
+      // Confirmar exclusão
+      await excluirItemOrcamento(sock, userId, groupId, estado, estado.item_excluir);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 para excluir ou 0 para cancelar.'
+    });
+    return;
+  }
+
   // Fluxo de criação
   switch (estado.etapa) {
     case 'SELECIONAR_EMBARCACAO':
@@ -3215,7 +3270,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
           break;
         }
 
-        await excluirItemOrcamento(sock, userId, groupId, estado, numero);
+        await confirmarExclusaoItem(sock, userId, groupId, estado, numero);
         break;
       }
 
@@ -3260,4 +3315,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241603
+// V.2610241607
