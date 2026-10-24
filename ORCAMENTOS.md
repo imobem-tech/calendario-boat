@@ -1,6 +1,6 @@
 # 💼 SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 
-**Versão:** V.2610241503  
+**Versão:** V.2610241528  
 **Data:** 24/10/2026  
 **Arquivo:** `wpp/comandos/orcamentos.js`
 
@@ -15,8 +15,10 @@
 5. [Consultar Orçamentos](#consultar-orçamentos)
 6. [Detalhes do Orçamento](#detalhes-do-orçamento)
 7. [Editar Itens](#editar-itens)
-8. [Sistema de LOG](#sistema-de-log)
-9. [Validações e Regras](#validações-e-regras)
+8. [Sistema de LOG e Histórico](#sistema-de-log-e-histórico)
+9. [Observações Privadas](#observações-privadas)
+10. [Sistema de Anexos](#sistema-de-anexos)
+11. [Validações e Regras](#validações-e-regras)
 
 ---
 
@@ -658,62 +660,171 @@ Retorna para o menu de detalhes do orçamento.
 
 ---
 
-## 📋 SISTEMA DE LOG
+## 📋 SISTEMA DE LOG E HISTÓRICO
 
 **Opção 1 do menu de detalhes**
 
+### **Submenu de Histórico e Anexos:**
+
+Ao escolher "1️⃣ Acessar HISTÓRICO (LOG)" no menu de detalhes:
+
 ```
 ━━━━━━━━━━━━━━━━
-📋 HISTÓRICO (LOG)
+📋 HISTÓRICO E ANEXOS
 ━━━━━━━━━━━━━━━━
-🆔 Orçamento: ORC-2610241430
-🚤 Embarcação: PB-002
+🆔 ORC-2610241430
+📝 Manutenção preventiva do motor
+🚤 PB-002
+━━━━━━━━━━━━━━━━
+
+OPÇÕES:
+
+1️⃣ 📜 Ver LOG (histórico)
+2️⃣ 📝 Registrar observação privada
+3️⃣ 📎 Inserir anexo
+4️⃣ 📂 Ver anexos
+0️⃣ 🔙 Voltar
+
+━━━━━━━━━━━━━━━━
+Digite o número da opção:
+```
+
+---
+
+### **1️⃣ VER LOG (Histórico)**
+
+Mostra todas as ações realizadas no orçamento:
+
+```
+━━━━━━━━━━━━━━━━
+📜 LOG (HISTÓRICO)
 ━━━━━━━━━━━━━━━━
 
 ━━━━━━━━━━━━━━━━
 2026/10/24-15:05
 Item #2: Valor alterado de R$ 150,00 para R$ 180,00
-USR: 5563999887766
+USR: 63999887766
 ━━━━━━━━━━━━━━━━
 2026/10/24-15:04
 Item #2: Descrição alterada de "Filtro" para "Filtro de óleo novo"
-USR: 5563999887766
+USR: 63999887766
 ━━━━━━━━━━━━━━━━
 2026/10/24-15:03
 Item #3: Mão de obra - R$ 320,00
-USR: 5563999887766
+USR: 63999887766
 ━━━━━━━━━━━━━━━━
 2026/10/24-15:02
 Item #2: Filtro de óleo - R$ 150,00
-USR: 5563999887766
+USR: 63999887766
 ━━━━━━━━━━━━━━━━
 2026/10/24-14:58
-Orçamento criado
 Título: Manutenção preventiva do motor
 Embarcação: PB-002
 Valor Total: R$ 780,00
 Itens: 2
+USR: 63999887766
 ━━━━━━━━━━━━━━━━
 
 ━━━━━━━━━━━━━━━━
-Digite 0 para voltar aos detalhes.
+Digite 0 para voltar ao menu.
 ```
+
+**Formato do telefone no LOG:**
+- Exibe apenas os últimos 11 dígitos (padrão brasileiro: DDD + número)
+- Exemplo: `63999887766` em vez do formato técnico completo
+
+---
 
 ### **Tipos de LOG:**
 
 | Ação | Quando | Informação Registrada |
 |------|--------|----------------------|
-| `CRIOU` | Ao criar orçamento | Título, embarcação, valor, itens |
-| `ITEM_ADICIONADO` | Ao adicionar item | Descrição e valor do item |
+| `ORCAMENTO_CRIADO` | Ao criar orçamento | Título, embarcação, valor total, qtd itens |
+| `ITEM_ADICIONADO` | Ao adicionar item | Item #X: Descrição - Valor |
 | `ITEM_EDITADO` | Ao editar item | Antes/depois (descrição ou valor) |
-| `ITEM_EXCLUIDO` | Ao excluir item | Descrição e valor excluído |
+| `ITEM_EXCLUIDO` | Ao excluir item | Item #X: Descrição - Valor |
+| `OBSERVACAO_PRIVADA` | Observação manual | Texto livre do usuário |
 
-**Dados salvos:**
+**Dados salvos em `orcamento_log`:**
 - `id_orcamento` - ID do orçamento
-- `acao` - Tipo da ação
+- `acao` - Tipo da ação (ver tabela acima)
 - `descricao` - Detalhes da ação
 - `data_hora` - Timestamp (America/Sao_Paulo)
-- `ip_origem` - Telefone do usuário WhatsApp
+- `ip_origem` - Telefone WhatsApp (11 dígitos)
+
+---
+
+## 📝 OBSERVAÇÕES PRIVADAS
+
+**Opção 2 do submenu de histórico**
+
+### **Fluxo de Registro:**
+
+**1. Solicitar observação:**
+```
+📝 REGISTRAR OBSERVAÇÃO PRIVADA
+━━━━━━━━━━━━━━━━
+
+Digite a observação que deseja registrar:
+
+💡 Será registrado como LOG privado
+
+0️⃣ Cancelar
+```
+
+**2. Digitar observação:**
+```
+Cliente solicitou prioridade na execução devido a viagem programada
+```
+
+**3. Confirmação:**
+```
+✅ Observação registrada com sucesso!
+
+📝 Cliente solicitou prioridade na execução devido a viagem programada
+
+Voltando ao menu...
+```
+
+### **Características:**
+- ✅ Texto livre, sem limite de caracteres
+- ✅ Registrado automaticamente no LOG
+- ✅ Tipo de ação: `OBSERVACAO_PRIVADA`
+- ✅ Inclui timestamp e usuário WhatsApp
+- ✅ Aparece no histórico completo do orçamento
+- ✅ Privado (não aparece para o cliente)
+
+### **Casos de Uso:**
+- 📌 Anotações sobre solicitações específicas do cliente
+- 📌 Observações sobre prioridade ou urgência
+- 📌 Lembretes sobre condições especiais
+- 📌 Informações de contexto para a equipe
+
+---
+
+## 📎 SISTEMA DE ANEXOS
+
+**Opções 3 e 4 do submenu de histórico**
+
+### **Status:** 🚧 Em implementação
+
+### **Funcionalidades Planejadas:**
+
+#### **3️⃣ Inserir Anexo**
+- Upload de arquivo via WhatsApp
+- Nome amigável para o anexo
+- Opção: Visível (cliente pode ver) ou Privado (só gestores)
+- Múltiplos formatos suportados
+- Múltiplos anexos por orçamento
+
+#### **4️⃣ Ver Anexos**
+- Listagem de todos os anexos do orçamento
+- Indicação de anexos públicos vs privados
+- Download/visualização via WhatsApp
+- Data de upload e usuário
+
+### **Padrão de Implementação:**
+Seguirá o mesmo modelo usado nos **extratos bancários**, onde já existe sistema de anexos funcional.
 
 ---
 
