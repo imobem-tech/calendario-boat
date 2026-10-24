@@ -1,525 +1,422 @@
-# 🚧 DESENVOLVIMENTO DO SISTEMA DE ANEXOS - ORÇAMENTOS
+# 📊 SISTEMA DE ORÇAMENTOS VIA WHATSAPP - DOCUMENTAÇÃO
 
-**Versão:** V.2610241540  
-**Data Início:** 24/10/2026  
-**Status:** EM ANDAMENTO
-
----
-
-## 📋 CONTEXTO
-
-Implementação do sistema de anexos para orçamentos via WhatsApp, seguindo o mesmo modelo usado nos **extratos bancários**.
+**Versão:** V.2610241646  
+**Última Atualização:** 24/10/2026 16:46  
+**Status:** ✅ OPERACIONAL
 
 ---
 
-## ✅ O QUE JÁ FOI IMPLEMENTADO
+## 📋 VISÃO GERAL
 
-### **1. Submenu de HISTÓRICO transformado (V.2610241528)**
+Sistema completo de gestão de orçamentos via WhatsApp, integrado ao grupo ORÇAMENTOS (120363412373130577@g.us).
 
-Anteriormente: Clicar em "Acessar HISTÓRICO" mostrava direto o LOG.
+**Principais Funcionalidades:**
+- ✅ Criação de orçamentos multi-item
+- ✅ Gestão de itens (adicionar, editar, excluir)
+- ✅ Sistema de aprovação
+- ✅ Rateio automático por cotas
+- ✅ Rateio manual personalizado
+- ✅ Geração de cobranças (Contas a Receber)
+- ✅ Sistema de LOG completo
+- ✅ Observações privadas
+- ✅ Upload de anexos
 
-Agora: Mostra um submenu com 4 opções:
+---
+
+## 🗂️ ESTRUTURA DE TABELAS
+
+### **orcamento_servico**
+Tabela principal de orçamentos.
+
+**Campos principais:**
+- `id_orcamento` - ID sequencial
+- `numero` - Código único (ORC-AAMMDDHHMM)
+- `id_embarcacao` - FK para P_BOAT_1_Embarcacao
+- `descricao` - Título do orçamento
+- `valor_servicos` - Subtotal dos itens
+- `taxa_servico_perc` - % da taxa (padrão 20%)
+- `taxa_servico_valor` - Valor da taxa em R$
+- `valor_total` - Total final
+- `status` - RASCUNHO, APROVADO, CANCELADO
+
+### **orcamento_item**
+Itens do orçamento (serviços/produtos).
+
+**Campos:**
+- `id_item` - ID sequencial
+- `id_orcamento` - FK para orcamento_servico
+- `ordem` - Número do item (1, 2, 3...)
+- `descricao` - Descrição do item
+- `valor_unitario` - Valor por unidade
+- `quantidade` - Quantidade
+- `valor_total` - Total do item
+
+### **orcamento_rateio**
+Divisão do orçamento entre cotistas.
+
+**Campos:**
+- `id_rateio` - ID sequencial
+- `id_orcamento` - FK para orcamento_servico
+- `cod_pessoa` - FK para Cliente
+- `grupo_letra` - Código do grupo (A1, W2, etc)
+- `qtd_cotas` - Quantidade de cotas
+- `percentual` - % do rateio
+- `valor_servico` - Valor do serviço
+- `valor_taxa` - Valor da taxa
+- `valor_cotista` - Total do cotista
+
+### **orcamento_log**
+Histórico completo de ações.
+
+**Ações registradas:**
+- ORCAMENTO_CRIADO
+- ITEM_ADICIONADO
+- ITEM_EDITADO
+- ITEM_EXCLUIDO
+- OBSERVACAO_PRIVADA
+- ORCAMENTO_APROVADO
+- RATEIO_DEFINIDO
+- COBRANCA_GERADA
+- ANEXO_ADICIONADO
+
+### **orcamento_anexo**
+Arquivos anexados ao orçamento.
+
+**Campos:**
+- `id_anexo` - ID sequencial
+- `id_orcamento` - FK para orcamento_servico
+- `nome_amigavel` - Nome exibido
+- `nome_arquivo` - Nome técnico
+- `url_arquivo` - URL no Vercel Blob
+- `visivel_cliente` - true/false
+- `tipo_arquivo` - Extensão
+- `tamanho` - Bytes
+- `usuario_upload` - LID ou telefone
+
+---
+
+## 🔄 FLUXO PRINCIPAL
+
+### **1. Criação de Orçamento**
 
 ```
-━━━━━━━━━━━━━━━━
-📋 HISTÓRICO E ANEXOS
-━━━━━━━━━━━━━━━━
-🆔 ORC-2610241430
-📝 Manutenção preventiva do motor
-🚤 PB-002
-━━━━━━━━━━━━━━━━
-
-OPÇÕES:
-
-1️⃣ 📜 Ver LOG (histórico)
-2️⃣ 📝 Registrar observação privada
-3️⃣ 📎 Inserir anexo
-4️⃣ 📂 Ver anexos
-0️⃣ 🔙 Voltar
+Menu → Criar orçamento
+  ↓
+Escolher embarcação
+  ↓
+Digite título
+  ↓
+Adicionar itens (descrição + valor)
+  ↓
+Revisar e confirmar
+  ↓
+✅ Orçamento criado (RASCUNHO)
 ```
 
-**Arquivo:** `wpp/comandos/orcamentos.js`  
-**Função:** `mostrarMenuHistorico()`  
-**Estado:** `MENU_HISTORICO`
+### **2. Rateio Automático**
+
+```
+Ver detalhes → Definir rateio
+  ↓
+Sistema busca cotistas da embarcação
+  ↓
+Calcula divisão proporcional por cotas
+  ↓
+Exibe rateio com nomes dos cotistas
+  ↓
+Opções:
+  1 - Confirmar e salvar
+  2 - Outra distribuição (manual)
+  0 - Cancelar
+```
+
+### **3. Rateio Manual**
+
+```
+Escolhe "2 - Outra distribuição"
+  ↓
+Sistema lista cotistas disponíveis
+  ↓
+Digite código (ex: E1)
+  ↓
+Digite valor para E1
+  ↓
+Sistema mostra resumo e saldo restante
+  ↓
+Repetir até atingir 100%
+  ↓
+✅ Confirmar e salvar
+```
+
+### **4. Aprovação**
+
+```
+Ver detalhes → Aprovar
+  ↓
+Verifica se tem rateio definido
+  ↓
+Altera status para APROVADO
+  ↓
+Registra data e usuário de aprovação
+```
+
+### **5. Geração de Cobrança**
+
+```
+Menu → Pendentes de cobrança
+  ↓
+Escolhe orçamento aprovado
+  ↓
+Sistema cria Contas a Receber para cada cotista
+  ↓
+Vencimento = Data atual + 30 dias
+  ↓
+Registra id_cobranca no orçamento
+```
 
 ---
 
-### **2. Observações Privadas Funcionando (V.2610241528)**
+## 🔑 FUNCIONALIDADES IMPLEMENTADAS
 
-Fluxo completo implementado:
+### ✅ **Relacionamento de Cotistas (V.2610241635)**
 
-1. Usuário escolhe opção 2
-2. Sistema pede: "Digite a observação"
-3. Usuário digita texto livre
-4. Sistema salva como LOG tipo `OBSERVACAO_PRIVADA`
-5. Confirmação e retorno ao menu
+**Problema resolvido:**
+- Query usava relacionamento ERRADO entre tabelas
+- Campo `Cod_Embarcacao` em P_BOAT_4_Autorizados armazena `Num_PB`, não `Código`
 
-**Função:** Integrada no processador principal  
-**Estado:** `REGISTRAR_OBSERVACAO`  
-**LOG:** Tabela `orcamento_log` com ação `OBSERVACAO_PRIVADA`
-
----
-
-### **3. Estrutura SQL Completa (V.2610241535)**
-
-**Arquivo:** `sql/criar_tabela_orcamento_anexo.sql`
-
+**Solução:**
 ```sql
-CREATE TABLE IF NOT EXISTS orcamento_anexo (
-  id_anexo SERIAL PRIMARY KEY,
-  id_orcamento INTEGER NOT NULL REFERENCES orcamento_servico(id_orcamento) ON DELETE CASCADE,
-  nome_amigavel VARCHAR(255) NOT NULL,      -- Nome dado pelo usuário
-  nome_arquivo VARCHAR(500) NOT NULL,        -- Nome técnico no storage
-  url_arquivo TEXT NOT NULL,                 -- URL do Vercel Blob
-  visivel_cliente BOOLEAN DEFAULT true,      -- true = cliente vê, false = só gestores
-  tipo_arquivo VARCHAR(50),                  -- Extensão/MIME type
-  tamanho INTEGER,                           -- Bytes
-  data_upload TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'America/Sao_Paulo'),
-  usuario_upload VARCHAR(50)                 -- Telefone WhatsApp (11 dígitos)
-);
+FROM "P_BOAT_1_Embarcacao" e
+INNER JOIN "P_BOAT_4_Autorizados" a
+  ON e."Num_PB" = a."Cod_Embarcacao"  -- JOIN CORRETO
+WHERE e."Código" = $1  -- ID da embarcação
+  AND e."Cod_Cliente" = $2
+  AND a."Dt_Desautorizacao" IS NULL
+  AND a."Dt_Cancelamento" IS NULL
+  AND a."Cod_Pessoa" NOT IN (3327, 4135, 4138, 3678)
 ```
 
-**Índices:**
-- `idx_orcamento_anexo_orcamento` (busca por orçamento)
-- `idx_orcamento_anexo_visivel` (filtro visibilidade)
-
-**Status:** SQL criado, TABELA AINDA NÃO EXECUTADA NO BANCO
+**Resultado:** De 0 para 13 cotistas encontrados no teste!
 
 ---
 
-## ⏳ O QUE FALTA IMPLEMENTAR
+### ✅ **Upload de Anexos (V.2610241620)**
 
-### **FASE 1: Funções Base**
+**Problema resolvido:**
+- Sistema travava ao enviar imagem/arquivo
+- Não detectava mensagens de mídia
 
-#### **A) Processar Anexo do WhatsApp**
+**Solução:**
+- `server.js` passa objeto `msg` completo
+- `orcamentos.js` processa `mensagemCompleta.message`
+- Detecta: imageMessage, documentMessage, videoMessage, audioMessage
 
+**Código:**
 ```javascript
-async function processarAnexoOrcamento(sock, userId, groupId, mensagem) {
-  // 1. Detectar tipo de mídia (image, document, video, audio, etc)
-  // 2. Baixar mídia com downloadMediaMessage() do Baileys
-  // 3. Armazenar buffer temporariamente no estado
-  // 4. Pedir nome amigável ao usuário
-  // 5. Transição para estado AGUARDANDO_NOME_ANEXO
-}
-```
+// server.js linha 438
+await processarMensagemOrcamentos(sock, remetente, grupoId, texto, msg)
 
-**Referência:** `wpp/routes/banco/whatsapp-recibos.js` linhas 79-147
-
----
-
-#### **B) Solicitar Nome Amigável**
-
-```javascript
-async function solicitarNomeAnexo(sock, userId, groupId, estado) {
-  const mensagem = `📎 *NOME DO ANEXO*
-━━━━━━━━━━━━━━━━
-
-Arquivo recebido! 
-
-Digite um nome amigável para este anexo:
-
-💡 Exemplo: "Orçamento fornecedor XYZ", "Foto do problema"
-
-0️⃣ Cancelar`;
-
-  await sock.sendMessage(groupId, { text: mensagem });
-  
-  atualizarEstado(userId, {
-    ...estado,
-    etapa: 'AGUARDANDO_NOME_ANEXO'
-  });
-}
-```
-
----
-
-#### **C) Solicitar Visibilidade**
-
-```javascript
-async function solicitarVisibilidadeAnexo(sock, userId, groupId, estado, nomeAnexo) {
-  const mensagem = `👁️ *VISIBILIDADE DO ANEXO*
-━━━━━━━━━━━━━━━━
-
-📎 ${nomeAnexo}
-
-Este anexo será visível para o cliente?
-
-1️⃣ 👁️ SIM - Cliente pode ver
-2️⃣ 🔒 NÃO - Apenas gestores
-
-0️⃣ Cancelar`;
-
-  await sock.sendMessage(groupId, { text: mensagem });
-  
-  atualizarEstado(userId, {
-    ...estado,
-    etapa: 'AGUARDANDO_VISIBILIDADE_ANEXO',
-    nome_anexo: nomeAnexo
-  });
-}
-```
-
----
-
-#### **D) Upload para Vercel Blob**
-
-```javascript
-import { put } from '@vercel/blob';
-
-async function uploadAnexoBlob(buffer, idOrcamento, nomeOriginal) {
-  const timestamp = Date.now();
-  const extensao = nomeOriginal.split('.').pop();
-  const nomeArquivo = `orc_${idOrcamento}_${timestamp}.${extensao}`;
-  const blobPath = `orcamentos/${idOrcamento}/${nomeArquivo}`;
-
-  const blob = await put(blobPath, buffer, {
-    access: 'public',
-    addRandomSuffix: false
-  });
-
-  return {
-    url: blob.url,
-    nome_arquivo: nomeArquivo,
-    tamanho: buffer.length,
-    tipo_arquivo: extensao
-  };
-}
-```
-
-**Referência:** `wpp/routes/banco/recibos-api.js` linhas 220-234
-
----
-
-#### **E) Salvar no Banco**
-
-```javascript
-async function salvarAnexoBanco(idOrcamento, dados, userId) {
-  try {
-    // Limpar telefone
-    let telefone = userId.replace('@s.whatsapp.net', '').replace(/\D/g, '');
-    if (telefone.length > 11) {
-      telefone = telefone.slice(-11);
-    }
-
-    const result = await pool.query(`
-      INSERT INTO orcamento_anexo (
-        id_orcamento,
-        nome_amigavel,
-        nome_arquivo,
-        url_arquivo,
-        visivel_cliente,
-        tipo_arquivo,
-        tamanho,
-        usuario_upload
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING id_anexo
-    `, [
-      idOrcamento,
-      dados.nome_amigavel,
-      dados.nome_arquivo,
-      dados.url_arquivo,
-      dados.visivel_cliente,
-      dados.tipo_arquivo,
-      dados.tamanho,
-      telefone
-    ]);
-
-    // Adicionar LOG
-    await adicionarLog(
-      idOrcamento,
-      'ANEXO_ADICIONADO',
-      `${dados.nome_amigavel} (${dados.visivel_cliente ? 'Visível' : 'Privado'})`,
-      userId
-    );
-
-    return result.rows[0].id_anexo;
-
-  } catch (error) {
-    console.error('❌ [ORCAMENTOS] Erro ao salvar anexo:', error);
-    throw error;
+// orcamentos.js
+if (mensagemCompleta && mensagemCompleta.message) {
+  const tipoMensagem = Object.keys(mensagemCompleta.message)[0];
+  if (['imageMessage', 'documentMessage', ...].includes(tipoMensagem)) {
+    await processarAnexoOrcamento(sock, userId, groupId, mensagemCompleta);
   }
 }
 ```
 
 ---
 
-#### **F) Listar Anexos**
+### ✅ **Nomes no Rateio (V.2610241642)**
 
+**Recurso:**
+- Exibe nome do cotista ao lado da cota
+- Mostra apenas os 2 primeiros nomes
+- Facilita identificação visual
+
+**Formato:**
+```
+A1 (1 cota) - FELIPE TAVARES
+   R$ 2,83 (6.25%)
+
+D1 (1 cota) - ALLEFE HENRIQUE
+   R$ 2,83 (6.25%)
+```
+
+**Implementação:**
 ```javascript
-async function listarAnexosOrcamento(sock, userId, groupId, idOrcamento) {
-  try {
-    const result = await pool.query(`
-      SELECT
-        id_anexo,
-        nome_amigavel,
-        nome_arquivo,
-        url_arquivo,
-        visivel_cliente,
-        tipo_arquivo,
-        tamanho,
-        data_upload,
-        usuario_upload
-      FROM orcamento_anexo
-      WHERE id_orcamento = $1
-      ORDER BY data_upload DESC
-    `, [idOrcamento]);
+// JOIN com tabela Cliente
+LEFT JOIN "Cliente" c ON c."Codigo" = a."Cod_Pessoa"
 
-    if (result.rows.length === 0) {
-      await sock.sendMessage(groupId, {
-        text: `📂 *ANEXOS*
-━━━━━━━━━━━━━━━━
+// Extração dos 2 primeiros nomes
+const partesNome = cot.nome_pessoa.trim().split(/\s+/);
+nomeResumido = partesNome.slice(0, 2).join(' ').toUpperCase();
+```
 
-⚠️ Nenhum anexo encontrado.
+---
 
-━━━━━━━━━━━━━━━━
-Digite 0 para voltar.`
-      });
-      
-      atualizarEstado(userId, {
-        etapa: 'VER_ANEXOS_VAZIO',
-        id_orcamento: idOrcamento
-      });
-      return;
-    }
+### ✅ **Distribuição Manual (V.2610241646)**
 
-    let mensagem = `📂 *ANEXOS*
-━━━━━━━━━━━━━━━━
-🆔 Orçamento: #${idOrcamento}
-📎 Total: ${result.rows.length}
-━━━━━━━━━━━━━━━━
+**Recurso:**
+- Permite distribuir valor manualmente entre cotistas específicos
+- Usuário escolhe quais cotistas e quanto cada um recebe
 
-`;
+**Fluxo:**
+1. Escolhe "2 - Outra distribuição"
+2. Sistema lista cotistas disponíveis
+3. Digite código (ex: E1)
+4. Digite valor (ex: 25.50)
+5. Sistema valida e mostra saldo restante
+6. Repetir até atingir 100%
+7. Salvar
 
-    result.rows.forEach((anexo, index) => {
-      const data = new Date(anexo.data_upload).toLocaleDateString('pt-BR');
-      const visibilidade = anexo.visivel_cliente ? '👁️ Visível' : '🔒 Privado';
-      const tamanhoKB = (anexo.tamanho / 1024).toFixed(1);
+**Validações:**
+- ✅ Código deve existir na lista de cotistas
+- ✅ Valor não pode exceder saldo restante
+- ✅ Mesmo cotista não pode ser adicionado duas vezes
+- ✅ Total deve atingir exatamente 100%
 
-      mensagem += `${index + 1}️⃣ ${anexo.nome_amigavel}
-   ${visibilidade} | ${tamanhoKB} KB
-   📅 ${data}
-   🔗 ${anexo.url_arquivo}
+**Estados criados:**
+- `DIST_MANUAL_CODIGO` - Aguardando código
+- `DIST_MANUAL_VALOR` - Aguardando valor
+- `CONFIRMAR_DIST_MANUAL` - Confirmar salvamento
 
-`;
-    });
+**Funções:**
+- `iniciarDistribuicaoManual()`
+- `processarCodigoCotistaManual()`
+- `processarValorCotistaManual()`
 
-    mensagem += `━━━━━━━━━━━━━━━━
-Digite o número para opções
-ou 0 para voltar.`;
+---
 
-    await sock.sendMessage(groupId, { text: mensagem });
+### ✅ **Melhorias na Exclusão de Itens (V.2610241607)**
 
-    atualizarEstado(userId, {
-      etapa: 'VER_ANEXOS',
-      id_orcamento: idOrcamento,
-      anexos: result.rows
-    });
+**Recursos:**
+- Confirmação antes de excluir
+- Mantém usuário na tela de edição após exclusão
+- LOG registra "Item #X excluído"
 
-  } catch (error) {
-    console.error('❌ [ORCAMENTOS] Erro ao listar anexos:', error);
-    await sock.sendMessage(groupId, {
-      text: `❌ Erro ao listar anexos.\n\n${error.message}`
-    });
+**Fluxo:**
+```
+Editar itens → Escolhe item → Excluir
+  ↓
+⚠️ Confirmar exclusão?
+  ↓
+1 - SIM / 0 - NÃO
+  ↓
+✅ Item excluído
+  ↓
+Volta para tela de edição (não menu)
+```
+
+---
+
+### ✅ **Identificação de Usuários por LID (V.2610241551)**
+
+**Recurso:**
+- Decodifica LID para mostrar nome do usuário
+- LOG mostra "USR: Adm_JDN_SM" em vez de "USR: 31796215899"
+
+**Implementação:**
+```javascript
+if (usuario.includes('@lid')) {
+  const result = await pool.query(`
+    SELECT "Nome" FROM wpp_colaboradores
+    WHERE "Lid" = $1 AND "Ativo" = 'S'
+  `, [usuario]);
+  
+  if (result.rows.length > 0) {
+    identificacao = result.rows[0].Nome;
   }
 }
 ```
 
 ---
 
-### **FASE 2: Integração no Processador**
+## 📝 PENDÊNCIAS
 
-#### **Localização:** `wpp/comandos/orcamentos.js` linha ~2229
+### **BAIXA PRIORIDADE:**
 
-```javascript
-// Menu de histórico e anexos
-if (estado.etapa === 'MENU_HISTORICO') {
-  if (texto === '0') {
-    await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-    return;
-  }
-
-  switch (texto) {
-    case '1': // Ver LOG
-      await mostrarHistoricoOrcamento(sock, userId, groupId, estado.id_orcamento);
-      break;
-
-    case '2': // Registrar observação
-      // ... JÁ IMPLEMENTADO
-      break;
-
-    case '3': // Inserir anexo
-      await iniciarInsercaoAnexo(sock, userId, groupId, estado);
-      break;
-
-    case '4': // Ver anexos
-      await listarAnexosOrcamento(sock, userId, groupId, estado.id_orcamento);
-      break;
-
-    default:
-      await sock.sendMessage(groupId, {
-        text: '❌ Opção inválida! Digite 1, 2, 3, 4 ou 0.'
-      });
-  }
-  return;
-}
-```
-
-#### **Função Iniciar Inserção:**
-
-```javascript
-async function iniciarInsercaoAnexo(sock, userId, groupId, estado) {
-  await sock.sendMessage(groupId, {
-    text: `📎 *INSERIR ANEXO*
-━━━━━━━━━━━━━━━━
-
-Envie o arquivo que deseja anexar ao orçamento:
-
-📷 Foto
-📄 Documento (PDF, Word, etc)
-🎥 Vídeo
-🎵 Áudio
-
-0️⃣ Cancelar`
-  });
-
-  atualizarEstado(userId, {
-    ...estado,
-    etapa: 'AGUARDANDO_ANEXO'
-  });
-}
-```
+- [ ] Deletar anexo individual
+- [ ] Editar observação privada
+- [ ] Filtros avançados de consulta
+- [ ] Exportação de relatórios
+- [ ] Notificações de vencimento
 
 ---
 
-### **FASE 3: Handler de Mídia**
+## 🔧 ARQUIVOS PRINCIPAIS
 
-#### **Localização:** Adicionar no início do processador
+### **wpp/comandos/orcamentos.js**
+Arquivo principal com todas as funções.
 
-```javascript
-export async function processarMensagemOrcamentos(sock, userId, groupId, mensagem) {
-  const estado = obterEstado(userId);
-  
-  // PROCESSAR MÍDIA (antes de processar texto)
-  if (estado.etapa === 'AGUARDANDO_ANEXO') {
-    const tipoMensagem = Object.keys(mensagem.message || {})[0];
-    
-    if (['imageMessage', 'documentMessage', 'videoMessage', 'audioMessage'].includes(tipoMensagem)) {
-      await processarAnexoOrcamento(sock, userId, groupId, mensagem);
-      return;
-    }
-  }
-  
-  const texto = mensagem.trim();
-  
-  // ... resto do processador
-}
-```
+**Versão atual:** V.2610241646
 
----
+**Principais funções:**
+- `mostrarMenuOrcamentos()` - Menu principal
+- `criarOrcamento()` - Criação de orçamento
+- `adicionarItemOrcamento()` - Adicionar item
+- `editarItensOrcamento()` - Editar/excluir itens
+- `definirRateioOrcamento()` - Rateio automático
+- `iniciarDistribuicaoManual()` - Rateio manual
+- `aprovarOrcamento()` - Aprovação
+- `enviarCobrancaOrcamento()` - Gerar cobrança
+- `processarAnexoOrcamento()` - Upload de anexos
 
-### **FASE 4: Estados Adicionais**
+### **wpp/server.js**
+Servidor principal do bot.
 
-Adicionar handlers para:
+**Linha 438:** Passa objeto `msg` completo para orçamentos
 
-```javascript
-// Estado: AGUARDANDO_NOME_ANEXO
-if (estado.etapa === 'AGUARDANDO_NOME_ANEXO') {
-  if (texto === '0') {
-    await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-    return;
-  }
-  
-  await solicitarVisibilidadeAnexo(sock, userId, groupId, estado, texto);
-  return;
-}
-
-// Estado: AGUARDANDO_VISIBILIDADE_ANEXO
-if (estado.etapa === 'AGUARDANDO_VISIBILIDADE_ANEXO') {
-  if (texto === '0') {
-    await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
-    return;
-  }
-  
-  if (texto === '1' || texto === '2') {
-    const visivelCliente = texto === '1';
-    await finalizarUploadAnexo(sock, userId, groupId, estado, visivelCliente);
-    return;
-  }
-  
-  await sock.sendMessage(groupId, {
-    text: '❌ Opção inválida! Digite 1 (Visível) ou 2 (Privado).'
-  });
-  return;
-}
-```
+### **backup/**
+Todos os backups com timestamp e cabeçalho documentado:
+- `2610241620_server.js` - Bug upload anexos
+- `2610241620_orcamentos.js` - Bug upload anexos
+- `2610241635_orcamentos.js` - Relacionamento cotistas
+- `2610241642_orcamentos.js` - Nomes no rateio
+- `2610241646_orcamentos.js` - Distribuição manual
 
 ---
 
-## 🔧 IMPORTS NECESSÁRIOS
+## 🎯 PRÓXIMOS PASSOS
 
-No topo do arquivo `orcamentos.js`:
+1. **Testes em produção:**
+   - Criar orçamento completo
+   - Testar rateio automático
+   - Testar rateio manual
+   - Aprovar e gerar cobrança
+   - Upload de anexos
 
-```javascript
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { put } from '@vercel/blob';
-```
+2. **Monitoramento:**
+   - Verificar LOGs de erro
+   - Validar integridade das cobranças
+   - Confirmar criação de Contas a Receber
 
----
-
-## 📊 CHECKLIST DE IMPLEMENTAÇÃO
-
-- [ ] Executar SQL no banco (criar tabela orcamento_anexo)
-- [ ] Adicionar imports (downloadMediaMessage, put)
-- [ ] Implementar `processarAnexoOrcamento()`
-- [ ] Implementar `solicitarNomeAnexo()`
-- [ ] Implementar `solicitarVisibilidadeAnexo()`
-- [ ] Implementar `uploadAnexoBlob()`
-- [ ] Implementar `salvarAnexoBanco()`
-- [ ] Implementar `listarAnexosOrcamento()`
-- [ ] Implementar `iniciarInsercaoAnexo()`
-- [ ] Implementar `finalizarUploadAnexo()`
-- [ ] Integrar case '3' no MENU_HISTORICO
-- [ ] Integrar case '4' no MENU_HISTORICO
-- [ ] Adicionar handler de mídia no início do processador
-- [ ] Adicionar estado AGUARDANDO_ANEXO
-- [ ] Adicionar estado AGUARDANDO_NOME_ANEXO
-- [ ] Adicionar estado AGUARDANDO_VISIBILIDADE_ANEXO
-- [ ] Adicionar estado VER_ANEXOS
-- [ ] Testar upload de imagem
-- [ ] Testar upload de PDF
-- [ ] Testar listagem
-- [ ] Atualizar versão V.26yyMMddHHmm
+3. **Melhorias futuras:**
+   - Interface web para visualização
+   - Envio de orçamento por email
+   - Assinatura digital
+   - Integração com Asaas (cobrança automática)
 
 ---
 
-## 📝 NOTAS IMPORTANTES
+## 📚 HISTÓRICO DE VERSÕES
 
-1. **Vercel Blob:** Usar variável de ambiente `BLOB_READ_WRITE_TOKEN`
-2. **Tamanho máximo:** Definir limite (ex: 5MB como nos extratos)
-3. **Tipos aceitos:** image/*, application/pdf, video/*, audio/*
-4. **LOG:** Sempre registrar ANEXO_ADICIONADO e ANEXO_REMOVIDO
-5. **Telefone:** Sempre limpar e pegar últimos 11 dígitos
-6. **Timestamp:** America/Sao_Paulo em todas as datas
-
----
-
-## 🚀 DEPLOY
-
-Após implementação completa:
-
-```bash
-git add .
-git commit -m "feat(orcamentos): Sistema completo de anexos - V.26yyMMddHHmm"
-git push origin main
-```
-
-Railway fará deploy automático.
+| Versão | Data | Descrição |
+|--------|------|-----------|
+| V.2610241646 | 24/10/26 16:46 | Distribuição manual de rateio |
+| V.2610241642 | 24/10/26 16:42 | Nomes dos cotistas no rateio |
+| V.2610241635 | 24/10/26 16:35 | Correção relacionamento cotistas |
+| V.2610241620 | 24/10/26 16:20 | Correção bug upload anexos |
+| V.2610241607 | 24/10/26 16:07 | Melhorias exclusão de itens |
+| V.2610241603 | 24/10/26 16:03 | Rateio, aprovação e cobrança |
+| V.2610241551 | 24/10/26 15:51 | Identificação por LID |
+| V.2610241528 | 24/10/26 15:28 | Menu histórico e observações |
 
 ---
 
-**Última Atualização:** 24/10/2026 15:40  
-**Próximo Passo:** Corrigir erro menu 6 → Implementar funções de anexo
+**Desenvolvido com Claude Sonnet 4.5**  
+**Projeto:** Allmax Gestão de Cotas (Marujo⚓)
 
 ---
 
-## V.2610241540
+## V.2610241646
