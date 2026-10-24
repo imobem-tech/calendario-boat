@@ -138,9 +138,9 @@ function formatarMoeda(valor) {
 // ============================================================
 
 export async function mostrarMenuOrcamentos(sock, userId, groupId) {
-  const mensagem = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const mensagem = `━━━━━━━━━━━━━━━━
 💼 *SISTEMA DE ORÇAMENTOS*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 Escolha uma opção:
 
@@ -150,7 +150,7 @@ Escolha uma opção:
 
 0️⃣ Sair
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 Digite o número da opção:`;
 
   await sock.sendMessage(groupId, { text: mensagem });
@@ -189,9 +189,9 @@ async function listarEmbarcacoes(sock, userId, groupId) {
       return;
     }
 
-    let mensagem = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let mensagem = `━━━━━━━━━━━━━━━━
 🚤 *SELECIONAR EMBARCAÇÃO*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 Escolha a embarcação:
 
@@ -201,7 +201,7 @@ Escolha a embarcação:
       mensagem += `${index + 1}️⃣ ${emb.numero_pb} - ${emb.nome}\n`;
     });
 
-    mensagem += `\n0️⃣ Cancelar\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nDigite o número:`;
+    mensagem += `\n0️⃣ Cancelar\n\n━━━━━━━━━━━━━━━━\nDigite o número:`;
 
     await sock.sendMessage(groupId, { text: mensagem });
 
@@ -252,9 +252,9 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
   // Pedir título do orçamento
   const mensagem = `✅ Embarcação selecionada: ${embarcacao.numero_pb} (${embarcacao.nome})
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 📝 *PASSO 2/5: TÍTULO DO ORÇAMENTO*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 Digite o título do orçamento:
 
@@ -312,9 +312,9 @@ async function pedirDescricaoItem(sock, userId, groupId) {
   const mensagem = `✅ Embarcação: ${estado.orcamento.id_embarcacao} (${estado.orcamento.nome_embarcacao})
 ✅ Título: ${estado.orcamento.titulo}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 📦 *PASSO 3/5: ITENS DO ORÇAMENTO*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 *Item #${numeroItem}* - Digite a descrição:
 
@@ -356,9 +356,9 @@ Digite novamente:`;
   // Pedir valor
   const mensagem = `✅ Item #${numeroItem}: ${descricao}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 💰 *VALOR DO ITEM*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 Digite o valor (R$) ou "pular":
 
@@ -423,7 +423,7 @@ async function mostrarMenuItens(sock, userId, groupId) {
 📦 ${ultimoItem.descricao}
 💰 ${formatarMoeda(ultimoItem.valor)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 O que deseja fazer?
 
@@ -480,7 +480,7 @@ async function mostrarListaItens(sock, userId, groupId) {
     mensagem += `${item.ordem}. ${item.descricao}\n   💰 ${formatarMoeda(item.valor)}\n\n`;
   });
 
-  mensagem += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  mensagem += `━━━━━━━━━━━━━━━━
 
 Digite o número para editar/excluir
 ou escolha:
@@ -515,7 +515,7 @@ async function mostrarResumoFinal(sock, userId, groupId) {
 🚤 Embarcação: ${orcamento.id_embarcacao} (${orcamento.nome_embarcacao})
 📌 Título: ${orcamento.titulo}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 📦 *ITENS:*
 
 `;
@@ -525,15 +525,15 @@ async function mostrarResumoFinal(sock, userId, groupId) {
   });
 
   mensagem += `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 💰 *VALORES:*
 
 Subtotal (itens).............. ${formatarMoeda(subtotal)}
 Taxa de Gestão (${taxaGestaoPerc}%).......... ${formatarMoeda(taxaGestaoValor)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 *TOTAL......................... ${formatarMoeda(total)}*
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 1️⃣ ✅ Confirmar e criar orçamento
 2️⃣ ✏️ Voltar para editar itens
@@ -592,6 +592,7 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
     // Usar campos existentes: descricao, valor_servicos, taxa_servico_perc, taxa_servico_valor, data_cadastro
     const orcamentoResult = await client.query(`
       INSERT INTO "orcamento_servico" (
+        "id_empresa",
         "id_embarcacao",
         "descricao",
         "valor_servicos",
@@ -601,7 +602,7 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
         "status",
         "id_grupo",
         "data_cadastro"
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'ABERTO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
+      ) VALUES (1, $1, $2, $3, $4, $5, $6, 'ABERTO', 1, NOW() AT TIME ZONE 'America/Sao_Paulo')
       RETURNING "id_orcamento"
     `, [
       orcamento.id_embarcacao,
@@ -637,7 +638,7 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
 🚤 Embarcação: ${orcamento.id_embarcacao}
 💰 Valor Total: ${formatarMoeda(orcamento.valor_total)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 O orçamento foi salvo e está disponível para consulta.
 
