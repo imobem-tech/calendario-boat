@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241607
+// wpp/comandos/orcamentos.js — V.2610241620
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2894,20 +2894,34 @@ Digite o número da opção:`;
 // PROCESSADOR PRINCIPAL DE MENSAGENS
 // ============================================================
 
-export async function processarMensagemOrcamentos(sock, userId, groupId, mensagem) {
+export async function processarMensagemOrcamentos(sock, userId, groupId, mensagem, mensagemCompleta = null) {
   const estado = obterEstado(userId);
 
   // PROCESSAR MÍDIA (anexos)
   if (estado.etapa === 'AGUARDANDO_ANEXO') {
-    // Verificar se é mensagem de mídia
-    if (typeof mensagem === 'object' && mensagem.message) {
-      const tipoMensagem = Object.keys(mensagem.message)[0];
+    // Se recebeu mensagemCompleta (objeto Baileys com mídia)
+    if (mensagemCompleta && mensagemCompleta.message) {
+      const tipoMensagem = Object.keys(mensagemCompleta.message)[0];
 
       if (['imageMessage', 'documentMessage', 'videoMessage', 'audioMessage'].includes(tipoMensagem)) {
-        await processarAnexoOrcamento(sock, userId, groupId, mensagem);
+        console.log(`📎 [ORCAMENTOS] Processando mídia tipo: ${tipoMensagem}`);
+        await processarAnexoOrcamento(sock, userId, groupId, mensagemCompleta);
         return;
       }
     }
+
+    // Se digitou 0, cancela
+    const textoDigitado = String(mensagem).trim();
+    if (textoDigitado === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Se não é mídia nem cancelamento, avisa
+    await sock.sendMessage(groupId, {
+      text: '❌ Por favor, envie um arquivo (imagem, PDF, vídeo ou áudio) ou digite 0 para cancelar.'
+    });
+    return;
   }
 
   const texto = mensagem.trim ? mensagem.trim() : String(mensagem);

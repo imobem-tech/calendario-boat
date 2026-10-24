@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2610072147
+// wpp/server.js — V.2610241620
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
@@ -7,6 +7,7 @@
 // + Sistema 70m: DESABILITADO (14/09 00:53) - Até segunda ordem
 // REBUILD: Forçando deploy limpo (Railway cache fix)
 // DEBUG: Rota /versao-html para verificar arquivo servido (07/10/2026 21:47)
+// FIX (24/10 16:20): Passa mensagem completa para orcamentos.js (bug upload anexos)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -435,7 +436,8 @@ async function iniciarBot() {
             }
 
             // Processar demais mensagens do fluxo de orçamentos
-            await processarMensagemOrcamentos(sock, remetente, grupoId, texto)
+            // Passa msg (mensagem completa) para suportar anexos/mídia
+            await processarMensagemOrcamentos(sock, remetente, grupoId, texto, msg)
             continue
           }
 
