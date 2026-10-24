@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241503
+// wpp/comandos/orcamentos.js — V.2610241528
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1267,14 +1267,23 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
 
     await client.query('COMMIT');
 
-    // Registrar no log
-    const logMensagem = `Orçamento criado
-Título: ${orcamento.titulo}
-Embarcação: ${orcamento.numero_pb}
-Valor Total: ${formatarMoeda(orcamento.valor_total)}
-Itens: ${orcamento.itens.length}`;
+    // Registrar criação do orçamento no log
+    await adicionarLog(
+      idOrcamento,
+      'ORCAMENTO_CRIADO',
+      `Título: ${orcamento.titulo}\nEmbarcação: ${orcamento.numero_pb}\nValor Total: ${formatarMoeda(orcamento.valor_total)}\nItens: ${orcamento.itens.length}`,
+      userId
+    );
 
-    await adicionarLog(idOrcamento, logMensagem, userId);
+    // Registrar cada item adicionado no log
+    for (const item of orcamento.itens) {
+      await adicionarLog(
+        idOrcamento,
+        'ITEM_ADICIONADO',
+        `Item #${item.ordem}: ${item.descricao} - ${formatarMoeda(item.valor || 0)}`,
+        userId
+      );
+    }
 
     const mensagem = `✅ *ORÇAMENTO CRIADO COM SUCESSO!*
 
@@ -1317,7 +1326,13 @@ Digite *menu* para voltar ao menu principal.`;
  */
 async function adicionarLog(idOrcamento, acao, descricao, usuario) {
   try {
-    const telefone = usuario.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    // Limpar telefone: remover @s.whatsapp.net e caracteres não numéricos
+    let telefone = usuario.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+
+    // Se tiver mais de 11 dígitos, pegar apenas os últimos 11 (padrão BR: DDD + número)
+    if (telefone.length > 11) {
+      telefone = telefone.slice(-11);
+    }
 
     await pool.query(`
       INSERT INTO "orcamento_log" (
@@ -1656,6 +1671,7 @@ Total: ${result.rows.length} orçamento(s)
       if (orc.status === 'CANCELADO') statusEmoji = '🚫';
 
       mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   📝 ${orc.titulo || '(sem título)'}\n`;
       mensagem += `   ${statusEmoji} ${orc.status}\n`;
       mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
       mensagem += `   📅 ${data}\n\n`;
@@ -1848,15 +1864,15 @@ ou 0 para voltar ao menu.`;
   }
 }
 
-async function mostrarHistoricoOrcamento(sock, userId, groupId, idOrcamento) {
+async function mostrarMenuHistorico(sock, userId, groupId, idOrcamento) {
   try {
-    console.log(`📋 [ORCAMENTOS] Buscando histórico do orçamento #${idOrcamento}...`);
+    console.log(`📋 [ORCAMENTOS] Menu histórico do orçamento #${idOrcamento}...`);
 
     // Buscar dados básicos do orçamento
     const orcResult = await pool.query(`
       SELECT
         os.numero,
-        os.status,
+        os.descricao as titulo,
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
@@ -1872,23 +1888,57 @@ async function mostrarHistoricoOrcamento(sock, userId, groupId, idOrcamento) {
     }
 
     const orc = orcResult.rows[0];
+
+    const mensagem = `━━━━━━━━━━━━━━━━
+📋 *HISTÓRICO E ANEXOS*
+━━━━━━━━━━━━━━━━
+🆔 ${orc.numero}
+📝 ${orc.titulo || '(sem título)'}
+🚤 ${orc.numero_pb}
+━━━━━━━━━━━━━━━━
+
+*OPÇÕES:*
+
+1️⃣ 📜 Ver LOG (histórico)
+2️⃣ 📝 Registrar observação privada
+3️⃣ 📎 Inserir anexo
+4️⃣ 📂 Ver anexos
+0️⃣ 🔙 Voltar
+
+━━━━━━━━━━━━━━━━
+Digite o número da opção:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'MENU_HISTORICO',
+      id_orcamento: idOrcamento,
+      orcamento_dados: orc
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao mostrar menu histórico:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao carregar menu.\n\n${error.message}`
+    });
+  }
+}
+
+async function mostrarHistoricoOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
     const logs = await buscarLogs(idOrcamento);
 
     const mensagem = `━━━━━━━━━━━━━━━━
-📋 *HISTÓRICO (LOG)*
-━━━━━━━━━━━━━━━━
-🆔 Orçamento: ${orc.numero}
-🚤 Embarcação: ${orc.numero_pb}
+📜 *LOG (HISTÓRICO)*
 ━━━━━━━━━━━━━━━━
 
 ${logs}
 
 ━━━━━━━━━━━━━━━━
-Digite 0 para voltar aos detalhes.`;
+Digite 0 para voltar ao menu.`;
 
     await sock.sendMessage(groupId, { text: mensagem });
 
-    // Manter estado no submenu, mas indicar que está visualizando log
     atualizarEstado(userId, {
       etapa: 'VISUALIZAR_LOG',
       id_orcamento: idOrcamento
@@ -2136,7 +2186,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
 
     switch (texto) {
       case '1': // Acessar HISTÓRICO (LOG)
-        await mostrarHistoricoOrcamento(sock, userId, groupId, estado.id_orcamento);
+        await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
         break;
 
       case '2': // Editar itens
@@ -2169,15 +2219,80 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     return;
   }
 
-  // Visualizar LOG
-  if (estado.etapa === 'VISUALIZAR_LOG') {
+  // Menu de histórico e anexos
+  if (estado.etapa === 'MENU_HISTORICO') {
     if (texto === '0') {
       await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
       return;
     }
+
+    switch (texto) {
+      case '1': // Ver LOG
+        await mostrarHistoricoOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '2': // Registrar observação
+        await sock.sendMessage(groupId, {
+          text: `📝 *REGISTRAR OBSERVAÇÃO PRIVADA*\n━━━━━━━━━━━━━━━━\n\nDigite a observação que deseja registrar:\n\n💡 Será registrado como LOG privado\n\n0️⃣ Cancelar`
+        });
+        atualizarEstado(userId, {
+          ...estado,
+          etapa: 'REGISTRAR_OBSERVACAO'
+        });
+        break;
+
+      case '3': // Inserir anexo
+        await sock.sendMessage(groupId, {
+          text: '🚧 *Inserir anexo* - Em implementação.\n\nDigite 0 para voltar.'
+        });
+        break;
+
+      case '4': // Ver anexos
+        await sock.sendMessage(groupId, {
+          text: '🚧 *Ver anexos* - Em implementação.\n\nDigite 0 para voltar.'
+        });
+        break;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1, 2, 3, 4 ou 0.'
+        });
+    }
+    return;
+  }
+
+  // Visualizar LOG
+  if (estado.etapa === 'VISUALIZAR_LOG') {
+    if (texto === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
     await sock.sendMessage(groupId, {
-      text: '❌ Digite 0 para voltar aos detalhes do orçamento.'
+      text: '❌ Digite 0 para voltar ao menu.'
     });
+    return;
+  }
+
+  // Registrar observação privada
+  if (estado.etapa === 'REGISTRAR_OBSERVACAO') {
+    if (texto === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Salvar observação como LOG
+    await adicionarLog(
+      estado.id_orcamento,
+      'OBSERVACAO_PRIVADA',
+      texto,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Observação registrada com sucesso!*\n\n📝 ${texto}\n\nVoltando ao menu...`
+    });
+
+    await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
     return;
   }
 
@@ -2289,4 +2404,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241503
+// V.2610241528
