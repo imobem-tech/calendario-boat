@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241931
+// wpp/comandos/orcamentos.js — V.2610241948
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2784,21 +2784,6 @@ async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
 
     const orc = orcResult.rows[0];
 
-    // Verificar se está aprovado
-    if (orc.status !== 'APROVADO') {
-      await sock.sendMessage(groupId, {
-        text: `⚠️ *ORÇAMENTO NÃO APROVADO*
-
-Status atual: ${orc.status}
-
-O orçamento precisa estar APROVADO antes de gerar cobrança!
-
-Voltando aos detalhes...`
-      });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
-      return;
-    }
-
     // Verificar se já tem cobrança
     if (orc.id_cobranca) {
       await sock.sendMessage(groupId, {
@@ -2812,7 +2797,7 @@ Voltando aos detalhes...`
       return;
     }
 
-    // Buscar rateio
+    // 1️⃣ PRIMEIRO: Verificar se tem rateio
     const rateioResult = await pool.query(`
       SELECT
         r.*,
@@ -2827,8 +2812,28 @@ Voltando aos detalhes...`
 
     if (rateioResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: '❌ Rateio não encontrado! Defina o rateio primeiro.'
+        text: `⚠️ *RATEIO PENDENTE*
+
+Este orçamento ainda não tem rateio definido!
+
+📊 Abrindo menu de rateio...`
       });
+      await definirRateioOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // 2️⃣ SEGUNDO: Verificar se está aprovado
+    if (orc.status !== 'APROVADO') {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *APROVAÇÃO PENDENTE*
+
+Status atual: ${orc.status}
+
+O orçamento precisa estar APROVADO antes de gerar cobrança!
+
+✅ Abrindo menu de aprovação...`
+      });
+      await aprovarOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
@@ -2978,11 +2983,9 @@ async function aprovarOrcamento(sock, userId, groupId, idOrcamento) {
 
 Este orçamento ainda não tem rateio definido!
 
-Por favor, defina o rateio antes de aprovar.
-
-Voltando aos detalhes...`
+📊 Abrindo menu de rateio...`
       });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
+      await definirRateioOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
@@ -3253,7 +3256,7 @@ async function processarNovoPercentualGestao(sock, userId, groupId, texto) {
     `, [novoPercentual, novaTaxa, novoTotal, estado.id_orcamento]);
 
     // Registrar LOG
-    await registrarLog(
+    await adicionarLog(
       estado.id_orcamento,
       'PERCENTUAL_ALTERADO',
       `% de gestão alterado: ${estado.orcamento.percentual_atual}% → ${novoPercentual}%`,
@@ -3280,7 +3283,7 @@ async function processarNovoPercentualGestao(sock, userId, groupId, texto) {
         WHERE r.id_orcamento = $4
       `, [valorServicos, novaTaxa, novoTotal, estado.id_orcamento]);
 
-      await registrarLog(
+      await adicionarLog(
         estado.id_orcamento,
         'RATEIO_RECALCULADO',
         `Rateio recalculado com novo percentual de ${novoPercentual}%`,
