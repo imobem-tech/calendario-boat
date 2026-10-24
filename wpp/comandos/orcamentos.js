@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241751
+// wpp/comandos/orcamentos.js — V.2610241754
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2443,17 +2443,17 @@ Voltando aos detalhes...`
     // Agrupar rateio por percentual (proporcional)
     const grupos = {};
     rateio.forEach(r => {
-      const perc = r.percentual.toFixed(2);
+      const perc = parseFloat(r.percentual).toFixed(2);
       if (!grupos[perc]) {
         grupos[perc] = {
           percentual: perc,
           qtd_pessoas: 0,
-          valor_por_pessoa: r.valor_cotista,
+          valor_por_pessoa: parseFloat(r.valor_cotista),
           qtd_cotas_total: 0
         };
       }
       grupos[perc].qtd_pessoas++;
-      grupos[perc].qtd_cotas_total += r.qtd_cotas;
+      grupos[perc].qtd_cotas_total += parseInt(r.qtd_cotas || 0);
     });
 
     // Montar mensagem com resumo agrupado
@@ -2981,12 +2981,12 @@ Voltando aos detalhes...`
       // Agrupar por percentual
       const grupos = {};
       rateio.forEach(r => {
-        const perc = r.percentual.toFixed(2);
+        const perc = parseFloat(r.percentual).toFixed(2);
         if (!grupos[perc]) {
           grupos[perc] = {
             percentual: perc,
             qtd_pessoas: 0,
-            valor_por_pessoa: r.valor_cotista
+            valor_por_pessoa: parseFloat(r.valor_cotista)
           };
         }
         grupos[perc].qtd_pessoas++;
