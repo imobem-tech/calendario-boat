@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241528
+// wpp/comandos/orcamentos.js — V.2610241544
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -27,6 +27,8 @@
 
 import pkg from 'pg';
 const { Pool } = pkg;
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import { put } from '@vercel/blob';
 
 // Usar mesma configuração do server.js
 const pool = new Pool({
@@ -1775,8 +1777,8 @@ async function listarPendentesCobranca(sock, userId, groupId) {
   try {
     console.log('💵 [ORCAMENTOS] Listando pendentes de cobrança...');
 
-    // Buscar orçamentos APROVADOS que ainda não têm cobrança gerada
-    // Verificar se existe registro em Contas_Receber vinculado
+    // Buscar orçamentos APROVADOS
+    // TODO: Implementar vínculo com Contas_Receber quando campo estiver criado
     const result = await pool.query(`
       SELECT
         os.id_orcamento,
@@ -1785,17 +1787,10 @@ async function listarPendentesCobranca(sock, userId, groupId) {
         os.valor_total,
         os.status,
         os.data_orcamento,
+        os.id_cobranca,
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao,
-        CURRENT_DATE - os.data_orcamento::date as dias_aprovado,
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM "Contas_Receber" cr
-            WHERE cr."Origem" = 'ORCAMENTO'
-              AND cr."Num_Origem"::text = os.id_orcamento::text
-          ) THEN true
-          ELSE false
-        END as tem_cobranca
+        CURRENT_DATE - os.data_orcamento::date as dias_aprovado
       FROM "orcamento_servico" os
       JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
       WHERE os.status = 'APROVADO'
@@ -1811,8 +1806,8 @@ async function listarPendentesCobranca(sock, userId, groupId) {
       return;
     }
 
-    // Filtrar apenas os que NÃO têm cobrança
-    const pendentes = result.rows.filter(orc => !orc.tem_cobranca);
+    // Filtrar apenas os que NÃO têm cobrança (id_cobranca NULL ou 0)
+    const pendentes = result.rows.filter(orc => !orc.id_cobranca || orc.id_cobranca === 0);
 
     if (pendentes.length === 0) {
       await sock.sendMessage(groupId, {
@@ -1952,6 +1947,302 @@ Digite 0 para voltar ao menu.`;
   }
 }
 
+// ============================================================
+// SISTEMA DE ANEXOS
+// ============================================================
+
+async function iniciarInsercaoAnexo(sock, userId, groupId, estado) {
+  await sock.sendMessage(groupId, {
+    text: `📎 *INSERIR ANEXO*
+━━━━━━━━━━━━━━━━
+
+Envie o arquivo que deseja anexar ao orçamento:
+
+📷 Foto
+📄 Documento (PDF, Word, etc)
+🎥 Vídeo
+🎵 Áudio
+
+0️⃣ Cancelar`
+  });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'AGUARDANDO_ANEXO'
+  });
+}
+
+async function processarAnexoOrcamento(sock, userId, groupId, mensagem) {
+  try {
+    const estado = obterEstado(userId);
+    const tipoMensagem = Object.keys(mensagem.message || {})[0];
+
+    console.log(`📎 [ORCAMENTOS] Processando anexo tipo: ${tipoMensagem}`);
+
+    // Baixar mídia
+    const buffer = await downloadMediaMessage(
+      mensagem,
+      'buffer',
+      {},
+      { logger: console, reuploadRequest: sock.updateMediaMessage }
+    );
+
+    // Detectar tipo de arquivo
+    let extensao = 'bin';
+    let nomeOriginal = 'arquivo';
+
+    if (tipoMensagem === 'imageMessage') {
+      extensao = 'jpg';
+      nomeOriginal = mensagem.message.imageMessage.caption || 'imagem';
+    } else if (tipoMensagem === 'documentMessage') {
+      const doc = mensagem.message.documentMessage;
+      nomeOriginal = doc.fileName || 'documento';
+      extensao = nomeOriginal.split('.').pop() || 'pdf';
+    } else if (tipoMensagem === 'videoMessage') {
+      extensao = 'mp4';
+      nomeOriginal = 'video';
+    } else if (tipoMensagem === 'audioMessage') {
+      extensao = 'ogg';
+      nomeOriginal = 'audio';
+    }
+
+    await sock.sendMessage(groupId, {
+      text: `✅ Arquivo recebido! (${(buffer.length / 1024).toFixed(1)} KB)\n\nProcessando...`
+    });
+
+    // Armazenar no estado temporariamente
+    atualizarEstado(userId, {
+      ...estado,
+      etapa: 'AGUARDANDO_NOME_ANEXO',
+      anexo_buffer: buffer,
+      anexo_extensao: extensao,
+      anexo_nome_original: nomeOriginal,
+      anexo_tamanho: buffer.length
+    });
+
+    await solicitarNomeAnexo(sock, userId, groupId, estado);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao processar anexo:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao processar anexo.\n\n${error.message}`
+    });
+  }
+}
+
+async function solicitarNomeAnexo(sock, userId, groupId, estado) {
+  const mensagem = `📎 *NOME DO ANEXO*
+━━━━━━━━━━━━━━━━
+
+Digite um nome amigável para este anexo:
+
+💡 Exemplo: "Orçamento fornecedor XYZ", "Foto do problema"
+
+0️⃣ Cancelar`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+}
+
+async function solicitarVisibilidadeAnexo(sock, userId, groupId, estado, nomeAnexo) {
+  const mensagem = `👁️ *VISIBILIDADE DO ANEXO*
+━━━━━━━━━━━━━━━━
+
+📎 ${nomeAnexo}
+
+Este anexo será visível para o cliente?
+
+1️⃣ 👁️ SIM - Cliente pode ver
+2️⃣ 🔒 NÃO - Apenas gestores
+
+0️⃣ Cancelar`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'AGUARDANDO_VISIBILIDADE_ANEXO',
+    anexo_nome_amigavel: nomeAnexo
+  });
+}
+
+async function finalizarUploadAnexo(sock, userId, groupId, estado, visivelCliente) {
+  try {
+    await sock.sendMessage(groupId, {
+      text: '⏳ Fazendo upload do arquivo...'
+    });
+
+    // Upload para Vercel Blob
+    const timestamp = Date.now();
+    const nomeArquivo = `orc_${estado.id_orcamento}_${timestamp}.${estado.anexo_extensao}`;
+    const blobPath = `orcamentos/${estado.id_orcamento}/${nomeArquivo}`;
+
+    const blob = await put(blobPath, estado.anexo_buffer, {
+      access: 'public',
+      addRandomSuffix: false
+    });
+
+    console.log(`✅ [ORCAMENTOS] Upload concluído: ${blob.url}`);
+
+    // Salvar no banco
+    const dados = {
+      nome_amigavel: estado.anexo_nome_amigavel,
+      nome_arquivo: nomeArquivo,
+      url_arquivo: blob.url,
+      visivel_cliente: visivelCliente,
+      tipo_arquivo: estado.anexo_extensao,
+      tamanho: estado.anexo_tamanho
+    };
+
+    await salvarAnexoBanco(estado.id_orcamento, dados, userId);
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Anexo salvo com sucesso!*
+
+📎 ${estado.anexo_nome_amigavel}
+${visivelCliente ? '👁️ Visível para cliente' : '🔒 Privado (apenas gestores)'}
+
+Voltando ao menu...`
+    });
+
+    await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao finalizar upload:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao salvar anexo.\n\n${error.message}`
+    });
+  }
+}
+
+async function salvarAnexoBanco(idOrcamento, dados, userId) {
+  try {
+    // Limpar telefone
+    let telefone = userId.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    if (telefone.length > 11) {
+      telefone = telefone.slice(-11);
+    }
+
+    const result = await pool.query(`
+      INSERT INTO orcamento_anexo (
+        id_orcamento,
+        nome_amigavel,
+        nome_arquivo,
+        url_arquivo,
+        visivel_cliente,
+        tipo_arquivo,
+        tamanho,
+        usuario_upload
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id_anexo
+    `, [
+      idOrcamento,
+      dados.nome_amigavel,
+      dados.nome_arquivo,
+      dados.url_arquivo,
+      dados.visivel_cliente,
+      dados.tipo_arquivo,
+      dados.tamanho,
+      telefone
+    ]);
+
+    // Adicionar LOG
+    await adicionarLog(
+      idOrcamento,
+      'ANEXO_ADICIONADO',
+      `${dados.nome_amigavel} (${dados.visivel_cliente ? 'Visível' : 'Privado'})`,
+      userId
+    );
+
+    console.log(`✅ [ORCAMENTOS] Anexo salvo no banco: ID ${result.rows[0].id_anexo}`);
+    return result.rows[0].id_anexo;
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao salvar anexo:', error);
+    throw error;
+  }
+}
+
+async function listarAnexosOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id_anexo,
+        nome_amigavel,
+        nome_arquivo,
+        url_arquivo,
+        visivel_cliente,
+        tipo_arquivo,
+        tamanho,
+        data_upload,
+        usuario_upload
+      FROM orcamento_anexo
+      WHERE id_orcamento = $1
+      ORDER BY data_upload DESC
+    `, [idOrcamento]);
+
+    if (result.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `📂 *ANEXOS*
+━━━━━━━━━━━━━━━━
+
+⚠️ Nenhum anexo encontrado.
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar.`
+      });
+
+      atualizarEstado(userId, {
+        etapa: 'VER_ANEXOS_VAZIO',
+        id_orcamento: idOrcamento
+      });
+      return;
+    }
+
+    let mensagem = `📂 *ANEXOS*
+━━━━━━━━━━━━━━━━
+🆔 Orçamento: #${idOrcamento}
+📎 Total: ${result.rows.length}
+━━━━━━━━━━━━━━━━
+
+`;
+
+    result.rows.forEach((anexo, index) => {
+      const data = new Date(anexo.data_upload).toLocaleDateString('pt-BR');
+      const visibilidade = anexo.visivel_cliente ? '👁️ Visível' : '🔒 Privado';
+      const tamanhoKB = (anexo.tamanho / 1024).toFixed(1);
+
+      mensagem += `${index + 1}️⃣ ${anexo.nome_amigavel}
+   ${visibilidade} | ${tamanhoKB} KB
+   📅 ${data}
+   🔗 ${anexo.url_arquivo}
+
+`;
+    });
+
+    mensagem += `━━━━━━━━━━━━━━━━
+Digite o número para opções
+ou 0 para voltar.`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'VER_ANEXOS',
+      id_orcamento: idOrcamento,
+      anexos: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao listar anexos:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao listar anexos.\n\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
+// DETALHES DO ORÇAMENTO
+// ============================================================
+
 async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
   try {
     console.log(`🔍 [ORCAMENTOS] Buscando detalhes do orçamento #${idOrcamento}...`);
@@ -2071,7 +2362,21 @@ Digite o número da opção:`;
 
 export async function processarMensagemOrcamentos(sock, userId, groupId, mensagem) {
   const estado = obterEstado(userId);
-  const texto = mensagem.trim();
+
+  // PROCESSAR MÍDIA (anexos)
+  if (estado.etapa === 'AGUARDANDO_ANEXO') {
+    // Verificar se é mensagem de mídia
+    if (typeof mensagem === 'object' && mensagem.message) {
+      const tipoMensagem = Object.keys(mensagem.message)[0];
+
+      if (['imageMessage', 'documentMessage', 'videoMessage', 'audioMessage'].includes(tipoMensagem)) {
+        await processarAnexoOrcamento(sock, userId, groupId, mensagem);
+        return;
+      }
+    }
+  }
+
+  const texto = mensagem.trim ? mensagem.trim() : String(mensagem);
 
   // Menu principal
   if (estado.etapa === 'MENU') {
@@ -2242,15 +2547,11 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         break;
 
       case '3': // Inserir anexo
-        await sock.sendMessage(groupId, {
-          text: '🚧 *Inserir anexo* - Em implementação.\n\nDigite 0 para voltar.'
-        });
+        await iniciarInsercaoAnexo(sock, userId, groupId, estado);
         break;
 
       case '4': // Ver anexos
-        await sock.sendMessage(groupId, {
-          text: '🚧 *Ver anexos* - Em implementação.\n\nDigite 0 para voltar.'
-        });
+        await listarAnexosOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       default:
@@ -2293,6 +2594,50 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     });
 
     await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+    return;
+  }
+
+  // Aguardando nome do anexo
+  if (estado.etapa === 'AGUARDANDO_NOME_ANEXO') {
+    if (texto === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await solicitarVisibilidadeAnexo(sock, userId, groupId, estado, texto);
+    return;
+  }
+
+  // Aguardando visibilidade do anexo
+  if (estado.etapa === 'AGUARDANDO_VISIBILIDADE_ANEXO') {
+    if (texto === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1' || texto === '2') {
+      const visivelCliente = texto === '1';
+      await finalizarUploadAnexo(sock, userId, groupId, estado, visivelCliente);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 (Visível) ou 2 (Privado).'
+    });
+    return;
+  }
+
+  // Ver anexos
+  if (estado.etapa === 'VER_ANEXOS' || estado.etapa === 'VER_ANEXOS_VAZIO') {
+    if (texto === '0') {
+      await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // TODO: Implementar opções de anexo individual (baixar, deletar, etc)
+    await sock.sendMessage(groupId, {
+      text: '❌ Digite 0 para voltar ao menu.'
+    });
     return;
   }
 
@@ -2404,4 +2749,4 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 }
 
-// V.2610241528
+// V.2610241544
