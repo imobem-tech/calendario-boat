@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610241635
+// wpp/comandos/orcamentos.js — V.2610241642
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2354,10 +2354,13 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
       SELECT
         a."Código" as id_autorizado,
         a."Gropo_letra" as grupo_letra,
-        a."Cod_Pessoa" as cod_pessoa
+        a."Cod_Pessoa" as cod_pessoa,
+        c."Cliente_Nome" as nome_pessoa
       FROM "P_BOAT_1_Embarcacao" e
       INNER JOIN "P_BOAT_4_Autorizados" a
         ON e."Num_PB" = a."Cod_Embarcacao"
+      LEFT JOIN "Cliente" c
+        ON c."Codigo" = a."Cod_Pessoa"
       WHERE e."Código" = $1
         AND e."Cod_Cliente" = $2
         AND a."Dt_Desautorizacao" IS NULL
@@ -2377,10 +2380,19 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
     const cotistas = cotistasResult.rows.map(cot => {
       const match = cot.grupo_letra.match(/(\d+)/);
       const qtdCotas = match ? parseInt(match[1]) : 1;
+
+      // Extrair apenas os 2 primeiros nomes
+      let nomeResumido = '';
+      if (cot.nome_pessoa) {
+        const partesNome = cot.nome_pessoa.trim().split(/\s+/);
+        nomeResumido = partesNome.slice(0, 2).join(' ').toUpperCase();
+      }
+
       return {
         ...cot,
         qtd_cotas: qtdCotas,
-        percentual: qtdCotas * 6.25
+        percentual: qtdCotas * 6.25,
+        nome_resumido: nomeResumido
       };
     });
 
@@ -2417,7 +2429,10 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
 `;
 
     rateio.forEach(r => {
-      mensagem += `${r.grupo_letra} (${r.qtd_cotas} cota${r.qtd_cotas > 1 ? 's' : ''})
+      const cotaTexto = r.qtd_cotas === 1 ? '1 cota' : `${r.qtd_cotas} cotas`;
+      const nomeExibir = r.nome_resumido ? ` - ${r.nome_resumido}` : '';
+
+      mensagem += `${r.grupo_letra} (${cotaTexto})${nomeExibir}
    ${formatarMoeda(r.valor_cotista)} (${r.percentual.toFixed(2)}%)
 
 `;
