@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250944
+// wpp/comandos/orcamentos.js — V.2610250947
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2701,7 +2701,7 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
 
       novaDistribuicao.forEach(d => {
         const nomeExibir = d.nome_resumido ? ` - ${d.nome_resumido}` : '';
-        mensagem += `${d.grupo_letra}${nomeExibir}: ${formatarMoeda(d.valor)} (${d.percentual.toFixed(2)}%)
+        mensagem += `${d.grupo_letra}${nomeExibir}: ${formatarMoeda(d.valor)} (${(parseFloat(d.percentual) || 0).toFixed(2)}%)
 `;
       });
 
@@ -3050,7 +3050,7 @@ Este orçamento ainda não tem rateio definido!
       rateio.forEach(r => {
         const nome = r.nome_pessoa ? r.nome_pessoa.split(/\s+/).slice(0, 2).join(' ').toUpperCase() : '';
         const nomeExibir = nome ? ` - ${nome}` : '';
-        mensagem += `${r.grupo_letra}${nomeExibir}: ${formatarMoeda(r.valor_cotista)} (${r.percentual.toFixed(2)}%)
+        mensagem += `${r.grupo_letra}${nomeExibir}: ${formatarMoeda(r.valor_cotista)} (${(parseFloat(r.percentual) || 0).toFixed(2)}%)
 `;
       });
     }
