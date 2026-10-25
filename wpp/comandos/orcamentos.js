@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610242103
+// wpp/comandos/orcamentos.js — V.2610250653
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3522,6 +3522,7 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
         os.valor_total,
         os.status,
         os.data_orcamento,
+        os.token_visualizacao,
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
@@ -3594,11 +3595,21 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 
 1️⃣ 📋 Acessar HISTÓRICO (LOG)
 2️⃣ ✏️ Editar itens
-3️⃣ 📊 Definir rateio
-4️⃣ ✅ Aprovar orçamento
-5️⃣ 💵 Enviar cobrança
-6️⃣ ⚙️ Alterar % Gestão
-7️⃣ 🔗 Gerar Link de Visualização
+3️⃣ ⚙️ Alterar % Gestão
+4️⃣ 📊 Definir rateio
+5️⃣ ✅ Aprovar orçamento
+`;
+
+    // Opção 6 dinâmica (Link)
+    if (orc.token_visualizacao) {
+      const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
+      mensagem += `6️⃣ 🔗 Ver Link\n${url}\n`;
+    } else {
+      mensagem += `6️⃣ 🔗 Gerar Link\n`;
+    }
+
+    mensagem += `7️⃣ 📤 Enviar orçamento
+8️⃣ 💵 Enviar cobrança
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
@@ -3610,13 +3621,292 @@ Digite o número da opção:`;
     atualizarEstado(userId, {
       etapa: 'SUBMENU_DETALHES',
       id_orcamento: idOrcamento,
-      orcamento_dados: orc
+      orcamento_dados: orc,
+      token_existente: !!orc.token_visualizacao  // true se existe, false se não
     });
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao buscar detalhes:', error);
     await sock.sendMessage(groupId, {
       text: `❌ Erro ao buscar detalhes.\n\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
+// MOSTRAR OPÇÕES DO LINK EXISTENTE
+// ============================================================
+
+async function mostrarOpcoesLink(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT token_visualizacao, numero, descricao
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+    const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
+
+    await sock.sendMessage(groupId, {
+      text: `🔗 *LINK EXISTENTE*
+
+📋 ${orc.numero}
+
+━━━━━━━━━━━━━━━━
+
+${url}
+
+━━━━━━━━━━━━━━━━
+
+*Opções:*
+
+1️⃣ Copiar resumo do orçamento
+2️⃣ Gerar novo link (⚠️ invalida o anterior)
+0️⃣ Voltar aos detalhes`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'OPCOES_LINK',
+      id_orcamento: idOrcamento,
+      url_atual: url
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao mostrar opções do link:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
+// COPIAR LINK/RESUMO DO ORÇAMENTO (SEM PREÇO)
+// ============================================================
+
+async function copiarLinkOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    const orcResult = await pool.query(`
+      SELECT
+        os.numero,
+        os.descricao,
+        os.token_visualizacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM orcamento_servico os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = orcResult.rows[0];
+    const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
+
+    // Mensagem SEM PREÇO (Modelo 5)
+    const mensagem = `━━━━━━━━━━━━━━━━
+🔔 NOVO ORÇAMENTO
+━━━━━━━━━━━━━━━━
+
+🚤 Embarcação: ${orc.nome_embarcacao}
+🆔 ${orc.numero}
+
+📝 Descrição:
+${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+
+🌐 Visualizar orçamento completo:
+🔗 ${url}
+
+⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
+
+    await sock.sendMessage(groupId, {
+      text: `📋 *MENSAGEM COPIÁVEL*
+
+Segue abaixo o resumo do orçamento para você copiar/encaminhar:
+
+━━━━━━━━━━━━━━━━
+
+${mensagem}
+
+━━━━━━━━━━━━━━━━
+
+✅ Use "encaminhar" ou copie manualmente o texto acima
+
+Digite 0 para voltar aos detalhes`
+    });
+
+    await adicionarLog(
+      idOrcamento,
+      'LINK_COPIADO',
+      'Resumo de orçamento gerado para cópia/encaminhamento',
+      userId
+    );
+
+  } catch (error) {
+    console.error('❌ Erro ao copiar link:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}\n\nDigite 0 para voltar`
+    });
+  }
+}
+
+// ============================================================
+// ENVIAR ORÇAMENTO PARA GRUPOS DO RATEIO
+// ============================================================
+
+async function enviarOrcamentoGrupos(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`📤 [ORCAMENTOS] Enviando orçamento #${idOrcamento} para grupos...`);
+
+    // 1. Buscar orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.token_visualizacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM orcamento_servico os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // 2. Verificar se tem rateio (agrupa por grupo e soma valores)
+    const rateioResult = await pool.query(`
+      SELECT
+        a."Gropo_letra" as grupo_letra,
+        SUM(r.valor_cotista) as valor_grupo,
+        SUM(r.percentual) as percentual_grupo,
+        COUNT(*) as qtd_cotistas,
+        MAX(wg.id_grupo_wpp) as id_grupo_wpp
+      FROM orcamento_rateio r
+      JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      LEFT JOIN wpp_grupos_agenda wg
+        ON wg.num_pb = $1
+        AND wg.grupo_comp_letra = a."Gropo_letra"
+      WHERE r.id_orcamento = $2
+        AND r.participando = true
+      GROUP BY a."Gropo_letra"
+      ORDER BY a."Gropo_letra"
+    `, [orc.numero_pb, idOrcamento]);
+
+    if (rateioResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *RATEIO PENDENTE*
+
+Este orçamento ainda não tem rateio definido!
+
+📊 Abrindo menu de rateio...`
+      });
+      await definirRateioOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // 3. Verificar/Gerar link
+    let token = orc.token_visualizacao;
+    if (!token) {
+      // Gera automaticamente
+      token = Buffer.from(`${idOrcamento}-${Date.now()}-${Math.random()}`)
+        .toString('base64')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .substring(0, 32);
+
+      await pool.query(`
+        UPDATE orcamento_servico
+        SET token_visualizacao = $1
+        WHERE id_orcamento = $2
+      `, [token, idOrcamento]);
+
+      await adicionarLog(
+        idOrcamento,
+        'LINK_GERADO',
+        'Link gerado automaticamente para envio aos grupos',
+        userId
+      );
+    }
+
+    const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${token}`;
+
+    // 4. Enviar para cada grupo (Modelo 5)
+    let enviosOk = 0;
+    let erros = [];
+
+    for (const grupo of rateioResult.rows) {
+      if (!grupo.id_grupo_wpp) {
+        erros.push(`❌ Grupo ${grupo.grupo_letra}: Sem WhatsApp cadastrado`);
+        continue;  // Continua para próximo
+      }
+
+      const mensagem = `━━━━━━━━━━━━━━━━
+🔔 NOVO ORÇAMENTO
+━━━━━━━━━━━━━━━━
+
+🚤 Embarcação: ${orc.nome_embarcacao}
+🆔 ${orc.numero}
+
+📝 Descrição:
+${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+💵 VALOR DO SEU GRUPO
+━━━━━━━━━━━━━━━━
+
+🎯 Grupo ${grupo.grupo_letra}
+
+   ✨ ${formatarMoeda(grupo.valor_grupo)} ✨
+
+━━━━━━━━━━━━━━━━
+
+🌐 Visualizar orçamento completo:
+🔗 ${url}
+
+⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
+
+      try {
+        await sock.sendMessage(grupo.id_grupo_wpp, { text: mensagem });
+        enviosOk++;
+      } catch (error) {
+        erros.push(`❌ Grupo ${grupo.grupo_letra}: ${error.message}`);
+      }
+    }
+
+    // 5. LOG final (resumo)
+    await adicionarLog(
+      idOrcamento,
+      'ORCAMENTO_ENVIADO',
+      `Enviado para ${enviosOk}/${rateioResult.rows.length} grupos`,
+      userId
+    );
+
+    // 6. Resumo
+    let resumo = `✅ *ORÇAMENTO ENVIADO*
+
+📊 ${enviosOk} de ${rateioResult.rows.length} grupos receberam
+
+🆔 ${orc.numero}`;
+
+    if (erros.length > 0) {
+      resumo += `\n\n⚠️ *Erros:*\n${erros.join('\n')}`;
+    }
+
+    resumo += '\n\n━━━━━━━━━━━━━━━━\nDigite 0 para voltar aos detalhes';
+
+    await sock.sendMessage(groupId, { text: resumo });
+
+  } catch (error) {
+    console.error('❌ Erro ao enviar orçamento:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao enviar orçamento:\n\n${error.message}\n\nDigite 0 para voltar`
     });
   }
 }
@@ -3795,29 +4085,39 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '3': // Definir rateio
-        await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
-        break;
-
-      case '4': // Aprovar orçamento
-        await aprovarOrcamento(sock, userId, groupId, estado.id_orcamento);
-        break;
-
-      case '5': // Enviar cobrança
-        await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
-        break;
-
-      case '6': // Alterar % Gestão
+      case '3': // Alterar % Gestão
         await alterarPercentualGestao(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '7': // Gerar Link de Visualização
-        await gerarLinkVisualizacao(sock, userId, groupId, estado.id_orcamento);
+      case '4': // Definir rateio
+        await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '5': // Aprovar orçamento
+        await aprovarOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '6': // Link (dinâmico)
+        if (estado.token_existente) {
+          // Link existe - Mostrar opções
+          await mostrarOpcoesLink(sock, userId, groupId, estado.id_orcamento);
+        } else {
+          // Link não existe - Gerar novo
+          await gerarLinkVisualizacao(sock, userId, groupId, estado.id_orcamento);
+        }
+        break;
+
+      case '7': // Enviar orçamento para grupos
+        await enviarOrcamentoGrupos(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '8': // Enviar cobrança
+        await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       default:
         await sock.sendMessage(groupId, {
-          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6, 7 ou 0.'
+          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6, 7, 8 ou 0.'
         });
     }
     return;
@@ -3853,6 +4153,27 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       default:
         await sock.sendMessage(groupId, {
           text: '❌ Opção inválida! Digite 1, 2, 3, 4 ou 0.'
+        });
+    }
+    return;
+  }
+
+  // Menu de opções do link existente
+  if (estado.etapa === 'OPCOES_LINK') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    switch (texto) {
+      case '1': // Copiar resumo do orçamento
+        await copiarLinkOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '2': // Gerar novo link
+        await gerarLinkVisualizacao(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1, 2 ou 0.'
         });
     }
     return;
