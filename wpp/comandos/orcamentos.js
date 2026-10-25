@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250805
+// wpp/comandos/orcamentos.js — V.2610250851
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3987,6 +3987,18 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     console.log(`[ORCAMENTOS DEBUG] Tipos de mensagem: ${Object.keys(mensagemCompleta.message)}`);
   }
 
+  // HANDLER DE EMERGÊNCIA: Comando para destravar estado
+  const textoEmergencia = String(mensagem).trim().toUpperCase();
+  if (textoEmergencia === 'CANCELAR' || textoEmergencia === 'MENU' || textoEmergencia === 'SAIR') {
+    console.log(`🚨 [ORCAMENTOS] Comando de emergência recebido: ${textoEmergencia}`);
+    limparEstado(userId);
+    await sock.sendMessage(groupId, {
+      text: '✅ Estado resetado!\n\nVoltando ao menu principal de orçamentos...'
+    });
+    await mostrarMenuOrcamentos(sock, userId, groupId);
+    return;
+  }
+
   // PROCESSAR MÍDIA (anexos)
   if (estado.etapa === 'AGUARDANDO_ANEXO') {
     console.log(`[ORCAMENTOS DEBUG] Entrou no handler AGUARDANDO_ANEXO`);
@@ -4476,8 +4488,25 @@ Voltando aos detalhes...`
       break;
 
     case 'EDITAR_ITENS':
-      // TODO: Implementar edição de itens (durante criação)
-      await sock.sendMessage(groupId, { text: '🚧 Edição em desenvolvimento. Digite F para finalizar.' });
+      // Edição de itens durante criação (ainda não implementado)
+      const textoEdit = texto.toUpperCase();
+
+      if (textoEdit === 'F') {
+        // Finalizar e voltar ao menu de itens
+        await sock.sendMessage(groupId, {
+          text: '✅ Edição finalizada.\n\nVoltando ao menu de itens...'
+        });
+
+        const estado = obterEstado(userId);
+        await mostrarMenuItens(sock, userId, groupId, estado.orcamento || {});
+      } else if (textoEdit === '0') {
+        // Cancelar e voltar ao menu principal
+        await mostrarMenuOrcamentos(sock, userId, groupId);
+      } else {
+        await sock.sendMessage(groupId, {
+          text: '🚧 *EDIÇÃO EM DESENVOLVIMENTO*\n\nEssa funcionalidade ainda não está disponível.\n\n*Opções:*\n\nF - Finalizar edição\n0 - Cancelar e voltar ao menu'
+        });
+      }
       break;
 
     case 'EDITAR_ITENS_BANCO':
