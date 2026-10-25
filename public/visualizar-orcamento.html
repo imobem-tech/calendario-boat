@@ -1,3 +1,4 @@
+<!-- V.2610250819 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -175,12 +176,27 @@
             font-size: 15px;
             color: var(--gray-900);
             font-weight: 500;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .info-value.large {
             font-size: 24px;
             color: var(--primary);
             font-weight: 700;
+        }
+
+        /* Links dentro de descrição */
+        .info-value a {
+            color: var(--primary);
+            text-decoration: underline;
+            word-break: break-all;
+            transition: color 0.2s;
+        }
+
+        .info-value a:hover {
+            color: var(--primary-dark);
         }
 
         /* ============================================================
@@ -598,7 +614,7 @@
                         ${orcamento.descricao ? `
                         <div class="info-item" style="margin-top: 15px;">
                             <div class="info-label">Descrição</div>
-                            <div class="info-value">${orcamento.descricao}</div>
+                            <div class="info-value">${formatarDescricao(orcamento.descricao)}</div>
                         </div>
                         ` : ''}
                     </div>
@@ -751,6 +767,29 @@
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function formatarDescricao(texto) {
+            if (!texto) return '';
+
+            // Escapa HTML primeiro (segurança)
+            const escapado = texto
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            // Converte URLs em links clicáveis
+            const comLinks = escapado.replace(
+                /(https?:\/\/[^\s]+)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; word-break: break-all;">$1</a>'
+            );
+
+            // Converte quebras de linha em <br>
+            const comQuebras = comLinks.replace(/\n/g, '<br>');
+
+            return comQuebras;
         }
 
         function getIconeAnexo(tipo) {
