@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610242053
+// wpp/comandos/orcamentos.js — V.2610242103
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2955,9 +2955,9 @@ async function aprovarOrcamento(sock, userId, groupId, idOrcamento) {
     // Verificar se já está aprovado
     if (orc.status === 'APROVADO') {
       await sock.sendMessage(groupId, {
-        text: '⚠️ Este orçamento já está aprovado!'
+        text: '⚠️ Este orçamento já está aprovado!\n\n' +
+              'Digite *0* para voltar aos detalhes.'
       });
-      await verDetalhesOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
 
