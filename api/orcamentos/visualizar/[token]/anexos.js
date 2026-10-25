@@ -1,5 +1,5 @@
 // ============================================================
-// api/orcamentos/visualizar/[token]/anexos.js — V.2610242101
+// api/orcamentos/visualizar/[token]/anexos.js — V.2610242107
 // GET /api/orcamentos/visualizar/:token/anexos
 // Lista anexos VISÍVEIS do orçamento
 // ============================================================
