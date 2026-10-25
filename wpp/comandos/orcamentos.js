@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250951
+// wpp/comandos/orcamentos.js — V.2610250954
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2353,6 +2353,96 @@ ou 0 para voltar.`;
   }
 }
 
+async function mostrarOpcoesAnexo(sock, userId, groupId, estado, numeroAnexo) {
+  try {
+    const anexo = estado.anexos[numeroAnexo - 1];
+
+    if (!anexo) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Anexo não encontrado!'
+      });
+      return;
+    }
+
+    const visibilidade = anexo.visivel_cliente ? '👁️ Visível para cliente' : '🔒 Privado (interno)';
+    const tamanhoKB = (anexo.tamanho_bytes / 1024).toFixed(1);
+    const data = new Date(anexo.data_upload).toLocaleDateString('pt-BR');
+
+    const mensagem = `📎 *OPÇÕES DO ANEXO*
+━━━━━━━━━━━━━━━━
+📄 ${anexo.nome_amigavel}
+${visibilidade}
+📦 ${tamanhoKB} KB
+📅 ${data}
+━━━━━━━━━━━━━━━━
+
+*OPÇÕES:*
+
+1️⃣ 📋 Copiar link
+2️⃣ 🗑️ Excluir anexo
+0️⃣ 🔙 Voltar
+
+━━━━━━━━━━━━━━━━`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      ...estado,
+      etapa: 'OPCOES_ANEXO',
+      anexo_selecionado: anexo
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao mostrar opções de anexo:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao carregar opções.\n\n${error.message}`
+    });
+  }
+}
+
+async function excluirAnexo(sock, userId, groupId, estado) {
+  try {
+    const anexo = estado.anexo_selecionado;
+
+    console.log(`🗑️ [ORCAMENTOS] Excluindo anexo: ${anexo.nome_arquivo}`);
+
+    // 1. Deletar do Vercel Blob Storage
+    try {
+      const { del } = await import('@vercel/blob');
+      await del(anexo.url);
+      console.log(`✅ [BLOB] Arquivo deletado: ${anexo.url}`);
+    } catch (blobError) {
+      console.warn(`⚠️ [BLOB] Erro ao deletar (pode já não existir):`, blobError.message);
+      // Continua mesmo se falhar no blob (pode já ter sido deletado)
+    }
+
+    // 2. Deletar do banco de dados
+    await pool.query(`
+      DELETE FROM orcamento_anexo
+      WHERE id_anexo = $1
+    `, [anexo.id_anexo]);
+
+    console.log(`✅ [ORCAMENTOS] Anexo #${anexo.id_anexo} excluído com sucesso`);
+
+    await sock.sendMessage(groupId, {
+      text: `✅ *Anexo excluído com sucesso!*
+
+📄 ${anexo.nome_amigavel}
+
+Voltando à lista de anexos...`
+    });
+
+    // Voltar para lista de anexos atualizada
+    await listarAnexosOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao excluir anexo:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao excluir anexo.\n\n${error.message}`
+    });
+  }
+}
+
 // ============================================================
 // SISTEMA DE RATEIO
 // ============================================================
@@ -4365,9 +4455,87 @@ Voltando aos detalhes...`
   if (estado.etapa === 'VER_ANEXOS' || estado.etapa === 'VER_ANEXOS_VAZIO') {
     // Handler de "0" é global (volta aos detalhes)
 
-    // TODO: Implementar opções de anexo individual (baixar, deletar, etc)
+    if (estado.etapa === 'VER_ANEXOS_VAZIO') {
+      await sock.sendMessage(groupId, {
+        text: '❌ Digite 0 para voltar ao menu.'
+      });
+      return;
+    }
+
+    // Verificar se digitou número de anexo
+    const numeroAnexo = parseInt(texto);
+    if (!isNaN(numeroAnexo) && numeroAnexo > 0 && numeroAnexo <= estado.anexos.length) {
+      await mostrarOpcoesAnexo(sock, userId, groupId, estado, numeroAnexo);
+      return;
+    }
+
     await sock.sendMessage(groupId, {
-      text: '❌ Digite 0 para voltar ao menu.'
+      text: `❌ Opção inválida! Digite um número de 1 a ${estado.anexos.length} ou 0 para voltar.`
+    });
+    return;
+  }
+
+  // Opções de anexo individual
+  if (estado.etapa === 'OPCOES_ANEXO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    switch (texto) {
+      case '1': // Copiar link
+        await sock.sendMessage(groupId, {
+          text: `📋 *Link do anexo:*
+
+${estado.anexo_selecionado.url}
+
+Você pode copiar e compartilhar este link.`
+        });
+        // Volta para opções do anexo
+        return;
+
+      case '2': // Excluir
+        await sock.sendMessage(groupId, {
+          text: `⚠️ *CONFIRMAR EXCLUSÃO*
+
+Tem certeza que deseja excluir este anexo?
+
+📄 ${estado.anexo_selecionado.nome_amigavel}
+
+Digite:
+✅ *SIM* para confirmar
+❌ *NÃO* para cancelar`
+        });
+        atualizarEstado(userId, {
+          ...estado,
+          etapa: 'CONFIRMAR_EXCLUIR_ANEXO'
+        });
+        return;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1, 2 ou 0.'
+        });
+        return;
+    }
+  }
+
+  // Confirmar exclusão de anexo
+  if (estado.etapa === 'CONFIRMAR_EXCLUIR_ANEXO') {
+    const respostaUpper = texto.toUpperCase();
+
+    if (respostaUpper === 'SIM' || respostaUpper === 'S') {
+      await excluirAnexo(sock, userId, groupId, estado);
+      return;
+    }
+
+    if (respostaUpper === 'NAO' || respostaUpper === 'NÃO' || respostaUpper === 'N') {
+      await sock.sendMessage(groupId, {
+        text: '❌ Exclusão cancelada. Voltando à lista de anexos...'
+      });
+      await listarAnexosOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Resposta inválida! Digite SIM ou NÃO.'
     });
     return;
   }
