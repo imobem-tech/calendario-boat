@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250653
+// wpp/comandos/orcamentos.js — V.2610250736
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1473,6 +1473,10 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
       JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
       WHERE os.status IN ('RASCUNHO', 'ENVIADO')
         AND os.id_grupo = 1
+        AND NOT EXISTS (
+          SELECT 1 FROM orcamento_rateio r
+          WHERE r.id_orcamento = os.id_orcamento
+        )
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
       LIMIT 20
     `);
@@ -1552,7 +1556,10 @@ async function listarOrcamentosFechados(sock, userId, groupId, dias = null) {
   try {
     console.log(`✅ [ORCAMENTOS] Listando orçamentos fechados (${dias ? dias + ' dias' : 'todos'})...`);
 
-    let whereClause = `os.status IN ('APROVADO', 'RECUSADO', 'CONCLUIDO', 'CANCELADO')
+    let whereClause = `(
+          os.status IN ('RECUSADO', 'CONCLUIDO', 'CANCELADO')
+          OR (os.status = 'APROVADO' AND os.id_cobranca IS NOT NULL AND os.id_cobranca > 0)
+        )
         AND os.id_grupo = 1`;
 
     if (dias !== null) {
@@ -1773,8 +1780,12 @@ async function listarPendentesAprovacao(sock, userId, groupId) {
         CURRENT_DATE - os.data_orcamento::date as dias_pendente
       FROM "orcamento_servico" os
       JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
-      WHERE os.status IN ('RASCUNHO', 'ENVIADO')
+      WHERE os.status = 'ENVIADO'
         AND os.id_grupo = 1
+        AND EXISTS (
+          SELECT 1 FROM orcamento_rateio r
+          WHERE r.id_orcamento = os.id_orcamento
+        )
       ORDER BY os.data_orcamento ASC, os.id_orcamento ASC
       LIMIT 50
     `);
@@ -2406,7 +2417,7 @@ Digite 0 para voltar aos detalhes`
         AND e."Cod_Cliente" = $2
         AND a."Dt_Desautorizacao" IS NULL
         AND a."Dt_Cancelamento" IS NULL
-        AND a."Cod_Pessoa" NOT IN (3327, 4135, 4138, 3678)
+        AND a."Dt_Fechamento" IS NOT NULL
       ORDER BY a."Gropo_letra"
     `, [orc.id_embarcacao, orc.cod_cliente]);
 
