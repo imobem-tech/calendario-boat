@@ -1,5 +1,5 @@
 // ============================================================
-// api/orcamentos/visualizar/[token]/index.js — V.2610242107
+// api/orcamentos/visualizar/[token]/index.js — V.2610242125
 // GET /api/orcamentos/visualizar/:token
 // Visualiza orçamento por token de segurança
 // ============================================================
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
         os.token_visualizacao,
         os.id_embarcacao,
         e."Num_PB" as numero_pb,
-        e."Nome_Embarcação" as nome_embarcacao
+        e."Nome_Embar" as nome_embarcacao
       FROM orcamento_servico os
       LEFT JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.token_visualizacao = $1
