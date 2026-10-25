@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610251008
+// wpp/comandos/orcamentos.js — V.2610251014
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2836,6 +2836,21 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
 
       let mensagem = `✅ ${estado.cotista_atual.grupo_letra}${nomeExibir}: ${formatarMoeda(valor)}
 
+━━━━━━━━━━━━━━━━
+📋 *COTAS DISPONÍVEIS:*
+
+`;
+
+      // Listar todos os cotistas, marcando quais já foram distribuídos
+      estado.cotistas_disponiveis.forEach(c => {
+        const jaDistribuido = novaDistribuicao.find(d => d.grupo_letra === c.grupo_letra);
+        const icone = jaDistribuido ? '✅' : '⏸️';
+        const nome = c.nome_resumido || '';
+        mensagem += `${icone} ${c.grupo_letra}${nome ? ' - ' + nome : ''}\n`;
+      });
+
+      mensagem += `
+━━━━━━━━━━━━━━━━
 📊 *RESUMO ATUAL:*
 `;
 
