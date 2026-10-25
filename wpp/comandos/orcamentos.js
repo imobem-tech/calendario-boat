@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250741
+// wpp/comandos/orcamentos.js — V.2610250805
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3613,23 +3613,16 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 
 *OPÇÕES:*
 
-1️⃣ 📋 Acessar HISTÓRICO (LOG)
-2️⃣ ✏️ Editar itens
-3️⃣ ⚙️ Alterar % Gestão
-4️⃣ 📊 Definir rateio
-5️⃣ ✅ Aprovar orçamento
-`;
-
-    // Opção 6 dinâmica (Link)
-    if (orc.token_visualizacao) {
-      const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
-      mensagem += `6️⃣ 🔗 Ver Link\n${url}\n`;
-    } else {
-      mensagem += `6️⃣ 🔗 Gerar Link\n`;
-    }
-
-    mensagem += `7️⃣ 📤 Enviar orçamento
-8️⃣ 💵 Enviar cobrança
+1️⃣ 📋 Acessar HISTÓRICO
+2️⃣ 📝 Alterar a Descrição
+3️⃣ ✏️ Editar itens
+4️⃣ 📎 Inserir anexo
+5️⃣ ⚙️ Alterar % Gestão
+6️⃣ 📊 Definir rateio
+7️⃣ ✅ Aprovar orçamento
+8️⃣ 🔗 Ver Link
+9️⃣ 📤 Enviar orçamento
+🔟 💵 Enviar cobrança
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
@@ -3649,6 +3642,56 @@ Digite o número da opção:`;
     console.error('❌ [ORCAMENTOS] Erro ao buscar detalhes:', error);
     await sock.sendMessage(groupId, {
       text: `❌ Erro ao buscar detalhes.\n\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
+// ALTERAR DESCRIÇÃO DO ORÇAMENTO
+// ============================================================
+
+async function alterarDescricaoOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    // Buscar descrição atual
+    const result = await pool.query(`
+      SELECT descricao, numero
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (result.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `📝 *ALTERAR DESCRIÇÃO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${orc.numero}
+
+📌 *Descrição atual:*
+${orc.descricao || '(sem descrição)'}
+
+━━━━━━━━━━━━━━━━
+Digite a nova descrição
+ou 0 para cancelar`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'ALTERAR_DESCRICAO',
+      id_orcamento: idOrcamento,
+      descricao_anterior: orc.descricao
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao alterar descrição:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
     });
   }
 }
@@ -4097,47 +4140,53 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     // Handler de "0" agora é global (volta aos detalhes se tem id_orcamento)
 
     switch (texto) {
-      case '1': // Acessar HISTÓRICO (LOG)
+      case '1': // Acessar HISTÓRICO
         await mostrarMenuHistorico(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '2': // Editar itens
+      case '2': // Alterar a Descrição
+        await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      case '3': // Editar itens
         await editarItensOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '3': // Alterar % Gestão
+      case '4': // Inserir anexo (atalho para função do histórico)
+        await iniciarInsercaoAnexo(sock, userId, groupId, estado);
+        break;
+
+      case '5': // Alterar % Gestão
         await alterarPercentualGestao(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '4': // Definir rateio
+      case '6': // Definir rateio
         await definirRateioOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '5': // Aprovar orçamento
+      case '7': // Aprovar orçamento
         await aprovarOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '6': // Link (dinâmico)
+      case '8': // Ver Link (mostra link com opções ou gera novo)
         if (estado.token_existente) {
-          // Link existe - Mostrar opções
           await mostrarOpcoesLink(sock, userId, groupId, estado.id_orcamento);
         } else {
-          // Link não existe - Gerar novo
           await gerarLinkVisualizacao(sock, userId, groupId, estado.id_orcamento);
         }
         break;
 
-      case '7': // Enviar orçamento para grupos
+      case '9': // Enviar orçamento para grupos
         await enviarOrcamentoGrupos(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '8': // Enviar cobrança
+      case '10': // Enviar cobrança
         await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       default:
         await sock.sendMessage(groupId, {
-          text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6, 7, 8 ou 0.'
+          text: '❌ Opção inválida! Digite 1 a 10 ou 0.'
         });
     }
     return;
@@ -4205,6 +4254,46 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     await sock.sendMessage(groupId, {
       text: '❌ Digite 0 para voltar ao menu.'
     });
+    return;
+  }
+
+  // Alterar descrição do orçamento
+  if (estado.etapa === 'ALTERAR_DESCRICAO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    try {
+      // Atualizar descrição no banco
+      await pool.query(`
+        UPDATE orcamento_servico
+        SET descricao = $1
+        WHERE id_orcamento = $2
+      `, [texto, estado.id_orcamento]);
+
+      // Registrar no LOG
+      await adicionarLog(
+        estado.id_orcamento,
+        'DESCRICAO_ALTERADA',
+        `Descrição alterada:\nAnterior: ${estado.descricao_anterior || '(vazio)'}\nNova: ${texto}`,
+        userId
+      );
+
+      await sock.sendMessage(groupId, {
+        text: `✅ *Descrição alterada com sucesso!*
+
+📝 *Nova descrição:*
+${texto}
+
+Voltando aos detalhes...`
+      });
+
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+    } catch (error) {
+      console.error('❌ Erro ao salvar descrição:', error);
+      await sock.sendMessage(groupId, {
+        text: `❌ Erro ao salvar descrição:\n${error.message}\n\nDigite 0 para voltar`
+      });
+    }
     return;
   }
 
