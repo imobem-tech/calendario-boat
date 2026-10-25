@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610251014
+// wpp/comandos/orcamentos.js — V.2610251017
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2572,6 +2572,8 @@ Digite 0 para voltar aos detalhes`
 
     // Determinar se é rateio MANUAL ou PROPORCIONAL
     let tipoRateio = 'PROPORCIONAL';
+    let rateioIndividual = [];
+
     if (jaRealizado) {
       // Se já existe rateio, comparar quantidade de cotistas
       const qtdRateioSalvo = parseInt(rateioSalvoResult.rows[0].qtd);
@@ -2580,6 +2582,23 @@ Digite 0 para voltar aos detalhes`
       // Se quantidade diferente = MANUAL (apenas alguns cotistas)
       if (qtdRateioSalvo !== qtdCotistasTotal) {
         tipoRateio = 'MANUAL';
+
+        // Buscar dados reais do rateio manual do banco
+        const rateioRealResult = await pool.query(`
+          SELECT
+            r.qtd_cotas,
+            r.percentual,
+            r.valor_cotista,
+            a."Gropo_letra" as grupo_letra,
+            c."Cliente_Nome" as nome_pessoa
+          FROM orcamento_rateio r
+          LEFT JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+          LEFT JOIN "Cliente" c ON c."Codigo" = a."Cod_Pessoa"
+          WHERE r.id_orcamento = $1
+          ORDER BY a."Gropo_letra"
+        `, [idOrcamento]);
+
+        rateioIndividual = rateioRealResult.rows;
       }
     }
 
@@ -2599,7 +2618,7 @@ Digite 0 para voltar aos detalhes`
       grupos[perc].qtd_cotas_total += parseInt(r.qtd_cotas || 0);
     });
 
-    // Montar mensagem com resumo agrupado
+    // Montar mensagem
     let mensagem = `📊 *RATEIO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
 🆔 ${orc.numero}
@@ -2611,12 +2630,38 @@ Digite 0 para voltar aos detalhes`
 
 `;
 
-    // Listar grupos
-    Object.values(grupos).forEach(g => {
-      const qtdTexto = g.qtd_pessoas === 1 ? '1 cota' : `${g.qtd_pessoas} cotas`;
-      mensagem += `${qtdTexto} a ${g.percentual}% → ${formatarMoeda(g.valor_por_pessoa)} cada
+    if (tipoRateio === 'MANUAL' && rateioIndividual.length > 0) {
+      // Mostrar lista individual para rateio MANUAL
+      rateioIndividual.forEach(r => {
+        const nome = r.nome_pessoa ? r.nome_pessoa.split(/\s+/).slice(0, 2).join(' ').toUpperCase() : '';
+        const nomeExibir = nome ? ` - ${nome}` : '';
+        const perc = (parseFloat(r.percentual) || 0).toFixed(2);
+        mensagem += `${r.grupo_letra}${nomeExibir}: ${formatarMoeda(r.valor_cotista)} (${perc}%)
 `;
-    });
+      });
+    } else {
+      // Agrupar e listar para rateio PROPORCIONAL
+      const grupos = {};
+      rateio.forEach(r => {
+        const perc = parseFloat(r.percentual).toFixed(2);
+        if (!grupos[perc]) {
+          grupos[perc] = {
+            percentual: perc,
+            qtd_pessoas: 0,
+            valor_por_pessoa: parseFloat(r.valor_cotista),
+            qtd_cotas_total: 0
+          };
+        }
+        grupos[perc].qtd_pessoas++;
+        grupos[perc].qtd_cotas_total += parseInt(r.qtd_cotas || 0);
+      });
+
+      Object.values(grupos).forEach(g => {
+        const qtdTexto = g.qtd_pessoas === 1 ? '1 cota' : `${g.qtd_pessoas} cotas`;
+        mensagem += `${qtdTexto} a ${g.percentual}% → ${formatarMoeda(g.valor_por_pessoa)} cada
+`;
+      });
+    }
 
     mensagem += `
 ━━━━━━━━━━━━━━━━
