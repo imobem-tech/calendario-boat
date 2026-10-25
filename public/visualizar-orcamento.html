@@ -1,4 +1,4 @@
-<!-- V.2610250819 -->
+<!-- V.2610250826 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -320,6 +320,14 @@
         .total-label {
             font-size: 14px;
             color: var(--gray-700);
+        }
+
+        .total-label-right {
+            font-size: 14px;
+            color: var(--gray-700);
+            text-align: right;
+            width: 100%;
+            font-style: italic;
         }
 
         .total-label.final {
@@ -653,9 +661,8 @@
                                 <div class="total-label">Subtotal Serviços</div>
                                 <div class="total-valor">${formatarMoeda(orcamento.valor_servicos)}</div>
                             </div>
-                            <div class="total-row">
-                                <div class="total-label">Taxa de Gestão (${orcamento.taxa_servico_perc}%)</div>
-                                <div class="total-valor">${formatarMoeda(orcamento.taxa_servico_valor)}</div>
+                            <div class="total-row taxa-only">
+                                <div class="total-label-right">Taxa de Gestão (${orcamento.taxa_servico_perc}%)</div>
                             </div>
                             <div class="total-row final">
                                 <div class="total-label final">VALOR TOTAL</div>
