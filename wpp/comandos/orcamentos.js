@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250851
+// wpp/comandos/orcamentos.js — V.2610250944
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -436,8 +436,7 @@ async function mostrarMenuItens(sock, userId, groupId) {
 O que deseja fazer?
 
 1️⃣ ➕ Adicionar outro item
-2️⃣ ✏️ Ver/Editar itens
-3️⃣ ✅ Finalizar itens
+2️⃣ ✅ Finalizar itens
 
 0️⃣ Cancelar orçamento`;
 
@@ -460,17 +459,13 @@ async function processarMenuItens(sock, userId, groupId, opcao) {
       await pedirDescricaoItem(sock, userId, groupId);
       break;
 
-    case '2': // Ver/Editar itens
-      await mostrarListaItens(sock, userId, groupId);
-      break;
-
-    case '3': // Finalizar itens
+    case '2': // Finalizar itens
       await mostrarResumoFinal(sock, userId, groupId);
       break;
 
     default:
       await sock.sendMessage(groupId, {
-        text: '❌ Opção inválida! Digite 1, 2, 3 ou 0.'
+        text: '❌ Opção inválida! Digite 1, 2 ou 0.'
       });
   }
 }
