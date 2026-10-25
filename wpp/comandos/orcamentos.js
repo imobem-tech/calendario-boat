@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250736
+// wpp/comandos/orcamentos.js — V.2610250741
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1640,7 +1640,7 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
   try {
     console.log('🚤 [ORCAMENTOS] Listando embarcações para consulta...');
 
-    // Buscar embarcações com contagem de orçamentos
+    // Buscar embarcações com contagem de orçamentos NÃO ENCERRADOS
     const result = await pool.query(`
       SELECT
         e."Código" as codigo,
@@ -1650,6 +1650,10 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
       FROM "P_BOAT_1_Embarcacao" e
       LEFT JOIN "orcamento_servico" os ON os.id_embarcacao = e."Código"
         AND os.id_grupo = 1
+        AND (
+          os.status IN ('RASCUNHO', 'ENVIADO')
+          OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
+        )
       WHERE e."Cod_Cliente" = 4255
       GROUP BY e."Código", e."Num_PB", e."Nome_Embar"
       ORDER BY e."Num_PB"
@@ -1704,10 +1708,15 @@ async function listarOrcamentosPorEmbarcacao(sock, userId, groupId, idEmbarcacao
         os.descricao as titulo,
         os.valor_total,
         os.status,
-        os.data_orcamento
+        os.data_orcamento,
+        os.id_cobranca
       FROM "orcamento_servico" os
       WHERE os.id_embarcacao = $1
         AND os.id_grupo = 1
+        AND (
+          os.status IN ('RASCUNHO', 'ENVIADO')
+          OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
+        )
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
     `, [idEmbarcacao]);
 
