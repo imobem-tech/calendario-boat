@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250954
+// wpp/comandos/orcamentos.js — V.2610251008
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -577,9 +577,9 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
 
 *OPÇÕES:*
 
-Digite o número do item para editar
+✏️ *1, 2, 3...* - Editar item
 ➕ *A* - Adicionar novo item
-🗑️ *E[número]* - Excluir (ex: E2)
+🗑️ *E1, E2...* - Excluir item
 ✅ *S* - Salvar e voltar
 
 0️⃣ Cancelar
