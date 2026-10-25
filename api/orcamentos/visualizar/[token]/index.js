@@ -1,5 +1,5 @@
 // ============================================================
-// api/orcamentos/visualizar/[token]/index.js — V.2610242125
+// api/orcamentos/visualizar/[token]/index.js — V.2610242133
 // GET /api/orcamentos/visualizar/:token
 // Visualiza orçamento por token de segurança
 // ============================================================
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
         c."Cliente_Nome" as nome_pessoa
       FROM orcamento_rateio r
       LEFT JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
-      LEFT JOIN "Cliente" c ON c."Código" = a."Cod_Pessoa"
+      LEFT JOIN "Cliente" c ON c."Codigo" = a."Cod_Pessoa"
       WHERE r.id_orcamento = $1
       ORDER BY a."Gropo_letra"
     `, [orcamento.id_orcamento]);
