@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610250947
+// wpp/comandos/orcamentos.js — V.2610250951
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2480,6 +2480,19 @@ Digite 0 para voltar aos detalhes`
     const jaRealizado = parseInt(rateioSalvoResult.rows[0].qtd) > 0;
     const statusTexto = jaRealizado ? 'JÁ REALIZADA' : 'NÃO REALIZADA';
 
+    // Determinar se é rateio MANUAL ou PROPORCIONAL
+    let tipoRateio = 'PROPORCIONAL';
+    if (jaRealizado) {
+      // Se já existe rateio, comparar quantidade de cotistas
+      const qtdRateioSalvo = parseInt(rateioSalvoResult.rows[0].qtd);
+      const qtdCotistasTotal = cotistas.length;
+
+      // Se quantidade diferente = MANUAL (apenas alguns cotistas)
+      if (qtdRateioSalvo !== qtdCotistasTotal) {
+        tipoRateio = 'MANUAL';
+      }
+    }
+
     // Agrupar rateio por percentual (proporcional)
     const grupos = {};
     rateio.forEach(r => {
@@ -2504,7 +2517,7 @@ Digite 0 para voltar aos detalhes`
 💰 Total: ${formatarMoeda(valorTotal)}
 ━━━━━━━━━━━━━━━━
 
-*PROPORCIONAL - ${statusTexto}:*
+*${tipoRateio} - ${statusTexto}:*
 
 `;
 
