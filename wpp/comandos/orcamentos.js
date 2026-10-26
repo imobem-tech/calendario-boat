@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260935
+// wpp/comandos/orcamentos.js — V.2610260941
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3149,6 +3149,7 @@ Digite 0 para voltar aos detalhes`;
     const EMPRESA = 8; // ALLMAX
     const CENTRO_CUSTO = 8;
     const DIAS_VENCIMENTO = 30;
+    const VALOR_MINIMO_COBRANCA = 50.00; // Mínimo para gerar cobrança
     const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
 
     // URL do orçamento
@@ -3156,6 +3157,7 @@ Digite 0 para voltar aos detalhes`;
 
     // Array para guardar cobranças geradas
     const cobrancasGeradas = [];
+    const valoresTruncados = [];
     const erros = [];
 
     console.log(`\n💳 ═══════════════════════════════════════════════`);
@@ -3165,9 +3167,19 @@ Digite 0 para voltar aos detalhes`;
 
     for (const rateio of rateioResult.rows) {
       try {
-        console.log(`\n💳 Gerando cobrança para ${rateio.grupo_letra}:`);
+        console.log(`\n💳 Processando ${rateio.grupo_letra}:`);
         console.log(`   - Cliente: ${rateio.cod_pessoa}`);
         console.log(`   - Valor: ${rateio.valor_cotista}`);
+
+        // Validar valor mínimo
+        if (parseFloat(rateio.valor_cotista) < VALOR_MINIMO_COBRANCA) {
+          console.log(`   ⚠️  TRUNCADO - Valor inferior a R$ ${VALOR_MINIMO_COBRANCA.toFixed(2)}`);
+          valoresTruncados.push({
+            grupo: rateio.grupo_letra,
+            valor: rateio.valor_cotista
+          });
+          continue; // Pula para o próximo
+        }
 
         const descricaoCR = `${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)} ${orc.descricao}`;
 
@@ -3296,8 +3308,15 @@ ${orc.descricao}
 ✅ ${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)
 📤 ${enviosOk} mensagem(ns) enviada(s)`;
 
+    if (valoresTruncados.length > 0) {
+      resumo += `\n\n⚠️ *Valores truncados (< R$ ${VALOR_MINIMO_COBRANCA.toFixed(2)}):*\n`;
+      valoresTruncados.forEach(v => {
+        resumo += `${v.grupo}: ${formatarMoeda(v.valor)}\n`;
+      });
+    }
+
     if (erros.length > 0) {
-      resumo += `\n\n⚠️ *Erros:*\n${erros.join('\n')}`;
+      resumo += `\n\n❌ *Erros:*\n${erros.join('\n')}`;
     }
 
     resumo += '\n\n━━━━━━━━━━━━━━━━\nDigite 0 para voltar aos detalhes';
