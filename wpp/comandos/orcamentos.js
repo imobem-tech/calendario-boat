@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261153
+// wpp/comandos/orcamentos.js — V.2610261205
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -270,9 +270,8 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
 
 async function pedirTitulo(sock, userId, groupId) {
   const estado = obterEstado(userId);
-  const embarcacao = estado.orcamento.embarcacao;
 
-  const mensagem = `✅ Embarcação selecionada: ${embarcacao.numero_pb} (${embarcacao.nome})
+  const mensagem = `✅ Embarcação selecionada: ${estado.orcamento.numero_pb} (${estado.orcamento.nome_embarcacao})
 
 ━━━━━━━━━━━━━━━━
 📝 *PASSO 2/5: TÍTULO DO ORÇAMENTO*
