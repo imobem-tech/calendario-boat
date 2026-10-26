@@ -1,5 +1,5 @@
 // ============================================================
-// api/orcamentos/visualizar/[token]/index.js — V.2610250832
+// api/orcamentos/visualizar/[token]/index.js — V.2610260819
 // GET /api/orcamentos/visualizar/:token
 // Visualiza orçamento por token de segurança
 // ============================================================
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
         os.id_orcamento,
         os.numero,
         os.descricao,
+        os.observacao,
         os.status,
         os.valor_servicos,
         os.taxa_servico_perc,

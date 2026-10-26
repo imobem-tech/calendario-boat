@@ -1,4 +1,4 @@
-<!-- V.2610260726 -->
+<!-- V.2610260819 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -629,8 +629,14 @@
                         </div>
                         ${orcamento.descricao ? `
                         <div class="info-item" style="margin-top: 15px;">
-                            <div class="info-label">Descrição</div>
+                            <div class="info-label">Título/Descrição</div>
                             <div class="info-value">${formatarDescricao(orcamento.descricao)}</div>
+                        </div>
+                        ` : ''}
+                        ${orcamento.observacao ? `
+                        <div class="info-item" style="margin-top: 15px;">
+                            <div class="info-label">Observações</div>
+                            <div class="info-value">${formatarDescricao(orcamento.observacao)}</div>
                         </div>
                         ` : ''}
                     </div>
