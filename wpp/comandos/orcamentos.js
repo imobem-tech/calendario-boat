@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261238
+// wpp/comandos/orcamentos.js — V.2610261303
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4288,9 +4288,9 @@ Digite 0 para voltar aos detalhes`
 // DETALHES DO ORÇAMENTO
 // ============================================================
 
-async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
+async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento, origem = null) {
   try {
-    console.log(`🔍 [ORCAMENTOS] Buscando detalhes do orçamento #${idOrcamento}...`);
+    console.log(`🔍 [ORCAMENTOS] Buscando detalhes do orçamento #${idOrcamento}... (origem: ${origem || 'desconhecida'})`);
 
     // Buscar cabeçalho
     const orcResult = await pool.query(`
@@ -4397,11 +4397,16 @@ Digite o número da opção:`;
     await sock.sendMessage(groupId, { text: mensagem });
 
     // Atualizar estado para processar submenu
+    // Se não recebeu origem, tentar pegar do estado atual
+    const estadoAtual = obterEstado(userId);
+    const origemFinal = origem || estadoAtual.origem || estadoAtual.etapa;
+
     atualizarEstado(userId, {
       etapa: 'SUBMENU_DETALHES',
       id_orcamento: idOrcamento,
       orcamento_dados: orc,
-      token_existente: !!orc.token_visualizacao  // true se existe, false se não
+      token_existente: !!orc.token_visualizacao,  // true se existe, false se não
+      origem: origemFinal  // Guardar de onde veio para voltar com "0"
     });
 
   } catch (error) {
@@ -5107,12 +5112,37 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   const texto = mensagem.trim ? mensagem.trim() : String(mensagem);
 
   // ============================================================
-  // HANDLER GLOBAL: Voltar aos detalhes do orçamento com "0"
+  // HANDLER GLOBAL: Voltar com "0"
   // ============================================================
-  // REGRA: Se digitou "0" e está em um estado derivado do menu de detalhes
-  // (tem id_orcamento e NÃO está no menu principal), volta aos detalhes
+  // REGRA: Se digitou "0":
+  // - Em SUBMENU_DETALHES → volta para lista de origem
+  // - Em etapa derivada dos detalhes → volta para detalhes
   if (texto === '0' && estado.id_orcamento && estado.etapa !== 'MENU') {
-    await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+    // Se está nos detalhes, volta para a origem (lista)
+    if (estado.etapa === 'SUBMENU_DETALHES' && estado.origem) {
+      switch (estado.origem) {
+        case 'LISTAR_ABERTOS':
+          await listarOrcamentosAbertos(sock, userId, groupId);
+          break;
+        case 'LISTAR_FECHADOS':
+          await perguntarDiasFechados(sock, userId, groupId);
+          break;
+        case 'LISTAR_POR_EMBARCACAO':
+          await listarEmbarcacoesParaConsulta(sock, userId, groupId);
+          break;
+        case 'LISTAR_PENDENTES_APROVACAO':
+          await listarPendentesAprovacao(sock, userId, groupId);
+          break;
+        case 'LISTAR_PENDENTES_COBRANCA':
+          await listarPendentesCobranca(sock, userId, groupId);
+          break;
+        default:
+          await mostrarMenuOrcamentos(sock, userId, groupId);
+      }
+    } else {
+      // Está em submenu derivado, volta para detalhes
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+    }
     return;
   }
 
@@ -5139,7 +5169,9 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         break;
       case '0':
         limparEstado(userId);
-        await sock.sendMessage(groupId, { text: '👋 Até logo!' });
+        await sock.sendMessage(groupId, {
+          text: '✅ Sessão encerrada.\n\nDigite *menu* ou *mmm* para voltar.'
+        });
         break;
       default:
         await sock.sendMessage(groupId, { text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6 ou 0.' });
@@ -5203,7 +5235,14 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       estado.etapa === 'LISTAR_PENDENTES_APROVACAO' ||
       estado.etapa === 'LISTAR_PENDENTES_COBRANCA') {
     if (texto === '0') {
-      await mostrarMenuOrcamentos(sock, userId, groupId);
+      // LISTAR_FECHADOS volta para escolher período, outros voltam para menu
+      if (estado.etapa === 'LISTAR_FECHADOS') {
+        await perguntarDiasFechados(sock, userId, groupId);
+      } else if (estado.etapa === 'LISTAR_POR_EMBARCACAO') {
+        await listarEmbarcacoesParaConsulta(sock, userId, groupId);
+      } else {
+        await mostrarMenuOrcamentos(sock, userId, groupId);
+      }
       return;
     }
 
@@ -5216,7 +5255,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     }
 
     const orcamento = estado.orcamentos[index];
-    await verDetalhesOrcamento(sock, userId, groupId, orcamento.id_orcamento);
+    await verDetalhesOrcamento(sock, userId, groupId, orcamento.id_orcamento, estado.etapa);
     return;
   }
 
