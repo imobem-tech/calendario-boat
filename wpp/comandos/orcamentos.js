@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261625
+// wpp/comandos/orcamentos.js — V.2610261634
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -1292,8 +1292,7 @@ Taxa de Gestão (${taxaGestaoPerc}%).......... ${formatarMoeda(taxaGestaoValor)}
 
 ━━━━━━━━━━━━━━━━
 1️⃣ ✅ Confirmar e criar orçamento
-2️⃣ ✏️ Voltar para editar itens
-3️⃣ 🗑️ Cancelar tudo
+2️⃣ 🗑️ Cancelar tudo
 
 Escolha uma opção:`;
 
@@ -1310,7 +1309,7 @@ Escolha uma opção:`;
 }
 
 async function processarConfirmacao(sock, userId, groupId, opcao) {
-  if (opcao === '3' || opcao === '0') {
+  if (opcao === '2' || opcao === '0') {
     await mostrarMenuOrcamentos(sock, userId, groupId);
     return;
   }
@@ -1320,13 +1319,9 @@ async function processarConfirmacao(sock, userId, groupId, opcao) {
       await criarOrcamentoBanco(sock, userId, groupId);
       break;
 
-    case '2': // Voltar para editar
-      await mostrarListaItens(sock, userId, groupId);
-      break;
-
     default:
       await sock.sendMessage(groupId, {
-        text: '❌ Opção inválida! Digite 1, 2 ou 3.'
+        text: '❌ Opção inválida! Digite 1 ou 2.'
       });
   }
 }
