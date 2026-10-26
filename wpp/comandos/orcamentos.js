@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261504
+// wpp/comandos/orcamentos.js — V.2610261509
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -177,14 +177,30 @@ export async function mostrarMenuOrcamentos(sock, userId, groupId) {
           )
       `),
 
-      // 2. Total de orçamentos por embarcação (NÃO ENCERRADOS)
+      // 2. Total de orçamentos por embarcação (SOMA das 3 categorias)
+      // = Abertos (RASCUNHO/ENVIADO sem rateio)
+      // + Pend. Aprovação (ENVIADO com rateio)
+      // + Pend. Cobrança (APROVADO sem cobrança)
       pool.query(`
         SELECT COUNT(*) as total
         FROM "orcamento_servico" os
         WHERE os.id_grupo = 1
           AND (
-            os.status IN ('RASCUNHO', 'ENVIADO')
-            OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
+            -- Abertos: RASCUNHO/ENVIADO sem rateio
+            (
+              os.status IN ('RASCUNHO', 'ENVIADO')
+              AND NOT EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
+            )
+            -- Pend. Aprovação: ENVIADO com rateio
+            OR (
+              os.status = 'ENVIADO'
+              AND EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
+            )
+            -- Pend. Cobrança: APROVADO sem cobrança
+            OR (
+              os.status = 'APROVADO'
+              AND (os.id_cobranca IS NULL OR os.id_cobranca = 0)
+            )
           )
       `),
 
