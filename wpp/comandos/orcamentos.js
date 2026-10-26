@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260923
+// wpp/comandos/orcamentos.js — V.2610260929
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4188,7 +4188,7 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 8️⃣ 🔗 Ver Link
 9️⃣ 📤 Enviar orçamento
 🔟 💵 Enviar cobrança
-1️⃣1️⃣ ${statusEmoji} Status ${orc.status}
+1️⃣1️⃣ Status ${orc.status}
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
