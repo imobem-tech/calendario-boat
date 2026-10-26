@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260720
+// wpp/comandos/orcamentos.js — V.2610260725
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -133,6 +133,12 @@ function formatarMoeda(valor) {
     return '(não informado)';
   }
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatarNumeroOrcamento(idOrcamento, numero) {
+  // Formata: 051ORC-261025152542 (ID com 3 dígitos + número)
+  const idFormatado = String(idOrcamento).padStart(3, '0');
+  return `${idFormatado}${numero}`;
 }
 
 // ============================================================
@@ -550,7 +556,7 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
 
     if (itensResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `📦 *EDITAR ITENS*\n━━━━━━━━━━━━━━━━\n🆔 Orçamento: ${orc.numero}\n━━━━━━━━━━━━━━━━\n\n❌ Nenhum item cadastrado.\n\n➕ Digite *A* para adicionar item\n0️⃣ Voltar`
+        text: `📦 *EDITAR ITENS*\n━━━━━━━━━━━━━━━━\n🆔 Orçamento: ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}\n━━━━━━━━━━━━━━━━\n\n❌ Nenhum item cadastrado.\n\n➕ Digite *A* para adicionar item\n0️⃣ Voltar`
       });
 
       atualizarEstado(userId, {
@@ -563,7 +569,7 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
 
     let mensagem = `📦 *EDITAR ITENS*
 ━━━━━━━━━━━━━━━━
-🆔 Orçamento: ${orc.numero}
+🆔 Orçamento: ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 🚤 ${orc.numero_pb}
 ━━━━━━━━━━━━━━━━
 
@@ -1959,7 +1965,7 @@ async function mostrarMenuHistorico(sock, userId, groupId, idOrcamento) {
     const mensagem = `━━━━━━━━━━━━━━━━
 📋 *HISTÓRICO E ANEXOS*
 ━━━━━━━━━━━━━━━━
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📝 ${orc.titulo || '(sem título)'}
 🚤 ${orc.numero_pb}
 ━━━━━━━━━━━━━━━━
@@ -2622,7 +2628,7 @@ Digite 0 para voltar aos detalhes`
     // Montar mensagem
     let mensagem = `📊 *RATEIO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(idOrcamento, orc.numero)}
 🚤 ${orc.numero_pb}
 💰 Total: ${formatarMoeda(valorTotal)}
 ━━━━━━━━━━━━━━━━
@@ -3081,7 +3087,7 @@ Aguarde...`
       await sock.sendMessage(groupId, {
         text: `✅ *COBRANÇAS GERADAS!*
 
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 💰 ${formatarMoeda(orc.valor_total)}
 📋 ${cobrancasCriadas} conta(s) a receber criada(s)
 
@@ -3280,7 +3286,7 @@ async function confirmarAprovacaoOrcamento(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `✅ *ORÇAMENTO APROVADO!*
 
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 🚤 ${orc.numero_pb}
 💰 ${formatarMoeda(orc.valor_total)}
 
@@ -3557,7 +3563,7 @@ async function gerarLinkVisualizacao(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `🔗 *LINK DE VISUALIZAÇÃO GERADO*
 
-📋 ${orc.numero}
+📋 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}
 
 ━━━━━━━━━━━━━━━━
@@ -3743,7 +3749,7 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
     let mensagem = `━━━━━━━━━━━━━━━━
 📋 *DETALHES DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-🆔 Número: ${orc.numero}
+🆔 Número: ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 ${statusEmoji} Status: ${orc.status}
 🚤 Embarcação: ${orc.numero_pb} - ${orc.nome_embarcacao}
 📅 Data: ${data}
@@ -4069,7 +4075,7 @@ Este orçamento ainda não tem rateio definido!
 
     let mensagem = `📊 *PREVIEW DO ENVIO*
 ━━━━━━━━━━━━━━━━
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 🚤 ${orc.nome_embarcacao}
 💰 Total: ${formatarMoeda(orc.valor_total)}
 ━━━━━━━━━━━━━━━━
@@ -4244,7 +4250,7 @@ Este orçamento ainda não tem rateio definido!
 ━━━━━━━━━━━━━━━━
 
 🚤 Embarcação: ${orc.nome_embarcacao}
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📝 Descrição:
 ${orc.descricao}
@@ -4298,7 +4304,7 @@ ${orc.descricao}
 
 📊 ${enviosOk} de ${rateioResult.rows.length} grupos receberam
 
-🆔 ${orc.numero}`;
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}`;
 
     if (erros.length > 0) {
       resumo += `\n\n⚠️ *Erros:*\n${erros.join('\n')}`;
