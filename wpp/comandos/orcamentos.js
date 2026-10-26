@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260640
+// wpp/comandos/orcamentos.js — V.2610260644
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4421,7 +4421,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     const embarcacao = estado.embarcacoes[index];
     await listarOrcamentosPorEmbarcacao(
       sock, userId, groupId,
-      embarcacao.codigo,
+      embarcacao.numero_pb,  // CORRIGIDO: usar numero_pb, não codigo!
       embarcacao.nome,
       embarcacao.numero_pb
     );
