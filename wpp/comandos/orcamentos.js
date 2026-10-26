@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610251017
+// wpp/comandos/orcamentos.js — V.2610260545
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4009,12 +4009,12 @@ async function enviarOrcamentoGrupos(sock, userId, groupId, idOrcamento) {
         SUM(r.valor_cotista) as valor_grupo,
         SUM(r.percentual) as percentual_grupo,
         COUNT(*) as qtd_cotistas,
-        MAX(wg.id_grupo_wpp) as id_grupo_wpp
+        MAX(wg.grupowppid) as id_grupo_wpp
       FROM orcamento_rateio r
       JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
       LEFT JOIN wpp_grupos_agenda wg
-        ON wg.num_pb = $1
-        AND wg.grupo_comp_letra = a."Gropo_letra"
+        ON wg.pb = $1
+        AND wg.cota = a."Gropo_letra"
       WHERE r.id_orcamento = $2
         AND r.participando = true
       GROUP BY a."Gropo_letra"
