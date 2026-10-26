@@ -363,8 +363,7 @@ async function receberDescricaoItem(sock, userId, groupId, descricao) {
 
   // Se digitar 1, pular cadastro de itens
   if (descricao === '1') {
-    const estado = obterEstado(userId);
-    await finalizarOrcamento(sock, userId, groupId, estado.orcamento);
+    await mostrarResumoFinal(sock, userId, groupId);
     return;
   }
 
