@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261214
+// wpp/comandos/orcamentos.js — V.2610261232
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4822,6 +4822,7 @@ async function enviarOrcamentoGrupos(sock, userId, groupId, idOrcamento) {
         os.id_orcamento,
         os.numero,
         os.descricao,
+        os.status,
         os.token_visualizacao,
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
@@ -4838,6 +4839,50 @@ async function enviarOrcamentoGrupos(sock, userId, groupId, idOrcamento) {
     }
 
     const orc = orcResult.rows[0];
+
+    // ═══════════════════════════════════════════════════════════
+    // VALIDAÇÃO: Verificar se status permite envio
+    // ═══════════════════════════════════════════════════════════
+    const statusPermitidos = ['RASCUNHO', 'ENVIADO', 'APROVADO'];
+
+    if (!statusPermitidos.includes(orc.status)) {
+      console.log(`🚫 [ORCAMENTOS] Envio bloqueado - Status: ${orc.status}`);
+
+      let motivoBloqueio = '';
+      switch (orc.status) {
+        case 'RECUSADO':
+          motivoBloqueio = '❌ Este orçamento foi *RECUSADO* pelo cliente';
+          break;
+        case 'CANCELADO':
+          motivoBloqueio = '🚫 Este orçamento foi *CANCELADO*';
+          break;
+        case 'CONCLUIDO':
+          motivoBloqueio = '✅ Este orçamento já foi *CONCLUIDO* (cobrança gerada)';
+          break;
+        default:
+          motivoBloqueio = `⚠️ Status atual: ${orc.status}`;
+      }
+
+      await sock.sendMessage(groupId, {
+        text: `🚫 *ENVIO BLOQUEADO*
+
+${motivoBloqueio}
+
+━━━━━━━━━━━━━━━━
+⚠️ *Não é possível enviar orçamentos com este status!*
+
+💡 *Motivos possíveis:*
+• RECUSADO: Cliente já recusou
+• CANCELADO: Foi cancelado manualmente
+• CONCLUIDO: Já foi cobrado (finalizado)
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
+      });
+      return;
+    }
+
+    console.log(`✅ [ORCAMENTOS] Status ${orc.status} permite envio`);
 
     // 2. Verificar se tem rateio (SEM LEFT JOIN para evitar duplicação)
     const rateioResult = await pool.query(`
@@ -4959,18 +5004,25 @@ ${orc.descricao}
     console.log(`🏁 Erros: ${erros.length}`);
     console.log(`🏁 ═══════════════════════════════════════════════\n`);
 
-    // 5. Atualizar status para ENVIADO
-    await pool.query(`
-      UPDATE orcamento_servico
-      SET status = 'ENVIADO'
-      WHERE id_orcamento = $1
-    `, [idOrcamento]);
+    // 5. Atualizar status para ENVIADO (só se for RASCUNHO)
+    let statusFinal = orc.status;
+    if (orc.status === 'RASCUNHO') {
+      await pool.query(`
+        UPDATE orcamento_servico
+        SET status = 'ENVIADO'
+        WHERE id_orcamento = $1
+      `, [idOrcamento]);
+      statusFinal = 'ENVIADO';
+      console.log(`✅ [ORCAMENTOS] Status alterado: RASCUNHO → ENVIADO`);
+    } else {
+      console.log(`ℹ️  [ORCAMENTOS] Status mantido: ${orc.status} (não era RASCUNHO)`);
+    }
 
     // 6. LOG final (resumo)
     await adicionarLog(
       idOrcamento,
       'ORCAMENTO_ENVIADO',
-      `Enviado para ${enviosOk}/${rateioResult.rows.length} grupos - Status: ENVIADO`,
+      `Enviado para ${enviosOk}/${rateioResult.rows.length} grupos | Status: ${statusFinal}`,
       userId
     );
 
