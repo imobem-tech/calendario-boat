@@ -1,4 +1,4 @@
-<!-- V.2610250956 -->
+<!-- V.2610260726 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -574,11 +574,19 @@
         }
 
         // ============================================================
+        // FORMATAR NÚMERO DO ORÇAMENTO
+        // ============================================================
+        function formatarNumeroOrcamento(idOrcamento, numero) {
+            const idFormatado = String(idOrcamento).padStart(3, '0');
+            return `${idFormatado}${numero}`;
+        }
+
+        // ============================================================
         // RENDERIZAR ORÇAMENTO
         // ============================================================
         function renderizarOrcamento() {
             // Atualizar cabeçalho
-            document.getElementById('headerTitle').textContent = orcamento.numero;
+            document.getElementById('headerTitle').textContent = formatarNumeroOrcamento(orcamento.id_orcamento, orcamento.numero);
             document.getElementById('headerStatus').textContent = orcamento.status;
             document.getElementById('headerStatus').className = `header-status ${orcamento.status.toLowerCase()}`;
             document.getElementById('headerInfo').textContent = `${orcamento.numero_pb} - ${orcamento.nome_embarcacao}`;
@@ -594,7 +602,7 @@
                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">Orçamento</div>
-                                <div class="info-value">${orcamento.numero}</div>
+                                <div class="info-value">${formatarNumeroOrcamento(orcamento.id_orcamento, orcamento.numero)}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Status</div>
