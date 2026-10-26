@@ -1,4 +1,4 @@
-<!-- V.2610260819 -->
+<!-- V.2610260821 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -693,17 +693,42 @@
                         <div class="card-title">📊 Rateio entre Cotistas</div>
                     </div>
                     <div class="card-body">
-                        ${orcamento.rateio.map(r => `
-                            <div class="rateio-item">
-                                <div class="rateio-cotista">
-                                    <div class="rateio-grupo">${r.grupo_letra} • ${r.qtd_cotas} cota(s)</div>
-                                </div>
-                                <div class="rateio-valores">
-                                    <div class="rateio-percentual">${parseFloat(r.percentual).toFixed(2)}%</div>
-                                    <div class="rateio-valor">${formatarMoeda(r.valor_cotista)}</div>
-                                </div>
-                            </div>
-                        `).join('')}
+                        ${(() => {
+                            // Verificar se é rateio proporcional (todos valores iguais)
+                            const valores = orcamento.rateio.map(r => parseFloat(r.valor_cotista));
+                            const valorPrimeiro = valores[0];
+                            const isProporcional = valores.every(v => Math.abs(v - valorPrimeiro) < 0.01);
+
+                            if (isProporcional && orcamento.rateio.length > 1) {
+                                // Rateio proporcional: mostrar apenas uma linha resumida
+                                const totalCotistas = orcamento.rateio.reduce((sum, r) => sum + parseInt(r.qtd_cotas), 0);
+                                const primeiroItem = orcamento.rateio[0];
+                                return `
+                                    <div class="rateio-item" style="justify-content: center;">
+                                        <div class="rateio-valores">
+                                            <div style="text-align: center; margin-bottom: 8px; color: #666; font-size: 14px;">
+                                                Rateio Proporcional • ${totalCotistas} cotista(s)
+                                            </div>
+                                            <div class="rateio-percentual">${parseFloat(primeiroItem.percentual).toFixed(2)}%</div>
+                                            <div class="rateio-valor">${formatarMoeda(primeiroItem.valor_cotista)} <span style="font-size: 12px; color: #666;">por cotista</span></div>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                // Rateio manual: mostrar todos os cotistas
+                                return orcamento.rateio.map(r => `
+                                    <div class="rateio-item">
+                                        <div class="rateio-cotista">
+                                            <div class="rateio-grupo">${r.grupo_letra} • ${r.qtd_cotas} cota(s)</div>
+                                        </div>
+                                        <div class="rateio-valores">
+                                            <div class="rateio-percentual">${parseFloat(r.percentual).toFixed(2)}%</div>
+                                            <div class="rateio-valor">${formatarMoeda(r.valor_cotista)}</div>
+                                        </div>
+                                    </div>
+                                `).join('');
+                            }
+                        })()}
                     </div>
                 </div>
                 ` : ''}
