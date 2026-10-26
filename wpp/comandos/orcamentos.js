@@ -1,6 +1,8 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261303
+// wpp/comandos/orcamentos.js — V.2610261419
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
+//
+// NOVO: Sistema de parcelamento (até 6x, mín R$ 500/parcela/cotista)
 //
 // Gerencia criação de orçamentos com múltiplos itens
 // dentro do grupo ORÇAMENTOS (120363412373130577@g.us)
@@ -38,6 +40,14 @@ const pool = new Pool({
 });
 
 console.log('🔌 Pool de conexão orçamentos inicializado');
+
+// ============================================================
+// CONSTANTES DE PARCELAMENTO E COBRANÇA
+// ============================================================
+const PARCELA_MINIMA_INDIVIDUAL = 500.00;  // R$ 500 mínimo por cotista por parcela
+const MAX_PARCELAS = 6;                     // Até 6 parcelas
+const DIAS_VENCIMENTO_PADRAO = 5;           // Vencimento padrão: 5 dias
+const MAX_DIAS_PRIMEIRA_PARCELA = 30;      // Data primeira parcela: máx 30 dias
 
 // ============================================================
 // GERENCIAMENTO DE ESTADO
@@ -147,7 +157,86 @@ function formatarNumeroOrcamento(idOrcamento, numero) {
 // ============================================================
 
 export async function mostrarMenuOrcamentos(sock, userId, groupId) {
-  const mensagem = `━━━━━━━━━━━━━━━━
+  try {
+    // Buscar contagens em paralelo
+    const [abertosResult, porEmbResult, pendAprovResult, pendCobrResult] = await Promise.all([
+      // 1. Orçamentos ABERTOS (RASCUNHO, ENVIADO sem rateio)
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM "orcamento_servico" os
+        WHERE os.status IN ('RASCUNHO', 'ENVIADO')
+          AND os.id_grupo = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM orcamento_rateio r
+            WHERE r.id_orcamento = os.id_orcamento
+          )
+      `),
+
+      // 2. Total de orçamentos por embarcação (NÃO ENCERRADOS)
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM "orcamento_servico" os
+        WHERE os.id_grupo = 1
+          AND (
+            os.status IN ('RASCUNHO', 'ENVIADO')
+            OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
+          )
+      `),
+
+      // 3. Pendentes de APROVAÇÃO (ENVIADO com rateio)
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM "orcamento_servico" os
+        WHERE os.status = 'ENVIADO'
+          AND os.id_grupo = 1
+          AND EXISTS (
+            SELECT 1 FROM orcamento_rateio r
+            WHERE r.id_orcamento = os.id_orcamento
+          )
+      `),
+
+      // 4. Pendentes de COBRANÇA (APROVADO sem id_cobranca)
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM "orcamento_servico" os
+        WHERE os.status = 'APROVADO'
+          AND os.id_grupo = 1
+          AND (os.id_cobranca IS NULL OR os.id_cobranca = 0)
+      `)
+    ]);
+
+    const qtdAbertos = parseInt(abertosResult.rows[0].total) || 0;
+    const qtdPorEmb = parseInt(porEmbResult.rows[0].total) || 0;
+    const qtdPendAprov = parseInt(pendAprovResult.rows[0].total) || 0;
+    const qtdPendCobr = parseInt(pendCobrResult.rows[0].total) || 0;
+
+    const mensagem = `━━━━━━━━━━━━━━━━
+💼 *SISTEMA DE ORÇAMENTOS*
+━━━━━━━━━━━━━━━━
+
+Escolha uma opção:
+
+1️⃣ ➕ Criar Novo Orçamento
+2️⃣ 📋 Consultar Orç. Abertos (${qtdAbertos})
+3️⃣ ✅ Consultar Orç. Fechados
+4️⃣ 🚤 Orç. por Embarcação (${qtdPorEmb})
+5️⃣ ⏰ Pendentes Aprovação (${qtdPendAprov})
+6️⃣ 💵 Pendentes de cobrança (${qtdPendCobr})
+0️⃣ 🔙 Voltar ao Menu Principal
+
+━━━━━━━━━━━━━━━━
+Digite o número da opção:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Resetar estado
+    atualizarEstado(userId, { etapa: 'MENU', orcamento: null });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao mostrar menu:', error);
+
+    // Fallback: mostrar menu sem contagens
+    const mensagem = `━━━━━━━━━━━━━━━━
 💼 *SISTEMA DE ORÇAMENTOS*
 ━━━━━━━━━━━━━━━━
 
@@ -164,10 +253,9 @@ Escolha uma opção:
 ━━━━━━━━━━━━━━━━
 Digite o número da opção:`;
 
-  await sock.sendMessage(groupId, { text: mensagem });
-
-  // Resetar estado
-  atualizarEstado(userId, { etapa: 'MENU', orcamento: null });
+    await sock.sendMessage(groupId, { text: mensagem });
+    atualizarEstado(userId, { etapa: 'MENU', orcamento: null });
+  }
 }
 
 // ============================================================
@@ -1511,7 +1599,13 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `📋 *ORÇAMENTOS ABERTOS*\n\n❌ Nenhum orçamento aberto encontrado.\n\nDigite *menu* para voltar.`
+        text: `📋 *ORÇAMENTOS ABERTOS*\n\n❌ Nenhum orçamento aberto encontrado.\n\n0️⃣ Voltar ao menu`
+      });
+
+      // Definir etapa para que "0" funcione
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_ABERTOS',
+        orcamentos: []
       });
       return;
     }
@@ -1614,7 +1708,13 @@ async function listarOrcamentosFechados(sock, userId, groupId, dias = null) {
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `✅ *ORÇAMENTOS FECHADOS*\n📅 ${periodo}\n\n❌ Nenhum orçamento fechado encontrado.\n\nDigite *menu* para voltar.`
+        text: `✅ *ORÇAMENTOS FECHADOS*\n📅 ${periodo}\n\n❌ Nenhum orçamento fechado encontrado.\n\n0️⃣ Voltar`
+      });
+
+      // Definir etapa para que "0" volte para escolher período
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_FECHADOS',
+        orcamentos: []
       });
       return;
     }
@@ -1749,7 +1849,13 @@ async function listarOrcamentosPorEmbarcacao(sock, userId, groupId, idEmbarcacao
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `🚤 *${numeroPb} - ${nomeEmbarcacao}*\n\n❌ Nenhum orçamento encontrado para esta embarcação.\n\nDigite *menu* para voltar.`
+        text: `🚤 *${numeroPb} - ${nomeEmbarcacao}*\n\n❌ Nenhum orçamento encontrado para esta embarcação.\n\n0️⃣ Voltar`
+      });
+
+      // Definir etapa para que "0" volte para lista de embarcações
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_POR_EMBARCACAO',
+        orcamentos: []
       });
       return;
     }
@@ -1828,7 +1934,13 @@ async function listarPendentesAprovacao(sock, userId, groupId) {
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `⏰ *PENDENTES DE APROVAÇÃO*\n\n✅ Nenhum orçamento pendente de aprovação!\n\nDigite *menu* para voltar.`
+        text: `⏰ *PENDENTES DE APROVAÇÃO*\n\n✅ Nenhum orçamento pendente de aprovação!\n\n0️⃣ Voltar ao menu`
+      });
+
+      // Definir etapa para que "0" funcione
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_PENDENTES_APROVACAO',
+        orcamentos: []
       });
       return;
     }
@@ -1904,7 +2016,13 @@ async function listarPendentesCobranca(sock, userId, groupId) {
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `💵 *PENDENTES DE COBRANÇA*\n\n✅ Nenhum orçamento aprovado pendente de cobrança!\n\nDigite *menu* para voltar.`
+        text: `💵 *PENDENTES DE COBRANÇA*\n\n✅ Nenhum orçamento aprovado pendente de cobrança!\n\n0️⃣ Voltar ao menu`
+      });
+
+      // Definir etapa para que "0" funcione
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_PENDENTES_COBRANCA',
+        orcamentos: []
       });
       return;
     }
@@ -1914,7 +2032,13 @@ async function listarPendentesCobranca(sock, userId, groupId) {
 
     if (pendentes.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `💵 *PENDENTES DE COBRANÇA*\n\n✅ Todos os orçamentos aprovados já foram cobrados!\n\n📊 Total aprovados: ${result.rows.length}\n✅ Cobrados: ${result.rows.length}\n⏳ Pendentes: 0\n\nDigite *menu* para voltar.`
+        text: `💵 *PENDENTES DE COBRANÇA*\n\n✅ Todos os orçamentos aprovados já foram cobrados!\n\n📊 Total aprovados: ${result.rows.length}\n✅ Cobrados: ${result.rows.length}\n⏳ Pendentes: 0\n\n0️⃣ Voltar ao menu`
+      });
+
+      // Definir etapa para que "0" funcione
+      atualizarEstado(userId, {
+        etapa: 'LISTAR_PENDENTES_COBRANCA',
+        orcamentos: []
       });
       return;
     }
@@ -3829,7 +3953,7 @@ ou 0 para cancelar:`
   }
 }
 
-async function confirmarRecusa(sock, userId, groupId, idOrcamento, motivo) {
+async function executarRecusa(sock, userId, groupId, idOrcamento, motivo) {
   try {
     // Atualizar status
     await pool.query(`
@@ -3866,7 +3990,53 @@ Digite 0 para voltar aos detalhes`
   }
 }
 
-async function confirmarCancelamento(sock, userId, groupId, idOrcamento, motivo) {
+async function confirmarRecusa(sock, userId, groupId, idOrcamento, motivo) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, status
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `⚠️ *CONFIRMAR RECUSA*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📊 Status: ${orc.status} → ❌ RECUSADO
+
+📝 Motivo:
+${motivo}
+
+━━━━━━━━━━━━━━━━
+⚠️ *ATENÇÃO:* Esta ação não pode ser desfeita!
+
+Confirma a recusa?
+
+1️⃣ ✅ SIM - Confirmar
+2️⃣ ❌ NÃO - Cancelar
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMANDO_RECUSA',
+      id_orcamento: idOrcamento,
+      motivo_recusa: motivo
+    });
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function executarCancelamento(sock, userId, groupId, idOrcamento, motivo) {
   try {
     // Atualizar status
     await pool.query(`
@@ -3897,6 +4067,52 @@ Digite 0 para voltar aos detalhes`
 
   } catch (error) {
     console.error('❌ Erro ao cancelar:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function confirmarCancelamento(sock, userId, groupId, idOrcamento, motivo) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, status
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `⚠️ *CONFIRMAR CANCELAMENTO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📊 Status: ${orc.status} → 🚫 CANCELADO
+
+📝 Motivo:
+${motivo}
+
+━━━━━━━━━━━━━━━━
+⚠️ *ATENÇÃO:* Esta ação não pode ser desfeita!
+
+Confirma o cancelamento?
+
+1️⃣ ✅ SIM - Confirmar
+2️⃣ ❌ NÃO - Cancelar
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMANDO_CANCELAMENTO',
+      id_orcamento: idOrcamento,
+      motivo_cancelamento: motivo
+    });
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
     await sock.sendMessage(groupId, {
       text: `❌ Erro:\n${error.message}`
     });
@@ -5053,6 +5269,312 @@ ${orc.descricao}
 }
 
 // ============================================================
+// FUNÇÕES DE PARCELAMENTO (MODO TESTE)
+// ============================================================
+
+// Calcular quais opções de parcelamento são válidas
+function calcularOpcoesParcelamento(rateio) {
+  const opcoesValidas = [];
+
+  for (let numParcelas = 1; numParcelas <= MAX_PARCELAS; numParcelas++) {
+    let todosPassam = true;
+    const detalhes = [];
+
+    for (const cotista of rateio) {
+      const valorCotista = parseFloat(cotista.valor_cotista);
+      const valorParcela = valorCotista / numParcelas;
+
+      detalhes.push({
+        grupo: cotista.grupo_letra,
+        valorTotal: valorCotista,
+        valorParcela: valorParcela,
+        passou: valorParcela >= PARCELA_MINIMA_INDIVIDUAL
+      });
+
+      if (valorParcela < PARCELA_MINIMA_INDIVIDUAL) {
+        todosPassam = false;
+      }
+    }
+
+    if (todosPassam) {
+      opcoesValidas.push({
+        numParcelas: numParcelas,
+        detalhes: detalhes
+      });
+    }
+  }
+
+  return opcoesValidas;
+}
+
+// Mostrar resumo inicial com opções de pagamento
+async function mostrarResumoCobranca(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`💰 [PARCELAMENTO] Mostrando resumo da cobrança #${idOrcamento}...`);
+
+    const orcResult = await pool.query(`
+      SELECT os.id_orcamento, os.numero, os.descricao, os.valor_total,
+             e."Num_PB" as numero_pb, e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = orcResult.rows[0];
+
+    const rateioResult = await pool.query(`
+      SELECT r.*, a."Gropo_letra" as grupo_letra
+      FROM orcamento_rateio r
+      JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      WHERE r.id_orcamento = $1 AND r.participando = true
+      ORDER BY a."Gropo_letra"
+    `, [idOrcamento]);
+
+    const rateio = rateioResult.rows;
+    const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO_PADRAO * 24 * 60 * 60 * 1000);
+    const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
+
+    let mensagem = `💰 *RESUMO DA COBRANÇA*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📋 ${orc.descricao}
+
+📊 *${rateio.length} cotista(s):*
+`;
+
+    rateio.forEach(r => {
+      mensagem += `   • ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}\n`;
+    });
+
+    mensagem += `
+💰 *TOTAL: ${formatarMoeda(orc.valor_total)}*
+
+━━━━━━━━━━━━━━━━
+*OPÇÕES DE PAGAMENTO:*
+
+1️⃣ À VISTA
+   📅 Vencimento: ${dataFormatada} (${DIAS_VENCIMENTO_PADRAO} dias)
+   💰 Valor: ${formatarMoeda(orc.valor_total)}
+
+2️⃣ 📅 Alterar data do vencimento
+
+3️⃣ 📊 Parcelar
+
+0️⃣ 🔙 Voltar
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    atualizarEstado(userId, {
+      etapa: 'RESUMO_COBRANCA',
+      id_orcamento: idOrcamento,
+      rateio: rateio,
+      data_vencimento: dataVencimento,
+      num_parcelas: 1
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao mostrar resumo:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao carregar resumo.\n\n${error.message}`
+    });
+  }
+}
+
+// Mostrar menu de parcelamento com opções válidas
+async function mostrarMenuParcelamento(sock, userId, groupId) {
+  const estado = obterEstado(userId);
+  const opcoesValidas = calcularOpcoesParcelamento(estado.rateio);
+
+  if (opcoesValidas.length === 0) {
+    const valorMinimoTotal = estado.rateio.length * PARCELA_MINIMA_INDIVIDUAL;
+
+    await sock.sendMessage(groupId, {
+      text: `📊 *PARCELAMENTO*
+━━━━━━━━━━━━━━━━
+
+❌ *PARCELAMENTO NÃO DISPONÍVEL*
+
+Valores por cotista:
+${estado.rateio.map(r => `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}`).join('\n')}
+
+━━━━━━━━━━━━━━━━
+⚠️ *Parcela mínima:* R$ 500,00 por cotista
+
+Nenhum cotista atinge o valor mínimo
+de R$ 500,00 para parcelamento.
+
+💡 *Valor mínimo do orçamento* para
+habilitar parcelamento: ${formatarMoeda(valorMinimoTotal)}
+(${estado.rateio.length} cotista(s) × R$ 500,00)
+
+━━━━━━━━━━━━━━━━
+0️⃣ Voltar ao resumo`
+    });
+    return;
+  }
+
+  let mensagem = `📊 *PARCELAMENTO*
+━━━━━━━━━━━━━━━━
+
+Valores por cotista:
+${estado.rateio.map(r => `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}`).join('\n')}
+
+━━━━━━━━━━━━━━━━
+*Escolha o número de parcelas:*
+
+`;
+
+  opcoesValidas.forEach((opcao) => {
+    const numParcelas = opcao.numParcelas;
+    const exemploValor = opcao.detalhes[0].valorParcela;
+
+    if (numParcelas === 1) {
+      mensagem += `1️⃣ À VISTA - ${formatarMoeda(exemploValor)}\n`;
+    } else {
+      mensagem += `${numParcelas}️⃣ ${numParcelas}x de ${formatarMoeda(exemploValor)}\n`;
+    }
+  });
+
+  mensagem += `\n0️⃣ 🔙 Voltar ao resumo
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`;
+
+  await sock.sendMessage(groupId, { text: mensagem });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'ESCOLHER_PARCELAS',
+    opcoes_validas: opcoesValidas
+  });
+}
+
+// Pedir data de vencimento customizada
+async function pedirDataVencimento(sock, userId, groupId) {
+  const estado = obterEstado(userId);
+  const hoje = new Date();
+  const maxData = new Date(hoje.getTime() + MAX_DIAS_PRIMEIRA_PARCELA * 24 * 60 * 60 * 1000);
+
+  await sock.sendMessage(groupId, {
+    text: `📅 *ALTERAR DATA DE VENCIMENTO*
+━━━━━━━━━━━━━━━━
+
+Digite a data da primeira parcela:
+
+📌 *Formato:* DD/MM/AAAA
+📌 *Exemplo:* 15/11/2026
+
+⚠️ *Limite:* até ${maxData.toLocaleDateString('pt-BR')}
+   (máximo ${MAX_DIAS_PRIMEIRA_PARCELA} dias a partir de hoje)
+
+━━━━━━━━━━━━━━━━
+0️⃣ Cancelar
+
+Digite a data:`
+  });
+
+  atualizarEstado(userId, {
+    ...estado,
+    etapa: 'DIGITAR_DATA_VENCIMENTO'
+  });
+}
+
+// Mostrar resumo final (SIMULAÇÃO - NÃO GERA COBRANÇA REAL)
+async function mostrarResumoFinalCobranca(sock, userId, groupId) {
+  const estado = obterEstado(userId);
+
+  try {
+    const orcResult = await pool.query(`
+      SELECT id_orcamento, numero, descricao, valor_total
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    const orc = orcResult.rows[0];
+    const numParcelas = estado.num_parcelas || 1;
+    const dataVencimento = estado.data_vencimento;
+    const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
+
+    let mensagem = `🧪 *SIMULAÇÃO DE COBRANÇA*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📋 ${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+📊 *CONFIGURAÇÃO:*
+
+`;
+
+    if (numParcelas === 1) {
+      mensagem += `💰 Pagamento: À VISTA\n`;
+      mensagem += `📅 Vencimento: ${dataFormatada}\n`;
+      mensagem += `💵 Valor: ${formatarMoeda(orc.valor_total)}\n`;
+    } else {
+      mensagem += `💰 Pagamento: ${numParcelas}x\n`;
+      mensagem += `📅 Primeira parcela: ${dataFormatada}\n`;
+      mensagem += `💵 Valor da parcela: ${formatarMoeda(orc.valor_total / numParcelas)}\n`;
+    }
+
+    mensagem += `\n━━━━━━━━━━━━━━━━
+📋 *COBRANÇAS QUE SERIAM GERADAS:*\n\n`;
+
+    for (const cotista of estado.rateio) {
+      const valorCotista = parseFloat(cotista.valor_cotista);
+      const valorParcela = valorCotista / numParcelas;
+
+      mensagem += `🔹 *${cotista.grupo_letra}*\n`;
+      if (numParcelas === 1) {
+        mensagem += `   À vista: ${formatarMoeda(valorCotista)}\n`;
+      } else {
+        mensagem += `   ${numParcelas}x de ${formatarMoeda(valorParcela)}\n`;
+        mensagem += `   Total: ${formatarMoeda(valorCotista)}\n`;
+      }
+      mensagem += `\n`;
+    }
+
+    mensagem += `━━━━━━━━━━━━━━━━
+🧪 *MODO TESTE ATIVO*
+
+Esta é uma SIMULAÇÃO.
+Nenhuma cobrança será gerada agora.
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Registrar no LOG
+    let descricaoLog = `SIMULAÇÃO de cobrança: ${numParcelas}x`;
+    if (numParcelas > 1) {
+      descricaoLog += ` | 1ª parcela: ${dataFormatada}`;
+    } else {
+      descricaoLog += ` | Vencimento: ${dataFormatada}`;
+    }
+    descricaoLog += ` | Modo TESTE - não gerou cobrança real`;
+
+    await adicionarLog(
+      estado.id_orcamento,
+      'SIMULACAO_COBRANCA',
+      descricaoLog,
+      userId
+    );
+
+    console.log(`🧪 [TESTE] Simulação concluída - Orçamento #${estado.id_orcamento}`);
+
+  } catch (error) {
+    console.error('❌ Erro ao mostrar simulação:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro: ${error.message}`
+    });
+  }
+}
+
+// ============================================================
 // PROCESSADOR PRINCIPAL DE MENSAGENS
 // ============================================================
 
@@ -5813,12 +6335,58 @@ Digite:
     return;
   }
 
+  // Confirmando recusa (após digitar motivo)
+  if (estado.etapa === 'CONFIRMANDO_RECUSA') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    switch (texto) {
+      case '1': // SIM - Confirmar
+        await executarRecusa(sock, userId, groupId, estado.id_orcamento, estado.motivo_recusa);
+        return;
+
+      case '2': // NÃO - Cancelar
+        await sock.sendMessage(groupId, {
+          text: '❌ Recusa cancelada.\n\nDigite 0 para voltar aos detalhes.'
+        });
+        return;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1 para confirmar ou 2 para cancelar.'
+        });
+        return;
+    }
+  }
+
   // Digitando motivo de cancelamento
   if (estado.etapa === 'DIGITANDO_MOTIVO_CANCELAMENTO') {
     // Handler de "0" é global (volta aos detalhes)
 
     await confirmarCancelamento(sock, userId, groupId, estado.id_orcamento, texto);
     return;
+  }
+
+  // Confirmando cancelamento (após digitar motivo)
+  if (estado.etapa === 'CONFIRMANDO_CANCELAMENTO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    switch (texto) {
+      case '1': // SIM - Confirmar
+        await executarCancelamento(sock, userId, groupId, estado.id_orcamento, estado.motivo_cancelamento);
+        return;
+
+      case '2': // NÃO - Cancelar
+        await sock.sendMessage(groupId, {
+          text: '❌ Cancelamento cancelado.\n\nDigite 0 para voltar aos detalhes.'
+        });
+        return;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1 para confirmar ou 2 para cancelar.'
+        });
+        return;
+    }
   }
 
   // Alterar percentual de gestão

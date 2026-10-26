@@ -166,15 +166,18 @@ export async function criarCobranca(apiKey, customerId, dados) {
 export async function inserirContasReceber(pool, dados) {
   // dados: { empresa, descricao, codCliente, valor, vencimento, centroCusto }
 
-  // CORREÇÃO V.2610260945: Usa VIEW vw_proximo_codigo do Neon
-  // ANTES: gerar_proximo_codigo_cr() ← gerava códigos ultrapassados
-  // DEPOIS: vw_proximo_codigo ← sempre pega o próximo disponível
+  // CORREÇÃO V.2610261337: Usa VIEW vw_proximo_codigo do Neon
+  // A VIEW já filtra por Empresa = 8 e retorna apenas proximo_codigo
+  // Estrutura: PK = ID (não Codigo), então (Empresa, Codigo) é a chave de negócio
+  // Códigos PODEM repetir entre empresas diferentes
   const { rows } = await pool.query(`
     SELECT proximo_codigo
     FROM vw_proximo_codigo
-    WHERE tabela = 'Contas_Receber'
-      AND empresa = $1
-  `, [Number(dados.empresa)])
+  `)
+
+  if (!rows || rows.length === 0) {
+    throw new Error('VIEW vw_proximo_codigo não retornou resultado')
+  }
 
   const codigo = rows[0].proximo_codigo
 

@@ -1,0 +1,125 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    CORREÇÃO VBA - RACE CONDITION                             ║
+║                       Data: 17/09/2026 20:30                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 1. PROBLEMA IDENTIFICADO                                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Arquivo VBA: (o que você abriu no Access)
+Sub: Gera_cobranca_Click()
+
+Linha problemática:
+    novoCodigo = Nz(DMax("Codigo", "Contas_Receber"), 0) + 1
+
+⚠️  PROBLEMA: Race condition!
+    Se 2 usuários clicarem ao mesmo tempo, ambos pegam o mesmo MAX
+    Resultado: códigos duplicados
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 2. ALTERAÇÃO NECESSÁRIA - APENAS 1 LINHA!                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  SUBSTITUIR:                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    novoCodigo = Nz(DMax("Codigo", "Contas_Receber"), 0) + 1
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  POR:                                                                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    novoCodigo = CLng(Nz(DLookup("gerar_proximo_codigo_cr()", "dual"), 0))
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 3. EXPLICAÇÃO                                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+ANTES:
+    DMax("Codigo", "Contas_Receber") + 1
+    └─ Busca MAX no PostgreSQL (não é thread-safe!)
+
+DEPOIS:
+    DLookup("gerar_proximo_codigo_cr()", "dual")
+    └─ Chama FUNCTION do PostgreSQL que usa SEQUENCE
+       (100% thread-safe, atômica, nunca duplica!)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 4. PASSO A PASSO                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+1. Abrir o formulário no Access (modo Design)
+2. Clicar no botão "Gera_cobranca"
+3. Clicar em "Ver Código" ou [F7]
+4. Localizar a linha:
+
+   novoCodigo = Nz(DMax("Codigo", "Contas_Receber"), 0) + 1
+
+5. SUBSTITUIR por:
+
+   novoCodigo = CLng(Nz(DLookup("gerar_proximo_codigo_cr()", "dual"), 0))
+
+6. Salvar [Ctrl+S]
+7. Fechar editor VBA
+8. Testar o botão!
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 5. TESTE                                                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Após a alteração:
+
+1. Abrir o formulário
+2. Preencher dados de cobrança
+3. Clicar em "Gera_cobranca"
+4. Verificar no banco se o código foi gerado (deve ser >= 58271)
+5. ✅ Se funcionar: correção concluída!
+6. ❌ Se der erro: me avise!
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 6. IMPORTANTE                                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+✅ Banco PostgreSQL JÁ TEM a SEQUENCE e FUNCTION criadas!
+✅ Node.js (Railway) JÁ ESTÁ usando a SEQUENCE!
+⏳ FALTA APENAS alterar o VBA!
+
+Depois dessa alteração:
+    → VBA usa SEQUENCE
+    → Node.js usa SEQUENCE
+    → ZERO duplicações possíveis!
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 7. SE DER ALGUM ERRO                                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Erro possível: "ODBC não conecta" ou "dual não existe"
+
+Solução alternativa (se o DLookup não funcionar):
+
+    novoCodigo = CLng(CurrentDb.OpenRecordset( _
+        "SELECT gerar_proximo_codigo_cr() AS prox").Fields("prox").Value)
+
+OU (mais simples, uma query temporária):
+
+1. Criar uma query salva chamada "qry_ProximoCodigo":
+   SQL: SELECT gerar_proximo_codigo_cr() AS ProximoCodigo
+
+2. Usar no VBA:
+   novoCodigo = CLng(DLookup("ProximoCodigo", "qry_ProximoCodigo"))
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              FIM DA INSTRUÇÃO                                ║
+║                                                                              ║
+║  Dúvidas? Me avise no chat!                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝

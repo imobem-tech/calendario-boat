@@ -1,12 +1,12 @@
 // ============================================================
 // API ORÇAMENTOS - SUMMERMAX
-// V.2606210825
+// V.2610242135
 // ============================================================
 //
 // RELACIONAMENTOS:
 // - P_BOAT_1_Embarcacao.Num_PB = P_BOAT_4_Autorizados.Cod_Embarcacao
-// - P_BOAT_4_Autorizados.Cod_Pessoa = Cliente.Código
-// - P_BOAT_1_Embarcacao.Cod_Cliente = Cliente.Código (proprietário)
+// - P_BOAT_4_Autorizados.Cod_Pessoa = Cliente.Codigo
+// - P_BOAT_1_Embarcacao.Cod_Cliente = Cliente.Codigo (proprietário)
 //
 // ============================================================
 
@@ -39,7 +39,7 @@ export async function listarEmbarcacoes(req, res) {
           ELSE FALSE
         END as is_allmax
       FROM "P_BOAT_1_Embarcacao" e
-      LEFT JOIN "Cliente" c ON e."Cod_Cliente" = c."Código"
+      LEFT JOIN "Cliente" c ON e."Cod_Cliente" = c."Codigo"
       WHERE e."Ativo" = TRUE
       ORDER BY e."Num_PB"
       LIMIT 200
@@ -79,13 +79,13 @@ export async function buscarCotistas(req, res) {
         a."Cod_Pessoa" as id_cliente,
         a."Cod_Embarcacao" as num_pb,
         a."Cota_comp" as qtd_cotas,
-        c."Código" as codigo_cliente,
+        c."Codigo" as codigo_cliente,
         c."Cliente_Nome" as nome,
         c."Cliente_CPF" as cpf_cnpj,
         c."Cliente_Telefone_Celular" as telefone,
         c."Cliente_Email" as email
       FROM "P_BOAT_4_Autorizados" a
-      LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Código"
+      LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Codigo"
       WHERE a."Cod_Embarcacao" = $1
         AND a."Cota_comp" > 0
       ORDER BY a."Código"
@@ -128,7 +128,7 @@ export async function buscarEmbarcacaoCompleta(req, res) {
         e."Ano" as ano,
         e."Pés" as pes,
         e."Cod_Cliente" as id_proprietario,
-        c."Código" as codigo_proprietario,
+        c."Codigo" as codigo_proprietario,
         c."Cliente_Nome" as nome_proprietario,
         c."Cliente_CPF" as cpf_proprietario,
         c."Cliente_Telefone_Celular" as telefone_proprietario,
@@ -137,7 +137,7 @@ export async function buscarEmbarcacaoCompleta(req, res) {
           ELSE FALSE
         END as is_allmax
       FROM "P_BOAT_1_Embarcacao" e
-      LEFT JOIN "Cliente" c ON e."Cod_Cliente" = c."Código"
+      LEFT JOIN "Cliente" c ON e."Cod_Cliente" = c."Codigo"
       WHERE e."Num_PB" = $1
     `, [num_pb]);
 
@@ -160,7 +160,7 @@ export async function buscarEmbarcacaoCompleta(req, res) {
         c."Cliente_CPF" as cpf_cnpj,
         c."Cliente_Telefone_Celular" as telefone
       FROM "P_BOAT_4_Autorizados" a
-      LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Código"
+      LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Codigo"
       WHERE a."Cod_Embarcacao" = $1
         AND a."Cota_comp" > 0
       ORDER BY a."Código"
@@ -271,7 +271,7 @@ export async function criarOrcamento(req, res) {
           a."Cota_comp" as qtd_cotas,
           c."Cliente_Nome" as nome
         FROM "P_BOAT_4_Autorizados" a
-        LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Código"
+        LEFT JOIN "Cliente" c ON a."Cod_Pessoa" = c."Codigo"
         WHERE a."Cod_Embarcacao" = $1
           AND a."Cota_comp" > 0
       `, [id_embarcacao]);
@@ -349,7 +349,7 @@ export async function visualizarOrcamento(req, res) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM orcamento_servico os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.token_visualizacao = $1
     `, [token]);
 
@@ -501,4 +501,4 @@ export async function gerarTokenVisualizacao(req, res) {
   }
 }
 
-// V.2610241950
+// V.2610242135

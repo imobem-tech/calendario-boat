@@ -29,4 +29,20 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-backup/
+# Relatórios e auditorias com dados sensíveis (API keys, dados de clientes)
+relatorio_*.json
+relatorio_*.csv
+relatorio_*.txt
+auditoria_*.json
+AUDITORIA_*.json
+*_auditoria.json
+backup_antes_correcao_*.json
+backup/relatorio_*.json
+backup/auditoria_*.json
+baixas_incorretas_*.json
+baixas_incorretas_*.csv
+verificacao_asaas_*.json
+verificacao_asaas_*.csv
+duplicados_cr_links.csv
+pendentes_classificacao_*.csv
+analise_detalhada_output.txt
