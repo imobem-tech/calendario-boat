@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM orcamento_servico os
-      LEFT JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      LEFT JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.token_visualizacao = $1
     `, [token]);
 
