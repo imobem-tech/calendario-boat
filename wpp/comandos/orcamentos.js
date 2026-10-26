@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260814
+// wpp/comandos/orcamentos.js — V.2610260821
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2808,7 +2808,10 @@ async function processarValorCotistaManual(sock, userId, groupId, estado, textoV
 
     const valorRestante = estado.valor_total - estado.valor_distribuido;
 
-    if (valor > valorRestante) {
+    // Aceita diferença de até R$ 0,02 por arredondamento
+    const MARGEM_ARREDONDAMENTO = 0.02;
+
+    if (valor > valorRestante + MARGEM_ARREDONDAMENTO) {
       await sock.sendMessage(groupId, {
         text: `❌ Valor excede o restante!
 
