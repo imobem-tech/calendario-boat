@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260812
+// wpp/comandos/orcamentos.js — V.2610260814
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3695,6 +3695,7 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
         os.id_orcamento,
         os.numero,
         os.descricao as titulo,
+        os.observacao,
         os.valor_servicos as subtotal,
         os.taxa_servico_perc,
         os.taxa_servico_valor,
@@ -3748,8 +3749,11 @@ ${statusEmoji} Status: ${orc.status}
 🚤 Embarcação: ${orc.numero_pb} - ${orc.nome_embarcacao}
 📅 Data: ${data}
 ━━━━━━━━━━━━━━━━
-📌 *TÍTULO:*
-${orc.titulo}
+📌 *TÍTULO/DESCRIÇÃO:*
+${orc.titulo || '(sem descrição)'}
+━━━━━━━━━━━━━━━━
+📌 *Observações:*
+${orc.observacao || '(sem observação)'}
 ━━━━━━━━━━━━━━━━
 📦 *ITENS:*
 `;
