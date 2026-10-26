@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261509
+// wpp/comandos/orcamentos.js — V.2610261511
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -5301,7 +5301,11 @@ async function mostrarResumoCobranca(sock, userId, groupId, idOrcamento) {
     `, [idOrcamento]);
 
     const rateio = rateioResult.rows;
-    const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO_PADRAO * 24 * 60 * 60 * 1000);
+
+    // Usar data do estado se existir (quando volta do menu de alteração)
+    // Caso contrário, calcular data padrão
+    const estado = obterEstado(userId);
+    const dataVencimento = estado?.data_vencimento || new Date(Date.now() + DIAS_VENCIMENTO_PADRAO * 24 * 60 * 60 * 1000);
     const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
 
     let mensagem = `💰 *RESUMO DA COBRANÇA*
@@ -5321,15 +5325,11 @@ async function mostrarResumoCobranca(sock, userId, groupId, idOrcamento) {
 
 ━━━━━━━━━━━━━━━━
 *OPÇÕES DE PAGAMENTO:*
-
 1️⃣ À VISTA
    📅 Vencimento: ${dataFormatada} (${DIAS_VENCIMENTO_PADRAO} dias)
    💰 Valor: ${formatarMoeda(orc.valor_total)}
-
 2️⃣ 📅 Alterar data do vencimento
-
 3️⃣ 📊 Parcelar
-
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
