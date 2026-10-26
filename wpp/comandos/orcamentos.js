@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261511
+// wpp/comandos/orcamentos.js — V.2610261514
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -5380,8 +5380,11 @@ habilitar parcelamento: ${formatarMoeda(valorMinimoTotal)}
 (${estado.rateio.length} cotista(s) × R$ 500,00)
 
 ━━━━━━━━━━━━━━━━
-0️⃣ Voltar ao resumo`
+Voltando ao resumo...`
     });
+
+    // Voltar automaticamente ao resumo
+    await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
     return;
   }
 
