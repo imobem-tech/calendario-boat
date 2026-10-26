@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260838
+// wpp/comandos/orcamentos.js — V.2610260859
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -29,6 +29,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { put } from '@vercel/blob';
+import { gerarCobrancaCompleta } from '../asaas.js';
 
 // Usar mesma configuração do server.js
 const pool = new Pool({
@@ -2940,7 +2941,7 @@ async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
   try {
     console.log(`💵 [ORCAMENTOS] Enviando cobrança do orçamento #${idOrcamento}...`);
 
-    // Buscar dados do orçamento com rateio
+    // Buscar dados do orçamento com token
     const orcResult = await pool.query(`
       SELECT
         os.id_orcamento,
@@ -2949,7 +2950,7 @@ async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
         os.status,
         os.valor_total,
         os.id_cobranca,
-        e."Código" as id_embarcacao,
+        os.token_visualizacao,
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
@@ -2979,7 +2980,20 @@ Digite 0 para voltar aos detalhes`
       return;
     }
 
-    // 1️⃣ PRIMEIRO: Verificar se tem rateio
+    // Verificar se tem token (link gerado)
+    if (!orc.token_visualizacao) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *LINK NÃO GERADO*
+
+Gere o link primeiro (opção 8) antes de enviar cobrança!
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
+      });
+      return;
+    }
+
+    // Verificar se tem rateio
     const rateioResult = await pool.query(`
       SELECT
         r.*,
@@ -3004,7 +3018,7 @@ Este orçamento ainda não tem rateio definido!
       return;
     }
 
-    // 2️⃣ SEGUNDO: Verificar se está aprovado
+    // Verificar se está aprovado
     if (orc.status !== 'APROVADO') {
       await sock.sendMessage(groupId, {
         text: `⚠️ *APROVAÇÃO PENDENTE*
@@ -3020,91 +3034,179 @@ O orçamento precisa estar APROVADO antes de gerar cobrança!
     }
 
     await sock.sendMessage(groupId, {
-      text: `⏳ Gerando cobranças...
+      text: `⏳ *GERANDO COBRANÇAS ASAAS*
 
 📊 ${rateioResult.rows.length} cotista(s) a cobrar
+💰 Total: ${formatarMoeda(orc.valor_total)}
 
-Aguarde...`
+⏱️ Aguarde...`
     });
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    // Configurações fixas
+    const EMPRESA = 8; // ALLMAX
+    const CENTRO_CUSTO = 8;
+    const DIAS_VENCIMENTO = 30;
+    const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
 
-      // Criar contas a receber para cada cotista
-      let cobrancasCriadas = 0;
+    // URL do orçamento
+    const urlOrcamento = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
 
-      for (const rateio of rateioResult.rows) {
-        // Gerar código único para a conta
-        const codResult = await client.query(`
-          SELECT COALESCE(MAX("Codigo"), 0) + 1 as novo_codigo
-          FROM "Contas_Receber"
-        `);
-        const novoCodigo = codResult.rows[0].novo_codigo;
+    // Array para guardar cobranças geradas
+    const cobrancasGeradas = [];
+    const erros = [];
 
-        // Criar conta a receber
-        await client.query(`
-          INSERT INTO "Contas_Receber" (
-            "Codigo",
-            "Código_Cliente",
-            "Valor",
-            "Total",
-            "Data_Emissao",
-            "Data_Vencimento",
-            "Observações"
-          ) VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', $5)
-        `, [
-          novoCodigo,
-          rateio.cod_pessoa,
-          rateio.valor_cotista,
-          rateio.valor_cotista,
-          `ORÇAMENTO ${orc.numero} - ${orc.descricao} - ${rateio.grupo_letra}`
-        ]);
+    console.log(`\n💳 ═══════════════════════════════════════════════`);
+    console.log(`💳 GERANDO COBRANÇAS ASAAS`);
+    console.log(`💳 Total de cotistas: ${rateioResult.rows.length}`);
+    console.log(`💳 ═══════════════════════════════════════════════\n`);
 
-        cobrancasCriadas++;
+    for (const rateio of rateioResult.rows) {
+      try {
+        console.log(`\n💳 Gerando cobrança para ${rateio.grupo_letra}:`);
+        console.log(`   - Cliente: ${rateio.cod_pessoa}`);
+        console.log(`   - Valor: ${rateio.valor_cotista}`);
+
+        const descricaoCR = `${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)} ${orc.descricao}`;
+
+        // Gerar cobrança completa (CR + Asaas)
+        const resultado = await gerarCobrancaCompleta(pool, EMPRESA, rateio.cod_pessoa, {
+          valor: rateio.valor_cotista,
+          descricao: descricaoCR,
+          vencimento: dataVencimento,
+          centroCusto: String(CENTRO_CUSTO)
+        });
+
+        console.log(`   ✅ Cobrança gerada!`);
+        console.log(`   - CR: ${resultado.codigo}`);
+        console.log(`   - Payment ID: ${resultado.paymentId}`);
+        console.log(`   - Link: ${resultado.linkBoleto}`);
+
+        cobrancasGeradas.push({
+          grupo_letra: rateio.grupo_letra,
+          cod_pessoa: rateio.cod_pessoa,
+          valor: rateio.valor_cotista,
+          codigo_cr: resultado.codigo,
+          payment_id: resultado.paymentId,
+          link: resultado.linkBoleto,
+          linha_digitavel: resultado.linhaDigitavel
+        });
+
+      } catch (error) {
+        console.log(`   ❌ ERRO: ${error.message}`);
+        erros.push(`${rateio.grupo_letra}: ${error.message}`);
       }
+    }
 
-      // Atualizar orçamento com ID da primeira cobrança
-      await client.query(`
-        UPDATE "orcamento_servico"
-        SET id_cobranca = 1
-        WHERE id_orcamento = $1
-      `, [idOrcamento]);
+    console.log(`\n💳 ═══════════════════════════════════════════════`);
+    console.log(`💳 RESUMO`);
+    console.log(`💳 Sucesso: ${cobrancasGeradas.length}/${rateioResult.rows.length}`);
+    console.log(`💳 Erros: ${erros.length}`);
+    console.log(`💳 ═══════════════════════════════════════════════\n`);
 
-      // Log
-      await adicionarLog(
-        idOrcamento,
-        'COBRANCA_GERADA',
-        `${cobrancasCriadas} cobrança(s) criada(s) em Contas a Receber`,
-        userId
-      );
-
-      await client.query('COMMIT');
-
+    if (cobrancasGeradas.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `✅ *COBRANÇAS GERADAS!*
+        text: `❌ *ERRO AO GERAR COBRANÇAS*
 
-🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
-💰 ${formatarMoeda(orc.valor_total)}
-📋 ${cobrancasCriadas} conta(s) a receber criada(s)
+Nenhuma cobrança foi gerada com sucesso.
 
-📅 Vencimento: +30 dias
+*Erros:*
+${erros.join('\n')}
 
 ━━━━━━━━━━━━━━━━
 Digite 0 para voltar aos detalhes`
       });
-
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      return;
     }
+
+    // Atualizar orçamento com ID da primeira cobrança
+    await pool.query(`
+      UPDATE "orcamento_servico"
+      SET id_cobranca = $1,
+          cobrancas_asaas = $2
+      WHERE id_orcamento = $3
+    `, [
+      cobrancasGeradas[0].codigo_cr,
+      JSON.stringify(cobrancasGeradas),
+      idOrcamento
+    ]);
+
+    // Log
+    await adicionarLog(
+      idOrcamento,
+      'COBRANCA_GERADA',
+      `${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)${erros.length > 0 ? ` (${erros.length} erro(s))` : ''}`,
+      userId
+    );
+
+    // Enviar mensagens WhatsApp para grupos
+    console.log(`\n📤 ENVIANDO MENSAGENS WHATSAPP...\n`);
+
+    let enviosOk = 0;
+
+    for (const cobranca of cobrancasGeradas) {
+      // Buscar grupos WhatsApp da cota
+      const gruposWpp = await pool.query(`
+        SELECT grupowppid, nomegrupowpp
+        FROM wpp_grupos_agenda
+        WHERE pb = $1 AND cota = $2
+      `, [orc.numero_pb, cobranca.grupo_letra]);
+
+      if (gruposWpp.rows.length === 0) {
+        console.log(`⚠️  Grupo ${cobranca.grupo_letra}: Sem WhatsApp cadastrado`);
+        continue;
+      }
+
+      const dataVencFormat = dataVencimento.toLocaleDateString('pt-BR');
+      const mensagem = `💰 *COBRANÇA GERADA*
+
+*ORÇAMENTO ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}*
+${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+  | Valor: ${formatarMoeda(cobranca.valor)}
+  | Vencimento: ${dataVencFormat}
+  | Link:
+  | ${cobranca.link}
+━━━━━━━━━━━━━━━━
+
+🌐 Visualizar orçamento completo:
+🔗 ${urlOrcamento}`;
+
+      // Enviar para todos os grupos WhatsApp desta cota
+      for (const grupoWpp of gruposWpp.rows) {
+        try {
+          console.log(`📨 Enviando para ${cobranca.grupo_letra} (${grupoWpp.nomegrupowpp})...`);
+          await sock.sendMessage(grupoWpp.grupowppid, { text: mensagem });
+          console.log(`✅ Enviado!`);
+          enviosOk++;
+        } catch (error) {
+          console.log(`❌ Erro ao enviar: ${error.message}`);
+        }
+      }
+    }
+
+    console.log(`\n📤 Mensagens enviadas: ${enviosOk}\n`);
+
+    // Resumo final
+    let resumo = `✅ *COBRANÇAS GERADAS E ENVIADAS!*
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+💰 Total: ${formatarMoeda(orc.valor_total)}
+✅ ${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)
+📤 ${enviosOk} mensagem(ns) enviada(s)`;
+
+    if (erros.length > 0) {
+      resumo += `\n\n⚠️ *Erros:*\n${erros.join('\n')}`;
+    }
+
+    resumo += '\n\n━━━━━━━━━━━━━━━━\nDigite 0 para voltar aos detalhes';
+
+    await sock.sendMessage(groupId, { text: resumo });
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao gerar cobrança:', error);
     await sock.sendMessage(groupId, {
-      text: `❌ Erro ao gerar cobrança.\n\n${error.message}`
+      text: `❌ Erro ao gerar cobrança.\n\n${error.message}\n\nDigite 0 para voltar aos detalhes`
     });
   }
 }
