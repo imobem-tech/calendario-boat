@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261122
+// wpp/comandos/orcamentos.js — V.2610261140
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -265,6 +265,13 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
   atualizarEstado(userId, estado);
 
   // Pedir título do orçamento
+  await pedirTitulo(sock, userId, groupId);
+}
+
+async function pedirTitulo(sock, userId, groupId) {
+  const estado = obterEstado(userId);
+  const embarcacao = estado.orcamento.embarcacao;
+
   const mensagem = `✅ Embarcação selecionada: ${embarcacao.numero_pb} (${embarcacao.nome})
 
 ━━━━━━━━━━━━━━━━
@@ -305,7 +312,8 @@ Digite novamente:`;
   }
 
   const estado = obterEstado(userId);
-  estado.orcamento.titulo = titulo;
+  // Converter título para CAIXA ALTA
+  estado.orcamento.titulo = titulo.toUpperCase();
   estado.orcamento.itens = [];
   estado.orcamento.item_atual = {};
   estado.etapa = 'ITEM_DESCRICAO';
@@ -336,14 +344,20 @@ async function pedirDescricaoItem(sock, userId, groupId) {
 💡 Exemplo: Troca de óleo do motor
 
 1️⃣ Pular cadastro de item
-0️⃣ Cancelar orçamento`;
+0️⃣ Voltar ao título`;
 
   await sock.sendMessage(groupId, { text: mensagem });
 }
 
 async function receberDescricaoItem(sock, userId, groupId, descricao) {
+  // Voltar ao título
   if (descricao === '0') {
-    await mostrarMenuOrcamentos(sock, userId, groupId);
+    const estado = obterEstado(userId);
+    estado.etapa = 'TITULO';
+    estado.orcamento.itens = [];
+    estado.orcamento.item_atual = {};
+    atualizarEstado(userId, estado);
+    await pedirTitulo(sock, userId, groupId);
     return;
   }
 
@@ -361,6 +375,8 @@ async function receberDescricaoItem(sock, userId, groupId, descricao) {
 O item deve ter no mínimo *2 palavras de 3 ou mais caracteres* cada.
 
 💡 Exemplo: Troca de óleo
+
+0️⃣ Voltar ao título
 
 Digite novamente:`;
 
