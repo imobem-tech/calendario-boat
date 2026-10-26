@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260916
+// wpp/comandos/orcamentos.js — V.2610260923
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -335,6 +335,7 @@ async function pedirDescricaoItem(sock, userId, groupId) {
 
 💡 Exemplo: Troca de óleo do motor
 
+1️⃣ Pular cadastro de item
 0️⃣ Cancelar orçamento`;
 
   await sock.sendMessage(groupId, { text: mensagem });
@@ -343,6 +344,13 @@ async function pedirDescricaoItem(sock, userId, groupId) {
 async function receberDescricaoItem(sock, userId, groupId, descricao) {
   if (descricao === '0') {
     await mostrarMenuOrcamentos(sock, userId, groupId);
+    return;
+  }
+
+  // Se digitar 1, pular cadastro de itens
+  if (descricao === '1') {
+    const estado = obterEstado(userId);
+    await finalizarOrcamento(sock, userId, groupId, estado.orcamento);
     return;
   }
 
@@ -1332,14 +1340,18 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
 
 ━━━━━━━━━━━━━━━━
 
-O orçamento foi salvo e está disponível para consulta.
+O orçamento foi salvo.
 
-Digite *menu* para voltar ao menu principal.`;
+1️⃣ Entrar no detalhe
+0️⃣ Menu principal`;
 
     await sock.sendMessage(groupId, { text: mensagem });
 
-    // Limpar estado
-    limparEstado(userId);
+    // Aguardar escolha do usuário
+    atualizarEstado(userId, {
+      etapa: 'ORCAMENTO_CRIADO',
+      id_orcamento: idOrcamento
+    });
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -5290,6 +5302,21 @@ Voltando ao menu...`
       });
       await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
     }
+    return;
+  }
+
+  // Orçamento criado - escolher próxima ação
+  if (estado.etapa === 'ORCAMENTO_CRIADO') {
+    if (texto === '1') {
+      // Ir para detalhes
+      limparEstado(userId);
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Qualquer outra coisa volta ao menu
+    limparEstado(userId);
+    await mostrarMenuOrcamentos(sock, userId, groupId);
     return;
   }
 
