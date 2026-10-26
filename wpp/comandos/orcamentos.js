@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260638
+// wpp/comandos/orcamentos.js — V.2610260640
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -513,7 +513,7 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -1465,7 +1465,7 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.status IN ('RASCUNHO', 'ENVIADO')
         AND os.id_grupo = 1
         AND NOT EXISTS (
@@ -1573,7 +1573,7 @@ async function listarOrcamentosFechados(sock, userId, groupId, dias = null) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE ${whereClause}
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
       LIMIT 50
@@ -1784,7 +1784,7 @@ async function listarPendentesAprovacao(sock, userId, groupId) {
         e."Nome_Embar" as nome_embarcacao,
         CURRENT_DATE - os.data_orcamento::date as dias_pendente
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.status = 'ENVIADO'
         AND os.id_grupo = 1
         AND EXISTS (
@@ -1864,7 +1864,7 @@ async function listarPendentesCobranca(sock, userId, groupId) {
         e."Nome_Embar" as nome_embarcacao,
         CURRENT_DATE - os.data_orcamento::date as dias_aprovado
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.status = 'APROVADO'
         AND os.id_grupo = 1
       ORDER BY os.data_orcamento ASC, os.id_orcamento ASC
@@ -1943,7 +1943,7 @@ async function mostrarMenuHistorico(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -2466,7 +2466,7 @@ async function definirRateioOrcamento(sock, userId, groupId, idOrcamento) {
         e."Nome_Embar" as nome_embarcacao,
         e."Cod_Cliente" as cod_cliente
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -2950,7 +2950,7 @@ async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3118,7 +3118,7 @@ async function aprovarOrcamento(sock, userId, groupId, idOrcamento) {
         os.valor_total,
         e."Num_PB" as numero_pb
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3253,7 +3253,7 @@ async function confirmarAprovacaoOrcamento(sock, userId, groupId, idOrcamento) {
         os.valor_total,
         e."Num_PB" as numero_pb
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3322,7 +3322,7 @@ async function alterarPercentualGestao(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3512,7 +3512,7 @@ async function gerarLinkVisualizacao(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3705,7 +3705,7 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
         e."Num_PB" as numero_pb,
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
-      JOIN "P_BOAT_1_Embarcacao" e ON e."Código" = os.id_embarcacao
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.id_orcamento = $1
     `, [idOrcamento]);
 
