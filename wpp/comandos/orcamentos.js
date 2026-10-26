@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260555
+// wpp/comandos/orcamentos.js — V.2610260629
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -174,7 +174,7 @@ async function listarEmbarcacoes(sock, userId, groupId) {
 
     // Buscar apenas embarcações ALLMAX (Cod_Cliente = 4255)
     // Campos verificados em wpp/comandos/saida.js linha 292
-    // IMPORTANTE: FK orcamento_servico.id_embarcacao → P_BOAT_1_Embarcacao.Código
+    // CORRIGIDO: FK orcamento_servico.id_embarcacao → P_BOAT_1_Embarcacao.Num_PB
     const result = await pool.query(`
       SELECT
         "Código" as codigo,
@@ -249,9 +249,9 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
   const embarcacao = estado.embarcacoes[index];
 
   // Atualizar orçamento com embarcação selecionada
-  // IMPORTANTE: Salvar Código (FK) mas mostrar Num_PB (interface)
-  estado.orcamento.id_embarcacao = embarcacao.codigo; // FK para banco
-  estado.orcamento.numero_pb = embarcacao.numero_pb;  // Exibição
+  // CORRIGIDO: Usar Num_PB como FK (não Código!)
+  estado.orcamento.id_embarcacao = embarcacao.numero_pb; // FK para banco (Num_PB)
+  estado.orcamento.numero_pb = embarcacao.numero_pb;     // Exibição
   estado.orcamento.nome_embarcacao = embarcacao.nome;
   estado.etapa = 'TITULO';
 
@@ -4046,6 +4046,9 @@ Este orçamento ainda não tem rateio definido!
     });
 
     // 4. Montar preview
+    console.log(`🐛 DEBUG - Total do orçamento: ${orc.valor_total} (tipo: ${typeof orc.valor_total})`);
+    console.log(`🐛 DEBUG - Total formatado: ${formatarMoeda(orc.valor_total)}`);
+
     let mensagem = `📊 *PREVIEW DO ENVIO*
 ━━━━━━━━━━━━━━━━
 🆔 ${orc.numero}
@@ -4057,6 +4060,8 @@ Este orçamento ainda não tem rateio definido!
     if (gruposOk.length > 0) {
       mensagem += `\n✅ *GRUPOS QUE RECEBERÃO:*\n\n`;
       gruposOk.forEach(g => {
+        console.log(`🐛 DEBUG - Grupo ${g.grupo_letra}: valor_grupo = ${g.valor_grupo} (tipo: ${typeof g.valor_grupo})`);
+        console.log(`🐛 DEBUG - Formatado: ${formatarMoeda(g.valor_grupo)}`);
         mensagem += `${g.grupo_letra}: ${formatarMoeda(g.valor_grupo)} ✓\n`;
       });
     }
@@ -4180,11 +4185,22 @@ Este orçamento ainda não tem rateio definido!
     const url = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${token}`;
 
     // 4. Enviar para cada grupo (Modelo 5)
+    console.log(`\n🚀 ═══════════════════════════════════════════════`);
+    console.log(`🚀 INICIANDO ENVIO DE ORÇAMENTO PARA GRUPOS`);
+    console.log(`🚀 Total de grupos no rateio: ${rateioResult.rows.length}`);
+    console.log(`🚀 ═══════════════════════════════════════════════\n`);
+
     let enviosOk = 0;
     let erros = [];
 
     for (const grupo of rateioResult.rows) {
+      console.log(`\n📤 Processando grupo ${grupo.grupo_letra}:`);
+      console.log(`   - Nome: ${grupo.nome_grupo || 'não informado'}`);
+      console.log(`   - ID WhatsApp: ${grupo.id_grupo_wpp || 'NÃO CADASTRADO'}`);
+      console.log(`   - Valor: ${grupo.valor_grupo}`);
+
       if (!grupo.id_grupo_wpp) {
+        console.log(`   ❌ PULADO - Sem WhatsApp cadastrado\n`);
         erros.push(`❌ Grupo ${grupo.grupo_letra}: Sem WhatsApp cadastrado`);
         continue;  // Continua para próximo
       }
@@ -4215,12 +4231,21 @@ ${orc.descricao}
 ⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
 
       try {
+        console.log(`   📨 Enviando mensagem...`);
         await sock.sendMessage(grupo.id_grupo_wpp, { text: mensagem });
+        console.log(`   ✅ ENVIADO COM SUCESSO!\n`);
         enviosOk++;
       } catch (error) {
+        console.log(`   ❌ ERRO AO ENVIAR: ${error.message}\n`);
         erros.push(`❌ Grupo ${grupo.grupo_letra}: ${error.message}`);
       }
     }
+
+    console.log(`\n🏁 ═══════════════════════════════════════════════`);
+    console.log(`🏁 RESUMO DO ENVIO`);
+    console.log(`🏁 Enviados: ${enviosOk}/${rateioResult.rows.length}`);
+    console.log(`🏁 Erros: ${erros.length}`);
+    console.log(`🏁 ═══════════════════════════════════════════════\n`);
 
     // 5. LOG final (resumo)
     await adicionarLog(
@@ -4959,4 +4984,4 @@ Digite:
   }
 }
 
-// V.2610241607
+// V.2610260615
