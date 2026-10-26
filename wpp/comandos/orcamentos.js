@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261527
+// wpp/comandos/orcamentos.js — V.2610261552
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -169,51 +169,31 @@ export async function mostrarMenuOrcamentos(sock, userId, groupId) {
       pool.query(`
         SELECT COUNT(*) as total
         FROM "orcamento_servico" os
-        WHERE os.status IN ('RASCUNHO', 'ENVIADO')
+        WHERE os.status = 'RASCUNHO'
           AND os.id_grupo = 1
-          AND NOT EXISTS (
-            SELECT 1 FROM orcamento_rateio r
-            WHERE r.id_orcamento = os.id_orcamento
-          )
       `),
 
       // 2. Total de orçamentos por embarcação (SOMA das 3 categorias)
-      // = Abertos (RASCUNHO/ENVIADO sem rateio)
-      // + Pend. Aprovação (ENVIADO com rateio)
+      // = Rascunho (RASCUNHO com ou sem rateio)
+      // + Pend. Aprovação (ENVIADO com ou sem rateio)
       // + Pend. Cobrança (APROVADO sem cobrança)
       pool.query(`
         SELECT COUNT(*) as total
         FROM "orcamento_servico" os
         WHERE os.id_grupo = 1
           AND (
-            -- Abertos: RASCUNHO/ENVIADO sem rateio
-            (
-              os.status IN ('RASCUNHO', 'ENVIADO')
-              AND NOT EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
-            )
-            -- Pend. Aprovação: ENVIADO com rateio
-            OR (
-              os.status = 'ENVIADO'
-              AND EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
-            )
-            -- Pend. Cobrança: APROVADO sem cobrança
-            OR (
-              os.status = 'APROVADO'
-              AND (os.id_cobranca IS NULL OR os.id_cobranca = 0)
-            )
+            os.status = 'RASCUNHO'
+            OR os.status = 'ENVIADO'
+            OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
           )
       `),
 
-      // 3. Pendentes de APROVAÇÃO (ENVIADO com rateio)
+      // 3. Pendentes de APROVAÇÃO (ENVIADO com ou sem rateio)
       pool.query(`
         SELECT COUNT(*) as total
         FROM "orcamento_servico" os
         WHERE os.status = 'ENVIADO'
           AND os.id_grupo = 1
-          AND EXISTS (
-            SELECT 1 FROM orcamento_rateio r
-            WHERE r.id_orcamento = os.id_orcamento
-          )
       `),
 
       // 4. Pendentes de COBRANÇA (APROVADO sem id_cobranca)
@@ -1589,12 +1569,8 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
         e."Nome_Embar" as nome_embarcacao
       FROM "orcamento_servico" os
       JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
-      WHERE os.status IN ('RASCUNHO', 'ENVIADO')
+      WHERE os.status = 'RASCUNHO'
         AND os.id_grupo = 1
-        AND NOT EXISTS (
-          SELECT 1 FROM orcamento_rateio r
-          WHERE r.id_orcamento = os.id_orcamento
-        )
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
       LIMIT 20
     `);
@@ -1624,6 +1600,7 @@ Total: ${result.rows.length} orçamento(s)
       const statusEmoji = orc.status === 'RASCUNHO' ? '📝' : '📤';
 
       mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   📝 ${orc.titulo}\n`;
       mensagem += `   ${statusEmoji} ${orc.status}\n`;
       mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
       mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
@@ -1736,6 +1713,7 @@ Total: ${result.rows.length} orçamento(s)
       if (orc.status === 'CONCLUIDO') statusEmoji = '✅';
 
       mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   📝 ${orc.titulo}\n`;
       mensagem += `   ${statusEmoji} ${orc.status}\n`;
       mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
       mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
@@ -1778,7 +1756,8 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
       LEFT JOIN "orcamento_servico" os ON os.id_embarcacao = e."Num_PB"
         AND os.id_grupo = 1
         AND (
-          os.status IN ('RASCUNHO', 'ENVIADO')
+          os.status = 'RASCUNHO'
+          OR os.status = 'ENVIADO'
           OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
         )
       WHERE e."Cod_Cliente" = 4255
@@ -1840,21 +1819,9 @@ async function listarOrcamentosPorEmbarcacao(sock, userId, groupId, idEmbarcacao
       WHERE os.id_embarcacao = $1
         AND os.id_grupo = 1
         AND (
-          -- Abertos: RASCUNHO/ENVIADO sem rateio
-          (
-            os.status IN ('RASCUNHO', 'ENVIADO')
-            AND NOT EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
-          )
-          -- Pend. Aprovação: ENVIADO com rateio
-          OR (
-            os.status = 'ENVIADO'
-            AND EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
-          )
-          -- Pend. Cobrança: APROVADO sem cobrança
-          OR (
-            os.status = 'APROVADO'
-            AND (os.id_cobranca IS NULL OR os.id_cobranca = 0)
-          )
+          os.status = 'RASCUNHO'
+          OR os.status = 'ENVIADO'
+          OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
         )
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
     `, [idEmbarcacao]);
@@ -1935,10 +1902,6 @@ async function listarPendentesAprovacao(sock, userId, groupId) {
       JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
       WHERE os.status = 'ENVIADO'
         AND os.id_grupo = 1
-        AND EXISTS (
-          SELECT 1 FROM orcamento_rateio r
-          WHERE r.id_orcamento = os.id_orcamento
-        )
       ORDER BY os.data_orcamento ASC, os.id_orcamento ASC
       LIMIT 50
     `);
@@ -1972,6 +1935,7 @@ Total: ${result.rows.length} orçamento(s)
                         `${orc.dias_pendente} dias`;
 
       mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   📝 ${orc.titulo}\n`;
       mensagem += `   ${statusEmoji} ${orc.status} (${diasTexto})\n`;
       mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
       mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
@@ -2069,6 +2033,7 @@ async function listarPendentesCobranca(sock, userId, groupId) {
                         `${orc.dias_aprovado} dias`;
 
       mensagem += `${index + 1}️⃣ #${orc.id_orcamento} - ${orc.numero}\n`;
+      mensagem += `   📝 ${orc.titulo}\n`;
       mensagem += `   ⏰ Aprovado há ${diasTexto}\n`;
       mensagem += `   🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}\n`;
       mensagem += `   💰 ${formatarMoeda(orc.valor_total)}\n`;
