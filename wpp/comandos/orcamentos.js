@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260941
+// wpp/comandos/orcamentos.js — V.2610261122
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2582,6 +2582,50 @@ Digite 0 para voltar aos detalhes`
       };
     });
 
+    // ═══════════════════════════════════════════════════════════
+    // VALIDAÇÃO CRÍTICA: Verificar valores mínimos no rateio
+    // Se ALGUM cotista ficar com < R$ 5,00 → BLOQUEAR rateio
+    // ═══════════════════════════════════════════════════════════
+    const VALOR_MINIMO_ASAAS = 5.00;
+    const cotistasAbaixoMinimo = rateio.filter(r => parseFloat(r.valor_cotista) < VALOR_MINIMO_ASAAS);
+
+    if (cotistasAbaixoMinimo.length > 0) {
+      console.log(`\n🚫 RATEIO BLOQUEADO - ${cotistasAbaixoMinimo.length} cotista(s) com valor < R$ 5,00\n`);
+
+      let msgBloqueio = `🚫 *RATEIO BLOQUEADO*
+
+❌ O rateio proporcional resultou em valores inferiores a R$ 5,00:
+
+━━━━━━━━━━━━━━━━
+`;
+
+      cotistasAbaixoMinimo.forEach(c => {
+        const nomeExibir = c.nome_resumido ? ` - ${c.nome_resumido}` : '';
+        msgBloqueio += `${c.grupo_letra}${nomeExibir}: ${formatarMoeda(c.valor_cotista)} (${c.percentual.toFixed(2)}%)\n`;
+      });
+
+      msgBloqueio += `━━━━━━━━━━━━━━━━
+
+⚠️ *REGRA ASAAS:*
+Valor mínimo para cobrança é R$ 5,00
+
+💡 *SOLUÇÕES POSSÍVEIS:*
+
+1️⃣ *Aumentar valor total* do orçamento
+   (mínimo para ${totalCotas} cotas: ${formatarMoeda(VALOR_MINIMO_ASAAS * totalCotas)})
+
+2️⃣ *Distribuir manualmente* apenas para alguns cotistas
+   Digite *8* para escolher quais cotas participam
+
+3️⃣ *Reduzir o número* de cotistas na embarcação
+
+━━━━━━━━━━━━━━━━
+0️⃣ Voltar aos detalhes`;
+
+      await sock.sendMessage(groupId, { text: msgBloqueio });
+      return;
+    }
+
     // Verificar se já existe rateio salvo no banco
     const rateioSalvoResult = await pool.query(`
       SELECT COUNT(*) as qtd FROM orcamento_rateio WHERE id_orcamento = $1
@@ -2815,6 +2859,30 @@ async function processarValorCotistaManual(sock, userId, groupId, estado, textoV
     if (isNaN(valor) || valor <= 0) {
       await sock.sendMessage(groupId, {
         text: '❌ Valor inválido! Digite um número maior que zero.'
+      });
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // VALIDAÇÃO: Valor mínimo R$ 5,00 (limite Asaas)
+    // ═══════════════════════════════════════════════════════════
+    const VALOR_MINIMO_ASAAS = 5.00;
+
+    if (valor < VALOR_MINIMO_ASAAS) {
+      await sock.sendMessage(groupId, {
+        text: `🚫 *VALOR MUITO BAIXO*
+
+❌ Você digitou: ${formatarMoeda(valor)}
+
+⚠️ *REGRA ASAAS:*
+O valor mínimo para cobrança é R$ 5,00
+
+💡 *SOLUÇÃO:*
+• Digite um valor ≥ R$ 5,00
+• Ou redistribua entre menos cotistas
+
+━━━━━━━━━━━━━━━━
+Digite o valor novamente (mínimo R$ 5,00):`
       });
       return;
     }
@@ -3149,7 +3217,9 @@ Digite 0 para voltar aos detalhes`;
     const EMPRESA = 8; // ALLMAX
     const CENTRO_CUSTO = 8;
     const DIAS_VENCIMENTO = 30;
-    const VALOR_MINIMO_COBRANCA = 50.00; // Mínimo para gerar cobrança
+    const VALOR_MINIMO_ASAAS = 5.00; // Mínimo aceito pelo Asaas
+    const VALOR_CUSTO_BOLETO = 5.00; // Custo adicional de boleto
+    const LIMITE_ISENCAO_BOLETO = 50.00; // Acima deste valor, sem custo adicional
     const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
 
     // URL do orçamento
@@ -3157,7 +3227,8 @@ Digite 0 para voltar aos detalhes`;
 
     // Array para guardar cobranças geradas
     const cobrancasGeradas = [];
-    const valoresTruncados = [];
+    const valoresBloqueados = [];
+    const valoresComCusto = [];
     const erros = [];
 
     console.log(`\n💳 ═══════════════════════════════════════════════`);
@@ -3165,27 +3236,99 @@ Digite 0 para voltar aos detalhes`;
     console.log(`💳 Total de cotistas: ${rateioResult.rows.length}`);
     console.log(`💳 ═══════════════════════════════════════════════\n`);
 
+    // ═══════════════════════════════════════════════════════════
+    // PRIMEIRA PASSADA: VALIDAÇÃO CRÍTICA
+    // Se ALGUÉM tiver < R$ 5,00 → BLOQUEAR TUDO
+    // ═══════════════════════════════════════════════════════════
+    console.log(`🔍 VALIDANDO VALORES MÍNIMOS...\n`);
+
+    for (const rateio of rateioResult.rows) {
+      const valorCotista = parseFloat(rateio.valor_cotista);
+
+      if (valorCotista < VALOR_MINIMO_ASAAS) {
+        console.log(`❌ ${rateio.grupo_letra}: R$ ${valorCotista.toFixed(2)} < R$ ${VALOR_MINIMO_ASAAS.toFixed(2)}`);
+        valoresBloqueados.push({
+          grupo: rateio.grupo_letra,
+          valor: valorCotista
+        });
+      } else {
+        console.log(`✅ ${rateio.grupo_letra}: R$ ${valorCotista.toFixed(2)} OK`);
+      }
+    }
+
+    // Se ALGUM valor for < R$ 5,00 → BLOQUEAR TUDO
+    if (valoresBloqueados.length > 0) {
+      console.log(`\n🚫 ═══════════════════════════════════════════════`);
+      console.log(`🚫 COBRANÇA BLOQUEADA!`);
+      console.log(`🚫 ${valoresBloqueados.length} cotista(s) com valor < R$ 5,00`);
+      console.log(`🚫 ═══════════════════════════════════════════════\n`);
+
+      let msgBloqueio = `🚫 *COBRANÇA BLOQUEADA*
+
+❌ Não é possível gerar cobrança Asaas porque existem valores inferiores a R$ 5,00:
+
+`;
+      valoresBloqueados.forEach(v => {
+        msgBloqueio += `• ${v.grupo}: ${formatarMoeda(v.valor)}\n`;
+      });
+
+      msgBloqueio += `
+━━━━━━━━━━━━━━━━
+⚠️ *REGRA ASAAS:* Valor mínimo R$ 5,00
+
+💡 *SOLUÇÃO:*
+• Ajustar valores do rateio
+• Ou remover cotistas com valores muito baixos
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`;
+
+      await sock.sendMessage(groupId, { text: msgBloqueio });
+      return;
+    }
+
+    console.log(`\n✅ Todos os valores ≥ R$ 5,00 - Prosseguindo...\n`);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEGUNDA PASSADA: GERAÇÃO DE COBRANÇAS
+    // R$ 5,00 ≤ valor < R$ 50,00 → + R$ 5,00 custo boleto
+    // valor ≥ R$ 50,00 → sem custo adicional
+    // ═══════════════════════════════════════════════════════════
+
     for (const rateio of rateioResult.rows) {
       try {
-        console.log(`\n💳 Processando ${rateio.grupo_letra}:`);
-        console.log(`   - Cliente: ${rateio.cod_pessoa}`);
-        console.log(`   - Valor: ${rateio.valor_cotista}`);
+        const valorOriginal = parseFloat(rateio.valor_cotista);
+        let valorFinal = valorOriginal;
+        let custoBoleto = 0;
 
-        // Validar valor mínimo
-        if (parseFloat(rateio.valor_cotista) < VALOR_MINIMO_COBRANCA) {
-          console.log(`   ⚠️  TRUNCADO - Valor inferior a R$ ${VALOR_MINIMO_COBRANCA.toFixed(2)}`);
-          valoresTruncados.push({
+        // Adicionar custo de boleto se necessário
+        if (valorOriginal >= VALOR_MINIMO_ASAAS && valorOriginal < LIMITE_ISENCAO_BOLETO) {
+          custoBoleto = VALOR_CUSTO_BOLETO;
+          valorFinal = valorOriginal + custoBoleto;
+
+          console.log(`\n💳 Processando ${rateio.grupo_letra}:`);
+          console.log(`   - Cliente: ${rateio.cod_pessoa}`);
+          console.log(`   - Valor original: R$ ${valorOriginal.toFixed(2)}`);
+          console.log(`   - Custo boleto: + R$ ${custoBoleto.toFixed(2)}`);
+          console.log(`   - Valor final: R$ ${valorFinal.toFixed(2)}`);
+
+          valoresComCusto.push({
             grupo: rateio.grupo_letra,
-            valor: rateio.valor_cotista
+            valor_original: valorOriginal,
+            custo_boleto: custoBoleto,
+            valor_final: valorFinal
           });
-          continue; // Pula para o próximo
+        } else {
+          console.log(`\n💳 Processando ${rateio.grupo_letra}:`);
+          console.log(`   - Cliente: ${rateio.cod_pessoa}`);
+          console.log(`   - Valor: R$ ${valorOriginal.toFixed(2)} (sem custo adicional)`);
         }
 
         const descricaoCR = `${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)} ${orc.descricao}`;
 
-        // Gerar cobrança completa (CR + Asaas)
+        // Gerar cobrança completa (CR + Asaas) com valor FINAL
         const resultado = await gerarCobrancaCompleta(pool, EMPRESA, rateio.cod_pessoa, {
-          valor: rateio.valor_cotista,
+          valor: valorFinal,
           descricao: descricaoCR,
           vencimento: dataVencimento,
           centroCusto: String(CENTRO_CUSTO)
@@ -3199,7 +3342,9 @@ Digite 0 para voltar aos detalhes`;
         cobrancasGeradas.push({
           grupo_letra: rateio.grupo_letra,
           cod_pessoa: rateio.cod_pessoa,
-          valor: rateio.valor_cotista,
+          valor_original: valorOriginal,
+          custo_boleto: custoBoleto,
+          valor_final: valorFinal,
           codigo_cr: resultado.codigo,
           payment_id: resultado.paymentId,
           link: resultado.linkBoleto,
@@ -3244,10 +3389,18 @@ Digite 0 para voltar aos detalhes`
     ]);
 
     // Log
+    let descricaoLog = `${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)`;
+    if (valoresComCusto.length > 0) {
+      descricaoLog += ` | ${valoresComCusto.length} com custo boleto (+R$ 5,00)`;
+    }
+    if (erros.length > 0) {
+      descricaoLog += ` | ${erros.length} erro(s)`;
+    }
+
     await adicionarLog(
       idOrcamento,
       'COBRANCA_GERADA',
-      `${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)${erros.length > 0 ? ` (${erros.length} erro(s))` : ''}`,
+      descricaoLog,
       userId
     );
 
@@ -3270,13 +3423,24 @@ Digite 0 para voltar aos detalhes`
       }
 
       const dataVencFormat = dataVencimento.toLocaleDateString('pt-BR');
+
+      // Montar mensagem com ou sem custo de boleto
+      let detalhesValor = '';
+      if (cobranca.custo_boleto > 0) {
+        detalhesValor = `  | Valor rateio: ${formatarMoeda(cobranca.valor_original)}
+  | Custo boleto: ${formatarMoeda(cobranca.custo_boleto)}
+  | *TOTAL A PAGAR: ${formatarMoeda(cobranca.valor_final)}*`;
+      } else {
+        detalhesValor = `  | *VALOR: ${formatarMoeda(cobranca.valor_final)}*`;
+      }
+
       const mensagem = `💰 *COBRANÇA GERADA*
 
 *ORÇAMENTO ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}*
 ${orc.descricao}
 
 ━━━━━━━━━━━━━━━━
-  | Valor: ${formatarMoeda(cobranca.valor)}
+${detalhesValor}
   | Vencimento: ${dataVencFormat}
   | Link:
   | ${cobranca.link}
@@ -3304,15 +3468,16 @@ ${orc.descricao}
     let resumo = `✅ *COBRANÇAS GERADAS E ENVIADAS!*
 
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
-💰 Total: ${formatarMoeda(orc.valor_total)}
+💰 Total orçamento: ${formatarMoeda(orc.valor_total)}
 ✅ ${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)
 📤 ${enviosOk} mensagem(ns) enviada(s)`;
 
-    if (valoresTruncados.length > 0) {
-      resumo += `\n\n⚠️ *Valores truncados (< R$ ${VALOR_MINIMO_COBRANCA.toFixed(2)}):*\n`;
-      valoresTruncados.forEach(v => {
-        resumo += `${v.grupo}: ${formatarMoeda(v.valor)}\n`;
+    if (valoresComCusto.length > 0) {
+      resumo += `\n\n💵 *Custo de boleto adicionado (R$ 5,00):*\n`;
+      valoresComCusto.forEach(v => {
+        resumo += `${v.grupo}: ${formatarMoeda(v.valor_original)} → ${formatarMoeda(v.valor_final)}\n`;
       });
+      resumo += `\n_Valores < R$ 50,00 têm custo adicional de R$ 5,00_`;
     }
 
     if (erros.length > 0) {
