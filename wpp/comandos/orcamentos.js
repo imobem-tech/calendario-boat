@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260859
+// wpp/comandos/orcamentos.js — V.2610260905
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3032,6 +3032,97 @@ O orçamento precisa estar APROVADO antes de gerar cobrança!
       await aprovarOrcamento(sock, userId, groupId, idOrcamento);
       return;
     }
+
+    // VALIDAR DADOS DOS CLIENTES (CPF, E-mail, Telefone)
+    console.log(`\n🔍 VALIDANDO DADOS DOS CLIENTES...\n`);
+
+    const clientesPendentes = [];
+
+    for (const rateio of rateioResult.rows) {
+      const clienteResult = await pool.query(`
+        SELECT
+          "Codigo",
+          "Cliente_Nome",
+          "Cliente_CPF",
+          "Outros_Email",
+          "Cliente_Telefone_Celular"
+        FROM "Cliente"
+        WHERE "Codigo" = $1
+      `, [rateio.cod_pessoa]);
+
+      if (clienteResult.rows.length === 0) {
+        clientesPendentes.push({
+          grupo: rateio.grupo_letra,
+          codigo: rateio.cod_pessoa,
+          nome: '(não encontrado)',
+          problemas: ['Cliente não existe no banco']
+        });
+        continue;
+      }
+
+      const cliente = clienteResult.rows[0];
+      const problemas = [];
+
+      // Validar CPF
+      const cpf = String(cliente.Cliente_CPF || '').replace(/[.\-\/]/g, '').trim();
+      if (!cpf || cpf.length < 11) {
+        problemas.push('CPF ausente ou inválido');
+      }
+
+      // Validar E-mail
+      const email = String(cliente.Outros_Email || '').trim();
+      if (!email || !email.includes('@')) {
+        problemas.push('E-mail ausente ou inválido');
+      }
+
+      // Validar Telefone
+      const telefone = String(cliente.Cliente_Telefone_Celular || '').replace(/\D/g, '').trim();
+      if (!telefone || telefone.length < 10) {
+        problemas.push('Telefone ausente ou inválido');
+      }
+
+      if (problemas.length > 0) {
+        clientesPendentes.push({
+          grupo: rateio.grupo_letra,
+          codigo: cliente.Codigo,
+          nome: cliente.Cliente_Nome,
+          problemas: problemas
+        });
+      }
+
+      console.log(`${rateio.grupo_letra} - Cliente ${cliente.Codigo}: ${problemas.length === 0 ? '✅ OK' : '❌ ' + problemas.join(', ')}`);
+    }
+
+    // Se houver clientes com dados faltando, BLOQUEAR TUDO
+    if (clientesPendentes.length > 0) {
+      let mensagemErro = `❌ *DADOS INCOMPLETOS*
+
+Não é possível gerar cobranças.
+Os seguintes clientes estão com dados faltando:
+
+━━━━━━━━━━━━━━━━
+`;
+
+      clientesPendentes.forEach(c => {
+        mensagemErro += `\n🔴 *${c.grupo}* - Cliente ${c.codigo}\n`;
+        mensagemErro += `   ${c.nome}\n`;
+        c.problemas.forEach(p => {
+          mensagemErro += `   ⚠️ ${p}\n`;
+        });
+      });
+
+      mensagemErro += `\n━━━━━━━━━━━━━━━━
+📋 Cadastre os dados faltantes e tente novamente.
+
+Digite 0 para voltar aos detalhes`;
+
+      console.log(`\n❌ VALIDAÇÃO FALHOU: ${clientesPendentes.length} cliente(s) com dados incompletos\n`);
+
+      await sock.sendMessage(groupId, { text: mensagemErro });
+      return;
+    }
+
+    console.log(`\n✅ Todos os clientes validados com sucesso!\n`);
 
     await sock.sendMessage(groupId, {
       text: `⏳ *GERANDO COBRANÇAS ASAAS*
