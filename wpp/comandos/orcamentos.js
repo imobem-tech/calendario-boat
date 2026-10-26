@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260717
+// wpp/comandos/orcamentos.js — V.2610260720
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4088,6 +4088,15 @@ Este orçamento ainda não tem rateio definido!
       mensagem += `\n⚠️ *AVISOS:*\n`;
       erros.forEach(g => {
         mensagem += `❌ ${g.grupo_letra}: Sem WhatsApp cadastrado\n`;
+      });
+    }
+
+    // Verificar se alguma cota tem múltiplos grupos WhatsApp
+    const gruposMultiplos = gruposOk.filter(g => g.qtd_grupos_wpp > 1);
+    if (gruposMultiplos.length > 0) {
+      mensagem += `\n📱 *MÚLTIPLOS GRUPOS WHATSAPP:*\n`;
+      gruposMultiplos.forEach(g => {
+        mensagem += `⚠️ ${g.grupo_letra}: ${g.qtd_grupos_wpp} grupos cadastrados (enviará para todos)\n`;
       });
     }
 
