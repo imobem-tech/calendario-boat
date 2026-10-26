@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261205
+// wpp/comandos/orcamentos.js — V.2610261214
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1971,6 +1971,7 @@ async function mostrarMenuHistorico(sock, userId, groupId, idOrcamento) {
     // Buscar dados básicos do orçamento
     const orcResult = await pool.query(`
       SELECT
+        os.id_orcamento,
         os.numero,
         os.descricao as titulo,
         e."Num_PB" as numero_pb,
