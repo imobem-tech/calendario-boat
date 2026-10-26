@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261514
+// wpp/comandos/orcamentos.js — V.2610261518
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -5619,14 +5619,24 @@ Quando o modo teste for desativado:
       userId
     );
 
+    // ATUALIZAR STATUS PARA CONCLUIDO (mesmo em modo teste)
+    await pool.query(`
+      UPDATE "orcamento_servico"
+      SET status = 'CONCLUIDO'
+      WHERE id_orcamento = $1
+    `, [estado.id_orcamento]);
+
+    console.log(`✅ [TESTE] Status atualizado para CONCLUIDO - Orçamento #${estado.id_orcamento}`);
+
     // Mensagem final de confirmação
     const msgFinal = `✅ *SIMULAÇÃO CONCLUÍDA*
 
 📤 ${enviosOk} mensagem(ns) enviada(s) aos grupos
 📋 Registro salvo no LOG
+✅ Status alterado para: *CONCLUIDO*
 
 🧪 *MODO TESTE ATIVO*
-Nenhuma cobrança foi gerada.
+Nenhuma cobrança foi gerada no Asaas.
 
 ━━━━━━━━━━━━━━━━
 Digite 0 para voltar aos detalhes`;
