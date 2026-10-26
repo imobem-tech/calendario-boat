@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260658
+// wpp/comandos/orcamentos.js — V.2610260706
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4003,24 +4003,41 @@ async function previewEnvioOrcamento(sock, userId, groupId, idOrcamento) {
 
     const orc = orcResult.rows[0];
 
-    // 2. Buscar rateio e grupos WhatsApp
+    // 2. Buscar rateio (SEM JOIN com wpp_grupos_agenda para evitar duplicação)
+    // Agrupamos PRIMEIRO, depois buscamos grupos WhatsApp
     const rateioResult = await pool.query(`
       SELECT
         a."Gropo_letra" as grupo_letra,
         SUM(r.valor_cotista) as valor_grupo,
-        COUNT(*) as qtd_cotistas,
-        MAX(wg.grupowppid) as id_grupo_wpp,
-        MAX(wg.nomegrupowpp) as nome_grupo
+        COUNT(*) as qtd_cotistas
       FROM orcamento_rateio r
       JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
-      LEFT JOIN wpp_grupos_agenda wg
-        ON wg.pb = $1
-        AND wg.cota = a."Gropo_letra"
-      WHERE r.id_orcamento = $2
+      WHERE r.id_orcamento = $1
         AND r.participando = true
       GROUP BY a."Gropo_letra"
       ORDER BY a."Gropo_letra"
-    `, [orc.numero_pb, idOrcamento]);
+    `, [idOrcamento]);
+
+    // 3. Para cada grupo, buscar os IDs WhatsApp (pode ter múltiplos)
+    for (const grupo of rateioResult.rows) {
+      const gruposWpp = await pool.query(`
+        SELECT grupowppid, nomegrupowpp
+        FROM wpp_grupos_agenda
+        WHERE pb = $1 AND cota = $2
+      `, [orc.numero_pb, grupo.grupo_letra]);
+
+      // Se houver grupos WhatsApp, pegar o primeiro para o preview
+      // (no envio real, enviará para TODOS)
+      if (gruposWpp.rows.length > 0) {
+        grupo.id_grupo_wpp = gruposWpp.rows[0].grupowppid;
+        grupo.nome_grupo = gruposWpp.rows[0].nomegrupowpp;
+        grupo.qtd_grupos_wpp = gruposWpp.rows.length;
+      } else {
+        grupo.id_grupo_wpp = null;
+        grupo.nome_grupo = null;
+        grupo.qtd_grupos_wpp = 0;
+      }
+    }
 
     if (rateioResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
@@ -4034,7 +4051,7 @@ Este orçamento ainda não tem rateio definido!
       return;
     }
 
-    // 3. Separar grupos OK vs Erros
+    // 4. Separar grupos OK vs Erros
     const gruposOk = [];
     const erros = [];
 
