@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261140
+// wpp/comandos/orcamentos.js — V.2610261153
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3393,10 +3393,12 @@ Digite 0 para voltar aos detalhes`
       return;
     }
 
-    // Atualizar orçamento com ID da primeira cobrança
+    // Atualizar orçamento com ID da primeira cobrança e status CONCLUIDO
     await pool.query(`
       UPDATE "orcamento_servico"
-      SET id_cobranca = $1
+      SET
+        id_cobranca = $1,
+        status = 'CONCLUIDO'
       WHERE id_orcamento = $2
     `, [
       cobrancasGeradas[0].codigo_cr,
@@ -3404,7 +3406,7 @@ Digite 0 para voltar aos detalhes`
     ]);
 
     // Log
-    let descricaoLog = `${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)`;
+    let descricaoLog = `${cobrancasGeradas.length} cobrança(s) Asaas gerada(s) | Status: CONCLUIDO`;
     if (valoresComCusto.length > 0) {
       descricaoLog += ` | ${valoresComCusto.length} com custo boleto (+R$ 5,00)`;
     }
@@ -3485,7 +3487,8 @@ ${detalhesValor}
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 💰 Total orçamento: ${formatarMoeda(orc.valor_total)}
 ✅ ${cobrancasGeradas.length} cobrança(s) Asaas gerada(s)
-📤 ${enviosOk} mensagem(ns) enviada(s)`;
+📤 ${enviosOk} mensagem(ns) enviada(s)
+📋 Status: *CONCLUIDO*`;
 
     if (valoresComCusto.length > 0) {
       resumo += `\n\n💵 *Custo de boleto adicionado (R$ 5,00):*\n`;
