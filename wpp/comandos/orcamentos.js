@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261552
+// wpp/comandos/orcamentos.js — V.2610261603
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -4359,6 +4359,12 @@ Envie apenas para pessoas autorizadas a visualizar este orçamento.
 Digite 0 para voltar aos detalhes`
     });
 
+    // Atualizar estado para que 0 volte aos detalhes
+    atualizarEstado(userId, {
+      etapa: 'LINK_GERADO',
+      id_orcamento: idOrcamento
+    });
+
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao gerar link:', error);
     await sock.sendMessage(groupId, {
@@ -5945,6 +5951,14 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       embarcacao.numero_pb
     );
     return;
+  }
+
+  // Link de visualização gerado - voltar aos detalhes
+  if (estado.etapa === 'LINK_GERADO') {
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
   }
 
   // Listagens de orçamentos
