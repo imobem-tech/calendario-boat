@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261634
+// wpp/comandos/orcamentos.js — V.2610261652
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -3113,6 +3113,102 @@ ou 0 para cancelar`;
   }
 }
 
+// ============================================================
+// CONFIRMAÇÃO ANTES DE GERAR COBRANÇA
+// ============================================================
+
+async function mostrarConfirmacaoCobranca(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`⚠️ [ORCAMENTOS] Pedindo confirmação para gerar cobrança #${idOrcamento}...`);
+
+    // Buscar dados do orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.valor_total,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM "orcamento_servico" os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, { text: '❌ Orçamento não encontrado.' });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // Buscar rateio
+    const rateioResult = await pool.query(`
+      SELECT
+        r.*,
+        a."Gropo_letra" as grupo_letra,
+        a."Cod_Pessoa" as cod_pessoa
+      FROM orcamento_rateio r
+      JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      WHERE r.id_orcamento = $1
+        AND r.participando = true
+      ORDER BY a."Gropo_letra"
+    `, [idOrcamento]);
+
+    // Montar resumo
+    let mensagem = `⚠️ *CONFIRMAR GERAÇÃO DE COBRANÇA*
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}
+📝 ${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+📊 *RESUMO:*
+
+💰 Valor total: ${formatarMoeda(orc.valor_total)}
+👥 Cotistas: ${rateioResult.rows.length}
+
+*Cobranças a gerar:*
+`;
+
+    rateioResult.rows.forEach(r => {
+      mensagem += `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}\n`;
+    });
+
+    mensagem += `
+━━━━━━━━━━━━━━━━
+⚠️ *ATENÇÃO - ATO IRREVERSÍVEL!*
+
+Ao confirmar, o sistema irá:
+✅ Criar ${rateioResult.rows.length} cobrança(s) REAIS no Asaas
+✅ Gerar registros em Contas a Receber
+✅ Enviar links de pagamento para os grupos
+✅ Alterar status para CONCLUIDO
+
+*Esta ação NÃO pode ser desfeita!*
+
+━━━━━━━━━━━━━━━━
+1️⃣ ✅ CONFIRMAR e gerar cobranças
+0️⃣ ❌ Cancelar e voltar
+
+Escolha uma opção:`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // Atualizar estado
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMAR_COBRANCA',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ [ORCAMENTOS] Erro ao mostrar confirmação:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro ao preparar confirmação.\n\n${error.message}`
+    });
+  }
+}
+
 async function enviarCobrancaOrcamento(sock, userId, groupId, idOrcamento) {
   try {
     console.log(`💵 [ORCAMENTOS] Enviando cobrança do orçamento #${idOrcamento}...`);
@@ -3165,6 +3261,12 @@ Gere o link primeiro (opção 8) antes de enviar cobrança!
 
 ━━━━━━━━━━━━━━━━
 Digite 0 para voltar aos detalhes`
+      });
+
+      // Atualizar estado para que 0 volte aos detalhes
+      atualizarEstado(userId, {
+        etapa: 'LINK_NAO_GERADO',
+        id_orcamento: idOrcamento
       });
       return;
     }
@@ -5953,6 +6055,35 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     }
   }
 
+  // Link não gerado (tentou enviar cobrança sem link) - voltar aos detalhes
+  if (estado.etapa === 'LINK_NAO_GERADO') {
+    if (texto === '0') {
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+  }
+
+  // Confirmação de geração de cobrança
+  if (estado.etapa === 'CONFIRMAR_COBRANCA') {
+    if (texto === '0') {
+      // Cancelar - volta aos detalhes
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '1') {
+      // Confirmar - gera cobranças
+      await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Opção inválida
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
+    });
+    return;
+  }
+
   // Listagens de orçamentos
   if (estado.etapa === 'LISTAR_ABERTOS' ||
       estado.etapa === 'LISTAR_FECHADOS' ||
@@ -6029,8 +6160,8 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await previewEnvioOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
-      case '10': // Enviar cobrança
-        await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
+      case '10': // Enviar cobrança (mostra confirmação primeiro)
+        await mostrarConfirmacaoCobranca(sock, userId, groupId, estado.id_orcamento);
         break;
 
       case '11': // Alterar status
