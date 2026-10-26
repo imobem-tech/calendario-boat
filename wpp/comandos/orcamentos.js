@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260755
+// wpp/comandos/orcamentos.js — V.2610260812
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3773,7 +3773,7 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 *OPÇÕES:*
 
 1️⃣ 📋 Acessar HISTÓRICO
-2️⃣ 📝 Alterar a Descrição
+2️⃣ 📝 Descrição e Obs.
 3️⃣ ✏️ Editar itens
 4️⃣ 📎 Inserir anexo
 5️⃣ ⚙️ Alterar % Gestão
@@ -3809,11 +3809,12 @@ Digite o número da opção:`;
 // ALTERAR DESCRIÇÃO DO ORÇAMENTO
 // ============================================================
 
+// Renomeada para mostrar submenu
 async function alterarDescricaoOrcamento(sock, userId, groupId, idOrcamento) {
   try {
-    // Buscar descrição atual
+    // Buscar descrição e observação atuais
     const result = await pool.query(`
-      SELECT descricao, numero
+      SELECT id_orcamento, numero, descricao, observacao
       FROM orcamento_servico
       WHERE id_orcamento = $1
     `, [idOrcamento]);
@@ -3828,10 +3829,51 @@ async function alterarDescricaoOrcamento(sock, userId, groupId, idOrcamento) {
     const orc = result.rows[0];
 
     await sock.sendMessage(groupId, {
+      text: `📝 *ALTERAR*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+
+1️⃣ 📌 Descrição atual:
+${orc.descricao || '(sem descrição)'}
+
+2️⃣ 📌 Observação atual:
+${orc.observacao || '(sem observação)'}
+
+━━━━━━━━━━━━━━━━
+Digite a opção que quer alterar
+ou 0 para voltar`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'ESCOLHER_DESC_OU_OBS',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao mostrar menu descrição/obs:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+// Alterar apenas descrição
+async function iniciarAlteracaoDescricao(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, descricao
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
       text: `📝 *ALTERAR DESCRIÇÃO*
 ━━━━━━━━━━━━━━━━
 
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📌 *Descrição atual:*
 ${orc.descricao || '(sem descrição)'}
@@ -3843,15 +3885,48 @@ ou 0 para cancelar`
 
     atualizarEstado(userId, {
       etapa: 'ALTERAR_DESCRICAO',
-      id_orcamento: idOrcamento,
-      descricao_anterior: orc.descricao
+      id_orcamento: idOrcamento
     });
 
   } catch (error) {
-    console.error('❌ Erro ao alterar descrição:', error);
+    console.error('❌ Erro:', error);
+    await sock.sendMessage(groupId, { text: `❌ Erro:\n${error.message}` });
+  }
+}
+
+// Alterar apenas observação
+async function iniciarAlteracaoObservacao(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, observacao
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
     await sock.sendMessage(groupId, {
-      text: `❌ Erro:\n${error.message}`
+      text: `📝 *ALTERAR OBSERVAÇÃO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+
+📌 *Observação atual:*
+${orc.observacao || '(sem observação)'}
+
+━━━━━━━━━━━━━━━━
+Digite a nova observação
+ou 0 para cancelar`
     });
+
+    atualizarEstado(userId, {
+      etapa: 'ALTERAR_OBSERVACAO',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    await sock.sendMessage(groupId, { text: `❌ Erro:\n${error.message}` });
   }
 }
 
@@ -4612,6 +4687,25 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
   }
 
   // Alterar descrição do orçamento
+  // Escolher descrição ou observação
+  if (estado.etapa === 'ESCOLHER_DESC_OU_OBS') {
+    if (texto === '1') {
+      await iniciarAlteracaoDescricao(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (texto === '2') {
+      await iniciarAlteracaoObservacao(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Opção inválida! Digite 1 ou 2, ou 0 para voltar.'
+    });
+    return;
+  }
+
+  // Alterar descrição
   if (estado.etapa === 'ALTERAR_DESCRICAO') {
     // Handler de "0" é global (volta aos detalhes)
 
@@ -4627,7 +4721,7 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       await adicionarLog(
         estado.id_orcamento,
         'DESCRICAO_ALTERADA',
-        `Descrição alterada:\nAnterior: ${estado.descricao_anterior || '(vazio)'}\nNova: ${texto}`,
+        `Descrição alterada para: ${texto}`,
         userId
       );
 
@@ -4646,6 +4740,46 @@ Voltando aos detalhes...`
       console.error('❌ Erro ao salvar descrição:', error);
       await sock.sendMessage(groupId, {
         text: `❌ Erro ao salvar descrição:\n${error.message}\n\nDigite 0 para voltar`
+      });
+    }
+    return;
+  }
+
+  // Alterar observação
+  if (estado.etapa === 'ALTERAR_OBSERVACAO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    try {
+      // Atualizar observação no banco
+      await pool.query(`
+        UPDATE orcamento_servico
+        SET observacao = $1
+        WHERE id_orcamento = $2
+      `, [texto, estado.id_orcamento]);
+
+      // Registrar no LOG
+      await adicionarLog(
+        estado.id_orcamento,
+        'OBSERVACAO_ALTERADA',
+        `Observação alterada para: ${texto}`,
+        userId
+      );
+
+      await sock.sendMessage(groupId, {
+        text: `✅ *Observação alterada com sucesso!*
+
+📝 *Nova observação:*
+${texto}
+
+Voltando aos detalhes...`
+      });
+
+      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+    } catch (error) {
+      console.error('❌ Erro ao salvar observação:', error);
+      await sock.sendMessage(groupId, {
+        text: `❌ Erro ao salvar observação:\n${error.message}\n\nDigite 0 para voltar`
       });
     }
     return;
