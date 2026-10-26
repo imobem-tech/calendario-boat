@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260545
+// wpp/comandos/orcamentos.js — V.2610260555
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3972,6 +3972,127 @@ Digite 0 para voltar aos detalhes`
 }
 
 // ============================================================
+// PREVIEW DE ENVIO PARA GRUPOS (COM CONFIRMAÇÃO)
+// ============================================================
+
+async function previewEnvioOrcamento(sock, userId, groupId, idOrcamento) {
+  try {
+    console.log(`👁️ [ORCAMENTOS] Preview de envio #${idOrcamento}...`);
+
+    // 1. Buscar orçamento
+    const orcResult = await pool.query(`
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.valor_total,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM orcamento_servico os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (orcResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = orcResult.rows[0];
+
+    // 2. Buscar rateio e grupos WhatsApp
+    const rateioResult = await pool.query(`
+      SELECT
+        a."Gropo_letra" as grupo_letra,
+        SUM(r.valor_cotista) as valor_grupo,
+        COUNT(*) as qtd_cotistas,
+        MAX(wg.grupowppid) as id_grupo_wpp,
+        MAX(wg.nomegrupowpp) as nome_grupo
+      FROM orcamento_rateio r
+      JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
+      LEFT JOIN wpp_grupos_agenda wg
+        ON wg.pb = $1
+        AND wg.cota = a."Gropo_letra"
+      WHERE r.id_orcamento = $2
+        AND r.participando = true
+      GROUP BY a."Gropo_letra"
+      ORDER BY a."Gropo_letra"
+    `, [orc.numero_pb, idOrcamento]);
+
+    if (rateioResult.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: `⚠️ *RATEIO PENDENTE*
+
+Este orçamento ainda não tem rateio definido!
+
+📊 Abrindo menu de rateio...`
+      });
+      await definirRateioOrcamento(sock, userId, groupId, idOrcamento);
+      return;
+    }
+
+    // 3. Separar grupos OK vs Erros
+    const gruposOk = [];
+    const erros = [];
+
+    rateioResult.rows.forEach(grupo => {
+      if (grupo.id_grupo_wpp) {
+        gruposOk.push(grupo);
+      } else {
+        erros.push(grupo);
+      }
+    });
+
+    // 4. Montar preview
+    let mensagem = `📊 *PREVIEW DO ENVIO*
+━━━━━━━━━━━━━━━━
+🆔 ${orc.numero}
+🚤 ${orc.nome_embarcacao}
+💰 Total: ${formatarMoeda(orc.valor_total)}
+━━━━━━━━━━━━━━━━
+`;
+
+    if (gruposOk.length > 0) {
+      mensagem += `\n✅ *GRUPOS QUE RECEBERÃO:*\n\n`;
+      gruposOk.forEach(g => {
+        mensagem += `${g.grupo_letra}: ${formatarMoeda(g.valor_grupo)} ✓\n`;
+      });
+    }
+
+    if (erros.length > 0) {
+      mensagem += `\n⚠️ *AVISOS:*\n`;
+      erros.forEach(g => {
+        mensagem += `❌ ${g.grupo_letra}: Sem WhatsApp cadastrado\n`;
+      });
+    }
+
+    mensagem += `
+━━━━━━━━━━━━━━━━
+Enviar para ${gruposOk.length} de ${rateioResult.rows.length} grupos?
+
+1️⃣ ✅ Confirmar envio
+0️⃣ ❌ Cancelar
+━━━━━━━━━━━━━━━━`;
+
+    await sock.sendMessage(groupId, { text: mensagem });
+
+    // 5. Atualizar estado para aguardar confirmação
+    atualizarEstado(userId, {
+      etapa: 'CONFIRMAR_ENVIO_GRUPOS',
+      id_orcamento: idOrcamento
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar preview:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}\n\nDigite 0 para voltar`
+    });
+  }
+}
+
+// ============================================================
 // ENVIAR ORÇAMENTO PARA GRUPOS DO RATEIO
 // ============================================================
 
@@ -4346,8 +4467,8 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         }
         break;
 
-      case '9': // Enviar orçamento para grupos
-        await enviarOrcamentoGrupos(sock, userId, groupId, estado.id_orcamento);
+      case '9': // Preview de envio (confirmação antes)
+        await previewEnvioOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
       case '10': // Enviar cobrança
@@ -4631,6 +4752,21 @@ Digite:
 
     await sock.sendMessage(groupId, {
       text: '❌ Opção inválida! Digite 1 para confirmar ou 0 para cancelar.'
+    });
+    return;
+  }
+
+  // Confirmar envio para grupos
+  if (estado.etapa === 'CONFIRMAR_ENVIO_GRUPOS') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    if (texto === '1') {
+      await enviarOrcamentoGrupos(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Envio cancelado.\n\nDigite 0 para voltar aos detalhes.'
     });
     return;
   }
