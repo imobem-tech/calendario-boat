@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260706
+// wpp/comandos/orcamentos.js — V.2610260717
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4146,24 +4146,32 @@ async function enviarOrcamentoGrupos(sock, userId, groupId, idOrcamento) {
 
     const orc = orcResult.rows[0];
 
-    // 2. Verificar se tem rateio (agrupa por grupo e soma valores)
+    // 2. Verificar se tem rateio (SEM LEFT JOIN para evitar duplicação)
     const rateioResult = await pool.query(`
       SELECT
         a."Gropo_letra" as grupo_letra,
         SUM(r.valor_cotista) as valor_grupo,
         SUM(r.percentual) as percentual_grupo,
-        COUNT(*) as qtd_cotistas,
-        MAX(wg.grupowppid) as id_grupo_wpp
+        COUNT(*) as qtd_cotistas
       FROM orcamento_rateio r
       JOIN "P_BOAT_4_Autorizados" a ON a."Código" = r.id_autorizado
-      LEFT JOIN wpp_grupos_agenda wg
-        ON wg.pb = $1
-        AND wg.cota = a."Gropo_letra"
-      WHERE r.id_orcamento = $2
+      WHERE r.id_orcamento = $1
         AND r.participando = true
       GROUP BY a."Gropo_letra"
       ORDER BY a."Gropo_letra"
-    `, [orc.numero_pb, idOrcamento]);
+    `, [idOrcamento]);
+
+    // 3. Para cada grupo, buscar TODOS os IDs WhatsApp (pode ter múltiplos)
+    for (const grupo of rateioResult.rows) {
+      const gruposWpp = await pool.query(`
+        SELECT grupowppid, nomegrupowpp
+        FROM wpp_grupos_agenda
+        WHERE pb = $1 AND cota = $2
+      `, [orc.numero_pb, grupo.grupo_letra]);
+
+      // Guardar TODOS os grupos WhatsApp (enviaremos para todos)
+      grupo.grupos_wpp = gruposWpp.rows;
+    }
 
     if (rateioResult.rows.length === 0) {
       await sock.sendMessage(groupId, {
@@ -4212,15 +4220,14 @@ Este orçamento ainda não tem rateio definido!
     let erros = [];
 
     for (const grupo of rateioResult.rows) {
-      console.log(`\n📤 Processando grupo ${grupo.grupo_letra}:`);
-      console.log(`   - Nome: ${grupo.nome_grupo || 'não informado'}`);
-      console.log(`   - ID WhatsApp: ${grupo.id_grupo_wpp || 'NÃO CADASTRADO'}`);
+      console.log(`\n📤 Processando cota ${grupo.grupo_letra}:`);
       console.log(`   - Valor: ${grupo.valor_grupo}`);
+      console.log(`   - Grupos WhatsApp: ${grupo.grupos_wpp.length}`);
 
-      if (!grupo.id_grupo_wpp) {
+      if (grupo.grupos_wpp.length === 0) {
         console.log(`   ❌ PULADO - Sem WhatsApp cadastrado\n`);
         erros.push(`❌ Grupo ${grupo.grupo_letra}: Sem WhatsApp cadastrado`);
-        continue;  // Continua para próximo
+        continue;
       }
 
       const mensagem = `━━━━━━━━━━━━━━━━
@@ -4248,15 +4255,19 @@ ${orc.descricao}
 
 ⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
 
-      try {
-        console.log(`   📨 Enviando mensagem...`);
-        await sock.sendMessage(grupo.id_grupo_wpp, { text: mensagem });
-        console.log(`   ✅ ENVIADO COM SUCESSO!\n`);
-        enviosOk++;
-      } catch (error) {
-        console.log(`   ❌ ERRO AO ENVIAR: ${error.message}\n`);
-        erros.push(`❌ Grupo ${grupo.grupo_letra}: ${error.message}`);
+      // Enviar para TODOS os grupos WhatsApp desta cota
+      for (const grupoWpp of grupo.grupos_wpp) {
+        try {
+          console.log(`   📨 Enviando para: ${grupoWpp.nomegrupowpp || grupoWpp.grupowppid}`);
+          await sock.sendMessage(grupoWpp.grupowppid, { text: mensagem });
+          console.log(`   ✅ ENVIADO COM SUCESSO!`);
+          enviosOk++;
+        } catch (error) {
+          console.log(`   ❌ ERRO AO ENVIAR: ${error.message}`);
+          erros.push(`❌ Grupo ${grupo.grupo_letra} (${grupoWpp.nomegrupowpp}): ${error.message}`);
+        }
       }
+      console.log('');
     }
 
     console.log(`\n🏁 ═══════════════════════════════════════════════`);
