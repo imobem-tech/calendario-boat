@@ -1,11 +1,12 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261441
+// wpp/comandos/orcamentos.js — V.2610261455
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
 // - Fluxo completo: resumo → escolha parcelas → data customizada → simulação
 // - Envia mensagens aos grupos WhatsApp (MODO TESTE)
 // - NÃO gera cobrança Asaas nem Contas_Receber (preparado para habilitar)
+// FIX V.2610261455: Removido espaço após linhas divisórias (━━━━) em 40+ mensagens
 //
 // Gerencia criação de orçamentos com múltiplos itens
 // dentro do grupo ORÇAMENTOS (120363412373130577@g.us)
@@ -216,7 +217,6 @@ export async function mostrarMenuOrcamentos(sock, userId, groupId) {
     const mensagem = `━━━━━━━━━━━━━━━━
 💼 *SISTEMA DE ORÇAMENTOS*
 ━━━━━━━━━━━━━━━━
-
 Escolha uma opção:
 
 1️⃣ ➕ Criar Novo Orçamento
@@ -242,7 +242,6 @@ Digite o número da opção:`;
     const mensagem = `━━━━━━━━━━━━━━━━
 💼 *SISTEMA DE ORÇAMENTOS*
 ━━━━━━━━━━━━━━━━
-
 Escolha uma opção:
 
 1️⃣ ➕ Criar Novo Orçamento
@@ -296,7 +295,6 @@ async function listarEmbarcacoes(sock, userId, groupId) {
     let mensagem = `━━━━━━━━━━━━━━━━
 🚤 *SELECIONAR EMBARCAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 Escolha a embarcação:
 
 `;
@@ -367,7 +365,6 @@ async function pedirTitulo(sock, userId, groupId) {
 ━━━━━━━━━━━━━━━━
 📝 *PASSO 2/5: TÍTULO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 Digite o título do orçamento:
 
 💡 Exemplo: Manutenção preventiva do motor
@@ -428,7 +425,6 @@ async function pedirDescricaoItem(sock, userId, groupId) {
 ━━━━━━━━━━━━━━━━
 📦 *PASSO 3/5: ITENS DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 *Item #${numeroItem}* - Digite a descrição:
 
 💡 Exemplo: Troca de óleo do motor
@@ -487,7 +483,6 @@ Digite novamente:`;
 ━━━━━━━━━━━━━━━━
 💰 *VALOR DO ITEM*
 ━━━━━━━━━━━━━━━━
-
 Digite o valor (R$) ou "pular":
 
 💡 Formatos aceitos:
@@ -552,7 +547,6 @@ async function mostrarMenuItens(sock, userId, groupId) {
 💰 ${formatarMoeda(ultimoItem.valor)}
 
 ━━━━━━━━━━━━━━━━
-
 O que deseja fazer?
 
 1️⃣ ➕ Adicionar outro item
@@ -604,7 +598,6 @@ async function mostrarListaItens(sock, userId, groupId) {
   });
 
   mensagem += `━━━━━━━━━━━━━━━━
-
 Digite o número para editar/excluir
 ou escolha:
 
@@ -686,7 +679,6 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
 🆔 Orçamento: ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 🚤 ${orc.numero_pb}
 ━━━━━━━━━━━━━━━━
-
 `;
 
     itensResult.rows.forEach(item => {
@@ -694,7 +686,6 @@ async function editarItensOrcamento(sock, userId, groupId, idOrcamento) {
     });
 
     mensagem += `━━━━━━━━━━━━━━━━
-
 *OPÇÕES:*
 
 ✏️ *1, 2, 3...* - Editar item
@@ -771,7 +762,6 @@ Digite novamente:`;
 ━━━━━━━━━━━━━━━━
 💰 *VALOR DO ITEM*
 ━━━━━━━━━━━━━━━━
-
 Digite o valor (R$) ou "pular":
 
 💡 Formatos aceitos:
@@ -901,13 +891,11 @@ async function iniciarEdicaoItemBanco(sock, userId, groupId, estado, numeroItem)
 
   const mensagem = `✏️ *EDITAR ITEM #${numeroItem}*
 ━━━━━━━━━━━━━━━━
-
 *Atual:*
 📦 ${item.descricao}
 💰 ${formatarMoeda(item.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 *OPÇÕES:*
 
 1️⃣ Editar descrição
@@ -944,7 +932,6 @@ Item #${item.ordem}
 ${item.descricao}
 
 ━━━━━━━━━━━━━━━━
-
 Digite a nova descrição:
 
 💡 Exemplo: Troca de óleo do motor
@@ -969,7 +956,6 @@ ${item.descricao}
 ${formatarMoeda(item.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 Digite o novo valor:
 
 💡 Formatos aceitos:
@@ -1168,7 +1154,6 @@ async function confirmarExclusaoItem(sock, userId, groupId, estado, numeroItem) 
 
   const mensagem = `⚠️ *CONFIRMAR EXCLUSÃO*
 ━━━━━━━━━━━━━━━━
-
 Deseja realmente excluir este item?
 
 📦 Item #${numeroItem}
@@ -1176,7 +1161,6 @@ ${item.descricao}
 💰 ${formatarMoeda(item.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 1️⃣ ✅ SIM - Excluir
 0️⃣ ❌ NÃO - Cancelar
 
@@ -1307,7 +1291,6 @@ Taxa de Gestão (${taxaGestaoPerc}%).......... ${formatarMoeda(taxaGestaoValor)}
 *TOTAL......................... ${formatarMoeda(total)}*
 
 ━━━━━━━━━━━━━━━━
-
 1️⃣ ✅ Confirmar e criar orçamento
 2️⃣ ✏️ Voltar para editar itens
 3️⃣ 🗑️ Cancelar tudo
@@ -1444,7 +1427,6 @@ async function criarOrcamentoBanco(sock, userId, groupId) {
 💰 Valor Total: ${formatarMoeda(orcamento.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 O orçamento foi salvo.
 
 1️⃣ Entrar no detalhe
@@ -1616,7 +1598,6 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
     let mensagem = `━━━━━━━━━━━━━━━━
 📋 *ORÇAMENTOS ABERTOS*
 ━━━━━━━━━━━━━━━━
-
 Total: ${result.rows.length} orçamento(s)
 
 `;
@@ -1656,7 +1637,6 @@ async function perguntarDiasFechados(sock, userId, groupId) {
   const mensagem = `━━━━━━━━━━━━━━━━
 📅 *PERÍODO DE CONSULTA*
 ━━━━━━━━━━━━━━━━
-
 Quantos dias para trás?
 
 1️⃣ Últimos 7 dias
@@ -1799,7 +1779,6 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
     let mensagem = `━━━━━━━━━━━━━━━━
 🚤 *ORÇAMENTOS POR EMBARCAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 Selecione a embarcação:
 
 `;
@@ -1866,7 +1845,6 @@ async function listarOrcamentosPorEmbarcacao(sock, userId, groupId, idEmbarcacao
     let mensagem = `━━━━━━━━━━━━━━━━
 🚤 *${numeroPb} - ${nomeEmbarcacao}*
 ━━━━━━━━━━━━━━━━
-
 Total: ${result.rows.length} orçamento(s)
 
 `;
@@ -1951,7 +1929,6 @@ async function listarPendentesAprovacao(sock, userId, groupId) {
     let mensagem = `━━━━━━━━━━━━━━━━
 ⏰ *PENDENTES DE APROVAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 Total: ${result.rows.length} orçamento(s)
 ⚠️ Ordenado por mais antigo
 
@@ -2049,7 +2026,6 @@ async function listarPendentesCobranca(sock, userId, groupId) {
     let mensagem = `━━━━━━━━━━━━━━━━
 💵 *PENDENTES DE COBRANÇA*
 ━━━━━━━━━━━━━━━━
-
 📊 Total aprovados: ${result.rows.length}
 ✅ Já cobrados: ${result.rows.length - pendentes.length}
 ⏳ Pendentes: ${pendentes.length}
@@ -2122,7 +2098,6 @@ async function mostrarMenuHistorico(sock, userId, groupId, idOrcamento) {
 📝 ${orc.titulo || '(sem título)'}
 🚤 ${orc.numero_pb}
 ━━━━━━━━━━━━━━━━
-
 *OPÇÕES:*
 
 1️⃣ 📜 Ver LOG (histórico)
@@ -2157,7 +2132,6 @@ async function mostrarHistoricoOrcamento(sock, userId, groupId, idOrcamento) {
     const mensagem = `━━━━━━━━━━━━━━━━
 📜 *LOG (HISTÓRICO)*
 ━━━━━━━━━━━━━━━━
-
 ${logs}
 
 ━━━━━━━━━━━━━━━━
@@ -2186,7 +2160,6 @@ async function iniciarInsercaoAnexo(sock, userId, groupId, estado) {
   await sock.sendMessage(groupId, {
     text: `📎 *INSERIR ANEXO*
 ━━━━━━━━━━━━━━━━
-
 Envie o arquivo que deseja anexar ao orçamento:
 
 📷 Foto
@@ -2289,7 +2262,6 @@ async function processarAnexoOrcamento(sock, userId, groupId, mensagem) {
 async function solicitarNomeAnexo(sock, userId, groupId, estado) {
   const mensagem = `📎 *NOME DO ANEXO*
 ━━━━━━━━━━━━━━━━
-
 Digite um nome amigável para este anexo:
 
 💡 Exemplo: "Orçamento fornecedor XYZ", "Foto do problema"
@@ -2302,7 +2274,6 @@ Digite um nome amigável para este anexo:
 async function solicitarVisibilidadeAnexo(sock, userId, groupId, estado, nomeAnexo) {
   const mensagem = `👁️ *VISIBILIDADE DO ANEXO*
 ━━━━━━━━━━━━━━━━
-
 📎 ${nomeAnexo}
 
 Este anexo será visível para o cliente?
@@ -2458,7 +2429,6 @@ async function listarAnexosOrcamento(sock, userId, groupId, idOrcamento) {
       await sock.sendMessage(groupId, {
         text: `📂 *ANEXOS*
 ━━━━━━━━━━━━━━━━
-
 ⚠️ Nenhum anexo encontrado.
 
 ━━━━━━━━━━━━━━━━
@@ -2477,7 +2447,6 @@ Digite 0 para voltar.`
 🆔 Orçamento: #${idOrcamento}
 📎 Total: ${result.rows.length}
 ━━━━━━━━━━━━━━━━
-
 `;
 
     result.rows.forEach((anexo, index) => {
@@ -2535,7 +2504,6 @@ ${visibilidade}
 📦 ${tamanhoKB} KB
 📅 ${data}
 ━━━━━━━━━━━━━━━━
-
 *OPÇÕES:*
 
 1️⃣ 📋 Copiar link
@@ -2745,7 +2713,6 @@ Digite 0 para voltar aos detalhes`
       });
 
       msgBloqueio += `━━━━━━━━━━━━━━━━
-
 ⚠️ *REGRA ASAAS:*
 Valor mínimo para cobrança é R$ 5,00
 
@@ -2829,7 +2796,6 @@ Valor mínimo para cobrança é R$ 5,00
 🚤 ${orc.numero_pb}
 💰 Total: ${formatarMoeda(valorTotal)}
 ━━━━━━━━━━━━━━━━
-
 *${tipoRateio} - ${statusTexto}:*
 
 `;
@@ -2908,7 +2874,6 @@ async function iniciarDistribuicaoManual(sock, userId, groupId, estado) {
   try {
     const mensagem = `📝 *DISTRIBUIÇÃO MANUAL*
 ━━━━━━━━━━━━━━━━
-
 💰 Valor total: ${formatarMoeda(estado.valor_total)}
 📊 Valor restante: ${formatarMoeda(estado.valor_total)}
 
@@ -3065,7 +3030,6 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
       // Completou!
       let mensagem = `📊 *RATEIO DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 💰 Total: ${formatarMoeda(estado.valor_total)}
 
 *MANUAL - NÃO REALIZADA:*
@@ -3135,7 +3099,6 @@ Digite um valor menor ou igual a ${formatarMoeda(valorRestante)}.`
 ✅ Distribuído: ${formatarMoeda(novoValorDistribuido)}
 ⏳ Falta: ${formatarMoeda(novoRestante)}
 ━━━━━━━━━━━━━━━━
-
 Digite o próximo código de cotista
 ou 0 para cancelar`;
 
@@ -3596,7 +3559,6 @@ ${detalhesValor}
   | Link:
   | ${cobranca.link}
 ━━━━━━━━━━━━━━━━
-
 🌐 Visualizar orçamento completo:
 🔗 ${urlOrcamento}`;
 
@@ -3717,13 +3679,11 @@ Este orçamento ainda não tem rateio definido!
     // Montar mensagem de confirmação
     let mensagem = `⚠️ *CONFIRMAR APROVAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${orc.numero}
 🚤 ${orc.numero_pb}
 💰 ${formatarMoeda(orc.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 `;
 
     if (ehProporcional) {
@@ -3764,7 +3724,6 @@ Este orçamento ainda não tem rateio definido!
 
     mensagem += `
 ━━━━━━━━━━━━━━━━
-
 ⚠️ *ATENÇÃO:*
 Após aprovação, NENHUM dado poderá ser alterado!
 
@@ -3865,7 +3824,6 @@ async function menuAlterarStatus(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `🔄 *ALTERAR STATUS*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📊 Status atual: ${orc.status}
 
@@ -3907,7 +3865,6 @@ async function solicitarMotivoRecusa(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `❌ *RECUSAR ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📊 Status atual: ${orc.status}
 
@@ -3943,7 +3900,6 @@ async function solicitarMotivoCancelamento(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `🚫 *CANCELAR ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📊 Status atual: ${orc.status}
 
@@ -4016,7 +3972,6 @@ async function confirmarRecusa(sock, userId, groupId, idOrcamento, motivo) {
     await sock.sendMessage(groupId, {
       text: `⚠️ *CONFIRMAR RECUSA*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📊 Status: ${orc.status} → ❌ RECUSADO
 
@@ -4099,7 +4054,6 @@ async function confirmarCancelamento(sock, userId, groupId, idOrcamento, motivo)
     await sock.sendMessage(groupId, {
       text: `⚠️ *CONFIRMAR CANCELAMENTO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📊 Status: ${orc.status} → 🚫 CANCELADO
 
@@ -4185,7 +4139,6 @@ Digite 0 para voltar aos detalhes`
     // Mostrar percentual atual e pedir novo
     const mensagem = `⚙️ *ALTERAR % DE GESTÃO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${orc.numero}
 📝 ${orc.descricao}
 
@@ -4197,7 +4150,6 @@ Taxa gestão: *${orc.taxa_servico_perc}%* (${formatarMoeda(orc.taxa_servico_valo
 Total: ${formatarMoeda(orc.valor_total)}
 
 ━━━━━━━━━━━━━━━━
-
 Digite o novo percentual (ex: 15, 20, 25)
 ou 0 para cancelar:`;
 
@@ -4393,13 +4345,11 @@ async function gerarLinkVisualizacao(sock, userId, groupId, idOrcamento) {
 🚤 ${orc.numero_pb} - ${orc.nome_embarcacao}
 
 ━━━━━━━━━━━━━━━━
-
 *Link para visualização:*
 
 ${url}
 
 ━━━━━━━━━━━━━━━━
-
 ✅ Link válido e seguro
 📱 Funciona em qualquer dispositivo
 👁️ Mostra apenas informações públicas
@@ -4604,7 +4554,6 @@ Subtotal: ${formatarMoeda(orc.subtotal)}
 Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor)}
 *TOTAL: ${formatarMoeda(orc.valor_total)}*
 ━━━━━━━━━━━━━━━━
-
 *OPÇÕES:*
 
 1️⃣ 📋 Acessar HISTÓRICO
@@ -4672,7 +4621,6 @@ async function alterarDescricaoOrcamento(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `📝 *ALTERAR*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 1️⃣ 📌 Descrição atual:
@@ -4713,7 +4661,6 @@ async function iniciarAlteracaoDescricao(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `📝 *ALTERAR DESCRIÇÃO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📌 *Descrição atual:*
@@ -4749,7 +4696,6 @@ async function iniciarAlteracaoObservacao(sock, userId, groupId, idOrcamento) {
     await sock.sendMessage(groupId, {
       text: `📝 *ALTERAR OBSERVAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📌 *Observação atual:*
@@ -4792,11 +4738,9 @@ async function mostrarOpcoesLink(sock, userId, groupId, idOrcamento) {
 📋 ${orc.numero}
 
 ━━━━━━━━━━━━━━━━
-
 ${url}
 
 ━━━━━━━━━━━━━━━━
-
 *Opções:*
 
 1️⃣ Copiar resumo do orçamento
@@ -4843,7 +4787,6 @@ async function copiarLinkOrcamento(sock, userId, groupId, idOrcamento) {
     const mensagem = `━━━━━━━━━━━━━━━━
 🔔 ORÇAMENTO
 ━━━━━━━━━━━━━━━━
-
 🚤 Embarcação: ${orc.nome_embarcacao}
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
@@ -4851,7 +4794,6 @@ async function copiarLinkOrcamento(sock, userId, groupId, idOrcamento) {
 ${orc.descricao}
 
 ━━━━━━━━━━━━━━━━
-
 🌐 Visualizar orçamento completo:
 🔗 ${url}
 
@@ -4863,11 +4805,9 @@ ${orc.descricao}
 Segue abaixo o resumo do orçamento para você copiar/encaminhar:
 
 ━━━━━━━━━━━━━━━━
-
 ${mensagem}
 
 ━━━━━━━━━━━━━━━━
-
 ✅ Use "encaminhar" ou copie manualmente o texto acima
 
 Digite 0 para voltar aos detalhes`
@@ -5349,7 +5289,6 @@ async function mostrarResumoCobranca(sock, userId, groupId, idOrcamento) {
 
     let mensagem = `💰 *RESUMO DA COBRANÇA*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📋 ${orc.descricao}
 
@@ -5408,7 +5347,6 @@ async function mostrarMenuParcelamento(sock, userId, groupId) {
     await sock.sendMessage(groupId, {
       text: `📊 *PARCELAMENTO*
 ━━━━━━━━━━━━━━━━
-
 ❌ *PARCELAMENTO NÃO DISPONÍVEL*
 
 Valores por cotista:
@@ -5432,7 +5370,6 @@ habilitar parcelamento: ${formatarMoeda(valorMinimoTotal)}
 
   let mensagem = `📊 *PARCELAMENTO*
 ━━━━━━━━━━━━━━━━
-
 Valores por cotista:
 ${estado.rateio.map(r => `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}`).join('\n')}
 
@@ -5475,7 +5412,6 @@ async function pedirDataVencimento(sock, userId, groupId) {
   await sock.sendMessage(groupId, {
     text: `📅 *ALTERAR DATA DE VENCIMENTO*
 ━━━━━━━━━━━━━━━━
-
 Digite a data da primeira parcela:
 
 📌 *Formato:* DD/MM/AAAA
@@ -5522,7 +5458,6 @@ async function mostrarResumoFinalCobranca(sock, userId, groupId) {
 
     let mensagem = `🧪 *SIMULAÇÃO DE COBRANÇA*
 ━━━━━━━━━━━━━━━━
-
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 📋 ${orc.descricao}
 
@@ -6195,17 +6130,14 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       await sock.sendMessage(groupId, {
         text: `📝 *CONFIRMAR ALTERAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 📌 *DESCRIÇÃO ANTIGA:*
 ${descricaoAtual || '(vazia)'}
 
 ━━━━━━━━━━━━━━━━
-
 ✨ *DESCRIÇÃO NOVA:*
 ${texto}
 
 ━━━━━━━━━━━━━━━━
-
 1️⃣ ✅ Confirmar alteração
 0️⃣ ❌ Cancelar`
       });
@@ -6286,17 +6218,14 @@ Voltando ao menu...`
       await sock.sendMessage(groupId, {
         text: `📝 *CONFIRMAR ALTERAÇÃO*
 ━━━━━━━━━━━━━━━━
-
 📌 *OBSERVAÇÃO ANTIGA:*
 ${observacaoAtual || '(vazia)'}
 
 ━━━━━━━━━━━━━━━━
-
 ✨ *OBSERVAÇÃO NOVA:*
 ${texto}
 
 ━━━━━━━━━━━━━━━━
-
 1️⃣ ✅ Confirmar alteração
 0️⃣ ❌ Cancelar`
       });
