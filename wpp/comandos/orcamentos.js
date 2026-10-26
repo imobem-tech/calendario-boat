@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260629
+// wpp/comandos/orcamentos.js — V.2610260638
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1636,6 +1636,7 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
     console.log('🚤 [ORCAMENTOS] Listando embarcações para consulta...');
 
     // Buscar embarcações com contagem de orçamentos NÃO ENCERRADOS
+    // IMPORTANTE: id_embarcacao em orcamento_servico é Num_PB, NÃO Código!
     const result = await pool.query(`
       SELECT
         e."Código" as codigo,
@@ -1643,7 +1644,7 @@ async function listarEmbarcacoesParaConsulta(sock, userId, groupId) {
         e."Nome_Embar" as nome,
         COUNT(os.id_orcamento) as total_orcamentos
       FROM "P_BOAT_1_Embarcacao" e
-      LEFT JOIN "orcamento_servico" os ON os.id_embarcacao = e."Código"
+      LEFT JOIN "orcamento_servico" os ON os.id_embarcacao = e."Num_PB"
         AND os.id_grupo = 1
         AND (
           os.status IN ('RASCUNHO', 'ENVIADO')
