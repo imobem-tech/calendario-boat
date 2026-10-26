@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260644
+// wpp/comandos/orcamentos.js — V.2610260658
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2508,7 +2508,7 @@ Digite 0 para voltar aos detalhes`
         ON e."Num_PB" = a."Cod_Embarcacao"
       LEFT JOIN "Cliente" c
         ON c."Codigo" = a."Cod_Pessoa"
-      WHERE e."Código" = $1
+      WHERE e."Num_PB" = $1
         AND e."Cod_Cliente" = $2
         AND a."Dt_Desautorizacao" IS NULL
         AND a."Dt_Cancelamento" IS NULL
