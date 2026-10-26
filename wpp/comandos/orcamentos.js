@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261746
+// wpp/comandos/orcamentos.js — V.2610261823
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -3164,11 +3164,18 @@ async function executarGeracaoCobrancasAsaas(sock, userId, groupId, idOrcamento)
     // Configurações fixas
     const EMPRESA = 8; // ALLMAX
     const CENTRO_CUSTO = 8;
-    const DIAS_VENCIMENTO = 30;
     const VALOR_MINIMO_ASAAS = 5.00;
     const VALOR_CUSTO_BOLETO = 5.00;
     const LIMITE_ISENCAO_BOLETO = 50.00;
-    const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
+    const DIAS_ENTRE_PARCELAS = 30; // Intervalo entre parcelas
+
+    // ✅ PEGAR DO ESTADO (data e parcelas escolhidas pelo usuário)
+    const estado = obterEstado(userId);
+    const dataVencimentoPrimeiraParcela = estado?.data_vencimento || new Date(Date.now() + DIAS_VENCIMENTO_PADRAO * 24 * 60 * 60 * 1000);
+    const numParcelas = estado?.num_parcelas || 1;
+
+    console.log(`📅 Data 1ª parcela: ${dataVencimentoPrimeiraParcela.toLocaleDateString('pt-BR')}`);
+    console.log(`📊 Número de parcelas: ${numParcelas}x`);
 
     const urlOrcamento = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
     const cobrancasGeradas = [];
@@ -3224,44 +3231,80 @@ Digite 0 para voltar aos detalhes`;
 
     console.log(`\n✅ Todos os valores ≥ R$ 5,00 - Prosseguindo...\n`);
 
-    // GERAÇÃO DE COBRANÇAS
+    // GERAÇÃO DE COBRANÇAS (COM PARCELAMENTO)
     for (const rateio of rateioResult.rows) {
       try {
         const valorOriginal = parseFloat(rateio.valor_cotista);
-        let valorFinal = valorOriginal;
-        let custoBoleto = 0;
+        const podeParcelar = valorOriginal >= PARCELA_MINIMA_INDIVIDUAL;
 
-        if (valorOriginal >= VALOR_MINIMO_ASAAS && valorOriginal < LIMITE_ISENCAO_BOLETO) {
-          custoBoleto = VALOR_CUSTO_BOLETO;
-          valorFinal = valorOriginal + custoBoleto;
-          console.log(`\n💳 ${rateio.grupo_letra}: R$ ${valorOriginal.toFixed(2)} + R$ ${custoBoleto.toFixed(2)} = R$ ${valorFinal.toFixed(2)}`);
-          valoresComCusto.push({ grupo: rateio.grupo_letra, valor_original: valorOriginal, custo_boleto: custoBoleto, valor_final: valorFinal });
-        } else {
-          console.log(`\n💳 ${rateio.grupo_letra}: R$ ${valorOriginal.toFixed(2)} (sem custo adicional)`);
+        // Determinar quantas parcelas ESTE cotista vai ter
+        let parcelasDesteCotista = 1; // Padrão: à vista
+
+        if (podeParcelar && numParcelas > 1) {
+          const valorParcela = valorOriginal / numParcelas;
+          if (valorParcela >= PARCELA_MINIMA_INDIVIDUAL) {
+            parcelasDesteCotista = numParcelas; // Pode parcelar
+          }
         }
 
-        const descricaoCR = `${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)} ${orc.descricao}`;
+        console.log(`\n💳 ${rateio.grupo_letra}: R$ ${valorOriginal.toFixed(2)} → ${parcelasDesteCotista}x`);
 
-        const resultado = await gerarCobrancaCompleta(pool, EMPRESA, rateio.cod_pessoa, {
-          valor: valorFinal,
-          descricao: descricaoCR,
-          vencimento: dataVencimento,
-          centroCusto: String(CENTRO_CUSTO)
-        });
+        // CRIAR UMA COBRANÇA POR PARCELA
+        for (let numParcela = 1; numParcela <= parcelasDesteCotista; numParcela++) {
+          const valorParcela = valorOriginal / parcelasDesteCotista;
+          let valorFinal = valorParcela;
+          let custoBoleto = 0;
 
-        console.log(`   ✅ Cobrança gerada! CR: ${resultado.codigo} | Payment: ${resultado.paymentId}`);
+          // Custo de boleto (se < R$ 50)
+          if (valorParcela >= VALOR_MINIMO_ASAAS && valorParcela < LIMITE_ISENCAO_BOLETO) {
+            custoBoleto = VALOR_CUSTO_BOLETO;
+            valorFinal = valorParcela + custoBoleto;
 
-        cobrancasGeradas.push({
-          grupo_letra: rateio.grupo_letra,
-          cod_pessoa: rateio.cod_pessoa,
-          valor_original: valorOriginal,
-          custo_boleto: custoBoleto,
-          valor_final: valorFinal,
-          codigo_cr: resultado.codigo,
-          payment_id: resultado.paymentId,
-          link: resultado.linkBoleto,
-          linha_digitavel: resultado.linhaDigitavel
-        });
+            if (numParcela === 1) {
+              console.log(`   💵 Custo boleto: +R$ ${custoBoleto.toFixed(2)} por parcela`);
+              valoresComCusto.push({
+                grupo: rateio.grupo_letra,
+                valor_original: valorParcela,
+                custo_boleto: custoBoleto,
+                valor_final: valorFinal
+              });
+            }
+          }
+
+          // Calcular data de vencimento desta parcela
+          const diasAdicionar = (numParcela - 1) * DIAS_ENTRE_PARCELAS;
+          const dataVencimentoParcela = new Date(dataVencimentoPrimeiraParcela);
+          dataVencimentoParcela.setDate(dataVencimentoParcela.getDate() + diasAdicionar);
+
+          const sufixoParcela = parcelasDesteCotista > 1 ? ` ${numParcela}/${parcelasDesteCotista}` : '';
+          const descricaoCR = `${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)} ${orc.descricao}${sufixoParcela}`;
+
+          console.log(`   📅 Parcela ${numParcela}/${parcelasDesteCotista}: R$ ${valorFinal.toFixed(2)} - Venc: ${dataVencimentoParcela.toLocaleDateString('pt-BR')}`);
+
+          const resultado = await gerarCobrancaCompleta(pool, EMPRESA, rateio.cod_pessoa, {
+            valor: valorFinal,
+            descricao: descricaoCR,
+            vencimento: dataVencimentoParcela,
+            centroCusto: String(CENTRO_CUSTO)
+          });
+
+          console.log(`      ✅ CR: ${resultado.codigo} | Payment: ${resultado.paymentId}`);
+
+          cobrancasGeradas.push({
+            grupo_letra: rateio.grupo_letra,
+            cod_pessoa: rateio.cod_pessoa,
+            parcela: numParcela,
+            total_parcelas: parcelasDesteCotista,
+            valor_original: valorParcela,
+            custo_boleto: custoBoleto,
+            valor_final: valorFinal,
+            data_vencimento: dataVencimentoParcela,
+            codigo_cr: resultado.codigo,
+            payment_id: resultado.paymentId,
+            link: resultado.linkBoleto,
+            linha_digitavel: resultado.linhaDigitavel
+          });
+        }
 
       } catch (error) {
         console.log(`   ❌ ERRO: ${error.message}`);
@@ -3316,7 +3359,8 @@ Digite 0 para voltar aos detalhes`
         continue;
       }
 
-      const dataVencFormat = dataVencimento.toLocaleDateString('pt-BR');
+      const dataVencFormat = cobranca.data_vencimento.toLocaleDateString('pt-BR');
+      const sufixoParcela = cobranca.total_parcelas > 1 ? ` - Parcela ${cobranca.parcela}/${cobranca.total_parcelas}` : '';
 
       let detalhesValor = '';
       if (cobranca.custo_boleto > 0) {
@@ -3327,7 +3371,7 @@ Digite 0 para voltar aos detalhes`
         detalhesValor = `  | *VALOR: ${formatarMoeda(cobranca.valor_final)}*`;
       }
 
-      const mensagem = `💰 *COBRANÇA GERADA*
+      const mensagem = `💰 *COBRANÇA GERADA${sufixoParcela}*
 
 *ORÇAMENTO ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}*
 ${orc.descricao}
