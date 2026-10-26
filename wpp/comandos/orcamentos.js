@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261704
+// wpp/comandos/orcamentos.js — V.2610261723
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -5605,33 +5605,63 @@ ${orc.descricao}
 // ============================================================
 
 // Calcular quais opções de parcelamento são válidas
+// ✅ LÓGICA INDIVIDUAL: cada cotista parcela INDIVIDUALMENTE
 function calcularOpcoesParcelamento(rateio) {
   const opcoesValidas = [];
 
+  // Identificar quais cotistas PODEM parcelar (>= R$ 500)
+  const cotistasQuePodemParcelar = rateio.filter(c => parseFloat(c.valor_cotista) >= PARCELA_MINIMA_INDIVIDUAL);
+  const cotistasAVista = rateio.filter(c => parseFloat(c.valor_cotista) < PARCELA_MINIMA_INDIVIDUAL);
+
+  // Se NENHUM cotista pode parcelar, retorna vazio
+  if (cotistasQuePodemParcelar.length === 0) {
+    return [];
+  }
+
+  // Para cada opção de parcelas (1x a 6x)
   for (let numParcelas = 1; numParcelas <= MAX_PARCELAS; numParcelas++) {
-    let todosPassam = true;
     const detalhes = [];
+    let alguemPassou = false;
 
     for (const cotista of rateio) {
       const valorCotista = parseFloat(cotista.valor_cotista);
-      const valorParcela = valorCotista / numParcelas;
+      const podeParcelar = valorCotista >= PARCELA_MINIMA_INDIVIDUAL;
 
-      detalhes.push({
-        grupo: cotista.grupo_letra,
-        valorTotal: valorCotista,
-        valorParcela: valorParcela,
-        passou: valorParcela >= PARCELA_MINIMA_INDIVIDUAL
-      });
+      if (podeParcelar) {
+        const valorParcela = valorCotista / numParcelas;
+        const parcelaValida = valorParcela >= PARCELA_MINIMA_INDIVIDUAL;
 
-      if (valorParcela < PARCELA_MINIMA_INDIVIDUAL) {
-        todosPassam = false;
+        detalhes.push({
+          grupo: cotista.grupo_letra,
+          valorTotal: valorCotista,
+          valorParcela: valorParcela,
+          passou: parcelaValida,
+          podeParcelar: true
+        });
+
+        if (parcelaValida) {
+          alguemPassou = true;
+        }
+      } else {
+        // Cotista vai à vista (< R$ 500)
+        detalhes.push({
+          grupo: cotista.grupo_letra,
+          valorTotal: valorCotista,
+          valorParcela: valorCotista,
+          passou: false,
+          podeParcelar: false,
+          avistaObrigatorio: true
+        });
       }
     }
 
-    if (todosPassam) {
+    // Adiciona opção se PELO MENOS UM cotista pode parcelar nessa quantidade
+    if (alguemPassou) {
       opcoesValidas.push({
         numParcelas: numParcelas,
-        detalhes: detalhes
+        detalhes: detalhes,
+        cotistasQueParcelam: detalhes.filter(d => d.passou).length,
+        cotistasAVista: cotistasAVista.length
       });
     }
   }
@@ -5721,8 +5751,7 @@ async function mostrarMenuParcelamento(sock, userId, groupId) {
   const opcoesValidas = calcularOpcoesParcelamento(estado.rateio);
 
   if (opcoesValidas.length === 0) {
-    const valorMinimoTotal = estado.rateio.length * PARCELA_MINIMA_INDIVIDUAL;
-
+    // NENHUM cotista pode parcelar
     await sock.sendMessage(groupId, {
       text: `📊 *PARCELAMENTO*
 ━━━━━━━━━━━━━━━━
@@ -5732,42 +5761,67 @@ Valores por cotista:
 ${estado.rateio.map(r => `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}`).join('\n')}
 
 ━━━━━━━━━━━━━━━━
-⚠️ *Parcela mínima:* R$ 500,00 por cotista
+⚠️ *Parcela mínima:* R$ 500,00
 
 Nenhum cotista atinge o valor mínimo
 de R$ 500,00 para parcelamento.
 
-💡 *Valor mínimo do orçamento* para
-habilitar parcelamento: ${formatarMoeda(valorMinimoTotal)}
-(${estado.rateio.length} cotista(s) × R$ 500,00)
+Todos pagarão à vista.
 
 ━━━━━━━━━━━━━━━━
-Voltando ao resumo...`
+0️⃣ 🔙 Voltar ao resumo
+
+Digite 0 para voltar:`
     });
 
-    // Voltar automaticamente ao resumo
-    await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+    // SEM redirecionamento automático!
+    atualizarEstado(userId, {
+      ...estado,
+      etapa: 'SEM_PARCELAMENTO'
+    });
     return;
   }
+
+  // Identificar cotistas que vão à vista
+  const cotistasAVista = estado.rateio.filter(c => parseFloat(c.valor_cotista) < PARCELA_MINIMA_INDIVIDUAL);
+  const cotistasQuePodemParcelar = estado.rateio.filter(c => parseFloat(c.valor_cotista) >= PARCELA_MINIMA_INDIVIDUAL);
 
   let mensagem = `📊 *PARCELAMENTO*
 ━━━━━━━━━━━━━━━━
 Valores por cotista:
-${estado.rateio.map(r => `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}`).join('\n')}
+${estado.rateio.map(r => {
+    const valor = parseFloat(r.valor_cotista);
+    const podeParcelar = valor >= PARCELA_MINIMA_INDIVIDUAL;
+    return `• ${r.grupo_letra}: ${formatarMoeda(valor)}${podeParcelar ? '' : ' ⚠️'}`;
+  }).join('\n')}
+`;
 
+  // Se tem cotista que vai à vista obrigatoriamente
+  if (cotistasAVista.length > 0) {
+    mensagem += `\n⚠️ *Atenção:*
+${cotistasAVista.map(c => `• ${c.grupo_letra} pagará À VISTA (< R$ 500)`).join('\n')}
+`;
+  }
+
+  mensagem += `
 ━━━━━━━━━━━━━━━━
 *Escolha o número de parcelas:*
+${cotistasQuePodemParcelar.length > 0 ? `(Para quem pode parcelar)` : ''}
 
 `;
 
   opcoesValidas.forEach((opcao) => {
     const numParcelas = opcao.numParcelas;
-    const exemploValor = opcao.detalhes[0].valorParcela;
 
     if (numParcelas === 1) {
-      mensagem += `1️⃣ À VISTA - ${formatarMoeda(exemploValor)}\n`;
+      mensagem += `1️⃣ À VISTA\n`;
     } else {
-      mensagem += `${numParcelas}️⃣ ${numParcelas}x de ${formatarMoeda(exemploValor)}\n`;
+      // Mostrar apenas as parcelas de quem PODE parcelar
+      const detalheQueParcelam = opcao.detalhes.filter(d => d.passou);
+      if (detalheQueParcelam.length > 0) {
+        const exemploValor = detalheQueParcelam[0].valorParcela;
+        mensagem += `${numParcelas}️⃣ ${numParcelas}x de ~${formatarMoeda(exemploValor)}\n`;
+      }
     }
   });
 
@@ -6182,6 +6236,19 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
           text: '❌ Opção inválida!\n\nDigite:\n1 - À vista\n2 - Alterar data\n3 - Parcelar\n0 - Voltar'
         });
     }
+    return;
+  }
+
+  if (estado.etapa === 'SEM_PARCELAMENTO') {
+    // Sem parcelamento disponível - só pode voltar
+    if (texto === '0') {
+      await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    await sock.sendMessage(groupId, {
+      text: '❌ Nenhum cotista pode parcelar.\n\nDigite 0 para voltar ao resumo.'
+    });
     return;
   }
 
