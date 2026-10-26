@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261457
+// wpp/comandos/orcamentos.js — V.2610261504
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -221,7 +221,7 @@ export async function mostrarMenuOrcamentos(sock, userId, groupId) {
 Escolha uma opção:
 
 1️⃣ ➕ Criar Novo Orçamento
-2️⃣ 📋 Consultar Orç. Abertos (${qtdAbertos})
+2️⃣ 📋 Consultar Orç. Rascunho (${qtdAbertos})
 3️⃣ ✅ Consultar Orç. Fechados
 4️⃣ 🚤 Orç. por Embarcação (${qtdPorEmb})
 5️⃣ ⏰ Pendentes Aprovação (${qtdPendAprov})
@@ -246,7 +246,7 @@ Digite o número da opção:`;
 Escolha uma opção:
 
 1️⃣ ➕ Criar Novo Orçamento
-2️⃣ 📋 Consultar Orç. Abertos
+2️⃣ 📋 Consultar Orç. Rascunho
 3️⃣ ✅ Consultar Orç. Fechados
 4️⃣ 🚤 Orç. por Embarcação
 5️⃣ ⏰ Pendentes de Aprovação
