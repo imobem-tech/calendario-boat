@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260725
+// wpp/comandos/orcamentos.js — V.2610260730
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4093,7 +4093,7 @@ Este orçamento ainda não tem rateio definido!
     if (erros.length > 0) {
       mensagem += `\n⚠️ *AVISOS:*\n`;
       erros.forEach(g => {
-        mensagem += `❌ ${g.grupo_letra}: Sem WhatsApp cadastrado\n`;
+        mensagem += `❌ ${g.grupo_letra}: ${formatarMoeda(g.valor_grupo)} - Sem WhatsApp cadastrado\n`;
       });
     }
 
