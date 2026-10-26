@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261518
+// wpp/comandos/orcamentos.js — V.2610261527
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -1840,8 +1840,21 @@ async function listarOrcamentosPorEmbarcacao(sock, userId, groupId, idEmbarcacao
       WHERE os.id_embarcacao = $1
         AND os.id_grupo = 1
         AND (
-          os.status IN ('RASCUNHO', 'ENVIADO')
-          OR (os.status = 'APROVADO' AND (os.id_cobranca IS NULL OR os.id_cobranca = 0))
+          -- Abertos: RASCUNHO/ENVIADO sem rateio
+          (
+            os.status IN ('RASCUNHO', 'ENVIADO')
+            AND NOT EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
+          )
+          -- Pend. Aprovação: ENVIADO com rateio
+          OR (
+            os.status = 'ENVIADO'
+            AND EXISTS (SELECT 1 FROM orcamento_rateio r WHERE r.id_orcamento = os.id_orcamento)
+          )
+          -- Pend. Cobrança: APROVADO sem cobrança
+          OR (
+            os.status = 'APROVADO'
+            AND (os.id_cobranca IS NULL OR os.id_cobranca = 0)
+          )
         )
       ORDER BY os.data_orcamento DESC, os.id_orcamento DESC
     `, [idEmbarcacao]);
