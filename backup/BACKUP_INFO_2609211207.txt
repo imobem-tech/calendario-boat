@@ -1,0 +1,30 @@
+============================================================
+⚠️ BACKUP: 2609211207_extrato_bancario.html
+Data do backup: 21/09/2026 12:07
+Arquivo original: public/extrato_bancario.html — V.2609211152
+============================================================
+
+MOTIVO DO BACKUP:
+Corrigir erro de timezone/lógica no cálculo de saldo inicial
+
+PROBLEMA RESOLVIDO:
+- Quando saldo manual está DENTRO do período consultado, sistema estava
+  tentando buscar lançamentos "intermediários" com datas invertidas
+- Exemplo: Período 30/07-04/08, Saldo 31/07 → buscava 01/08 até 29/07 (ERRO!)
+- Resultado: Lançamentos de 30/07 e 31/07 ignorados, saldos negativos
+- Problema de timezone: data UTC 31/07T00:00Z = 30/07 21:00 BRT
+
+FUNÇÕES ALTERADAS:
+- carregarExtratos(): Adicionada verificação se saldo está ANTES ou DENTRO do período
+- Lógica dividida em 2 casos:
+  CASO 1: Saldo ANTES → buscar intermediários (21/07 até 29/07)
+  CASO 2: Saldo DENTRO → usar saldo manual diretamente sem buscar
+
+SOLUÇÃO:
+- Comparar data do saldo (YYYY-MM-DD) com primeira data do período
+- Se dataSaldo < primeiraData: calcular intermediários (como antes)
+- Se dataSaldo >= primeiraData: saldo calculado = saldo manual (sem busca)
+- Manipular datas como strings YYYY-MM-DD para evitar problemas de timezone
+- Evitar new Date() que converte para timezone local
+
+============================================================

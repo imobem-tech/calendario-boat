@@ -1,0 +1,860 @@
+<!-- V.2610260821 -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizar Orçamento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-50);
+            min-height: 100vh;
+            padding-bottom: 20px;
+        }
+
+        /* ============================================================
+           CABEÇALHO FIXO COM ANEXOS
+           ============================================================ */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .header-status.aprovado {
+            background: var(--success);
+        }
+
+        .header-status.rascunho {
+            background: var(--warning);
+        }
+
+        .header-status.cancelado {
+            background: var(--danger);
+        }
+
+        .header-info {
+            font-size: 13px;
+            opacity: 0.95;
+            margin-bottom: 10px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-header {
+            padding: 8px 16px;
+            border: 2px solid white;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-header:hover {
+            background: white;
+            color: var(--primary);
+        }
+
+        /* ============================================================
+           CONTAINER PRINCIPAL
+           ============================================================ */
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+
+        /* ============================================================
+           CARDS
+           ============================================================ */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--gray-200);
+            background: var(--gray-50);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* ============================================================
+           INFORMAÇÕES DO ORÇAMENTO
+           ============================================================ */
+        .info-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--gray-700);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 15px;
+            color: var(--gray-900);
+            font-weight: 500;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .info-value.large {
+            font-size: 24px;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        /* Links dentro de descrição */
+        .info-value a {
+            color: var(--primary);
+            text-decoration: underline;
+            word-break: break-all;
+            transition: color 0.2s;
+        }
+
+        .info-value a:hover {
+            color: var(--primary-dark);
+        }
+
+        /* ============================================================
+           LISTA DE ITENS
+           ============================================================ */
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .item {
+            padding: 15px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .item-numero {
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .item-descricao {
+            flex: 1;
+            padding: 0 12px;
+            font-size: 14px;
+            color: var(--gray-900);
+            line-height: 1.5;
+        }
+
+        .item-valor {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* ============================================================
+           RATEIO
+           ============================================================ */
+        .rateio-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .rateio-cotista {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rateio-nome {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .rateio-grupo {
+            font-size: 12px;
+            color: var(--gray-700);
+        }
+
+        .rateio-valores {
+            text-align: right;
+        }
+
+        .rateio-percentual {
+            font-size: 12px;
+            color: var(--gray-700);
+        }
+
+        .rateio-valor {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* ============================================================
+           TOTAIS
+           ============================================================ */
+        .totais {
+            background: var(--gray-50);
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid var(--gray-200);
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .total-row.final {
+            border-top: 2px solid var(--gray-300);
+            margin-top: 10px;
+            padding-top: 15px;
+        }
+
+        .total-label {
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        .total-label-right {
+            font-size: 14px;
+            color: var(--gray-700);
+            text-align: right;
+            width: 100%;
+            font-style: italic;
+        }
+
+        .total-label.final {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .total-valor {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .total-valor.final {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* ============================================================
+           MODAL DE ANEXOS
+           ============================================================ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: var(--gray-700);
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .anexo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            background: var(--gray-50);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s;
+        }
+
+        .anexo-item:hover {
+            background: var(--gray-100);
+            transform: translateX(4px);
+        }
+
+        .anexo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .anexo-info {
+            flex: 1;
+        }
+
+        .anexo-nome {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .anexo-meta {
+            font-size: 12px;
+            color: var(--gray-700);
+            margin-top: 2px;
+        }
+
+        /* ============================================================
+           ESTADOS
+           ============================================================ */
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray-700);
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--danger);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--gray-700);
+            font-size: 14px;
+        }
+
+        /* ============================================================
+           RESPONSIVO
+           ============================================================ */
+        @media (min-width: 640px) {
+            .info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .header-title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- CABEÇALHO FIXO -->
+    <div class="header" id="header">
+        <div class="header-top">
+            <div class="header-title" id="headerTitle">Carregando...</div>
+            <div class="header-status" id="headerStatus">...</div>
+        </div>
+        <div class="header-info" id="headerInfo">...</div>
+        <div class="header-actions" id="headerActions">
+            <button class="btn-header" onclick="abrirAnexos()">
+                📎 Anexos <span id="anexosCount">(0)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <div class="container" id="container">
+        <div class="loading">
+            <p>⏳ Carregando orçamento...</p>
+        </div>
+    </div>
+
+    <!-- MODAL DE ANEXOS -->
+    <div class="modal" id="modalAnexos">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">📎 Anexos</div>
+                <button class="modal-close" onclick="fecharAnexos()">&times;</button>
+            </div>
+            <div class="modal-body" id="listaAnexos">
+                <div class="empty">Nenhum anexo disponível</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // CONFIGURAÇÃO — V.2610241950
+        // ============================================================
+        const API_URL = window.location.origin;
+
+        // Obter token da URL
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+
+        let orcamento = null;
+        let anexos = [];
+
+        // ============================================================
+        // INICIALIZAÇÃO
+        // ============================================================
+        if (!token) {
+            mostrarErro('❌ Token não fornecido. Link inválido.');
+        } else {
+            carregarOrcamento();
+        }
+
+        // ============================================================
+        // CARREGAR ORÇAMENTO
+        // ============================================================
+        async function carregarOrcamento() {
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos/visualizar/${token}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Orçamento não encontrado');
+                }
+
+                orcamento = data.orcamento;
+                anexos = data.anexos || [];
+
+                renderizarOrcamento();
+                carregarAnexos();
+
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarErro(`❌ ${error.message}`);
+            }
+        }
+
+        // ============================================================
+        // FORMATAR NÚMERO DO ORÇAMENTO
+        // ============================================================
+        function formatarNumeroOrcamento(idOrcamento, numero) {
+            const idFormatado = String(idOrcamento).padStart(3, '0');
+            return `${idFormatado}${numero}`;
+        }
+
+        // ============================================================
+        // RENDERIZAR ORÇAMENTO
+        // ============================================================
+        function renderizarOrcamento() {
+            // Atualizar cabeçalho
+            document.getElementById('headerTitle').textContent = formatarNumeroOrcamento(orcamento.id_orcamento, orcamento.numero);
+            document.getElementById('headerStatus').textContent = orcamento.status;
+            document.getElementById('headerStatus').className = `header-status ${orcamento.status.toLowerCase()}`;
+            document.getElementById('headerInfo').textContent = `${orcamento.numero_pb} - ${orcamento.nome_embarcacao}`;
+
+            // Conteúdo
+            const html = `
+                <!-- INFORMAÇÕES GERAIS -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📋 Informações Gerais</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Orçamento</div>
+                                <div class="info-value">${formatarNumeroOrcamento(orcamento.id_orcamento, orcamento.numero)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Status</div>
+                                <div class="info-value">${orcamento.status}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Embarcação</div>
+                                <div class="info-value">${orcamento.numero_pb}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Nome</div>
+                                <div class="info-value">${orcamento.nome_embarcacao}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data</div>
+                                <div class="info-value">${formatarData(orcamento.data_orcamento)}</div>
+                            </div>
+                            ${orcamento.data_aprovacao ? `
+                            <div class="info-item">
+                                <div class="info-label">Aprovado em</div>
+                                <div class="info-value">${formatarData(orcamento.data_aprovacao)}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ${orcamento.descricao ? `
+                        <div class="info-item" style="margin-top: 15px;">
+                            <div class="info-label">Título/Descrição</div>
+                            <div class="info-value">${formatarDescricao(orcamento.descricao)}</div>
+                        </div>
+                        ` : ''}
+                        ${orcamento.observacao ? `
+                        <div class="info-item" style="margin-top: 15px;">
+                            <div class="info-label">Observações</div>
+                            <div class="info-value">${formatarDescricao(orcamento.observacao)}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- ITENS -->
+                ${orcamento.itens && orcamento.itens.length > 0 ? `
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📦 Itens do Orçamento</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="items-list">
+                            ${orcamento.itens.map(item => `
+                                <div class="item">
+                                    <div class="item-header">
+                                        <div class="item-numero">${item.ordem}</div>
+                                        <div class="item-descricao">${item.descricao}</div>
+                                        <div class="item-valor">${formatarMoeda(item.valor_total)}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- TOTAIS -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">💰 Valores</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="totais">
+                            <div class="total-row">
+                                <div class="total-label">Subtotal Serviços</div>
+                                <div class="total-valor">${formatarMoeda(orcamento.valor_servicos)}</div>
+                            </div>
+                            <div class="total-row taxa-only">
+                                <div class="total-label-right">Taxa de Gestão (${orcamento.taxa_servico_perc}%)</div>
+                            </div>
+                            <div class="total-row final">
+                                <div class="total-label final">VALOR TOTAL</div>
+                                <div class="total-valor final">${formatarMoeda(orcamento.valor_total)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RATEIO -->
+                ${orcamento.rateio && orcamento.rateio.length > 0 ? `
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📊 Rateio entre Cotistas</div>
+                    </div>
+                    <div class="card-body">
+                        ${(() => {
+                            // Verificar se é rateio proporcional (todos valores iguais)
+                            const valores = orcamento.rateio.map(r => parseFloat(r.valor_cotista));
+                            const valorPrimeiro = valores[0];
+                            const isProporcional = valores.every(v => Math.abs(v - valorPrimeiro) < 0.01);
+
+                            if (isProporcional && orcamento.rateio.length > 1) {
+                                // Rateio proporcional: mostrar apenas uma linha resumida
+                                const totalCotistas = orcamento.rateio.reduce((sum, r) => sum + parseInt(r.qtd_cotas), 0);
+                                const primeiroItem = orcamento.rateio[0];
+                                return `
+                                    <div class="rateio-item" style="justify-content: center;">
+                                        <div class="rateio-valores">
+                                            <div style="text-align: center; margin-bottom: 8px; color: #666; font-size: 14px;">
+                                                Rateio Proporcional • ${totalCotistas} cotista(s)
+                                            </div>
+                                            <div class="rateio-percentual">${parseFloat(primeiroItem.percentual).toFixed(2)}%</div>
+                                            <div class="rateio-valor">${formatarMoeda(primeiroItem.valor_cotista)} <span style="font-size: 12px; color: #666;">por cotista</span></div>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                // Rateio manual: mostrar todos os cotistas
+                                return orcamento.rateio.map(r => `
+                                    <div class="rateio-item">
+                                        <div class="rateio-cotista">
+                                            <div class="rateio-grupo">${r.grupo_letra} • ${r.qtd_cotas} cota(s)</div>
+                                        </div>
+                                        <div class="rateio-valores">
+                                            <div class="rateio-percentual">${parseFloat(r.percentual).toFixed(2)}%</div>
+                                            <div class="rateio-valor">${formatarMoeda(r.valor_cotista)}</div>
+                                        </div>
+                                    </div>
+                                `).join('');
+                            }
+                        })()}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+
+            document.getElementById('container').innerHTML = html;
+        }
+
+        // ============================================================
+        // CARREGAR ANEXOS VISÍVEIS
+        // ============================================================
+        async function carregarAnexos() {
+            try {
+                const response = await fetch(`${API_URL}/api/orcamentos/visualizar/${token}/anexos`);
+                const data = await response.json();
+
+                if (data.success) {
+                    anexos = data.anexos || [];
+                    document.getElementById('anexosCount').textContent = `(${anexos.length})`;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar anexos:', error);
+            }
+        }
+
+        // ============================================================
+        // MODAL DE ANEXOS
+        // ============================================================
+        function abrirAnexos() {
+            const modal = document.getElementById('modalAnexos');
+            const lista = document.getElementById('listaAnexos');
+
+            if (anexos.length === 0) {
+                lista.innerHTML = '<div class="empty">Nenhum anexo disponível</div>';
+            } else {
+                lista.innerHTML = anexos.map(a => `
+                    <a href="${a.url}" target="_blank" class="anexo-item">
+                        <div class="anexo-icon">${getIconeAnexo(a.tipo_arquivo)}</div>
+                        <div class="anexo-info">
+                            <div class="anexo-nome">${a.nome_amigavel}</div>
+                            <div class="anexo-meta">${formatarTamanho(a.tamanho_bytes)} • ${formatarData(a.data_upload)}</div>
+                        </div>
+                    </a>
+                `).join('');
+            }
+
+            modal.classList.add('active');
+        }
+
+        function fecharAnexos() {
+            document.getElementById('modalAnexos').classList.remove('active');
+        }
+
+        // Fechar modal ao clicar fora
+        document.getElementById('modalAnexos').addEventListener('click', (e) => {
+            if (e.target.id === 'modalAnexos') {
+                fecharAnexos();
+            }
+        });
+
+        // ============================================================
+        // HELPERS
+        // ============================================================
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor);
+        }
+
+        function formatarData(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        function formatarTamanho(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function formatarDescricao(texto) {
+            if (!texto) return '';
+
+            // Escapa HTML primeiro (segurança)
+            const escapado = texto
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            // Converte URLs em links clicáveis
+            const comLinks = escapado.replace(
+                /(https?:\/\/[^\s]+)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; word-break: break-all;">$1</a>'
+            );
+
+            // Converte quebras de linha em <br>
+            const comQuebras = comLinks.replace(/\n/g, '<br>');
+
+            return comQuebras;
+        }
+
+        function getIconeAnexo(tipo) {
+            const icones = {
+                'FOTO': '🖼️',
+                'PDF': '📄',
+                'DOCUMENTO': '📝',
+                'OUTRO': '📎'
+            };
+            return icones[tipo] || '📎';
+        }
+
+        function mostrarErro(mensagem) {
+            document.getElementById('container').innerHTML = `
+                <div class="error">
+                    <p>${mensagem}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
+<!-- V.2610241950 -->

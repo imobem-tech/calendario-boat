@@ -1,0 +1,42 @@
+============================================================
+⚠️ BACKUP: 2609211402_extrato_bancario.html
+Data do backup: 21/09/2026 14:02
+Arquivo original: public/extrato_bancario.html — V.2609211231
+============================================================
+
+MOTIVO DO BACKUP:
+Implementar lógica completa de saldos manuais conforme solicitado pelo usuário
+
+PROBLEMA RESOLVIDO:
+- Sistema não tratava saldos manuais DENTRO do período
+- Linha de ajuste aparecia no dia do saldo, não como "saldo anterior"
+- Não havia reset quando havia saldo manual intermediário
+
+NOVA LÓGICA IMPLEMENTADA:
+
+1. SALDO ANTERIOR (cabeçalho):
+   - Buscar último saldo manual ANTES do período
+   - Calcular lançamentos intermediários até dia anterior ao período
+   - Mostrar no card roxo: "Saldo anterior DD/MM: X,XX"
+
+2. SALDOS MANUAIS DENTRO DO PERÍODO:
+   - Buscar TODOS os saldos manuais dentro do período consultado
+   - Inserir linha especial de RESET quando encontrar
+   - Formato: "⚙️ SALDO MANUAL DD/MM: X,XX"
+   - Após linha de reset, saldo reinicia desse valor
+
+3. EXEMPLOS:
+   - Período 30/07-04/08, saldo 29/07=100 → cabeçalho "Saldo anterior 29/07: 100"
+   - Saldo manual em 01/08=50 → linha reset no meio + recalcula de 50
+
+FUNÇÕES ALTERADAS:
+- carregarExtratos(): buscar múltiplos saldos manuais
+- Lógica de exibição: verificar saldo manual a cada linha
+- Card de saldo inicial: mostrar como "saldo anterior"
+
+SOLUÇÃO:
+- Array saldosManuaisPeriodo[] com todos os saldos dentro do período
+- Ao percorrer lançamentos, verificar se data === saldo manual
+- Se sim, inserir linha de reset e resetar saldoAcumulado
+
+============================================================

@@ -1,0 +1,166 @@
+// ============================================================
+// ⚠️ BACKUP: 2609141950_reclassificar-api.js
+// Data do backup: 14/09/2026 19:50
+// Arquivo original: wpp/routes/banco/reclassificar-api.js — V.2609141935
+// ============================================================
+//
+// MOTIVO DO BACKUP:
+// Melhorar estatísticas de reclassificação para serem mais informativas
+//
+// PROBLEMA RESOLVIDO:
+// - Estatísticas eram confusas (misturavam "sem texto" com "sem regra")
+// - Não mostrava claramente quantos foram classificados vs não classificados
+// - Campo "processados" não era claro se incluía ou não os com erro
+//
+// FUNÇÕES ALTERADAS:
+// - router.post('/'): Mudou stats de { processados, reclassificados, semRegra, erros }
+//                     para { analisados, semTexto, semRegra, classificados, naoClassificados, erros }
+// - Lógica de contagem: Separou "sem texto" de "sem regra"
+// - Adicionou contador "naoClassificados" (soma de semTexto + semRegra)
+//
+// SOLUÇÃO:
+// - analisados: total de registros tentados
+// - semTexto: não tinha observacoes nem descricao_original
+// - semRegra: tinha texto mas nenhuma palavra-chave bateu
+// - classificados: encontrou regra e aplicou com sucesso
+// - naoClassificados: total que não foi classificado (semTexto + semRegra)
+// - erros: exceções durante processamento
+//
+// Resultado: estatísticas mais claras e informativas
+//
+// ============================================================
+
+// ============================================================
+// reclassificar-api.js — V.2609141935
+// ENDPOINT PARA RECLASSIFICAR POR PALAVRAS-CHAVE
+// + Filtros: empresa (TODAS ou específica)
+// + Filtros: intervalo de datas (dataInicio/dataFim)
+// + Apenas não classificados (classificacao IS NULL OR = '')
+// ============================================================
+
+import express from 'express';
+import pkg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const router = express.Router();
+const { Pool } = pkg;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Classificar automaticamente
+async function classificarAutomaticamente(texto, empresa) {
+  if (!texto) return null;
+
+  const regras = await pool.query(`
+    SELECT id, nome_regra, classificacao, palavras_chave, prioridade
+    FROM bank_regras_classificacao
+    WHERE ativa = true
+      AND ativo = true
+      AND (empresa = $1 OR empresa IS NULL)
+    ORDER BY prioridade DESC, id ASC
+  `, [empresa]);
+
+  const textoLower = texto.toLowerCase();
+
+  for (const regra of regras.rows) {
+    if (!regra.palavras_chave) continue;
+
+    const palavras = regra.palavras_chave.split(',').map(p => p.trim().toLowerCase());
+
+    if (palavras.some(palavra => textoLower.includes(palavra))) {
+      return {
+        classificacao: regra.classificacao,
+        regra_nome: regra.nome_regra
+      };
+    }
+  }
+
+  return null;
+}
+
+// ENDPOINT POST /api/banco/reclassificar
+router.post('/', async (req, res) => {
+  try {
+    const { empresa = 'ALLMAX', dataInicio, dataFim } = req.query;
+
+    // Construir query dinamicamente
+    let query = `
+      SELECT id, empresa, descricao_original, observacoes, classificacao, status
+      FROM bank_extratos
+      WHERE banco = 'Asaas'
+        AND (classificacao IS NULL OR classificacao = '')
+    `;
+
+    const params = [];
+    let paramIndex = 1;
+
+    // Filtro de empresa
+    if (empresa && empresa !== 'TODAS') {
+      query += ` AND empresa = $${paramIndex}`;
+      params.push(empresa);
+      paramIndex++;
+    }
+
+    // Filtro de data
+    if (dataInicio && dataFim) {
+      query += ` AND data BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      params.push(dataInicio, dataFim);
+      paramIndex += 2;
+    }
+
+    query += ` ORDER BY data, id`;
+
+    // Buscar registros não classificados
+    const registros = await pool.query(query, params);
+
+    const stats = {
+      processados: 0,
+      reclassificados: 0,
+      semRegra: 0,
+      erros: 0
+    };
+
+    for (const reg of registros.rows) {
+      try {
+        stats.processados++;
+
+        const texto = reg.observacoes || reg.descricao_original;
+        if (!texto) {
+          stats.semRegra++;
+          continue;
+        }
+
+        const resultado = await classificarAutomaticamente(texto, reg.empresa);
+
+        if (!resultado) {
+          stats.semRegra++;
+          continue;
+        }
+
+        // Atualizar registro
+        await pool.query(`
+          UPDATE bank_extratos
+          SET classificacao = $1,
+              status = 'OK',
+              classificado_em = NOW()
+          WHERE id = $2
+        `, [resultado.classificacao, reg.id]);
+
+        stats.reclassificados++;
+
+      } catch (err) {
+        console.error(`Erro ao processar ID ${reg.id}:`, err);
+        stats.erros++;
+      }
+    }
+
+    res.json({ sucesso: true, stats });
+
+  } catch (err) {
+    console.error('Erro ao reclassificar:', err);
+    res.status(500).json({ sucesso: false, erro: err.message });
+  }
+});
+
+export default router;

@@ -1,8 +1,11 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261419
+// wpp/comandos/orcamentos.js — V.2610261441
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
-// NOVO: Sistema de parcelamento (até 6x, mín R$ 500/parcela/cotista)
+// NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
+// - Fluxo completo: resumo → escolha parcelas → data customizada → simulação
+// - Envia mensagens aos grupos WhatsApp (MODO TESTE)
+// - NÃO gera cobrança Asaas nem Contas_Receber (preparado para habilitar)
 //
 // Gerencia criação de orçamentos com múltiplos itens
 // dentro do grupo ORÇAMENTOS (120363412373130577@g.us)
@@ -3341,6 +3344,15 @@ Digite 0 para voltar aos detalhes`;
 
     console.log(`\n✅ Todos os clientes validados com sucesso!\n`);
 
+    // ✅ REDIRECIONAR PARA MENU DE PARCELAMENTO
+    await mostrarResumoCobranca(sock, userId, groupId, idOrcamento);
+    return;
+
+    // ═══════════════════════════════════════════════════════════
+    // TODO: CÓDIGO ABAIXO SERÁ USADO QUANDO HABILITAR ASAAS
+    // Por enquanto, fluxo de parcelamento em modo teste
+    // ═══════════════════════════════════════════════════════════
+    /*
     await sock.sendMessage(groupId, {
       text: `⏳ *GERANDO COBRANÇAS ASAAS*
 
@@ -3360,7 +3372,7 @@ Digite 0 para voltar aos detalhes`;
     const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
 
     // URL do orçamento
-    const urlOrcamento = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
+    const urlOrcamento = \`https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=\${orc.token_visualizacao}\`;
 
     // Array para guardar cobranças geradas
     const cobrancasGeradas = [];
@@ -3368,10 +3380,10 @@ Digite 0 para voltar aos detalhes`;
     const valoresComCusto = [];
     const erros = [];
 
-    console.log(`\n💳 ═══════════════════════════════════════════════`);
-    console.log(`💳 GERANDO COBRANÇAS ASAAS`);
-    console.log(`💳 Total de cotistas: ${rateioResult.rows.length}`);
-    console.log(`💳 ═══════════════════════════════════════════════\n`);
+    console.log(\`\\n💳 ═══════════════════════════════════════════════\`);
+    console.log(\`💳 GERANDO COBRANÇAS ASAAS\`);
+    console.log(\`💳 Total de cotistas: \${rateioResult.rows.length}\`);
+    console.log(\`💳 ═══════════════════════════════════════════════\\n\`);
 
     // ═══════════════════════════════════════════════════════════
     // PRIMEIRA PASSADA: VALIDAÇÃO CRÍTICA
@@ -3627,6 +3639,7 @@ ${detalhesValor}
     resumo += '\n\n━━━━━━━━━━━━━━━━\nDigite 0 para voltar aos detalhes';
 
     await sock.sendMessage(groupId, { text: resumo });
+    */
 
   } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao gerar cobrança:', error);
@@ -5489,9 +5502,17 @@ async function mostrarResumoFinalCobranca(sock, userId, groupId) {
 
   try {
     const orcResult = await pool.query(`
-      SELECT id_orcamento, numero, descricao, valor_total
-      FROM orcamento_servico
-      WHERE id_orcamento = $1
+      SELECT
+        os.id_orcamento,
+        os.numero,
+        os.descricao,
+        os.valor_total,
+        os.token_visualizacao,
+        e."Num_PB" as numero_pb,
+        e."Nome_Embar" as nome_embarcacao
+      FROM orcamento_servico os
+      JOIN "P_BOAT_1_Embarcacao" e ON e."Num_PB" = os.id_embarcacao
+      WHERE os.id_orcamento = $1
     `, [estado.id_orcamento]);
 
     const orc = orcResult.rows[0];
@@ -5540,13 +5561,92 @@ async function mostrarResumoFinalCobranca(sock, userId, groupId) {
     mensagem += `━━━━━━━━━━━━━━━━
 🧪 *MODO TESTE ATIVO*
 
-Esta é uma SIMULAÇÃO.
-Nenhuma cobrança será gerada agora.
+📤 Enviando mensagens para os grupos...
 
-━━━━━━━━━━━━━━━━
-Digite 0 para voltar aos detalhes`;
+━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(groupId, { text: mensagem });
+
+    // ════════════════════════════════════════════════════════════
+    // ENVIAR MENSAGENS AOS GRUPOS (MODO TESTE)
+    // ════════════════════════════════════════════════════════════
+
+    console.log(`\n📤 [TESTE] ENVIANDO MENSAGENS WHATSAPP...\n`);
+
+    const urlOrcamento = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
+    let enviosOk = 0;
+
+    for (const cotista of estado.rateio) {
+      const valorCotista = parseFloat(cotista.valor_cotista);
+      const valorParcela = valorCotista / numParcelas;
+
+      // Buscar grupos WhatsApp da cota
+      const gruposWpp = await pool.query(`
+        SELECT grupowppid, nomegrupowpp
+        FROM wpp_grupos_agenda
+        WHERE pb = $1 AND cota = $2
+      `, [orc.numero_pb, cotista.grupo_letra]);
+
+      if (gruposWpp.rows.length === 0) {
+        console.log(`⚠️  Grupo ${cotista.grupo_letra}: Sem WhatsApp cadastrado`);
+        continue;
+      }
+
+      // Montar mensagem SIMULADA
+      let mensagemGrupo = `🧪 *SIMULAÇÃO DE COBRANÇA* 🧪
+
+*ORÇAMENTO ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}*
+${orc.descricao}
+
+━━━━━━━━━━━━━━━━
+📊 *DADOS DA COBRANÇA:*
+`;
+
+      if (numParcelas === 1) {
+        mensagemGrupo += `  | Pagamento: *À VISTA*
+  | Valor: *${formatarMoeda(valorCotista)}*
+  | Vencimento: ${dataFormatada}
+`;
+      } else {
+        mensagemGrupo += `  | Pagamento: *${numParcelas}x*
+  | Valor por parcela: *${formatarMoeda(valorParcela)}*
+  | Valor total: ${formatarMoeda(valorCotista)}
+  | 1ª parcela: ${dataFormatada}
+`;
+      }
+
+      mensagemGrupo += `
+━━━━━━━━━━━━━━━━
+🧪 *MODO TESTE*
+
+⚠️ Esta é uma SIMULAÇÃO!
+Nenhuma cobrança foi gerada no Asaas.
+Nenhum boleto foi criado.
+
+Quando o modo teste for desativado:
+✅ Cobrança será gerada no Asaas
+✅ Boleto será criado
+✅ Link será enviado aqui
+✅ Conta a receber será registrada
+
+━━━━━━━━━━━━━━━━
+🌐 Visualizar orçamento completo:
+🔗 ${urlOrcamento}`;
+
+      // Enviar para todos os grupos WhatsApp desta cota
+      for (const grupoWpp of gruposWpp.rows) {
+        try {
+          console.log(`📨 [TESTE] Enviando para ${cotista.grupo_letra} (${grupoWpp.nomegrupowpp})...`);
+          await sock.sendMessage(grupoWpp.grupowppid, { text: mensagemGrupo });
+          console.log(`✅ Enviado!`);
+          enviosOk++;
+        } catch (error) {
+          console.log(`❌ Erro ao enviar: ${error.message}`);
+        }
+      }
+    }
+
+    console.log(`\n📤 [TESTE] Mensagens enviadas: ${enviosOk}\n`);
 
     // Registrar no LOG
     let descricaoLog = `SIMULAÇÃO de cobrança: ${numParcelas}x`;
@@ -5555,7 +5655,7 @@ Digite 0 para voltar aos detalhes`;
     } else {
       descricaoLog += ` | Vencimento: ${dataFormatada}`;
     }
-    descricaoLog += ` | Modo TESTE - não gerou cobrança real`;
+    descricaoLog += ` | ${enviosOk} msg(s) enviada(s) | Modo TESTE - não gerou cobrança Asaas`;
 
     await adicionarLog(
       estado.id_orcamento,
@@ -5563,6 +5663,20 @@ Digite 0 para voltar aos detalhes`;
       descricaoLog,
       userId
     );
+
+    // Mensagem final de confirmação
+    const msgFinal = `✅ *SIMULAÇÃO CONCLUÍDA*
+
+📤 ${enviosOk} mensagem(ns) enviada(s) aos grupos
+📋 Registro salvo no LOG
+
+🧪 *MODO TESTE ATIVO*
+Nenhuma cobrança foi gerada.
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`;
+
+    await sock.sendMessage(groupId, { text: msgFinal });
 
     console.log(`🧪 [TESTE] Simulação concluída - Orçamento #${estado.id_orcamento}`);
 
@@ -5658,6 +5772,143 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         case 'LISTAR_PENDENTES_COBRANCA':
           await listarPendentesCobranca(sock, userId, groupId);
           break;
+
+        // ════════════════════════════════════════════════════════════
+        // HANDLERS DE PARCELAMENTO (MODO TESTE)
+        // ════════════════════════════════════════════════════════════
+
+        case 'RESUMO_COBRANCA':
+          // Menu inicial: 1) À vista, 2) Alterar data, 3) Parcelar, 0) Voltar
+          switch (texto) {
+            case '1':
+              // À VISTA - SIMULAÇÃO
+              await mostrarResumoFinalCobranca(sock, userId, groupId);
+              break;
+
+            case '2':
+              // Alterar data de vencimento
+              await pedirDataVencimento(sock, userId, groupId);
+              break;
+
+            case '3':
+              // Menu de parcelamento
+              await mostrarMenuParcelamento(sock, userId, groupId);
+              break;
+
+            case '0':
+              // Voltar aos detalhes
+              await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+              break;
+
+            default:
+              await sock.sendMessage(groupId, {
+                text: '❌ Opção inválida!\n\nDigite:\n1 - À vista\n2 - Alterar data\n3 - Parcelar\n0 - Voltar'
+              });
+          }
+          break;
+
+        case 'ESCOLHER_PARCELAS':
+          // Menu de parcelas: 1 a 6 (depende das opções válidas)
+          const numParcelas = parseInt(texto);
+
+          if (texto === '0') {
+            // Voltar ao resumo
+            await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+            break;
+          }
+
+          if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > MAX_PARCELAS) {
+            await sock.sendMessage(groupId, {
+              text: '❌ Opção inválida!\n\nEscolha entre 1 e 6 parcelas, ou digite 0 para voltar.'
+            });
+            break;
+          }
+
+          // Verificar se essa opção está disponível
+          const opcoesValidas = estado.opcoes_validas || [];
+          const opcaoEscolhida = opcoesValidas.find(o => o.numParcelas === numParcelas);
+
+          if (!opcaoEscolhida) {
+            await sock.sendMessage(groupId, {
+              text: `❌ *${numParcelas}x não disponível!*\n\nUm ou mais cotistas ficariam com parcela < R$ 500,00.\n\nEscolha uma das opções listadas ou digite 0 para voltar.`
+            });
+            break;
+          }
+
+          // Salvar escolha e mostrar resumo final
+          atualizarEstado(userId, {
+            ...estado,
+            num_parcelas: numParcelas
+          });
+
+          await mostrarResumoFinalCobranca(sock, userId, groupId);
+          break;
+
+        case 'DIGITAR_DATA_VENCIMENTO':
+          // Validar data DD/MM/AAAA
+          if (texto === '0') {
+            await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+            break;
+          }
+
+          // Validar formato DD/MM/AAAA
+          const regexData = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          const match = texto.match(regexData);
+
+          if (!match) {
+            await sock.sendMessage(groupId, {
+              text: '❌ Formato inválido!\n\nUse: DD/MM/AAAA\nExemplo: 15/11/2026\n\nOu digite 0 para cancelar.'
+            });
+            break;
+          }
+
+          const [, dia, mes, ano] = match;
+          const dataDigitada = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+
+          // Validar se é uma data válida
+          if (isNaN(dataDigitada.getTime())) {
+            await sock.sendMessage(groupId, {
+              text: '❌ Data inválida!\n\nVerifique o dia, mês e ano.\n\nOu digite 0 para cancelar.'
+            });
+            break;
+          }
+
+          // Validar limite de 30 dias
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          dataDigitada.setHours(0, 0, 0, 0);
+
+          const diffDias = Math.floor((dataDigitada - hoje) / (1000 * 60 * 60 * 24));
+
+          if (diffDias < 0) {
+            await sock.sendMessage(groupId, {
+              text: '❌ Data não pode ser no passado!\n\nDigite uma data futura ou 0 para cancelar.'
+            });
+            break;
+          }
+
+          if (diffDias > MAX_DIAS_PRIMEIRA_PARCELA) {
+            const maxData = new Date(hoje.getTime() + MAX_DIAS_PRIMEIRA_PARCELA * 24 * 60 * 60 * 1000);
+            await sock.sendMessage(groupId, {
+              text: `❌ Data muito distante!\n\n📅 Máximo: ${maxData.toLocaleDateString('pt-BR')}\n(${MAX_DIAS_PRIMEIRA_PARCELA} dias a partir de hoje)\n\nDigite outra data ou 0 para cancelar.`
+            });
+            break;
+          }
+
+          // Data válida! Salvar e mostrar resumo
+          atualizarEstado(userId, {
+            ...estado,
+            data_vencimento: dataDigitada,
+            etapa: 'RESUMO_COBRANCA'
+          });
+
+          await sock.sendMessage(groupId, {
+            text: `✅ Data definida: ${dataDigitada.toLocaleDateString('pt-BR')}\n\nVoltando ao resumo...`
+          });
+
+          await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+          break;
+
         default:
           await mostrarMenuOrcamentos(sock, userId, groupId);
       }

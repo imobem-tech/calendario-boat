@@ -1,0 +1,32 @@
+============================================================
+⚠️ BACKUP: 2609211231_extrato_bancario.html
+Data do backup: 21/09/2026 12:31
+Arquivo original: public/extrato_bancario.html — V.2609211207
+============================================================
+
+MOTIVO DO BACKUP:
+Corrigir ordem de execução: calcular saldo APÓS ordenar lançamentos
+
+PROBLEMA RESOLVIDO:
+- Sistema pegava `dados.lancamentos[0]` para calcular saldo inicial
+- Lançamentos vinham do servidor em ordem DECRESCENTE (mais recente primeiro)
+- Então pegava 04/08 ao invés de 30/07
+- Comparava: saldo 31/07 < período 04/08 → CASO 1 (errado!)
+- Deveria comparar: saldo 31/07 >= período 30/07 → CASO 2 (correto!)
+- Resultado: linha de ajuste no lugar errado, saldos negativos
+
+FUNÇÕES ALTERADAS:
+- carregarExtratos(): Movida ordenação ANTES do cálculo de saldo inicial
+- Ordem correta:
+  1. Buscar lançamentos
+  2. ORDENAR crescente
+  3. Pegar primeira data ORDENADA
+  4. Calcular saldo inicial
+  5. Exibir
+
+SOLUÇÃO:
+- Mover bloco de ordenação antes do bloco de cálculo de saldo
+- Usar `lancamentosOrdenados[0].data` ao invés de `dados.lancamentos[0].data`
+- Garantir que `primeiraDataVisivel` seja realmente a data MENOR do período
+
+============================================================

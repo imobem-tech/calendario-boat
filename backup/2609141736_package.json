@@ -1,0 +1,52 @@
+// ============================================================
+// ⚠️ BACKUP: 2609141736_package.json
+// Data do backup: 14/09/2026 17:36
+// Arquivo original: package.json — V.2609141736
+// ============================================================
+//
+// MOTIVO DO BACKUP:
+// Corrigir bugs que causaram falha no deploy do Railway
+//
+// PROBLEMA RESOLVIDO:
+// - Puppeteer estava em devDependencies mas é usado em produção
+// - Script de build executando npm install --force (redundante)
+// - Railway não conseguia encontrar o módulo puppeteer no build
+//
+// MUDANÇAS:
+// 1. Mover puppeteer de devDependencies para dependencies
+// 2. Remover script de build problemático
+// 3. Permitir que Railway use o build padrão do Node.js
+//
+// SOLUÇÃO:
+// - Puppeteer agora será instalado em produção
+// - Build do Railway funcionará corretamente
+// - Deploy será concluído com sucesso
+//
+// ============================================================
+
+{
+  "name": "calendario-boat",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "npm install --force",
+    "start": "node wpp/server.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^0.19.0",
+    "@whiskeysockets/baileys": "latest",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "latest",
+    "nanoid": "^3.3.19",
+    "node-cron": "^3.0.3",
+    "pg": "latest",
+    "pino": "latest",
+    "qrcode": "latest"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.11.0",
+    "xlsx": "^0.18.5"
+  }
+}
+
