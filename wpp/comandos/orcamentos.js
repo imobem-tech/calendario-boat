@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261455
+// wpp/comandos/orcamentos.js — V.2610261457
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -7,6 +7,7 @@
 // - Envia mensagens aos grupos WhatsApp (MODO TESTE)
 // - NÃO gera cobrança Asaas nem Contas_Receber (preparado para habilitar)
 // FIX V.2610261455: Removido espaço após linhas divisórias (━━━━) em 40+ mensagens
+// FIX V.2610261457: Corrigido handlers de parcelamento (estavam no bloco errado)
 //
 // Gerencia criação de orçamentos com múltiplos itens
 // dentro do grupo ORÇAMENTOS (120363412373130577@g.us)
@@ -5708,142 +5709,6 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
           await listarPendentesCobranca(sock, userId, groupId);
           break;
 
-        // ════════════════════════════════════════════════════════════
-        // HANDLERS DE PARCELAMENTO (MODO TESTE)
-        // ════════════════════════════════════════════════════════════
-
-        case 'RESUMO_COBRANCA':
-          // Menu inicial: 1) À vista, 2) Alterar data, 3) Parcelar, 0) Voltar
-          switch (texto) {
-            case '1':
-              // À VISTA - SIMULAÇÃO
-              await mostrarResumoFinalCobranca(sock, userId, groupId);
-              break;
-
-            case '2':
-              // Alterar data de vencimento
-              await pedirDataVencimento(sock, userId, groupId);
-              break;
-
-            case '3':
-              // Menu de parcelamento
-              await mostrarMenuParcelamento(sock, userId, groupId);
-              break;
-
-            case '0':
-              // Voltar aos detalhes
-              await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
-              break;
-
-            default:
-              await sock.sendMessage(groupId, {
-                text: '❌ Opção inválida!\n\nDigite:\n1 - À vista\n2 - Alterar data\n3 - Parcelar\n0 - Voltar'
-              });
-          }
-          break;
-
-        case 'ESCOLHER_PARCELAS':
-          // Menu de parcelas: 1 a 6 (depende das opções válidas)
-          const numParcelas = parseInt(texto);
-
-          if (texto === '0') {
-            // Voltar ao resumo
-            await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
-            break;
-          }
-
-          if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > MAX_PARCELAS) {
-            await sock.sendMessage(groupId, {
-              text: '❌ Opção inválida!\n\nEscolha entre 1 e 6 parcelas, ou digite 0 para voltar.'
-            });
-            break;
-          }
-
-          // Verificar se essa opção está disponível
-          const opcoesValidas = estado.opcoes_validas || [];
-          const opcaoEscolhida = opcoesValidas.find(o => o.numParcelas === numParcelas);
-
-          if (!opcaoEscolhida) {
-            await sock.sendMessage(groupId, {
-              text: `❌ *${numParcelas}x não disponível!*\n\nUm ou mais cotistas ficariam com parcela < R$ 500,00.\n\nEscolha uma das opções listadas ou digite 0 para voltar.`
-            });
-            break;
-          }
-
-          // Salvar escolha e mostrar resumo final
-          atualizarEstado(userId, {
-            ...estado,
-            num_parcelas: numParcelas
-          });
-
-          await mostrarResumoFinalCobranca(sock, userId, groupId);
-          break;
-
-        case 'DIGITAR_DATA_VENCIMENTO':
-          // Validar data DD/MM/AAAA
-          if (texto === '0') {
-            await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
-            break;
-          }
-
-          // Validar formato DD/MM/AAAA
-          const regexData = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-          const match = texto.match(regexData);
-
-          if (!match) {
-            await sock.sendMessage(groupId, {
-              text: '❌ Formato inválido!\n\nUse: DD/MM/AAAA\nExemplo: 15/11/2026\n\nOu digite 0 para cancelar.'
-            });
-            break;
-          }
-
-          const [, dia, mes, ano] = match;
-          const dataDigitada = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-
-          // Validar se é uma data válida
-          if (isNaN(dataDigitada.getTime())) {
-            await sock.sendMessage(groupId, {
-              text: '❌ Data inválida!\n\nVerifique o dia, mês e ano.\n\nOu digite 0 para cancelar.'
-            });
-            break;
-          }
-
-          // Validar limite de 30 dias
-          const hoje = new Date();
-          hoje.setHours(0, 0, 0, 0);
-          dataDigitada.setHours(0, 0, 0, 0);
-
-          const diffDias = Math.floor((dataDigitada - hoje) / (1000 * 60 * 60 * 24));
-
-          if (diffDias < 0) {
-            await sock.sendMessage(groupId, {
-              text: '❌ Data não pode ser no passado!\n\nDigite uma data futura ou 0 para cancelar.'
-            });
-            break;
-          }
-
-          if (diffDias > MAX_DIAS_PRIMEIRA_PARCELA) {
-            const maxData = new Date(hoje.getTime() + MAX_DIAS_PRIMEIRA_PARCELA * 24 * 60 * 60 * 1000);
-            await sock.sendMessage(groupId, {
-              text: `❌ Data muito distante!\n\n📅 Máximo: ${maxData.toLocaleDateString('pt-BR')}\n(${MAX_DIAS_PRIMEIRA_PARCELA} dias a partir de hoje)\n\nDigite outra data ou 0 para cancelar.`
-            });
-            break;
-          }
-
-          // Data válida! Salvar e mostrar resumo
-          atualizarEstado(userId, {
-            ...estado,
-            data_vencimento: dataDigitada,
-            etapa: 'RESUMO_COBRANCA'
-          });
-
-          await sock.sendMessage(groupId, {
-            text: `✅ Data definida: ${dataDigitada.toLocaleDateString('pt-BR')}\n\nVoltando ao resumo...`
-          });
-
-          await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
-          break;
-
         default:
           await mostrarMenuOrcamentos(sock, userId, groupId);
       }
@@ -5884,6 +5749,145 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
       default:
         await sock.sendMessage(groupId, { text: '❌ Opção inválida! Digite 1, 2, 3, 4, 5, 6 ou 0.' });
     }
+    return;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // HANDLERS DE PARCELAMENTO (MODO TESTE)
+  // ════════════════════════════════════════════════════════════
+
+  if (estado.etapa === 'RESUMO_COBRANCA') {
+    // Menu inicial: 1) À vista, 2) Alterar data, 3) Parcelar, 0) Voltar
+    switch (texto) {
+      case '1':
+        // À VISTA - SIMULAÇÃO
+        await mostrarResumoFinalCobranca(sock, userId, groupId);
+        break;
+
+      case '2':
+        // Alterar data de vencimento
+        await pedirDataVencimento(sock, userId, groupId);
+        break;
+
+      case '3':
+        // Menu de parcelamento
+        await mostrarMenuParcelamento(sock, userId, groupId);
+        break;
+
+      case '0':
+        // Voltar aos detalhes
+        await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+        break;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida!\n\nDigite:\n1 - À vista\n2 - Alterar data\n3 - Parcelar\n0 - Voltar'
+        });
+    }
+    return;
+  }
+
+  if (estado.etapa === 'ESCOLHER_PARCELAS') {
+    // Menu de parcelas: 1 a 6 (depende das opções válidas)
+    const numParcelas = parseInt(texto);
+
+    if (texto === '0') {
+      // Voltar ao resumo
+      await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    if (isNaN(numParcelas) || numParcelas < 1 || numParcelas > MAX_PARCELAS) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Opção inválida!\n\nEscolha entre 1 e 6 parcelas, ou digite 0 para voltar.'
+      });
+      return;
+    }
+
+    // Verificar se essa opção está disponível
+    const opcoesValidas = estado.opcoes_validas || [];
+    const opcaoEscolhida = opcoesValidas.find(o => o.numParcelas === numParcelas);
+
+    if (!opcaoEscolhida) {
+      await sock.sendMessage(groupId, {
+        text: `❌ *${numParcelas}x não disponível!*\n\nUm ou mais cotistas ficariam com parcela < R$ 500,00.\n\nEscolha uma das opções listadas ou digite 0 para voltar.`
+      });
+      return;
+    }
+
+    // Salvar escolha e mostrar resumo final
+    atualizarEstado(userId, {
+      ...estado,
+      num_parcelas: numParcelas
+    });
+
+    await mostrarResumoFinalCobranca(sock, userId, groupId);
+    return;
+  }
+
+  if (estado.etapa === 'DIGITAR_DATA_VENCIMENTO') {
+    // Validar data DD/MM/AAAA
+    if (texto === '0') {
+      await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
+      return;
+    }
+
+    // Validar formato DD/MM/AAAA
+    const regexData = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = texto.match(regexData);
+
+    if (!match) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Formato inválido!\n\nUse: DD/MM/AAAA\nExemplo: 15/11/2026\n\nOu digite 0 para cancelar.'
+      });
+      return;
+    }
+
+    const [, dia, mes, ano] = match;
+    const dataDigitada = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+
+    // Validar se é uma data válida
+    if (isNaN(dataDigitada.getTime())) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Data inválida!\n\nVerifique o dia, mês e ano.\n\nOu digite 0 para cancelar.'
+      });
+      return;
+    }
+
+    // Validar limite de 30 dias
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    dataDigitada.setHours(0, 0, 0, 0);
+
+    const diffDias = Math.floor((dataDigitada - hoje) / (1000 * 60 * 60 * 24));
+
+    if (diffDias < 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Data não pode ser no passado!\n\nDigite uma data futura ou 0 para cancelar.'
+      });
+      return;
+    }
+
+    if (diffDias > MAX_DIAS_PRIMEIRA_PARCELA) {
+      const maxData = new Date(hoje.getTime() + MAX_DIAS_PRIMEIRA_PARCELA * 24 * 60 * 60 * 1000);
+      await sock.sendMessage(groupId, {
+        text: `❌ Data muito distante!\n\n📅 Máximo: ${maxData.toLocaleDateString('pt-BR')}\n(${MAX_DIAS_PRIMEIRA_PARCELA} dias a partir de hoje)\n\nDigite outra data ou 0 para cancelar.`
+      });
+      return;
+    }
+
+    // Data válida! Salvar e mostrar resumo
+    atualizarEstado(userId, {
+      ...estado,
+      data_vencimento: dataDigitada,
+      etapa: 'RESUMO_COBRANCA'
+    });
+
+    await sock.sendMessage(groupId, {
+      text: `✅ Data definida: ${dataDigitada.toLocaleDateString('pt-BR')}\n\nVoltando ao resumo...`
+    });
+
+    await mostrarResumoCobranca(sock, userId, groupId, estado.id_orcamento);
     return;
   }
 
