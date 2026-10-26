@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260905
+// wpp/comandos/orcamentos.js — V.2610260910
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3212,12 +3212,10 @@ Digite 0 para voltar aos detalhes`
     // Atualizar orçamento com ID da primeira cobrança
     await pool.query(`
       UPDATE "orcamento_servico"
-      SET id_cobranca = $1,
-          cobrancas_asaas = $2
-      WHERE id_orcamento = $3
+      SET id_cobranca = $1
+      WHERE id_orcamento = $2
     `, [
       cobrancasGeradas[0].codigo_cr,
-      JSON.stringify(cobrancasGeradas),
       idOrcamento
     ]);
 
@@ -3458,10 +3456,7 @@ async function confirmarAprovacaoOrcamento(sock, userId, groupId, idOrcamento) {
     // Atualizar status
     await pool.query(`
       UPDATE "orcamento_servico"
-      SET status = 'APROVADO',
-          data_aprovacao = CURRENT_DATE,
-          aprovado_em = CURRENT_TIMESTAMP,
-          aprovado_por = NULL
+      SET status = 'APROVADO'
       WHERE id_orcamento = $1
     `, [idOrcamento]);
 
@@ -3627,14 +3622,11 @@ async function confirmarRecusa(sock, userId, groupId, idOrcamento, motivo) {
     // Atualizar status
     await pool.query(`
       UPDATE orcamento_servico
-      SET status = 'RECUSADO',
-          motivo_recusa = $2,
-          recusado_em = CURRENT_TIMESTAMP,
-          recusado_por = $3
+      SET status = 'RECUSADO'
       WHERE id_orcamento = $1
-    `, [idOrcamento, motivo, userId]);
+    `, [idOrcamento]);
 
-    // Log
+    // Log (motivo fica aqui)
     await adicionarLog(
       idOrcamento,
       'ORCAMENTO_RECUSADO',
@@ -3667,14 +3659,11 @@ async function confirmarCancelamento(sock, userId, groupId, idOrcamento, motivo)
     // Atualizar status
     await pool.query(`
       UPDATE orcamento_servico
-      SET status = 'CANCELADO',
-          motivo_cancelamento = $2,
-          cancelado_em = CURRENT_TIMESTAMP,
-          cancelado_por = $3
+      SET status = 'CANCELADO'
       WHERE id_orcamento = $1
-    `, [idOrcamento, motivo, userId]);
+    `, [idOrcamento]);
 
-    // Log
+    // Log (motivo fica aqui)
     await adicionarLog(
       idOrcamento,
       'ORCAMENTO_CANCELADO',
@@ -4769,8 +4758,7 @@ ${orc.descricao}
     // 5. Atualizar status para ENVIADO
     await pool.query(`
       UPDATE orcamento_servico
-      SET status = 'ENVIADO',
-          data_envio = CURRENT_TIMESTAMP
+      SET status = 'ENVIADO'
       WHERE id_orcamento = $1
     `, [idOrcamento]);
 
