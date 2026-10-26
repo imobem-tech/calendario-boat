@@ -1,4 +1,4 @@
-<!-- V.2610260821 -->
+<!-- V.2610261157 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -825,10 +825,22 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
 
-            // Converte URLs em links clicáveis
-            const comLinks = escapado.replace(
+            // 1. Converte URLs com http:// ou https://
+            let comLinks = escapado.replace(
                 /(https?:\/\/[^\s]+)/g,
                 '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; word-break: break-all;">$1</a>'
+            );
+
+            // 2. Converte URLs que começam com www. (adiciona https:// automaticamente)
+            comLinks = comLinks.replace(
+                /\b(www\.[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi,
+                '<a href="https://$1" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; word-break: break-all;">$1</a>'
+            );
+
+            // 3. Converte domínios simples (ex: google.com, youtube.com.br)
+            comLinks = comLinks.replace(
+                /\b([a-zA-Z0-9][a-zA-Z0-9-]*\.(com|com\.br|net|org|gov|edu|io|dev|app|br|co|info|tech|store)(?:\/[^\s]*)?)\b(?!["<])/gi,
+                '<a href="https://$1" target="_blank" rel="noopener noreferrer" style="color: #667eea; text-decoration: underline; word-break: break-all;">$1</a>'
             );
 
             // Converte quebras de linha em <br>
