@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260741
+// wpp/comandos/orcamentos.js — V.2610260755
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -2676,16 +2676,10 @@ Total cotas: ${totalCotas}
 
 `;
 
-    // Opções conforme status
-    if (jaRealizado) {
-      mensagem += `1️⃣ ✅ Confirmar e salvar
-2️⃣ 📝 Outra distribuição
+    // Opções (unificadas - sempre permite proporcional OU manual)
+    mensagem += `1️⃣ ✅ Rateia proporcional
+2️⃣ 📝 Distribuição manual
 0️⃣ Cancelar`;
-    } else {
-      mensagem += `1️⃣ ✅ Distribuir proporcional
-2️⃣ 📝 Outra distribuição
-0️⃣ Voltar`;
-    }
 
     mensagem += `
 ━━━━━━━━━━━━━━━━`;
