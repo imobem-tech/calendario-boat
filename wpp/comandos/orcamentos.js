@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260730
+// wpp/comandos/orcamentos.js — V.2610260741
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3931,11 +3931,11 @@ async function copiarLinkOrcamento(sock, userId, groupId, idOrcamento) {
 
     // Mensagem SEM PREÇO (Modelo 5)
     const mensagem = `━━━━━━━━━━━━━━━━
-🔔 NOVO ORÇAMENTO
+🔔 ORÇAMENTO
 ━━━━━━━━━━━━━━━━
 
 🚤 Embarcação: ${orc.nome_embarcacao}
-🆔 ${orc.numero}
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📝 Descrição:
 ${orc.descricao}
@@ -3945,7 +3945,7 @@ ${orc.descricao}
 🌐 Visualizar orçamento completo:
 🔗 ${url}
 
-⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
+⚠️ Obs: Valor pode sofrer pequena variação devido a frete, eventual incidência de DIFAL, ou ajustes do fornecedor.`;
 
     await sock.sendMessage(groupId, {
       text: `📋 *MENSAGEM COPIÁVEL*
@@ -4246,7 +4246,7 @@ Este orçamento ainda não tem rateio definido!
       }
 
       const mensagem = `━━━━━━━━━━━━━━━━
-🔔 NOVO ORÇAMENTO
+🔔 ORÇAMENTO
 ━━━━━━━━━━━━━━━━
 
 🚤 Embarcação: ${orc.nome_embarcacao}
@@ -4268,7 +4268,7 @@ ${orc.descricao}
 🌐 Visualizar orçamento completo:
 🔗 ${url}
 
-⚠️ Obs: Valor pode sofrer pequena variação devido a frete, impostos ou ajustes do fornecedor.`;
+⚠️ Obs: Valor pode sofrer pequena variação devido a frete, eventual incidência de DIFAL, ou ajustes do fornecedor.`;
 
       // Enviar para TODOS os grupos WhatsApp desta cota
       for (const grupoWpp of grupo.grupos_wpp) {
