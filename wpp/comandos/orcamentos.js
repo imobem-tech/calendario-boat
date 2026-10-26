@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261723
+// wpp/comandos/orcamentos.js — V.2610261746
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -3430,6 +3430,53 @@ async function mostrarConfirmacaoCobranca(sock, userId, groupId, idOrcamento) {
       ORDER BY a."Gropo_letra"
     `, [idOrcamento]);
 
+    // Pegar número de parcelas do estado
+    const estado = obterEstado(userId);
+    const numParcelas = estado?.num_parcelas || 1;
+
+    // Calcular TOTAL de cobranças que serão geradas
+    let totalCobrancas = 0;
+    const detalhamento = [];
+
+    rateioResult.rows.forEach(r => {
+      const valorCotista = parseFloat(r.valor_cotista);
+      const podeParcelar = valorCotista >= PARCELA_MINIMA_INDIVIDUAL;
+
+      if (podeParcelar && numParcelas > 1) {
+        const valorParcela = valorCotista / numParcelas;
+        const parcelaValida = valorParcela >= PARCELA_MINIMA_INDIVIDUAL;
+
+        if (parcelaValida) {
+          // Cotista PARCELA
+          totalCobrancas += numParcelas;
+          detalhamento.push({
+            grupo: r.grupo_letra,
+            valor: valorCotista,
+            parcelas: numParcelas,
+            texto: `${numParcelas}x de ${formatarMoeda(valorParcela)}`
+          });
+        } else {
+          // Cotista paga À VISTA (parcela ficaria < R$ 500)
+          totalCobrancas += 1;
+          detalhamento.push({
+            grupo: r.grupo_letra,
+            valor: valorCotista,
+            parcelas: 1,
+            texto: `À VISTA`
+          });
+        }
+      } else {
+        // À VISTA (ou < R$ 500)
+        totalCobrancas += 1;
+        detalhamento.push({
+          grupo: r.grupo_letra,
+          valor: valorCotista,
+          parcelas: 1,
+          texto: `À VISTA${!podeParcelar ? ' (< R$ 500)' : ''}`
+        });
+      }
+    });
+
     // Montar resumo
     let mensagem = `⚠️ *CONFIRMAR GERAÇÃO DE COBRANÇA*
 
@@ -3443,11 +3490,11 @@ async function mostrarConfirmacaoCobranca(sock, userId, groupId, idOrcamento) {
 💰 Valor total: ${formatarMoeda(orc.valor_total)}
 👥 Cotistas: ${rateioResult.rows.length}
 
-*Cobranças a gerar:*
+*Cobranças que serão geradas:*
 `;
 
-    rateioResult.rows.forEach(r => {
-      mensagem += `• ${r.grupo_letra}: ${formatarMoeda(r.valor_cotista)}\n`;
+    detalhamento.forEach(d => {
+      mensagem += `• ${d.grupo}: ${formatarMoeda(d.valor)}\n  → ${d.texto}\n`;
     });
 
     mensagem += `
@@ -3455,8 +3502,8 @@ async function mostrarConfirmacaoCobranca(sock, userId, groupId, idOrcamento) {
 ⚠️ *ATENÇÃO - ATO IRREVERSÍVEL!*
 
 Ao confirmar, o sistema irá:
-✅ Criar ${rateioResult.rows.length} cobrança(s) REAIS no Asaas
-✅ Gerar registros em Contas a Receber
+✅ Criar *${totalCobrancas} cobrança(s)* REAIS no Asaas
+✅ Gerar ${totalCobrancas} registro(s) em Contas a Receber
 ✅ Enviar links de pagamento para os grupos
 ✅ Alterar status para CONCLUIDO
 
