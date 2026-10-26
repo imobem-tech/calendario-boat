@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260910
+// wpp/comandos/orcamentos.js — V.2610260916
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -5111,82 +5111,184 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
     return;
   }
 
-  // Alterar descrição
+  // Alterar descrição - receber texto novo
   if (estado.etapa === 'ALTERAR_DESCRICAO') {
     // Handler de "0" é global (volta aos detalhes)
 
     try {
-      // Atualizar descrição no banco
-      await pool.query(`
-        UPDATE orcamento_servico
-        SET descricao = $1
-        WHERE id_orcamento = $2
-      `, [texto, estado.id_orcamento]);
+      // Buscar descrição atual
+      const result = await pool.query(`
+        SELECT descricao
+        FROM orcamento_servico
+        WHERE id_orcamento = $1
+      `, [estado.id_orcamento]);
 
-      // Registrar no LOG
-      await adicionarLog(
-        estado.id_orcamento,
-        'DESCRICAO_ALTERADA',
-        `Descrição alterada para: ${texto}`,
-        userId
-      );
+      const descricaoAtual = result.rows[0]?.descricao || '';
 
+      // Mostrar comparação e pedir confirmação
       await sock.sendMessage(groupId, {
-        text: `✅ *Descrição alterada com sucesso!*
+        text: `📝 *CONFIRMAR ALTERAÇÃO*
+━━━━━━━━━━━━━━━━
 
-📝 *Nova descrição:*
+📌 *DESCRIÇÃO ANTIGA:*
+${descricaoAtual || '(vazia)'}
+
+━━━━━━━━━━━━━━━━
+
+✨ *DESCRIÇÃO NOVA:*
 ${texto}
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+
+1️⃣ ✅ Confirmar alteração
+0️⃣ ❌ Cancelar`
       });
 
-      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      atualizarEstado(userId, {
+        etapa: 'CONFIRMAR_DESCRICAO',
+        id_orcamento: estado.id_orcamento,
+        descricao_nova: texto
+      });
 
     } catch (error) {
-      console.error('❌ Erro ao salvar descrição:', error);
+      console.error('❌ Erro:', error);
       await sock.sendMessage(groupId, {
-        text: `❌ Erro ao salvar descrição:\n${error.message}\n\nDigite 0 para voltar`
+        text: `❌ Erro:\n${error.message}\n\nDigite 0 para voltar`
       });
     }
     return;
   }
 
-  // Alterar observação
+  // Confirmar alteração de descrição
+  if (estado.etapa === 'CONFIRMAR_DESCRICAO') {
+    if (texto === '1') {
+      try {
+        // Salvar no banco
+        await pool.query(`
+          UPDATE orcamento_servico
+          SET descricao = $1
+          WHERE id_orcamento = $2
+        `, [estado.descricao_nova, estado.id_orcamento]);
+
+        // Registrar no LOG
+        await adicionarLog(
+          estado.id_orcamento,
+          'DESCRICAO_ALTERADA',
+          `Descrição alterada para: ${estado.descricao_nova}`,
+          userId
+        );
+
+        await sock.sendMessage(groupId, {
+          text: `✅ *Descrição alterada com sucesso!*
+
+Voltando ao menu...`
+        });
+
+        // Voltar ao submenu ALTERAR
+        await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+      } catch (error) {
+        console.error('❌ Erro ao salvar descrição:', error);
+        await sock.sendMessage(groupId, {
+          text: `❌ Erro ao salvar:\n${error.message}\n\nDigite 0 para voltar`
+        });
+      }
+    } else {
+      await sock.sendMessage(groupId, {
+        text: '❌ Alteração cancelada.\n\nVoltando ao menu...'
+      });
+      await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+    }
+    return;
+  }
+
+  // Alterar observação - receber texto novo
   if (estado.etapa === 'ALTERAR_OBSERVACAO') {
     // Handler de "0" é global (volta aos detalhes)
 
     try {
-      // Atualizar observação no banco
-      await pool.query(`
-        UPDATE orcamento_servico
-        SET observacao = $1
-        WHERE id_orcamento = $2
-      `, [texto, estado.id_orcamento]);
+      // Buscar observação atual
+      const result = await pool.query(`
+        SELECT observacao
+        FROM orcamento_servico
+        WHERE id_orcamento = $1
+      `, [estado.id_orcamento]);
 
-      // Registrar no LOG
-      await adicionarLog(
-        estado.id_orcamento,
-        'OBSERVACAO_ALTERADA',
-        `Observação alterada para: ${texto}`,
-        userId
-      );
+      const observacaoAtual = result.rows[0]?.observacao || '';
 
+      // Mostrar comparação e pedir confirmação
       await sock.sendMessage(groupId, {
-        text: `✅ *Observação alterada com sucesso!*
+        text: `📝 *CONFIRMAR ALTERAÇÃO*
+━━━━━━━━━━━━━━━━
 
-📝 *Nova observação:*
+📌 *OBSERVAÇÃO ANTIGA:*
+${observacaoAtual || '(vazia)'}
+
+━━━━━━━━━━━━━━━━
+
+✨ *OBSERVAÇÃO NOVA:*
 ${texto}
 
-Voltando aos detalhes...`
+━━━━━━━━━━━━━━━━
+
+1️⃣ ✅ Confirmar alteração
+0️⃣ ❌ Cancelar`
       });
 
-      await verDetalhesOrcamento(sock, userId, groupId, estado.id_orcamento);
+      atualizarEstado(userId, {
+        etapa: 'CONFIRMAR_OBSERVACAO',
+        id_orcamento: estado.id_orcamento,
+        observacao_nova: texto
+      });
 
     } catch (error) {
-      console.error('❌ Erro ao salvar observação:', error);
+      console.error('❌ Erro:', error);
       await sock.sendMessage(groupId, {
-        text: `❌ Erro ao salvar observação:\n${error.message}\n\nDigite 0 para voltar`
+        text: `❌ Erro:\n${error.message}\n\nDigite 0 para voltar`
       });
+    }
+    return;
+  }
+
+  // Confirmar alteração de observação
+  if (estado.etapa === 'CONFIRMAR_OBSERVACAO') {
+    if (texto === '1') {
+      try {
+        // Salvar no banco
+        await pool.query(`
+          UPDATE orcamento_servico
+          SET observacao = $1
+          WHERE id_orcamento = $2
+        `, [estado.observacao_nova, estado.id_orcamento]);
+
+        // Registrar no LOG
+        await adicionarLog(
+          estado.id_orcamento,
+          'OBSERVACAO_ALTERADA',
+          `Observação alterada para: ${estado.observacao_nova}`,
+          userId
+        );
+
+        await sock.sendMessage(groupId, {
+          text: `✅ *Observação alterada com sucesso!*
+
+Voltando ao menu...`
+        });
+
+        // Voltar ao submenu ALTERAR
+        await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+      } catch (error) {
+        console.error('❌ Erro ao salvar observação:', error);
+        await sock.sendMessage(groupId, {
+          text: `❌ Erro ao salvar:\n${error.message}\n\nDigite 0 para voltar`
+        });
+      }
+    } else {
+      await sock.sendMessage(groupId, {
+        text: '❌ Alteração cancelada.\n\nVoltando ao menu...'
+      });
+      await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
     }
     return;
   }
