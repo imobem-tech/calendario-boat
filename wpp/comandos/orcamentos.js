@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260828
+// wpp/comandos/orcamentos.js — V.2610260838
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -3304,6 +3304,212 @@ Digite 0 para voltar aos detalhes`
 }
 
 // ============================================================
+// MENU DE ALTERAÇÃO DE STATUS
+// ============================================================
+
+async function menuAlterarStatus(sock, userId, groupId, idOrcamento) {
+  try {
+    // Buscar status atual
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, status
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    if (result.rows.length === 0) {
+      await sock.sendMessage(groupId, {
+        text: '❌ Orçamento não encontrado.'
+      });
+      return;
+    }
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `🔄 *ALTERAR STATUS*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📊 Status atual: ${orc.status}
+
+━━━━━━━━━━━━━━━━
+*OPÇÕES:*
+
+1️⃣ ❌ RECUSADO
+2️⃣ 🚫 CANCELADO
+0️⃣ 🔙 Voltar
+
+━━━━━━━━━━━━━━━━
+Digite a opção:`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'MENU_ALTERAR_STATUS',
+      id_orcamento: idOrcamento,
+      status_anterior: orc.status
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao abrir menu de status:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function solicitarMotivoRecusa(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, status
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `❌ *RECUSAR ORÇAMENTO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📊 Status atual: ${orc.status}
+
+━━━━━━━━━━━━━━━━
+Digite o motivo da recusa
+ou 0 para cancelar:`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'DIGITANDO_MOTIVO_RECUSA',
+      id_orcamento: idOrcamento,
+      status_anterior: orc.status
+    });
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function solicitarMotivoCancelamento(sock, userId, groupId, idOrcamento) {
+  try {
+    const result = await pool.query(`
+      SELECT id_orcamento, numero, status
+      FROM orcamento_servico
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    const orc = result.rows[0];
+
+    await sock.sendMessage(groupId, {
+      text: `🚫 *CANCELAR ORÇAMENTO*
+━━━━━━━━━━━━━━━━
+
+🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
+📊 Status atual: ${orc.status}
+
+━━━━━━━━━━━━━━━━
+Digite o motivo do cancelamento
+ou 0 para cancelar:`
+    });
+
+    atualizarEstado(userId, {
+      etapa: 'DIGITANDO_MOTIVO_CANCELAMENTO',
+      id_orcamento: idOrcamento,
+      status_anterior: orc.status
+    });
+
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function confirmarRecusa(sock, userId, groupId, idOrcamento, motivo) {
+  try {
+    // Atualizar status
+    await pool.query(`
+      UPDATE orcamento_servico
+      SET status = 'RECUSADO',
+          motivo_recusa = $2,
+          recusado_em = CURRENT_TIMESTAMP,
+          recusado_por = $3
+      WHERE id_orcamento = $1
+    `, [idOrcamento, motivo, userId]);
+
+    // Log
+    await adicionarLog(
+      idOrcamento,
+      'ORCAMENTO_RECUSADO',
+      `Motivo: ${motivo}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `❌ *ORÇAMENTO RECUSADO*
+
+✅ Status alterado para RECUSADO
+
+📝 Motivo registrado:
+${motivo}
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao recusar:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+async function confirmarCancelamento(sock, userId, groupId, idOrcamento, motivo) {
+  try {
+    // Atualizar status
+    await pool.query(`
+      UPDATE orcamento_servico
+      SET status = 'CANCELADO',
+          motivo_cancelamento = $2,
+          cancelado_em = CURRENT_TIMESTAMP,
+          cancelado_por = $3
+      WHERE id_orcamento = $1
+    `, [idOrcamento, motivo, userId]);
+
+    // Log
+    await adicionarLog(
+      idOrcamento,
+      'ORCAMENTO_CANCELADO',
+      `Motivo: ${motivo}`,
+      userId
+    );
+
+    await sock.sendMessage(groupId, {
+      text: `🚫 *ORÇAMENTO CANCELADO*
+
+✅ Status alterado para CANCELADO
+
+📝 Motivo registrado:
+${motivo}
+
+━━━━━━━━━━━━━━━━
+Digite 0 para voltar aos detalhes`
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao cancelar:', error);
+    await sock.sendMessage(groupId, {
+      text: `❌ Erro:\n${error.message}`
+    });
+  }
+}
+
+// ============================================================
 // ALTERAR PERCENTUAL DE GESTÃO
 // ============================================================
 
@@ -3748,7 +3954,6 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento) {
 📋 *DETALHES DO ORÇAMENTO*
 ━━━━━━━━━━━━━━━━
 🆔 Número: ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
-${statusEmoji} Status: ${orc.status}
 🚤 Embarcação: ${orc.numero_pb} - ${orc.nome_embarcacao}
 📅 Data: ${data}
 ━━━━━━━━━━━━━━━━
@@ -3789,6 +3994,7 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 8️⃣ 🔗 Ver Link
 9️⃣ 📤 Enviar orçamento
 🔟 💵 Enviar cobrança
+1️⃣1️⃣ ${statusEmoji} Status ${orc.status}
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
@@ -4628,9 +4834,13 @@ export async function processarMensagemOrcamentos(sock, userId, groupId, mensage
         await enviarCobrancaOrcamento(sock, userId, groupId, estado.id_orcamento);
         break;
 
+      case '11': // Alterar status
+        await menuAlterarStatus(sock, userId, groupId, estado.id_orcamento);
+        break;
+
       default:
         await sock.sendMessage(groupId, {
-          text: '❌ Opção inválida! Digite 1 a 10 ou 0.'
+          text: '❌ Opção inválida! Digite 1 a 11 ou 0.'
         });
     }
     return;
@@ -4980,6 +5190,43 @@ Digite:
     await sock.sendMessage(groupId, {
       text: '❌ Envio cancelado.\n\nDigite 0 para voltar aos detalhes.'
     });
+    return;
+  }
+
+  // Menu alterar status
+  if (estado.etapa === 'MENU_ALTERAR_STATUS') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    switch (texto) {
+      case '1': // RECUSADO
+        await solicitarMotivoRecusa(sock, userId, groupId, estado.id_orcamento);
+        return;
+
+      case '2': // CANCELADO
+        await solicitarMotivoCancelamento(sock, userId, groupId, estado.id_orcamento);
+        return;
+
+      default:
+        await sock.sendMessage(groupId, {
+          text: '❌ Opção inválida! Digite 1, 2 ou 0.'
+        });
+        return;
+    }
+  }
+
+  // Digitando motivo de recusa
+  if (estado.etapa === 'DIGITANDO_MOTIVO_RECUSA') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    await confirmarRecusa(sock, userId, groupId, estado.id_orcamento, texto);
+    return;
+  }
+
+  // Digitando motivo de cancelamento
+  if (estado.etapa === 'DIGITANDO_MOTIVO_CANCELAMENTO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    await confirmarCancelamento(sock, userId, groupId, estado.id_orcamento, texto);
     return;
   }
 
