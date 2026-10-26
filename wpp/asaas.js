@@ -1,8 +1,8 @@
 // ============================================================
-// wpp/asaas.js — V.2609172030
+// wpp/asaas.js — V.2610260946
 // Allmax Gestão de Cotas — Marujo⚓
 // Módulo universal de integração com Asaas
-// FIX V.2609172030: Race condition em inserirContasReceber (MAX→SEQUENCE)
+// FIX V.2610260946: Códigos ultrapassados (SEQUENCE→VIEW vw_proximo_codigo)
 //
 // Exporta:
 //   buscarApiKey(pool, empresa)
@@ -166,14 +166,17 @@ export async function criarCobranca(apiKey, customerId, dados) {
 export async function inserirContasReceber(pool, dados) {
   // dados: { empresa, descricao, codCliente, valor, vencimento, centroCusto }
 
-  // CORREÇÃO V.2609172030: Usa SEQUENCE thread-safe (evita race condition)
-  // ANTES: SELECT MAX("Codigo")+1 WHERE "Empresa"=$1 ← duplicava códigos!
-  // DEPOIS: SELECT gerar_proximo_codigo_cr() ← atômico, nunca duplica
+  // CORREÇÃO V.2610260945: Usa VIEW vw_proximo_codigo do Neon
+  // ANTES: gerar_proximo_codigo_cr() ← gerava códigos ultrapassados
+  // DEPOIS: vw_proximo_codigo ← sempre pega o próximo disponível
   const { rows } = await pool.query(`
-    SELECT gerar_proximo_codigo_cr() AS proximo
-  `)
+    SELECT proximo_codigo
+    FROM vw_proximo_codigo
+    WHERE tabela = 'Contas_Receber'
+      AND empresa = $1
+  `, [Number(dados.empresa)])
 
-  const codigo = rows[0].proximo
+  const codigo = rows[0].proximo_codigo
 
   await pool.query(`
     INSERT INTO public."Contas_Receber"
