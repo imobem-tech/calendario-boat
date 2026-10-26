@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260821
+// wpp/comandos/orcamentos.js — V.2610260828
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4367,15 +4367,23 @@ ${orc.descricao}
     console.log(`🏁 Erros: ${erros.length}`);
     console.log(`🏁 ═══════════════════════════════════════════════\n`);
 
-    // 5. LOG final (resumo)
+    // 5. Atualizar status para ENVIADO
+    await pool.query(`
+      UPDATE orcamento_servico
+      SET status = 'ENVIADO',
+          data_envio = CURRENT_TIMESTAMP
+      WHERE id_orcamento = $1
+    `, [idOrcamento]);
+
+    // 6. LOG final (resumo)
     await adicionarLog(
       idOrcamento,
       'ORCAMENTO_ENVIADO',
-      `Enviado para ${enviosOk}/${rateioResult.rows.length} grupos`,
+      `Enviado para ${enviosOk}/${rateioResult.rows.length} grupos - Status: ENVIADO`,
       userId
     );
 
-    // 6. Resumo
+    // 7. Resumo
     let resumo = `✅ *ORÇAMENTO ENVIADO*
 
 📊 ${enviosOk} de ${rateioResult.rows.length} grupos receberam
