@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610260929
+// wpp/comandos/orcamentos.js — V.2610260931
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -4724,23 +4724,13 @@ Este orçamento ainda não tem rateio definido!
       const mensagem = `━━━━━━━━━━━━━━━━
 🔔 ORÇAMENTO
 ━━━━━━━━━━━━━━━━
-
 🚤 Embarcação: ${orc.nome_embarcacao}
 🆔 ${formatarNumeroOrcamento(orc.id_orcamento, orc.numero)}
 
 📝 Descrição:
 ${orc.descricao}
-
+🎯 Grupo ${grupo.grupo_letra} - ${formatarMoeda(grupo.valor_grupo)}
 ━━━━━━━━━━━━━━━━
-💵 VALOR DO SEU GRUPO
-━━━━━━━━━━━━━━━━
-
-🎯 Grupo ${grupo.grupo_letra}
-
-   ✨ ${formatarMoeda(grupo.valor_grupo)} ✨
-
-━━━━━━━━━━━━━━━━
-
 🌐 Visualizar orçamento completo:
 🔗 ${url}
 
