@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261232
+// wpp/comandos/orcamentos.js — V.2610261238
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // Gerencia criação de orçamentos com múltiplos itens
@@ -1584,10 +1584,8 @@ async function listarOrcamentosFechados(sock, userId, groupId, dias = null) {
   try {
     console.log(`✅ [ORCAMENTOS] Listando orçamentos fechados (${dias ? dias + ' dias' : 'todos'})...`);
 
-    let whereClause = `(
-          os.status IN ('RECUSADO', 'CONCLUIDO', 'CANCELADO')
-          OR (os.status = 'APROVADO' AND os.id_cobranca IS NOT NULL AND os.id_cobranca > 0)
-        )
+    // Orçamentos FECHADOS: RECUSADO, CANCELADO ou CONCLUIDO
+    let whereClause = `os.status IN ('RECUSADO', 'CONCLUIDO', 'CANCELADO')
         AND os.id_grupo = 1`;
 
     if (dias !== null) {
