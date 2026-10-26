@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261603
+// wpp/comandos/orcamentos.js — V.2610261605
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
@@ -1577,7 +1577,7 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
 
     if (result.rows.length === 0) {
       await sock.sendMessage(groupId, {
-        text: `📋 *ORÇAMENTOS ABERTOS*\n\n❌ Nenhum orçamento aberto encontrado.\n\n0️⃣ Voltar ao menu`
+        text: `📋 *ABERTOS / RASCUNHOS*\n\n❌ Nenhum orçamento aberto encontrado.\n\n0️⃣ Voltar ao menu`
       });
 
       // Definir etapa para que "0" funcione
@@ -1589,7 +1589,7 @@ async function listarOrcamentosAbertos(sock, userId, groupId) {
     }
 
     let mensagem = `━━━━━━━━━━━━━━━━
-📋 *ORÇAMENTOS ABERTOS*
+📋 *ABERTOS / RASCUNHOS*
 ━━━━━━━━━━━━━━━━
 Total: ${result.rows.length} orçamento(s)
 
