@@ -1,11 +1,14 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261605
+// wpp/comandos/orcamentos.js — V.2610261625
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
-// NOVO: Parcelamento COMPLETO em MODO TESTE (até 6x, mín R$ 500/parcela/cotista)
-// - Fluxo completo: resumo → escolha parcelas → data customizada → simulação
-// - Envia mensagens aos grupos WhatsApp (MODO TESTE)
-// - NÃO gera cobrança Asaas nem Contas_Receber (preparado para habilitar)
+// ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
+// - Gera cobranças REAIS no Asaas
+// - Cria registros em Contas_Receber
+// - Envia links de pagamento para grupos WhatsApp
+// - Valida: mínimo R$ 5,00 por cotista
+// - Adiciona custo de boleto R$ 5,00 para valores < R$ 50,00
+// - Status: CONCLUIDO após cobrança gerada
 // FIX V.2610261455: Removido espaço após linhas divisórias (━━━━) em 40+ mensagens
 // FIX V.2610261457: Corrigido handlers de parcelamento (estavam no bloco errado)
 //
@@ -3302,15 +3305,11 @@ Digite 0 para voltar aos detalhes`;
 
     console.log(`\n✅ Todos os clientes validados com sucesso!\n`);
 
-    // ✅ REDIRECIONAR PARA MENU DE PARCELAMENTO
-    await mostrarResumoCobranca(sock, userId, groupId, idOrcamento);
-    return;
+    // ═══════════════════════════════════════════════════════════
+    // GERAÇÃO DE COBRANÇAS ASAAS - PRODUÇÃO
+    // ═══════════════════════════════════════════════════════════
 
-    // ═══════════════════════════════════════════════════════════
-    // TODO: CÓDIGO ABAIXO SERÁ USADO QUANDO HABILITAR ASAAS
-    // Por enquanto, fluxo de parcelamento em modo teste
-    // ═══════════════════════════════════════════════════════════
-    /*
+    
     await sock.sendMessage(groupId, {
       text: `⏳ *GERANDO COBRANÇAS ASAAS*
 
@@ -3330,7 +3329,7 @@ Digite 0 para voltar aos detalhes`;
     const dataVencimento = new Date(Date.now() + DIAS_VENCIMENTO * 24 * 60 * 60 * 1000);
 
     // URL do orçamento
-    const urlOrcamento = \`https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=\${orc.token_visualizacao}\`;
+    const urlOrcamento = `https://allmaxcalendar.vercel.app/visualizar-orcamento.html?token=${orc.token_visualizacao}`;
 
     // Array para guardar cobranças geradas
     const cobrancasGeradas = [];
@@ -3338,10 +3337,10 @@ Digite 0 para voltar aos detalhes`;
     const valoresComCusto = [];
     const erros = [];
 
-    console.log(\`\\n💳 ═══════════════════════════════════════════════\`);
-    console.log(\`💳 GERANDO COBRANÇAS ASAAS\`);
-    console.log(\`💳 Total de cotistas: \${rateioResult.rows.length}\`);
-    console.log(\`💳 ═══════════════════════════════════════════════\\n\`);
+    console.log(`\n💳 ═══════════════════════════════════════════════`);
+    console.log(`💳 GERANDO COBRANÇAS ASAAS`);
+    console.log(`💳 Total de cotistas: ${rateioResult.rows.length}`);
+    console.log(`💳 ═══════════════════════════════════════════════\n`);
 
     // ═══════════════════════════════════════════════════════════
     // PRIMEIRA PASSADA: VALIDAÇÃO CRÍTICA
@@ -3596,9 +3595,7 @@ ${detalhesValor}
     resumo += '\n\n━━━━━━━━━━━━━━━━\nDigite 0 para voltar aos detalhes';
 
     await sock.sendMessage(groupId, { text: resumo });
-    */
-
-  } catch (error) {
+    } catch (error) {
     console.error('❌ [ORCAMENTOS] Erro ao gerar cobrança:', error);
     await sock.sendMessage(groupId, {
       text: `❌ Erro ao gerar cobrança.\n\n${error.message}\n\nDigite 0 para voltar aos detalhes`
