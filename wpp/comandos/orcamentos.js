@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610271051
+// wpp/comandos/orcamentos.js — V.2610261823
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -345,8 +345,8 @@ async function selecionarEmbarcacao(sock, userId, groupId, opcao) {
   const embarcacao = estado.embarcacoes[index];
 
   // Atualizar orçamento com embarcação selecionada
-  // ✅ CORREÇÃO: FK aponta para Código, não Num_PB!
-  estado.orcamento.id_embarcacao = embarcacao.codigo;    // FK para banco (Código)
+  // CORRIGIDO: Usar Num_PB como FK (não Código!)
+  estado.orcamento.id_embarcacao = embarcacao.numero_pb; // FK para banco (Num_PB)
   estado.orcamento.numero_pb = embarcacao.numero_pb;     // Exibição
   estado.orcamento.nome_embarcacao = embarcacao.nome;
   estado.etapa = 'TITULO';
