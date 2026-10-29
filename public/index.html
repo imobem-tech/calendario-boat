@@ -1067,7 +1067,10 @@
         }
 
         // Adimplente OU inadimplente mas liberado (1-9 dias) — navega direto
-        // A notificação WhatsApp já foi enviada pela API se necessário
+        // Marca WhatsApp se foi enviado pela API
+        if(json.inadimplente && (json.wppEnfileirado || json.privadoEnviado || json.espelhoEnviado)){
+          marcarWppDisparado();
+        }
         window.location.href = `/agendar?t=${encodeURIComponent(window.acessoAtual.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){

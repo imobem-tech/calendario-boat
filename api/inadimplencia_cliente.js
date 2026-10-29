@@ -1,6 +1,6 @@
 // ============================================================
-// /api/inadimplencia_cliente — V.2610291227
-// Allmax Gestão de Cotas — Allmax®2610291227
+// /api/inadimplencia_cliente — V.2610291258
+// Allmax Gestão de Cotas — Allmax®2610291258
 // Verifica inadimplência do cotista.
 // Se inadimplente:
 //   1. Envia relatório CR no privado do cliente (Cliente_Telefone_Celular)
@@ -13,12 +13,13 @@
 //   { inadimplente: true, privadoEnviado: true|false, espelhoEnviado: true|false, diasAtraso, bloqueado }
 //
 // FIX V.2610291227: Removido filtro de 3 dias - agora verifica QUALQUER conta vencida
+// FIX V.2610291258: Corrigido bug dispararWpp - String() para garantir comparação correta
 // ============================================================
 
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2610291227";
+const VERSAO_API = "Allmax®2610291258";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-production.up.railway.app";
@@ -116,7 +117,7 @@ export default async function handler(req, res) {
   const codAutorizado = Number(req.query.codAutorizado);
   const pb            = Number(req.query.pb);
   const grupo         = String(req.query.grupo || "").trim().toUpperCase();
-  const dispararWpp   = req.query.dispararWpp !== "false";
+  const dispararWpp   = String(req.query.dispararWpp) !== "false";
   const dataAgendamento = String(req.query.dataAgendamento || "").trim();
 
   if (!codAutorizado || !pb || !grupo) {
