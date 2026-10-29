@@ -1,22 +1,22 @@
 // ============================================================
-// /api/inadimplencia_cliente
-// Allmax Gestão de Cotas — Allmax®2605271745
+// /api/inadimplencia_cliente — V.2610290656
+// Allmax Gestão de Cotas — Allmax®2610290656
 // Verifica inadimplência do cotista.
 // Se inadimplente:
 //   1. Envia relatório CR no privado do cliente (Cliente_Telefone_Celular)
 //   2. Espelha no grupo ESPELHO_FINANCEIRO (log gerencial)
 //
-// GET /api/inadimplencia_cliente?codAutorizado=4307&pb=576&grupo=X4
+// GET /api/inadimplencia_cliente?codAutorizado=4307&pb=576&grupo=X4&dataAgendamento=2026-10-29
 //
 // Retorna:
 //   { inadimplente: false }
-//   { inadimplente: true, privadoEnviado: true|false, espelhoEnviado: true|false }
+//   { inadimplente: true, privadoEnviado: true|false, espelhoEnviado: true|false, diasAtraso, bloqueado }
 // ============================================================
 
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2605271600";
+const VERSAO_API = "Allmax®2610290656";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-production.up.railway.app";
@@ -41,14 +41,29 @@ function somenteDigitos(txt) {
   return String(txt || "").replace(/\D+/g, "");
 }
 
-function montarMensagemCR(faturas) {
+function montarMensagemCR(faturas, dataAgendamento, diasAtraso, bloqueado) {
   const linhas = [
     "*ALLMAX COTAS*",
     "*SUMMER NÁUTICA*",
-    "",
-    "⚠️ *Informações sobre Contas em Aberto*",
     ""
   ];
+
+  // Cabeçalho dinâmico com status do agendamento
+  if (dataAgendamento) {
+    const status = bloqueado ? "BLOQUEADO" : "liberado";
+    linhas.push(`Agendamento para ${dataAgendamento} ${status}`);
+    linhas.push("");
+    linhas.push(`⚠️ Atraso de ${diasAtraso} dias. Caso ainda não tenha regularizado o débito, faça para garantir a manutenção do agendamento.`);
+  } else {
+    linhas.push("⚠️ *Informações sobre Contas em Aberto*");
+  }
+
+  linhas.push("");
+
+  if (dataAgendamento) {
+    linhas.push("⚠️ *Informações sobre Contas em Aberto*");
+    linhas.push("");
+  }
 
   for (const f of faturas) {
     linhas.push(`*${f.descricao}*`);
@@ -100,6 +115,7 @@ export default async function handler(req, res) {
   const pb            = Number(req.query.pb);
   const grupo         = String(req.query.grupo || "").trim().toUpperCase();
   const dispararWpp   = req.query.dispararWpp !== "false";
+  const dataAgendamento = String(req.query.dataAgendamento || "").trim();
 
   if (!codAutorizado || !pb || !grupo) {
     return res.status(400).json({
@@ -148,6 +164,42 @@ export default async function handler(req, res) {
     const faturas = rsFaturas.rows;
     console.log(`[inadimplencia] totalFaturas=${faturas.length} codAutorizado=${codAutorizado}`);
 
+    // Calcular dias de atraso baseado na conta MAIS ANTIGA
+    const rsContaMaisAntiga = await client.query(
+      `SELECT "Data_Vencimento"
+         FROM public."Contas_Receber"
+        WHERE "Código_Cliente" = $1
+          AND "Data_Pagamento" IS NULL
+          AND "Data_Vencimento" < CURRENT_DATE
+        ORDER BY "Data_Vencimento" ASC
+        LIMIT 1`,
+      [codAutorizado]
+    );
+
+    let diasAtraso = 0;
+    let dataAgendamentoFormatada = null;
+
+    if (rsContaMaisAntiga.rowCount > 0) {
+      const vencimentoMaisAntigo = rsContaMaisAntiga.rows[0].Data_Vencimento;
+      const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const dataVencimento = new Date(vencimentoMaisAntigo);
+
+      // Calcular diferença em dias
+      const diffTime = hoje.getTime() - dataVencimento.getTime();
+      diasAtraso = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // Formatar data do agendamento se fornecida (YYYY-MM-DD -> DD/MM/YYYY)
+    if (dataAgendamento) {
+      const [ano, mes, dia] = dataAgendamento.split("-");
+      if (ano && mes && dia) {
+        dataAgendamentoFormatada = `${dia}/${mes}/${ano}`;
+      }
+    }
+
+    // Determinar se deve bloquear (> 9 dias)
+    const bloqueado = diasAtraso > 9;
+
     // Q3 — Nome e telefone do cliente
     const rsCliente = await client.query(
       `SELECT "Cliente_Nome" AS nome, "Cliente_Telefone_Celular" AS telefone
@@ -164,7 +216,7 @@ export default async function handler(req, res) {
     let espelhoEnviado = false;
 
     if (dispararWpp) {
-      const mensagemCR = montarMensagemCR(faturas);
+      const mensagemCR = montarMensagemCR(faturas, dataAgendamentoFormatada, diasAtraso, bloqueado);
 
       // 1. Privado do cliente
       if (telefoneBruto) {
@@ -185,12 +237,20 @@ export default async function handler(req, res) {
       }
 
       // 2. Espelho gerencial
-      const mensagemEspelho =
+      let mensagemEspelho =
         `*SAÍDA - ${pb}-${grupo}*\n` +
         `👤 *${nomeCliente}* (Cód. ${codAutorizado})\n` +
-        `📱 ${telefoneBruto || "sem telefone"}\n\n` +
-        `⚠️ *Informações sobre Contas em Aberto*\n\n` +
-        faturas.map(f => {
+        `📱 ${telefoneBruto || "sem telefone"}\n\n`;
+
+      // Adicionar cabeçalho de status se houver data de agendamento
+      if (dataAgendamentoFormatada) {
+        const status = bloqueado ? "BLOQUEADO" : "liberado";
+        mensagemEspelho += `Agendamento para ${dataAgendamentoFormatada} ${status}\n\n`;
+        mensagemEspelho += `⚠️ Atraso de ${diasAtraso} dias. Caso ainda não tenha regularizado o débito, faça para garantir a manutenção do agendamento.\n\n`;
+      }
+
+      mensagemEspelho += `⚠️ *Informações sobre Contas em Aberto*\n\n`;
+      mensagemEspelho += faturas.map(f => {
           const link = String(f.link || "").trim();
           let linhas = [
             `*${f.descricao}*`,
@@ -215,6 +275,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       inadimplente: true,
       totalFaturas: faturas.length,
+      diasAtraso,
+      bloqueado,
       privadoEnviado,
       espelhoEnviado,
       wppEnfileirado,

@@ -1,5 +1,5 @@
 // ============================================================
-// /api/agendar — V.2606251300
+// /api/agendar — V.2610290656
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
@@ -9,6 +9,7 @@
 // FIX V.2606060051: Timezone GMT-3 em contingência + console.error para logs Vercel
 // FIX V.2606060054: CRÍTICO - extrair ÚLTIMO dígito, não todos ("11" → 1 não 11)
 // NEW V.2606251500: Horários ALLMAX/SUMMER com corte SUMMER às 15h BR para amanhã
+// NEW V.2610290656: Bloqueio inadimplência em dois níveis (1-9 dias libera + notifica, >9 dias bloqueia)
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -27,7 +28,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2606251500";
+const VERSAO_API = "Allmax®2610290656";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 const COD_PROPRIETARIO_ALLMAX = 4255;
 
@@ -365,29 +366,61 @@ export default async function handler(req, res) {
     const contingenciaHoje = ehDiaContingenciaHoje(data);
     const dataHoraAgendamento = `${data} ${horaNormalizada}`;
 
-    const rsInadim = await client.query(
-      `SELECT EXISTS (
-         SELECT 1
-           FROM public."Contas_Receber"
-          WHERE "Código_Cliente" = $1
-            AND "Data_Pagamento" IS NULL
-            AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
-       ) AS inadimplente`,
+    // ============================================================
+    // VERIFICAÇÃO DE INADIMPLÊNCIA EM DOIS NÍVEIS
+    // ============================================================
+    const rsContaMaisAntiga = await client.query(
+      `SELECT "Data_Vencimento"
+         FROM public."Contas_Receber"
+        WHERE "Código_Cliente" = $1
+          AND "Data_Pagamento" IS NULL
+          AND "Data_Vencimento" < CURRENT_DATE
+        ORDER BY "Data_Vencimento" ASC
+        LIMIT 1`,
       [codAutorizado]
     );
 
-    if (rsInadim.rows[0]?.inadimplente === true) {
-      // ============================================================
-      // INADIMPLENTE DETECTADO
-      // TODO: Implementar notificação após corrigir erro 500
-      // ============================================================
-      console.log('[AGENDAR] Cliente inadimplente detectado:', codAutorizado);
+    if (rsContaMaisAntiga.rowCount > 0) {
+      const vencimentoMaisAntigo = rsContaMaisAntiga.rows[0].Data_Vencimento;
+      const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const dataVencimento = new Date(vencimentoMaisAntigo);
 
-      // Retorna erro 403 sem tentar enviar notificação (por enquanto)
-      return res.status(403).json({
-        error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
-        versao: VERSAO_API
-      });
+      // Calcular diferença em dias
+      const diffTime = hoje.getTime() - dataVencimento.getTime();
+      const diasAtraso = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      console.log(`[AGENDAR] Cliente ${codAutorizado} com ${diasAtraso} dias de atraso`);
+
+      // Chama API de inadimplência para enviar notificação (sempre)
+      const API_BASE_URL = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://calendario-boat.vercel.app';
+
+      try {
+        await fetch(
+          `${API_BASE_URL}/api/inadimplencia_cliente?codAutorizado=${codAutorizado}&pb=${codEmbPB}&grupo=${grupo}&dataAgendamento=${data}&dispararWpp=true`,
+          { method: 'GET' }
+        );
+        console.log(`[AGENDAR] Notificação de inadimplência enviada para cliente ${codAutorizado}`);
+      } catch (notifErr) {
+        console.warn(`[AGENDAR] Falha ao enviar notificação:`, notifErr.message);
+      }
+
+      // BLOQUEIA APENAS SE > 9 DIAS
+      if (diasAtraso > 9) {
+        console.log(`[AGENDAR] ❌ BLOQUEIO: ${diasAtraso} dias de atraso (>9)`);
+
+        client.release();
+        client = null;
+
+        return res.status(403).json({
+          error: "Agendamento suspenso. Faça contato com a Marina através do WhatsApp.",
+          versao: VERSAO_API
+        });
+      }
+
+      // 1-9 DIAS: LIBERA mas já notificou
+      console.log(`[AGENDAR] ✅ LIBERADO: ${diasAtraso} dias de atraso (≤9) - notificação enviada`);
     }
 
     await client.query("BEGIN");
