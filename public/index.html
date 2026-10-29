@@ -1052,12 +1052,12 @@
       try{
         // Consulta silenciosa — sem abrir modal ainda
         const dispararWpp = !wppJaDisparadoNaSessao();
-        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(window.acessoAtual.codAutorizado)}&pb=${encodeURIComponent(window.acessoAtual.pb)}&grupo=${encodeURIComponent(window.acessoAtual.grupo)}&dispararWpp=${dispararWpp}`;
+        const url = `/api/inadimplencia_cliente?codAutorizado=${encodeURIComponent(window.acessoAtual.codAutorizado)}&pb=${encodeURIComponent(window.acessoAtual.pb)}&grupo=${encodeURIComponent(window.acessoAtual.grupo)}&dataAgendamento=${encodeURIComponent(dataStr)}&dispararWpp=${dispararWpp}`;
         const resp = await fetch(url, { cache: "no-store" });
         const json = await resp.json();
 
-        if(!resp.ok || json.inadimplente){
-          // Só agora abre o modal — confirmada inadimplência
+        if(!resp.ok || (json.inadimplente && json.bloqueado)){
+          // BLOQUEIA apenas se inadimplente E bloqueado (> 9 dias)
           if(json.wppEnfileirado || json.privadoEnviado || json.espelhoEnviado){
             marcarWppDisparado();
           }
@@ -1066,7 +1066,8 @@
           return;
         }
 
-        // Adimplente — navega direto, sem abrir nada
+        // Adimplente OU inadimplente mas liberado (1-9 dias) — navega direto
+        // A notificação WhatsApp já foi enviada pela API se necessário
         window.location.href = `/agendar?t=${encodeURIComponent(window.acessoAtual.token)}&data=${encodeURIComponent(dataStr)}`;
 
       }catch(err){

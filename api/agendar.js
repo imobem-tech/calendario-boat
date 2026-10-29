@@ -1,5 +1,5 @@
 // ============================================================
-// /api/agendar — V.2610290656
+// /api/agendar — V.2610291252
 // Allmax Gestão de Cotas — Marujo⚓
 // FIX: Cod_Proprietário da tabela embarcações + decode token grupo E1→51 corrigido
 // FIX V.2606052012: Envio de previsão após agendamento do mesmo dia
@@ -10,6 +10,7 @@
 // FIX V.2606060054: CRÍTICO - extrair ÚLTIMO dígito, não todos ("11" → 1 não 11)
 // NEW V.2606251500: Horários ALLMAX/SUMMER com corte SUMMER às 15h BR para amanhã
 // NEW V.2610290656: Bloqueio inadimplência em dois níveis (1-9 dias libera + notifica, >9 dias bloqueia)
+// FIX V.2610291252: Force redeploy para garantir versão correta em produção
 // ============================================================
 import pkg from "pg";
 const { Pool } = pkg;
@@ -28,7 +29,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
   }
 }
 
-const VERSAO_API = "Allmax®2610290656";
+const VERSAO_API = "Allmax®2610291252";
 const VERSAO_WPP = process.env.VERSAO_WPP || "Allmax®2604232353";
 const COD_PROPRIETARIO_ALLMAX = 4255;
 
