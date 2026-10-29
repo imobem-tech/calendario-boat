@@ -1,6 +1,6 @@
 // ============================================================
-// /api/inadimplencia_cliente — V.2610290656
-// Allmax Gestão de Cotas — Allmax®2610290656
+// /api/inadimplencia_cliente — V.2610291227
+// Allmax Gestão de Cotas — Allmax®2610291227
 // Verifica inadimplência do cotista.
 // Se inadimplente:
 //   1. Envia relatório CR no privado do cliente (Cliente_Telefone_Celular)
@@ -11,12 +11,14 @@
 // Retorna:
 //   { inadimplente: false }
 //   { inadimplente: true, privadoEnviado: true|false, espelhoEnviado: true|false, diasAtraso, bloqueado }
+//
+// FIX V.2610291227: Removido filtro de 3 dias - agora verifica QUALQUER conta vencida
 // ============================================================
 
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®2610290656";
+const VERSAO_API = "Allmax®2610291227";
 
 const ESPELHO_FINANCEIRO_ID = process.env.ESPELHO_FINANCEIRO_ID || "120363424805097946@g.us";
 const BOT_URL = process.env.BOT_URL || "https://calendario-boat-production.up.railway.app";
@@ -129,14 +131,14 @@ export default async function handler(req, res) {
   try {
     client = await pool.connect();
 
-    // Q1 — Portão
+    // Q1 — Portão (verifica QUALQUER conta vencida)
     const rsExiste = await client.query(
       `SELECT EXISTS (
          SELECT 1
            FROM public."Contas_Receber"
           WHERE "Código_Cliente" = $1
             AND "Data_Pagamento" IS NULL
-            AND "Data_Vencimento" < CURRENT_DATE - INTERVAL '3 days'
+            AND "Data_Vencimento" < CURRENT_DATE
        ) AS inadimplente`,
       [codAutorizado]
     );
