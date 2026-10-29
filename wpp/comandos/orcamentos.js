@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/orcamentos.js — V.2610261823
+// wpp/comandos/orcamentos.js — V.2610290717
 // SISTEMA DE ORÇAMENTOS VIA WHATSAPP
 //
 // ⚠️ MODO: PRODUÇÃO - GERANDO COBRANÇAS ASAAS REAIS
@@ -5003,9 +5003,6 @@ async function verDetalhesOrcamento(sock, userId, groupId, idOrcamento, origem =
 📌 *TÍTULO/DESCRIÇÃO:*
 ${orc.titulo || '(sem descrição)'}
 ━━━━━━━━━━━━━━━━
-📌 *Observações:*
-${orc.observacao || '(sem observação)'}
-━━━━━━━━━━━━━━━━
 📦 *ITENS:*
 `;
 
@@ -5040,7 +5037,11 @@ Taxa gestão (${orc.taxa_servico_perc}%): ${formatarMoeda(orc.taxa_servico_valor
 0️⃣ 🔙 Voltar
 
 ━━━━━━━━━━━━━━━━
-Digite o número da opção:`;
+Digite o número da opção:
+
+━━━━━━━━━━━━━━━━
+📌 *Observações:*
+${orc.observacao || '(sem observação)'}`;
 
     await sock.sendMessage(groupId, { text: mensagem });
 
@@ -5172,8 +5173,11 @@ async function iniciarAlteracaoObservacao(sock, userId, groupId, idOrcamento) {
 ${orc.observacao || '(sem observação)'}
 
 ━━━━━━━━━━━━━━━━
-Digite a nova observação
-ou 0 para cancelar`
+Digite a nova observação (será adicionada)
+
+📝 Adicionar = acumula com as anteriores
+🗑️ "limpar" = apaga tudo e começa nova
+❌ 0 = voltar`
     });
 
     atualizarEstado(userId, {
@@ -6801,6 +6805,26 @@ Voltando ao menu...`
   if (estado.etapa === 'ALTERAR_OBSERVACAO') {
     // Handler de "0" é global (volta aos detalhes)
 
+    // Comando especial: limpar observações
+    if (texto.toLowerCase() === 'limpar') {
+      await sock.sendMessage(groupId, {
+        text: `🗑️ *LIMPAR OBSERVAÇÕES*
+━━━━━━━━━━━━━━━━
+🆔 ${formatarNumeroOrcamento(estado.id_orcamento, '')}
+
+📝 *NOVA OBSERVAÇÃO*
+━━━━━━━━━━━━━━━━
+Digite a nova observação
+ou 0 para voltar`
+      });
+
+      atualizarEstado(userId, {
+        etapa: 'LIMPAR_OBSERVACAO',
+        id_orcamento: estado.id_orcamento
+      });
+      return;
+    }
+
     try {
       // Buscar observação atual
       const result = await pool.query(`
@@ -6811,6 +6835,14 @@ Voltando ao menu...`
 
       const observacaoAtual = result.rows[0]?.observacao || '';
 
+      // ACUMULAR: adicionar com divisória
+      let observacaoFinal;
+      if (observacaoAtual) {
+        observacaoFinal = `${observacaoAtual}\n\n----------------------\n${texto}`;
+      } else {
+        observacaoFinal = texto;
+      }
+
       // Mostrar comparação e pedir confirmação
       await sock.sendMessage(groupId, {
         text: `📝 *CONFIRMAR ALTERAÇÃO*
@@ -6819,8 +6851,8 @@ Voltando ao menu...`
 ${observacaoAtual || '(vazia)'}
 
 ━━━━━━━━━━━━━━━━
-✨ *OBSERVAÇÃO NOVA:*
-${texto}
+✨ *OBSERVAÇÃO NOVA (acumulada):*
+${observacaoFinal}
 
 ━━━━━━━━━━━━━━━━
 1️⃣ ✅ Confirmar alteração
@@ -6830,7 +6862,7 @@ ${texto}
       atualizarEstado(userId, {
         etapa: 'CONFIRMAR_OBSERVACAO',
         id_orcamento: estado.id_orcamento,
-        observacao_nova: texto
+        observacao_nova: observacaoFinal
       });
 
     } catch (error) {
@@ -6881,6 +6913,44 @@ Voltando ao menu...`
         text: '❌ Alteração cancelada.\n\nVoltando ao menu...'
       });
       await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+    }
+    return;
+  }
+
+  // Limpar observações - receber nova observação do zero
+  if (estado.etapa === 'LIMPAR_OBSERVACAO') {
+    // Handler de "0" é global (volta aos detalhes)
+
+    try {
+      // Salvar apenas a nova observação (apaga a anterior)
+      await pool.query(`
+        UPDATE orcamento_servico
+        SET observacao = $1
+        WHERE id_orcamento = $2
+      `, [texto, estado.id_orcamento]);
+
+      // Registrar no LOG
+      await adicionarLog(
+        estado.id_orcamento,
+        'OBSERVACAO_LIMPA',
+        `Observações antigas limpas. Nova observação: ${texto}`,
+        userId
+      );
+
+      await sock.sendMessage(groupId, {
+        text: `✅ *Observações limpas e nova observação salva!*
+
+Voltando ao menu...`
+      });
+
+      // Voltar ao submenu ALTERAR
+      await alterarDescricaoOrcamento(sock, userId, groupId, estado.id_orcamento);
+
+    } catch (error) {
+      console.error('❌ Erro ao salvar observação:', error);
+      await sock.sendMessage(groupId, {
+        text: `❌ Erro ao salvar:\n${error.message}\n\nDigite 0 para voltar`
+      });
     }
     return;
   }
