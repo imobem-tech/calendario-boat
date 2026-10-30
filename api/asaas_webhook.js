@@ -1,7 +1,7 @@
 // ============================================================
 // /api/asaas_webhook
 // Allmax Gestão de Cotas — Baixa automática de CR
-// V.2605280015
+// V.2610292120
 //
 // Recebe eventos do Asaas (PAYMENT_RECEIVED / PAYMENT_CONFIRMED)
 // e grava Data_Pagamento em public."Contas_Receber".
@@ -23,7 +23,8 @@
 // UPDATE grava apenas:
 //   Total                  — valor pago (vBase + vJuros + vMulta - vDesc)
 //   Data_Pagamento         — paymentDate vindo do Asaas
-//   Observacões_Pagamento  — "Asaas_<timestamp> webhook <clientPaymentDate>"
+//   Observacões_Pagamento  — APPEND (preserva conteúdo anterior + separador + nova linha)
+//                            Formato: "Asaas_<timestamp> webhook <clientPaymentDate>"
 //
 // Idempotência: busca filtra Data_Pagamento IS NULL — se já baixada, ignora.
 // ============================================================
@@ -31,7 +32,7 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-const VERSAO_API = "Allmax®V.2605280015";
+const VERSAO_API = "Allmax®V.2610292120";
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
@@ -166,6 +167,7 @@ export default async function handler(req, res) {
 
     // --------------------------------------------------------
     // 5. Baixa definitiva
+    //    Observacões_Pagamento: APPEND ao invés de sobrescrever
     // --------------------------------------------------------
     await client.query("BEGIN");
 
@@ -173,7 +175,14 @@ export default async function handler(req, res) {
       `UPDATE public."Contas_Receber"
           SET "Total"                  = $1,
               "Data_Pagamento"         = $2,
-              "Observacões_Pagamento"  = $3
+              "Observacões_Pagamento"  =
+                COALESCE(NULLIF(TRIM("Observacões_Pagamento"), ''), '') ||
+                CASE
+                  WHEN TRIM(COALESCE("Observacões_Pagamento", '')) != ''
+                  THEN E'\n----------------------------------------------------------\n'
+                  ELSE ''
+                END ||
+                $3
         WHERE "Codigo" = $4`,
       [
         valorPago,
