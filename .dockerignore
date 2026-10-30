@@ -1,0 +1,83 @@
+# ============================================================
+# .dockerignore — V.2610302030
+# Evita subir arquivos desnecessários no deploy
+# ============================================================
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git (histórico completo - desnecessário no deploy)
+.git/
+.gitignore
+.gitattributes
+
+# Ambiente local
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backups e temporários
+backup/
+*.backup
+*.bak
+*.tmp
+temp/
+
+# CSV e relatórios (não precisam no servidor)
+*.csv
+relatorio_*.csv
+hm_*.csv
+
+# Scripts de teste local
+test-*.js
+simular_*.js
+debug_*.js
+verificar_*.js
+
+# Arquivos de desenvolvimento
+*.md
+!README.md
+CLAUDE.md
+TODO.md
+
+# Auth info (Railway cria próprio)
+auth_info/
+
+# Arquivos grandes desnecessários
+*.zip
+*.tar.gz
+*.rar
+
+# Documentação
+docs/
+documentation/
+
+# Cache
+.cache/
+.parcel-cache/
+.next/
+dist/
+
+# ============================================================
+# RESULTADO ESPERADO:
+# - Reduz upload de ~50 MB para ~5-10 MB
+# - Deploy 2-3 min mais rápido! ✅
+# ============================================================

@@ -1,3 +1,47 @@
-# Force rebuild
-node_modules/
+# ============================================================
+# .railwayignore — V.2610302030
+# Railway-specific: o que NÃO enviar no deploy
+# ============================================================
+
+# Backups (não precisam no servidor)
+backup/
+*.backup
+*.bak
+
+# Relatórios e CSVs locais
+*.csv
+relatorio_*.csv
+hm_*.csv
+
+# Scripts de teste/debug locais
+test-*.js
+simular_*.js
+debug_*.js
+verificar_*.js
+gerar_relatorio_*.js
+limpar_hm_*.js
+relatorio_comparativo_*.js
+
+# Documentação
+*.md
+!README.md
+
+# Git
 .git/
+.gitignore
+
+# Editores
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# NOTA: Railway processa .railwayignore ANTES de .dockerignore
+# Tudo aqui é EXCLUÍDO completamente do deploy
+# ============================================================
