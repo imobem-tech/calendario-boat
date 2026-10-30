@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2610241915
+// wpp/server.js — V.2610301215
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
@@ -8,6 +8,7 @@
 // REBUILD: Forçando deploy limpo (Railway cache fix)
 // DEBUG: Rota /versao-html para verificar arquivo servido (07/10/2026 21:47)
 // FIX (24/10 16:20): Passa mensagem completa para orcamentos.js (bug upload anexos)
+// NEW (30/10 12:15): Integração web-app/routes/orcamentos.js (sistema web estilo chat)
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -66,6 +67,7 @@ import { tratarComandoSaida, buscarColaborador } from './comandos/saida.js'
 import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 import { mostrarMenuOrcamentos, processarMensagemOrcamentos } from './comandos/orcamentos.js'
+import orcamentosWebRouter from '../web-app/routes/orcamentos.js'
 // GEOLOCALIZAÇÃO DESABILITADA (14/09/2026) - Até segunda ordem
 // import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
@@ -108,9 +110,11 @@ const __dirname = path.dirname(__filename)
 // Servir arquivos estáticos da pasta public (mapa de rastreamento)
 // public/ está na raiz do projeto (um nível acima de wpp/)
 const publicPath = path.join(__dirname, '..', 'public')
+const webAppPath = path.join(__dirname, '..', 'web-app')
 console.log('📁 Working directory:', process.cwd())
 console.log('📁 __dirname:', __dirname)
 console.log('📁 Servindo arquivos estáticos de:', publicPath)
+console.log('📁 Servindo web-app de:', webAppPath)
 
 // ============================================================
 // 🚫 MIDDLEWARE ANTI-CACHE (Railway Edge/CDN fix)
@@ -134,6 +138,10 @@ app.use((req, res, next) => {
 
 app.use(express.static(publicPath))
 
+// Servir arquivos públicos do web-app (CSS, JS)
+app.use('/css', express.static(path.join(webAppPath, 'public', 'css')))
+app.use('/js', express.static(path.join(webAppPath, 'public', 'js')))
+
 app.use(express.json())
 
 // CORS para permitir requisições do Vercel
@@ -152,6 +160,12 @@ app.use('/api/banco', bancoRouter)
 app.use('/api/banco/tokens', fileTokensRouter)
 app.use('/visualizador', visualizadorTokenRouter)
 app.use('/api/wpp', wppApiRouter)
+app.use('/api/orcamentos', orcamentosWebRouter)
+
+// Rota para servir página de orçamentos web
+app.get('/orcamentos', (req, res) => {
+  res.sendFile(path.join(webAppPath, 'views', 'orcamentos.html'))
+})
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL

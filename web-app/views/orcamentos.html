@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Orçamentos - SummerMax</title>
+    <link rel="stylesheet" href="/css/orcamentos.css?v=2610301210">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <h1>💼 Sistema de Orçamentos</h1>
+            <div class="header-info">
+                <span id="usuarioNome">Carregando...</span>
+                <button id="btnVoltar" class="btn-voltar">← Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container Principal -->
+    <div class="container">
+        <!-- Área de Chat -->
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <!-- Indicador de digitação -->
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input">
+                <input
+                    type="text"
+                    id="comandoInput"
+                    placeholder="Digite o número da opção ou comando..."
+                    autocomplete="off"
+                >
+                <button id="btnEnviar">Enviar ➤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <script src="/js/orcamentos.js?v=2610301210"></script>
+</body>
+</html>
+<!-- V.2610301210 -->
