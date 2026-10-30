@@ -162,6 +162,11 @@ app.use('/visualizador', visualizadorTokenRouter)
 app.use('/api/wpp', wppApiRouter)
 app.use('/api/orcamentos', orcamentosWebRouter)
 
+// Rota de teste
+app.get('/teste-orcamentos', (req, res) => {
+  res.send('✅ Sistema de orçamentos carregado! webAppPath: ' + webAppPath)
+})
+
 // Rota para servir página de orçamentos web
 app.get('/orcamentos', (req, res) => {
   res.sendFile(path.join(webAppPath, 'views', 'orcamentos.html'))
