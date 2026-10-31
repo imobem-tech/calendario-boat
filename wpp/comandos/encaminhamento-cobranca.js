@@ -1,10 +1,11 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302319
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302326
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
+// - Layout melhorado: cabeçalho + forward nativo + rodapé
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -169,103 +170,68 @@ Obrigado!`
 }
 
 /**
- * Gera mensagem para grupo responsável
+ * Gera cabeçalho para grupo (NOVO LAYOUT)
  */
-function gerarMensagemGrupo(cobranca, mensagemCliente, ehAudio = false, origem = 'cobranca') {
-  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
   const vencimento = new Date(cobranca.data_vencimento).toLocaleDateString('pt-BR')
-  const urlCobranca = gerarUrlCobranca(cobranca.id_asaas)
 
-  const tipoOrigem = origem === 'cobranca'
-    ? '🔔 *RESPOSTA DE CLIENTE - COBRANÇA*'
-    : '🔔 *CONTATO DE CLIENTE - CONTA PRÓXIMA VENCIMENTO*'
+  const emoji = origem === 'cobranca' ? '💰' : '📋'
+  const titulo = origem === 'cobranca'
+    ? 'COBRANÇA | RESPOSTA RECEBIDA'
+    : 'CONTA PRÓXIMA | CONTATO RECEBIDO'
 
-  if (ehAudio) {
-    return `${tipoOrigem}
+  return `${emoji} *${titulo}*
 
-👤 *Cliente:* ${cobranca.codigo_cliente} - ${cobranca.nome_cliente}
-📱 *Celular:* ${mensagemCliente.celular}
-🏢 *Empresa:* ${obterEmpresa(cobranca.centro_custo)}
-💰 *Valor:* R$ ${cobranca.valor.toFixed(2)}
-📅 *Vencimento:* ${vencimento}
-⏰ *Respondeu em:* ${agora}
+👤 ${cobranca.nome_cliente} (#${cobranca.codigo_cliente})
+📞 ${celular}
+🏢 ${obterEmpresa(cobranca.centro_custo)}
+💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎤 *ÁUDIO DO CLIENTE:*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[Áudio encaminhado abaixo] ⬇️
-Duração: ${mensagemCliente.duracao || '?'} segundos
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 *Descrição:* ${cobranca.descricao || 'N/A'}
-🔗 *Cobrança:* ${urlCobranca}`
-  }
-
-  return `${tipoOrigem}
-
-👤 *Cliente:* ${cobranca.codigo_cliente} - ${cobranca.nome_cliente}
-📱 *Celular:* ${mensagemCliente.celular}
-🏢 *Empresa:* ${obterEmpresa(cobranca.centro_custo)}
-💰 *Valor:* R$ ${cobranca.valor.toFixed(2)}
-📅 *Vencimento:* ${vencimento}
-⏰ *Respondeu em:* ${agora}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 *MENSAGEM DO CLIENTE:*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${mensagemCliente.texto}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 *Descrição:* ${cobranca.descricao || 'N/A'}
-🔗 *Cobrança:* ${urlCobranca}`
+💬 Cliente disse:`
 }
 
 /**
- * Gera mensagem para ambos grupos (cliente sem identificação)
+ * Gera rodapé com infos extras (NOVO LAYOUT)
  */
-function gerarMensagemSemIdentificacao(cliente, mensagemCliente, ehAudio = false) {
-  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+function gerarRodape(cobranca) {
+  const agora = new Date().toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  const dataAgora = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  const urlCobranca = gerarUrlCobranca(cobranca.id_asaas)
 
+  return `━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 ${cobranca.descricao || 'N/A'}
+🔗 ${urlCobranca}
+🕐 ${agora} | ${dataAgora}`
+}
+
+/**
+ * Gera cabeçalho para ambos grupos (sem identificação)
+ */
+function gerarCabecalhoSemIdentificacao(cliente, celular) {
   const clienteInfo = cliente
-    ? `👤 *Cliente:* ${cliente.codigo} - ${cliente.nome}`
-    : `👤 *Cliente:* Não identificado`
+    ? `${cliente.nome} (#${cliente.codigo})`
+    : 'Não identificado'
 
-  if (ehAudio) {
-    return `⚠️ *CONTATO DE CLIENTE - SEM COBRANÇA IDENTIFICADA*
+  const agora = new Date().toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  const dataAgora = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
 
-${clienteInfo}
-📱 *Celular:* ${mensagemCliente.celular}
-⏰ *Horário:* ${agora}
+  return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
 
-⚠️ *Cliente NÃO possui cobrança enviada recentemente*
-⚠️ *Não há contas próximas do vencimento*
-⚠️ *Verificar manualmente qual empresa atender*
+👤 ${clienteInfo}
+📞 ${celular}
+⚠️ Sem cobrança/conta identificada
+⚠️ Verificar manualmente
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎤 *ÁUDIO DO CLIENTE:*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[Áudio encaminhado abaixo] ⬇️
-Duração: ${mensagemCliente.duracao || '?'} segundos`
-  }
-
-  return `⚠️ *CONTATO DE CLIENTE - SEM COBRANÇA IDENTIFICADA*
-
-${clienteInfo}
-📱 *Celular:* ${mensagemCliente.celular}
-⏰ *Horário:* ${agora}
-
-⚠️ *Cliente NÃO possui cobrança enviada recentemente*
-⚠️ *Não há contas próximas do vencimento*
-⚠️ *Verificar manualmente qual empresa atender*
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 *MENSAGEM DO CLIENTE:*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${mensagemCliente.texto}`
+💬 Cliente disse:
+━━━━━━━━━━━━━━━━━━━━━━━━━━`
 }
 
 /**
@@ -331,24 +297,21 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
         await sock.sendMessage(remetente, { text: respostaGenerica })
         console.log('   ✅ Resposta genérica enviada ao cliente')
 
-        // Mensagem para grupos
-        const msgGrupos = gerarMensagemSemIdentificacao(cliente, {
-          celular: remetente,
-          texto: textoMensagem,
-          duracao: mensagem.message?.audioMessage?.seconds
-        }, ehAudio)
+        // NOVO LAYOUT: cabeçalho + forward
+        const cabecalho = gerarCabecalhoSemIdentificacao(cliente, remetente)
 
-        // Enviar para AMBOS grupos
-        await sock.sendMessage('120363429567064636@g.us', { text: msgGrupos }) // IMOBEM
-        await sock.sendMessage('556332258473-1556910161@g.us', { text: msgGrupos }) // ALLMAX
+        // Enviar para AMBOS grupos (IMOBEM + ALLMAX)
+        const grupos = ['120363429567064636@g.us', '556332258473-1556910161@g.us']
 
-        // Se for áudio, encaminhar também
-        if (ehAudio) {
-          await sock.sendMessage('120363429567064636@g.us', { forward: mensagem })
-          await sock.sendMessage('556332258473-1556910161@g.us', { forward: mensagem })
+        for (const grupo of grupos) {
+          // 1. Cabeçalho
+          await sock.sendMessage(grupo, { text: cabecalho })
+
+          // 2. Forward da mensagem original (com seta ↩️)
+          await sock.sendMessage(grupo, { forward: mensagem })
         }
 
-        console.log('   📨 Encaminhado para AMBOS grupos')
+        console.log('   📨 Encaminhado para AMBOS grupos (novo layout)')
         return true
       }
     }
@@ -382,20 +345,23 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     }
 
     // SEMPRE encaminha para grupo (primeira ou não)
-    const msgGrupo = gerarMensagemGrupo(cobranca, {
-      celular: remetente,
-      texto: textoMensagem,
-      duracao: mensagem.message?.audioMessage?.seconds
-    }, ehAudio, origem)
+    // NOVO LAYOUT: cabeçalho + forward + rodapé
 
-    await sock.sendMessage(grupoResponsavel, { text: msgGrupo })
+    // Adicionar celular ao objeto cobrança para usar no cabeçalho
+    cobranca.celular = remetente
 
-    // Se for áudio, encaminhar o áudio também
-    if (ehAudio) {
-      await sock.sendMessage(grupoResponsavel, { forward: mensagem })
-    }
+    // 1. Cabeçalho
+    const cabecalho = gerarCabecalhoGrupo(cobranca, remetente, origem)
+    await sock.sendMessage(grupoResponsavel, { text: cabecalho })
 
-    console.log(`   📨 Encaminhado para grupo ${empresa}`)
+    // 2. Forward da mensagem original (com seta ↩️)
+    await sock.sendMessage(grupoResponsavel, { forward: mensagem })
+
+    // 3. Rodapé
+    const rodape = gerarRodape(cobranca)
+    await sock.sendMessage(grupoResponsavel, { text: rodape })
+
+    console.log(`   📨 Encaminhado para grupo ${empresa} (novo layout: 3 mensagens)`)
 
     return true
 
