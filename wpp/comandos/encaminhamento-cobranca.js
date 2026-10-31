@@ -1,11 +1,12 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302326
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302333
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
+// FIX: Centro_Custo não existe em Cliente, apenas em Contas_Receber
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -73,6 +74,7 @@ async function buscarUltimaCobranca(pool, celular) {
 
 /**
  * Busca cliente por celular
+ * NOTA: Centro_Custo NÃO existe em Cliente, está em Contas_Receber!
  */
 async function buscarClientePorCelular(pool, celular) {
   const celularLimpo = celular.replace(/\D/g, '')
@@ -80,8 +82,7 @@ async function buscarClientePorCelular(pool, celular) {
   const query = `
     SELECT
       "Codigo" as codigo,
-      "Cliente_Nome" as nome,
-      "Centro_Custo" as centro_custo
+      "Cliente_Nome" as nome
     FROM public."Cliente"
     WHERE "Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
     LIMIT 1
