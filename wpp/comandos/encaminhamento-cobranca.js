@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302342
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302348
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
@@ -10,6 +10,8 @@
 //              Centro_Custo já existe em avisos_historico
 // AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
 //         Empresa dinâmica em mensagem genérica
+// NEW: Formatação de número WhatsApp (@lid, @s.whatsapp.net, etc)
+//      143572351365182@lid → +14 357 235 1365 182
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -194,6 +196,7 @@ Obrigado!`
  */
 function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
   const vencimento = new Date(cobranca.data_vencimento).toLocaleDateString('pt-BR')
+  const numeroFormatado = formatarNumeroWhatsApp(celular)
 
   const emoji = origem === 'cobranca' ? '💰' : '📋'
   const titulo = origem === 'cobranca'
@@ -203,7 +206,7 @@ function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
   return `${emoji} *${titulo}*
 
 👤 ${cobranca.nome_cliente} (#${cobranca.codigo_cliente})
-📞 ${celular}
+📞 ${numeroFormatado}
 🏢 ${obterEmpresa(cobranca.centro_custo)}
 💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
 
@@ -229,6 +232,34 @@ function gerarRodape(cobranca) {
 }
 
 /**
+ * Formata número de telefone do WhatsApp
+ * Remove @s.whatsapp.net, @lid, @c.us, etc.
+ * Formata para exibição legível
+ */
+function formatarNumeroWhatsApp(jid) {
+  // Remove sufixos do WhatsApp (@s.whatsapp.net, @lid, @c.us, etc)
+  const numero = jid.split('@')[0]
+
+  // Se não tem dígitos, retorna original
+  if (!/^\d+$/.test(numero)) return jid
+
+  // Formatar conforme tamanho
+  if (numero.length === 13) {
+    // Formato: +55 11 99999-9999 (Brasil com 9)
+    return `+${numero.slice(0, 2)} ${numero.slice(2, 4)} ${numero.slice(4, 9)}-${numero.slice(9)}`
+  } else if (numero.length === 12) {
+    // Formato: +55 11 9999-9999 (Brasil sem 9)
+    return `+${numero.slice(0, 2)} ${numero.slice(2, 4)} ${numero.slice(4, 8)}-${numero.slice(8)}`
+  } else if (numero.length > 10) {
+    // Formato genérico internacional
+    return `+${numero.slice(0, 2)} ${numero.slice(2)}`
+  } else {
+    // Retorna como está
+    return numero
+  }
+}
+
+/**
  * Gera cabeçalho para ambos grupos (sem identificação)
  */
 function gerarCabecalhoSemIdentificacao(cliente, celular) {
@@ -236,17 +267,12 @@ function gerarCabecalhoSemIdentificacao(cliente, celular) {
     ? `${cliente.nome} (#${cliente.codigo})`
     : 'Não identificado'
 
-  const agora = new Date().toLocaleString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-  const dataAgora = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  const numeroFormatado = formatarNumeroWhatsApp(celular)
 
   return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
 
 👤 ${clienteInfo}
-📞 ${celular}
+📞 ${numeroFormatado}
 ⚠️ Sem cobrança/conta identificada
 ⚠️ Verificar manualmente
 
