@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302348
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302352
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
@@ -10,8 +10,8 @@
 //              Centro_Custo já existe em avisos_historico
 // AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
 //         Empresa dinâmica em mensagem genérica
-// NEW: Formatação de número WhatsApp (@lid, @s.whatsapp.net, etc)
-//      143572351365182@lid → +14 357 235 1365 182
+// REVERT: Removida formatação de número - mostra JID original
+//         143572351365182@lid (como está no WhatsApp)
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -196,7 +196,6 @@ Obrigado!`
  */
 function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
   const vencimento = new Date(cobranca.data_vencimento).toLocaleDateString('pt-BR')
-  const numeroFormatado = formatarNumeroWhatsApp(celular)
 
   const emoji = origem === 'cobranca' ? '💰' : '📋'
   const titulo = origem === 'cobranca'
@@ -206,7 +205,7 @@ function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
   return `${emoji} *${titulo}*
 
 👤 ${cobranca.nome_cliente} (#${cobranca.codigo_cliente})
-📞 ${numeroFormatado}
+📞 ${celular}
 🏢 ${obterEmpresa(cobranca.centro_custo)}
 💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
 
@@ -267,12 +266,10 @@ function gerarCabecalhoSemIdentificacao(cliente, celular) {
     ? `${cliente.nome} (#${cliente.codigo})`
     : 'Não identificado'
 
-  const numeroFormatado = formatarNumeroWhatsApp(celular)
-
   return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
 
 👤 ${clienteInfo}
-📞 ${numeroFormatado}
+📞 ${celular}
 ⚠️ Sem cobrança/conta identificada
 ⚠️ Verificar manualmente
 
