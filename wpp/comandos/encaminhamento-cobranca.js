@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302335
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302342
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
@@ -8,6 +8,8 @@
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
 // FIX CRÍTICO: Removido JOIN com Cliente na busca de avisos_historico
 //              Centro_Custo já existe em avisos_historico
+// AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
+//         Empresa dinâmica em mensagem genérica
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -167,9 +169,7 @@ function gerarMensagemRetorno(empresa, ehAudio = false) {
 
 Aqui é o 🤖 atendente digital da ${empresa}!
 
-Sua ${tipo} foi recebida e encaminhada!
-
-Nossa equipe financeira já foi avisada e retornará em breve.
+Sua ${tipo} foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
 
 Obrigado!`
 }
@@ -177,16 +177,14 @@ Obrigado!`
 /**
  * Gera mensagem genérica (sem empresa identificada)
  */
-function gerarMensagemGenericaCliente(ehAudio = false) {
+function gerarMensagemGenericaCliente(empresa = 'ALLMAX', ehAudio = false) {
   const tipo = ehAudio ? 'áudio' : 'mensagem'
 
   return `Olá! 👋
 
-Aqui é o 🤖 atendente digital da ALLMAX!
+Aqui é o 🤖 atendente digital da ${empresa}!
 
-Sua ${tipo} foi recebida e encaminhada para nossa equipe financeira.
-
-Eles retornarão em breve com as informações solicitadas.
+Sua ${tipo} foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
 
 Obrigado!`
 }
