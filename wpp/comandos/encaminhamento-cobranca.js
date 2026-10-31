@@ -1,12 +1,13 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302333
+// wpp/comandos/encaminhamento-cobranca.js — V.2610302335
 // Encaminhamento de respostas sobre cobranças
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
-// FIX: Centro_Custo não existe em Cliente, apenas em Contas_Receber
+// FIX CRÍTICO: Removido JOIN com Cliente na busca de avisos_historico
+//              Centro_Custo já existe em avisos_historico
 // ============================================================
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -44,10 +45,25 @@ setInterval(() => {
 
 /**
  * Busca última cobrança enviada (avisos_historico)
+ * NOTA: avisos_historico JÁ TEM centro_custo, não precisa buscar de Cliente
  */
 async function buscarUltimaCobranca(pool, celular) {
   const celularLimpo = celular.replace(/\D/g, '')
 
+  // Primeiro buscar o código do cliente pelo celular
+  const clienteQuery = `
+    SELECT "Codigo" as codigo, "Cliente_Nome" as nome
+    FROM public."Cliente"
+    WHERE "Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
+    LIMIT 1
+  `
+
+  const clienteResult = await pool.query(clienteQuery)
+  if (clienteResult.rowCount === 0) return null
+
+  const cliente = clienteResult.rows[0]
+
+  // Depois buscar última cobrança do cliente
   const query = `
     SELECT
       ah.id_asaas,
@@ -56,20 +72,25 @@ async function buscarUltimaCobranca(pool, celular) {
       ah.descricao,
       ah.data_vencimento,
       ah.data_envio,
-      c."Cliente_Nome" as nome_cliente,
-      c."Centro_Custo" as centro_custo
+      ah.centro_custo
     FROM public.avisos_historico ah
-    INNER JOIN public."Cliente" c ON ah.codigo_cliente = c."Codigo"
     WHERE
-      c."Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
+      ah.codigo_cliente = $1
       AND ah.status = 'enviado'
       AND ah.data_envio > NOW() - INTERVAL '${TIMEOUT_HORAS} hours'
     ORDER BY ah.data_envio DESC
     LIMIT 1
   `
 
-  const result = await pool.query(query)
-  return result.rowCount > 0 ? result.rows[0] : null
+  const result = await pool.query(query, [cliente.codigo])
+
+  if (result.rowCount === 0) return null
+
+  // Adicionar nome do cliente ao resultado
+  return {
+    ...result.rows[0],
+    nome_cliente: cliente.nome
+  }
 }
 
 /**
