@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/server.js — V.2610301215
+// wpp/server.js — V.2610302307
 // Allmax Gestão de Cotas — Marujo⚓
 // Inicialização, conexão WhatsApp e rotas HTTP
 // + Localização em tempo real: tracking + ranking
@@ -9,6 +9,7 @@
 // DEBUG: Rota /versao-html para verificar arquivo servido (07/10/2026 21:47)
 // FIX (24/10 16:20): Passa mensagem completa para orcamentos.js (bug upload anexos)
 // NEW (30/10 12:15): Integração web-app/routes/orcamentos.js (sistema web estilo chat)
+// NEW (30/10 23:07): Encaminhamento automático de respostas sobre cobranças
 // ============================================================
 
 // Carrega .env apenas em desenvolvimento (Railway usa variáveis de ambiente diretas)
@@ -68,6 +69,7 @@ import { tratarComandoAdmin, ehGrupoAdm } from './comandos/admin.js'
 import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 import { mostrarMenuOrcamentos, processarMensagemOrcamentos } from './comandos/orcamentos.js'
 import orcamentosWebRouter from '../web-app/routes/orcamentos.js'
+import { processarRespostaCobranca } from './comandos/encaminhamento-cobranca.js'
 // GEOLOCALIZAÇÃO DESABILITADA (14/09/2026) - Até segunda ordem
 // import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
@@ -367,9 +369,29 @@ async function iniciarBot() {
 
       for (const msg of messages) {
         try {
-          if (!msg.key.remoteJid?.endsWith('@g.us')) continue
           if (msg.key.fromMe) continue
 
+          // ============================================================
+          // MENSAGENS PRIVADAS → Respostas sobre cobranças
+          // ============================================================
+          const ehMensagemPrivada = !msg.key.remoteJid?.endsWith('@g.us')
+
+          if (ehMensagemPrivada) {
+            // Tentar processar como resposta de cobrança
+            const processado = await processarRespostaCobranca(sock, pool, msg)
+
+            if (processado) {
+              // Resposta de cobrança tratada
+              continue
+            }
+
+            // Se não for resposta de cobrança, ignorar (mensagens privadas não têm outros comandos)
+            continue
+          }
+
+          // ============================================================
+          // MENSAGENS DE GRUPO (daqui para baixo)
+          // ============================================================
           const grupoId = msg.key.remoteJid
           // Remetente: em grupos vem em msg.key.participant
           const remetente = msg.key.participant || msg.key.remoteJid
