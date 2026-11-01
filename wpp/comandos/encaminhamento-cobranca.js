@@ -1,6 +1,9 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2610302352
+// wpp/comandos/encaminhamento-cobranca.js — V.2611011543
 // Encaminhamento de respostas sobre cobranças
+// BLOQUEIO ANTI-SPAM (01/11 15:43):
+// - Lista de números bloqueados (spam/bots)
+// - Throttle: 1 resposta por número a cada 30s
 // MELHORIAS:
 // - Controle de múltiplas mensagens (responde só a primeira)
 // - Busca contas próximas vencimento (não só avisos_historico)
@@ -13,6 +16,35 @@
 // REVERT: Removida formatação de número - mostra JID original
 //         143572351365182@lid (como está no WhatsApp)
 // ============================================================
+
+// ============================================================
+// 🚫 BLOQUEIO ANTI-SPAM
+// ============================================================
+const NUMEROS_BLOQUEADOS = [
+  '176716429443296', // Spam 01/11/2026
+  '270283013361791'  // Spam 01/11/2026
+]
+
+// Throttle: 1 resposta por número a cada 30s
+const ultimaResposta = new Map()
+const THROTTLE_SEGUNDOS = 30
+
+function numeroEstaBloqueado(jid) {
+  const numero = jid.replace(/@.*$/, '')
+  return NUMEROS_BLOQUEADOS.includes(numero)
+}
+
+function podeResponder(jid) {
+  const agora = Date.now()
+  const ultima = ultimaResposta.get(jid) || 0
+
+  if (agora - ultima < THROTTLE_SEGUNDOS * 1000) {
+    return false // Bloqueado por throttle
+  }
+
+  ultimaResposta.set(jid, agora)
+  return true
+}
 
 // Mapeamento Centro de Custos → Grupo Responsável
 const GRUPOS_RESPONSAVEIS = {
@@ -291,6 +323,19 @@ function obterGrupoResponsavel(centroCusto) {
 export async function processarRespostaCobranca(sock, pool, mensagem) {
   try {
     const remetente = mensagem.key.remoteJid
+
+    // 🚫 BLOQUEIO 1: Números na lista negra
+    if (numeroEstaBloqueado(remetente)) {
+      console.log(`🚫 Número BLOQUEADO (spam): ${remetente}`)
+      return // Ignora completamente
+    }
+
+    // 🚫 BLOQUEIO 2: Throttle (máx 1 resposta a cada 30s)
+    if (!podeResponder(remetente)) {
+      console.log(`⏱️  THROTTLE: Aguardar ${THROTTLE_SEGUNDOS}s para responder ${remetente}`)
+      return // Ignora temporariamente
+    }
+
     const ehAudio = mensagem.message?.audioMessage !== undefined
     const textoMensagem = mensagem.message?.conversation ||
                          mensagem.message?.extendedTextMessage?.text || ''
