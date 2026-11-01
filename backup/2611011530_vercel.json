@@ -1,0 +1,27 @@
+// ============================================================
+// ⚠️ BACKUP: 2611011530_vercel.json
+// Data do backup: 01/11/26 15:30
+// Arquivo original: vercel.json — V.2611011530
+// ============================================================
+//
+// MOTIVO DO BACKUP:
+// Adicionar Vercel Cron Job para importação automática de feriados
+//
+// ALTERAÇÃO:
+// - Adicionar configuração de cron para rodar todo dia 1 às 06:00 GMT-3
+//
+// ============================================================
+
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "echo 'No build needed'",
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/rastrear", "destination": "/rastrear.html" },
+    { "source": "/rastrear.html", "destination": "/rastrear.html" },
+    { "source": "/agendar", "destination": "/agendar.html" },
+    { "source": "/agendar.html", "destination": "/agendar.html" },
+    { "source": "/visualizar-orcamento.html", "destination": "/visualizar-orcamento.html" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ]
+}
