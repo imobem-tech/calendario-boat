@@ -70,6 +70,7 @@ import { enviarAlertasHMRetornoPendente } from './alerta_hm_retorno.js'
 import { mostrarMenuOrcamentos, processarMensagemOrcamentos } from './comandos/orcamentos.js'
 import orcamentosWebRouter from '../web-app/routes/orcamentos.js'
 import { processarRespostaCobranca } from './comandos/encaminhamento-cobranca.js'
+import { executarImportacaoFeriados } from './importar-feriados-cron.js'
 // GEOLOCALIZAÇÃO DESABILITADA (14/09/2026) - Até segunda ordem
 // import { handleLocalizacao, verificarPosicoesExpiradas, verificarPosicoes70Metros, enviarPerguntaConfirmacao70m, buscarRankingAtual, atualizarRankingEmTodosGrupos } from './localizacao.js'
 
@@ -1445,6 +1446,23 @@ app.listen(PORT, () => {
       }
     }, 60000)
     console.log('✅ [PREVISAO] Envio automático às 8h ATIVO (cache evita duplicatas)')
+
+    // Importação de feriados - todo dia 1 às 06:00h
+    let importacaoFeriadosUltimoMes = ''
+    setInterval(async () => {
+      const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+      const dia    = agora.getDate()
+      const hora   = agora.getHours()
+      const minuto = agora.getMinutes()
+      const mesAno = agora.toISOString().slice(0, 7) // YYYY-MM
+
+      if (dia === 1 && hora === 6 && minuto === 0 && importacaoFeriadosUltimoMes !== mesAno) {
+        importacaoFeriadosUltimoMes = mesAno
+        console.log('[FERIADOS] Iniciando importação mensal automática...')
+        await executarImportacaoFeriados().catch(console.error)
+      }
+    }, 60000) // Verifica a cada 1 minuto
+    console.log('✅ [FERIADOS] Importação automática todo dia 1 às 06:00h ATIVA')
 
     // Verificação de posições expiradas (localização)
     // DESABILITADO (14/09/2026) - Até segunda ordem
