@@ -9,11 +9,5 @@
     { "source": "/agendar.html", "destination": "/agendar.html" },
     { "source": "/visualizar-orcamento.html", "destination": "/visualizar-orcamento.html" },
     { "source": "/((?!api).*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/importar_feriados",
-      "schedule": "0 9 1 * *"
-    }
   ]
 }

@@ -1,92 +1,83 @@
-# 🚀 Deploy - Importação Automática de Feriados
-V.2611011531
+# ✅ Importação Automática de Feriados - RAILWAY
+V.2611011537
 
-## ✅ O que foi criado:
+## 🎯 O que foi implementado:
 
-1. **`/api/importar_feriados.js`** - Serverless function da Vercel
-2. **`vercel.json`** - Configuração do cron job
-3. **Schedule**: Todo dia 1 de cada mês às 06:00 (horário de Brasília)
+O cron de importação automática de feriados está rodando **no Railway**, integrado ao `wpp/server.js`.
 
-## 📋 Passo a Passo para Deploy:
+### 📁 Arquivos Criados:
 
-### 1. Configurar Variável de Ambiente no Vercel
+1. **`wpp/importar-feriados-cron.js`** - Módulo de importação
+2. **`wpp/server.js`** - Integração do cron (linhas após previsão diária)
 
-Acesse: https://vercel.com/seu-projeto/settings/environment-variables
+### ⏰ Schedule:
 
-Adicione:
-- **Nome**: `CRON_SECRET`
-- **Valor**: `sua-senha-secreta-aqui` (gere uma senha forte)
-- **Environment**: Production, Preview, Development
+- **Dia**: 1 de cada mês
+- **Hora**: 06:00 (horário de Brasília / GMT-3)
+- **Verificação**: A cada 1 minuto (mas só executa no dia/hora certos)
 
-### 2. Fazer o Deploy
-
-```bash
-cd D:\OneDrive\GESTAO_DZ\Claude_DZ\projetos\calendario_allmax
-
-# Commit das alterações
-git add vercel.json api/importar_feriados.js
-git commit -m "feat: adicionar cron job para importação automática de feriados
-
-- Cron roda todo dia 1 às 06:00 BRT
-- Importa feriados dos próximos 180 dias
-- Verifica duplicatas por nome+tipo+ano
-- V.2611011531"
-
-# Push para o repositório
-git push origin main
-```
-
-O Vercel vai fazer deploy automaticamente!
-
-### 3. Testar Manualmente (opcional)
-
-Após o deploy, teste chamando o endpoint:
-
-```bash
-curl -X GET https://seu-dominio.vercel.app/api/importar_feriados \
-  -H "Authorization: Bearer sua-senha-secreta-aqui"
-```
-
-## 🕐 Schedule do Cron:
-
-- **Horário UTC**: 09:00
-- **Horário Brasil (GMT-3)**: 06:00
-- **Frequência**: Todo dia 1 de cada mês
-- **Cron Expression**: `0 9 1 * *`
-
-## 🔍 Verificar se está funcionando:
-
-1. **Dashboard Vercel**: https://vercel.com/seu-projeto/deployments
-2. **Logs do Cron**: https://vercel.com/seu-projeto/logs
-3. **Banco de Dados**: Consultar tabela `Agenda_comp_02_feriados`
-
-## 📊 O que o cron faz:
+### 📊 O que faz:
 
 1. ✅ Busca feriados nacionais (Brasil API)
-2. ✅ Adiciona feriados estaduais (TO)
+2. ✅ Adiciona feriados estaduais (Tocantins)
 3. ✅ Adiciona feriados municipais (Palmas)
 4. ✅ Filtra próximos 180 dias
-5. ✅ Evita duplicatas (nome+tipo+ano)
+5. ✅ Evita duplicatas (nome + tipo + ano)
 6. ✅ Grava com horário de Brasília
 
-## ⚠️ Importante:
+### 🚀 Status:
 
-- Certifique-se de que `DATABASE_URL` ou `POSTGRES_URL` está configurado no Vercel
-- O `CRON_SECRET` é necessário para segurança (evita chamadas não autorizadas)
-- O cron só roda em **Production** (não em Preview/Development)
+**✅ JÁ ESTÁ RODANDO NO RAILWAY!**
 
-## 🔧 Troubleshooting:
+O deploy foi feito automaticamente quando o código foi enviado ao GitHub.
 
-**Cron não executou?**
-- Verifique os logs no Vercel
-- Confirme que está em Production
-- Valide o `CRON_SECRET` nas env vars
+### 🔍 Como Verificar:
 
-**Erro de conexão com banco?**
-- Verifique `DATABASE_URL` no Vercel
-- Confirme que o Neon está online
-- Teste o endpoint manualmente
+1. **Logs do Railway**: 
+   - Acesse: https://railway.app/project/seu-projeto
+   - Vá em: Deployments → Latest → View logs
+   - Procure por: `[FERIADOS]`
 
-**Duplicatas sendo criadas?**
-- Verifique se a lógica de duplicata está correta
-- Confira se o nome do feriado está exatamente igual
+2. **Banco de Dados**:
+   - Consulte: `SELECT * FROM "Agenda_comp_02_feriados" ORDER BY "Dt_Criacao" DESC LIMIT 10`
+
+3. **Próxima Execução**:
+   - **01/12/2026 às 06:00** (horário de Brasília)
+
+### 🧪 Testar Manualmente (opcional):
+
+Se quiser testar antes do dia 1, você pode chamar a função diretamente:
+
+1. Acesse o Railway shell
+2. Execute:
+```javascript
+import { executarImportacaoFeriados } from './wpp/importar-feriados-cron.js'
+await executarImportacaoFeriados()
+```
+
+### ⚠️ Importante:
+
+- ✅ Não precisa configurar nada no Vercel
+- ✅ Não precisa configurar variáveis de ambiente extras
+- ✅ Usa a mesma `DATABASE_URL` do bot WhatsApp
+- ✅ Roda automaticamente quando o servidor está ativo
+
+### 📝 Logs Esperados:
+
+Quando executar, você verá nos logs do Railway:
+
+```
+📅 [FERIADOS] Importação iniciada: 01/12/2026, 06:00:00
+📅 [FERIADOS] Período: 01/12/2026 até 30/05/2027
+📅 [FERIADOS] Anos: 2026, 2027
+📅 [FERIADOS] Feriados encontrados: 18
+✅ [FERIADOS] Inseridos: 15
+⏭️  [FERIADOS] Duplicados: 3
+✅ [FERIADOS] Importação concluída!
+```
+
+---
+
+## 🎉 Pronto!
+
+O sistema está configurado e rodando automaticamente no Railway!
