@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611011543
+// wpp/comandos/encaminhamento-cobranca.js — V.2611030654
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -9,8 +9,9 @@
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
-// FIX CRÍTICO: Removido JOIN com Cliente na busca de avisos_historico
-//              Centro_Custo já existe em avisos_historico
+// FIX CRÍTICO (03/11 06:54): Corrigido erro "column ah.centro_custo does not exist"
+//              - avisos_historico NÃO TEM centro_custo
+//              - Restaurado JOIN com Cliente para buscar Centro_Custo
 // AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
 //         Empresa dinâmica em mensagem genérica
 // REVERT: Removida formatação de número - mostra JID original
@@ -81,25 +82,13 @@ setInterval(() => {
 
 /**
  * Busca última cobrança enviada (avisos_historico)
- * NOTA: avisos_historico JÁ TEM centro_custo, não precisa buscar de Cliente
+ * IMPORTANTE: centro_custo NÃO existe em avisos_historico!
+ *             Precisa buscar com JOIN da tabela Cliente
  */
 async function buscarUltimaCobranca(pool, celular) {
   const celularLimpo = celular.replace(/\D/g, '')
 
-  // Primeiro buscar o código do cliente pelo celular
-  const clienteQuery = `
-    SELECT "Codigo" as codigo, "Cliente_Nome" as nome
-    FROM public."Cliente"
-    WHERE "Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
-    LIMIT 1
-  `
-
-  const clienteResult = await pool.query(clienteQuery)
-  if (clienteResult.rowCount === 0) return null
-
-  const cliente = clienteResult.rows[0]
-
-  // Depois buscar última cobrança do cliente
+  // Buscar cobrança com JOIN para pegar centro_custo do Cliente
   const query = `
     SELECT
       ah.id_asaas,
@@ -108,25 +97,23 @@ async function buscarUltimaCobranca(pool, celular) {
       ah.descricao,
       ah.data_vencimento,
       ah.data_envio,
-      ah.centro_custo
+      c."Cliente_Nome" as nome_cliente,
+      c."Centro_Custo" as centro_custo
     FROM public.avisos_historico ah
+    INNER JOIN public."Cliente" c ON ah.codigo_cliente = c."Codigo"
     WHERE
-      ah.codigo_cliente = $1
+      c."Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
       AND ah.status = 'enviado'
       AND ah.data_envio > NOW() - INTERVAL '${TIMEOUT_HORAS} hours'
     ORDER BY ah.data_envio DESC
     LIMIT 1
   `
 
-  const result = await pool.query(query, [cliente.codigo])
+  const result = await pool.query(query)
 
   if (result.rowCount === 0) return null
 
-  // Adicionar nome do cliente ao resultado
-  return {
-    ...result.rows[0],
-    nome_cliente: cliente.nome
-  }
+  return result.rows[0]
 }
 
 /**
