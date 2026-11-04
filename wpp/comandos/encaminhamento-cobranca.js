@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040737
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040742
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -88,7 +88,34 @@ async function buscarUltimaCobranca(pool, celular) {
 }
 
 /**
- * Busca cliente por celular
+ * Busca cliente por JID do WhatsApp (ID interno)
+ * PRIORIDADE 1: Busca pelo JID (ex: 143572351365182@lid)
+ */
+async function buscarClientePorJID(pool, jid) {
+  const query = `
+    SELECT
+      "Codigo" as codigo,
+      "Cliente_Nome" as nome,
+      "Cliente_Telefone_Celular" as telefone,
+      "WhatsApp_JID" as whatsapp_jid
+    FROM public."Cliente"
+    WHERE "WhatsApp_JID" = $1
+    LIMIT 1
+  `
+
+  const result = await pool.query(query, [jid])
+
+  if (result.rowCount > 0) {
+    const cliente = result.rows[0]
+    cliente.telefone_formatado = formatarTelefone(cliente.telefone)
+    return cliente
+  }
+
+  return null
+}
+
+/**
+ * Busca cliente por celular (FALLBACK - não funciona com @lid)
  * Retorna: codigo, nome, telefone formatado
  * NOTA: Centro_Custo NÃO existe em Cliente, está em Contas_Receber!
  */
@@ -99,7 +126,8 @@ async function buscarClientePorCelular(pool, celular) {
     SELECT
       "Codigo" as codigo,
       "Cliente_Nome" as nome,
-      "Cliente_Telefone_Celular" as telefone
+      "Cliente_Telefone_Celular" as telefone,
+      "WhatsApp_JID" as whatsapp_jid
     FROM public."Cliente"
     WHERE "Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
     LIMIT 1
@@ -115,6 +143,29 @@ async function buscarClientePorCelular(pool, celular) {
   }
 
   return null
+}
+
+/**
+ * Atualiza o JID do WhatsApp do cliente
+ * Executa apenas se JID for diferente do cadastrado
+ */
+async function atualizarJIDCliente(pool, codigoCliente, jid) {
+  try {
+    const query = `
+      UPDATE public."Cliente"
+      SET "WhatsApp_JID" = $1
+      WHERE "Codigo" = $2
+        AND ("WhatsApp_JID" IS NULL OR "WhatsApp_JID" != $1)
+    `
+
+    const result = await pool.query(query, [jid, codigoCliente])
+
+    if (result.rowCount > 0) {
+      console.log(`   📝 JID atualizado para cliente ${codigoCliente}: ${jid}`)
+    }
+  } catch (err) {
+    console.error(`   ⚠️  Erro ao atualizar JID:`, err.message)
+  }
 }
 
 /**
@@ -338,14 +389,14 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     console.log(`\n💬 Mensagem privada recebida de: ${remetente}`)
 
     // ============================================================
-    // PASSO 1: SEMPRE buscar dados do cliente primeiro
+    // PASSO 1: Buscar cliente por JID do WhatsApp (ID interno)
     // ============================================================
-    const cliente = await buscarClientePorCelular(pool, remetente)
+    let cliente = await buscarClientePorJID(pool, remetente)
 
     if (cliente) {
-      console.log(`   ✅ Cliente encontrado: ${cliente.codigo} - ${cliente.nome} - ${cliente.telefone_formatado}`)
+      console.log(`   ✅ Cliente encontrado por JID: ${cliente.codigo} - ${cliente.nome} - ${cliente.telefone_formatado}`)
     } else {
-      console.log(`   ⚠️  Cliente não cadastrado (número: ${remetente})`)
+      console.log(`   ℹ️  Cliente não encontrado por JID: ${remetente}`)
     }
 
     // ============================================================
@@ -356,6 +407,24 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
 
     if (cobranca) {
       console.log(`   ✅ Cobrança encontrada em avisos_historico (Cliente ${cobranca.codigo_cliente})`)
+
+      // Se não tinha cliente por JID, buscar dados pelo código da cobrança
+      if (!cliente) {
+        cliente = await pool.query(`
+          SELECT "Codigo" as codigo, "Cliente_Nome" as nome, "Cliente_Telefone_Celular" as telefone
+          FROM "Cliente" WHERE "Codigo" = $1
+        `, [cobranca.codigo_cliente])
+
+        if (cliente.rowCount > 0) {
+          cliente = cliente.rows[0]
+          cliente.telefone_formatado = formatarTelefone(cliente.telefone)
+        }
+      }
+
+      // Atualizar JID do cliente (se encontrou)
+      if (cliente && cliente.codigo) {
+        await atualizarJIDCliente(pool, cliente.codigo, remetente)
+      }
     } else {
       console.log('   ℹ️  Sem cobrança em avisos_historico')
 
@@ -369,6 +438,9 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
         if (cobranca) {
           console.log(`   ✅ Conta próxima encontrada: R$ ${cobranca.valor} - Venc: ${cobranca.data_vencimento}`)
           origem = 'conta'
+
+          // Atualizar JID do cliente
+          await atualizarJIDCliente(pool, cliente.codigo, remetente)
         } else {
           console.log('   ℹ️  Cliente sem contas próximas do vencimento')
         }
