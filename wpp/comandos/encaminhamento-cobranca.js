@@ -1,11 +1,13 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040655
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040715
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
-// - Throttle: 1 resposta por número a cada 30s
+// MUDANÇA (04/11 07:15): SEMPRE responde + SEMPRE encaminha
+//              - Removido throttle que bloqueava encaminhamento
+//              - Removido controle "só primeira mensagem"
+//              - TODA mensagem privada: responde cliente + encaminha grupo
 // MELHORIAS:
-// - Controle de múltiplas mensagens (responde só a primeira)
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
@@ -27,25 +29,9 @@ const NUMEROS_BLOQUEADOS = [
   '270283013361791'  // Spam 01/11/2026
 ]
 
-// Throttle: 1 resposta por número a cada 30s
-const ultimaResposta = new Map()
-const THROTTLE_SEGUNDOS = 30
-
 function numeroEstaBloqueado(jid) {
   const numero = jid.replace(/@.*$/, '')
   return NUMEROS_BLOQUEADOS.includes(numero)
-}
-
-function podeResponder(jid) {
-  const agora = Date.now()
-  const ultima = ultimaResposta.get(jid) || 0
-
-  if (agora - ultima < THROTTLE_SEGUNDOS * 1000) {
-    return false // Bloqueado por throttle
-  }
-
-  ultimaResposta.set(jid, agora)
-  return true
 }
 
 // Mapeamento Centro de Custos → Grupo Responsável
@@ -61,25 +47,6 @@ const GRUPOS_RESPONSAVEIS = {
 }
 
 const TIMEOUT_HORAS = 72 // 72 horas = 3 dias
-
-// ============================================================
-// CONTROLE DE MÚLTIPLAS MENSAGENS
-// Map: celular_idcobranca → { timestamp, respondido }
-// ============================================================
-const respostasEnviadas = new Map()
-
-// Limpar memória a cada 6 horas
-setInterval(() => {
-  const SEIS_HORAS = 6 * 60 * 60 * 1000
-  const agora = Date.now()
-
-  for (const [key, dados] of respostasEnviadas.entries()) {
-    if (agora - dados.timestamp > SEIS_HORAS) {
-      respostasEnviadas.delete(key)
-      console.log(`   🧹 Memória limpa: ${key}`)
-    }
-  }
-}, 3600000) // Roda a cada 1h
 
 /**
  * Busca última cobrança enviada (avisos_historico)
@@ -314,16 +281,10 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
   try {
     const remetente = mensagem.key.remoteJid
 
-    // 🚫 BLOQUEIO 1: Números na lista negra
+    // 🚫 BLOQUEIO: Números na lista negra
     if (numeroEstaBloqueado(remetente)) {
       console.log(`🚫 Número BLOQUEADO (spam): ${remetente}`)
-      return // Ignora completamente
-    }
-
-    // 🚫 BLOQUEIO 2: Throttle (máx 1 resposta a cada 30s)
-    if (!podeResponder(remetente)) {
-      console.log(`⏱️  THROTTLE: Aguardar ${THROTTLE_SEGUNDOS}s para responder ${remetente}`)
-      return // Ignora temporariamente
+      return false // Ignora completamente
     }
 
     const ehAudio = mensagem.message?.audioMessage !== undefined
@@ -395,35 +356,18 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     }
 
     // ============================================================
-    // COBRANÇA/CONTA IDENTIFICADA → Encaminhar para grupo correto
+    // COBRANÇA/CONTA IDENTIFICADA → Responder cliente + Encaminhar para grupo
     // ============================================================
     const empresa = obterEmpresa(cobranca.centro_custo)
     const grupoResponsavel = obterGrupoResponsavel(cobranca.centro_custo)
 
-    // ============================================================
-    // CONTROLE DE MÚLTIPLAS MENSAGENS
-    // Só responde a PRIMEIRA mensagem de cada cobrança
-    // ============================================================
-    const chaveMemoria = `${remetente}_${cobranca.id_asaas || cobranca.id_conta}`
-    const jaRespondeu = respostasEnviadas.has(chaveMemoria)
+    // SEMPRE responde ao cliente (TODA mensagem)
+    const respostaCliente = gerarMensagemRetorno(empresa, ehAudio)
+    await sock.sendMessage(remetente, { text: respostaCliente })
+    console.log(`   ✅ Resposta enviada ao cliente`)
 
-    if (!jaRespondeu) {
-      // PRIMEIRA mensagem → Responder ao cliente
-      const respostaCliente = gerarMensagemRetorno(empresa, ehAudio)
-      await sock.sendMessage(remetente, { text: respostaCliente })
-      console.log(`   ✅ Resposta enviada ao cliente (PRIMEIRA mensagem)`)
-
-      // Marcar como respondido
-      respostasEnviadas.set(chaveMemoria, {
-        timestamp: Date.now(),
-        id_cobranca: cobranca.id_asaas || cobranca.id_conta
-      })
-    } else {
-      console.log(`   ℹ️  2ª+ mensagem - pulando resposta automática`)
-    }
-
-    // SEMPRE encaminha para grupo (primeira ou não)
-    // NOVO LAYOUT: cabeçalho + forward + rodapé
+    // SEMPRE encaminha para grupo (TODA mensagem)
+    // LAYOUT: cabeçalho + forward + rodapé
 
     // Adicionar celular ao objeto cobrança para usar no cabeçalho
     cobranca.celular = remetente
