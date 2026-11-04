@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040742
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040751
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -51,14 +51,11 @@ const TIMEOUT_HORAS = 72 // 72 horas = 3 dias
 
 /**
  * Busca última cobrança enviada (avisos_historico)
- * IMPORTANTE: centro_custo NÃO existe em avisos_historico nem em Cliente!
- *             Centro_Custo está em Contas_Receber
- *             Precisa JOIN com Contas_Receber usando id_conta_receber
+ * BUSCA POR JID: Funciona com @lid, @s.whatsapp.net, qualquer formato
+ * IMPORTANTE: centro_custo está em Contas_Receber (JOIN necessário)
  */
-async function buscarUltimaCobranca(pool, celular) {
-  const celularLimpo = celular.replace(/\D/g, '')
-
-  // Buscar cobrança com JOIN em Contas_Receber para pegar Centro_Custo
+async function buscarUltimaCobranca(pool, jid) {
+  // Buscar por JID (ID do WhatsApp) - funciona com @lid
   const query = `
     SELECT
       ah.id_asaas,
@@ -67,20 +64,21 @@ async function buscarUltimaCobranca(pool, celular) {
       ah.descricao,
       ah.data_vencimento,
       ah.data_envio,
+      ah.whatsapp_jid,
       c."Cliente_Nome" as nome_cliente,
       cr."Centro_Custo" as centro_custo
     FROM public.avisos_historico ah
     INNER JOIN public."Contas_Receber" cr ON ah.id_conta_receber = cr."ID"
     INNER JOIN public."Cliente" c ON ah.codigo_cliente = c."Codigo"
     WHERE
-      c."Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
+      ah.whatsapp_jid = $1
       AND ah.status = 'enviado'
       AND ah.data_envio > NOW() - INTERVAL '${TIMEOUT_HORAS} hours'
     ORDER BY ah.data_envio DESC
     LIMIT 1
   `
 
-  const result = await pool.query(query)
+  const result = await pool.query(query, [jid])
 
   if (result.rowCount === 0) return null
 
