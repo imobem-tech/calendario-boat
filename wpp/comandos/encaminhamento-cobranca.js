@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040715
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040718
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -7,6 +7,11 @@
 //              - Removido throttle que bloqueava encaminhamento
 //              - Removido controle "só primeira mensagem"
 //              - TODA mensagem privada: responde cliente + encaminha grupo
+// MELHORIA (04/11 07:18): Cabeçalho com dados completos do cliente
+//              - SEMPRE busca cliente no início (antes de buscar cobrança)
+//              - Mostra: Código, Nome, Telefone formatado
+//              - Telefone formatado: (XX) XXXXX-XXXX (legível)
+//              - Mesmo sem cobrança, mostra dados do cliente se cadastrado
 // MELHORIAS:
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
@@ -15,10 +20,6 @@
 //              - Centro_Custo NÃO existe em Cliente, está em Contas_Receber
 //              - Adicionado JOIN com Contas_Receber para buscar Centro_Custo correto
 //              - Query agora busca cr."Centro_Custo" usando ah.id_conta_receber
-// AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
-//         Empresa dinâmica em mensagem genérica
-// REVERT: Removida formatação de número - mostra JID original
-//         143572351365182@lid (como está no WhatsApp)
 // ============================================================
 
 // ============================================================
@@ -88,6 +89,7 @@ async function buscarUltimaCobranca(pool, celular) {
 
 /**
  * Busca cliente por celular
+ * Retorna: codigo, nome, telefone formatado
  * NOTA: Centro_Custo NÃO existe em Cliente, está em Contas_Receber!
  */
 async function buscarClientePorCelular(pool, celular) {
@@ -96,14 +98,43 @@ async function buscarClientePorCelular(pool, celular) {
   const query = `
     SELECT
       "Codigo" as codigo,
-      "Cliente_Nome" as nome
+      "Cliente_Nome" as nome,
+      "Cliente_Telefone_Celular" as telefone
     FROM public."Cliente"
     WHERE "Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
     LIMIT 1
   `
 
   const result = await pool.query(query)
-  return result.rowCount > 0 ? result.rows[0] : null
+
+  if (result.rowCount > 0) {
+    const cliente = result.rows[0]
+    // Formatar telefone para exibição
+    cliente.telefone_formatado = formatarTelefone(cliente.telefone)
+    return cliente
+  }
+
+  return null
+}
+
+/**
+ * Formata telefone do banco para exibição
+ * Ex: "63999887766" → "(63) 99988-7766"
+ */
+function formatarTelefone(telefone) {
+  if (!telefone) return 'N/A'
+
+  const numeros = telefone.replace(/\D/g, '')
+
+  if (numeros.length === 11) {
+    // Celular com 9: (XX) 9XXXX-XXXX
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`
+  } else if (numeros.length === 10) {
+    // Fixo: (XX) XXXX-XXXX
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`
+  } else {
+    return telefone
+  }
 }
 
 /**
@@ -182,8 +213,9 @@ Obrigado!`
 
 /**
  * Gera cabeçalho para grupo (NOVO LAYOUT)
+ * Agora recebe dados completos do cliente
  */
-function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
+function gerarCabecalhoGrupo(cobranca, cliente, origem = 'cobranca') {
   const vencimento = new Date(cobranca.data_vencimento).toLocaleDateString('pt-BR')
 
   const emoji = origem === 'cobranca' ? '💰' : '📋'
@@ -191,10 +223,15 @@ function gerarCabecalhoGrupo(cobranca, celular, origem = 'cobranca') {
     ? 'COBRANÇA | RESPOSTA RECEBIDA'
     : 'CONTA PRÓXIMA | CONTATO RECEBIDO'
 
+  // Dados do cliente (usa dados da cobrança se cliente não foi passado)
+  const codigo = cliente?.codigo || cobranca.codigo_cliente
+  const nome = cliente?.nome || cobranca.nome_cliente
+  const telefone = cliente?.telefone_formatado || 'N/A'
+
   return `${emoji} *${titulo}*
 
-👤 ${cobranca.nome_cliente} (#${cobranca.codigo_cliente})
-📞 ${celular}
+👤 *${nome}* (#${codigo})
+📞 ${telefone}
 🏢 ${obterEmpresa(cobranca.centro_custo)}
 💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
 
@@ -248,22 +285,33 @@ function formatarNumeroWhatsApp(jid) {
 }
 
 /**
- * Gera cabeçalho para ambos grupos (sem identificação)
+ * Gera cabeçalho para ambos grupos (sem cobrança identificada)
+ * Mostra dados do cliente se encontrado
  */
-function gerarCabecalhoSemIdentificacao(cliente, celular) {
-  const clienteInfo = cliente
-    ? `${cliente.nome} (#${cliente.codigo})`
-    : 'Não identificado'
+function gerarCabecalhoSemIdentificacao(cliente, celularJid) {
+  if (cliente) {
+    // Cliente encontrado no banco
+    return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
 
-  return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
-
-👤 ${clienteInfo}
-📞 ${celular}
+👤 *${cliente.nome}* (#${cliente.codigo})
+📞 ${cliente.telefone_formatado}
 ⚠️ Sem cobrança/conta identificada
+⚠️ Verificar manualmente qual empresa atender
+
+💬 Cliente disse:
+━━━━━━━━━━━━━━━━━━━━━━━━━━`
+  } else {
+    // Cliente NÃO encontrado no banco
+    return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
+
+👤 *Cliente não cadastrado*
+📞 WhatsApp: ${celularJid}
+⚠️ Número não encontrado no sistema
 ⚠️ Verificar manualmente
 
 💬 Cliente disse:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━`
+  }
 }
 
 /**
@@ -294,7 +342,18 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     console.log(`\n💬 Mensagem privada recebida de: ${remetente}`)
 
     // ============================================================
-    // ESTRATÉGIA 1: Buscar em avisos_historico (últimas 72h)
+    // PASSO 1: SEMPRE buscar dados do cliente primeiro
+    // ============================================================
+    const cliente = await buscarClientePorCelular(pool, remetente)
+
+    if (cliente) {
+      console.log(`   ✅ Cliente encontrado: ${cliente.codigo} - ${cliente.nome} - ${cliente.telefone_formatado}`)
+    } else {
+      console.log(`   ⚠️  Cliente não cadastrado (número: ${remetente})`)
+    }
+
+    // ============================================================
+    // PASSO 2: Buscar em avisos_historico (últimas 72h)
     // ============================================================
     let cobranca = await buscarUltimaCobranca(pool, remetente)
     let origem = 'cobranca'
@@ -305,13 +364,9 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
       console.log('   ℹ️  Sem cobrança em avisos_historico')
 
       // ============================================================
-      // ESTRATÉGIA 2: Buscar cliente e suas contas próximas vencimento
+      // PASSO 3: Se tem cliente, buscar contas próximas vencimento
       // ============================================================
-      const cliente = await buscarClientePorCelular(pool, remetente)
-
       if (cliente) {
-        console.log(`   ✅ Cliente encontrado: ${cliente.codigo} - ${cliente.nome}`)
-
         // Buscar contas próximas do vencimento
         cobranca = await buscarContasProximasVencimento(pool, cliente.codigo)
 
@@ -369,11 +424,8 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     // SEMPRE encaminha para grupo (TODA mensagem)
     // LAYOUT: cabeçalho + forward + rodapé
 
-    // Adicionar celular ao objeto cobrança para usar no cabeçalho
-    cobranca.celular = remetente
-
-    // 1. Cabeçalho
-    const cabecalho = gerarCabecalhoGrupo(cobranca, remetente, origem)
+    // 1. Cabeçalho (passa dados do cliente buscado)
+    const cabecalho = gerarCabecalhoGrupo(cobranca, cliente, origem)
     await sock.sendMessage(grupoResponsavel, { text: cabecalho })
 
     // 2. Forward da mensagem original (com seta ↩️)
