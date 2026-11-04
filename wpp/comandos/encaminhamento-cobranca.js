@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040718
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040727
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -235,7 +235,7 @@ function gerarCabecalhoGrupo(cobranca, cliente, origem = 'cobranca') {
 🏢 ${obterEmpresa(cobranca.centro_custo)}
 💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
 
-💬 Cliente disse:`
+💬 Abaixo a mensagem do cliente 👇`
 }
 
 /**
@@ -298,8 +298,7 @@ function gerarCabecalhoSemIdentificacao(cliente, celularJid) {
 ⚠️ Sem cobrança/conta identificada
 ⚠️ Verificar manualmente qual empresa atender
 
-💬 Cliente disse:
-━━━━━━━━━━━━━━━━━━━━━━━━━━`
+💬 Abaixo a mensagem do cliente 👇`
   } else {
     // Cliente NÃO encontrado no banco
     return `⚠️ *SEM COBRANÇA | CONTATO RECEBIDO*
@@ -309,8 +308,7 @@ function gerarCabecalhoSemIdentificacao(cliente, celularJid) {
 ⚠️ Número não encontrado no sistema
 ⚠️ Verificar manualmente
 
-💬 Cliente disse:
-━━━━━━━━━━━━━━━━━━━━━━━━━━`
+💬 Abaixo a mensagem do cliente 👇`
   }
 }
 
@@ -387,7 +385,7 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
         console.log('   ⚠️  Encaminhando para AMBOS grupos (cliente/conta não identificados)')
 
         // Responder ao cliente (genérico)
-        const respostaGenerica = gerarMensagemGenericaCliente(ehAudio)
+        const respostaGenerica = gerarMensagemGenericaCliente('ALLMAX', ehAudio)
         await sock.sendMessage(remetente, { text: respostaGenerica })
         console.log('   ✅ Resposta genérica enviada ao cliente')
 
