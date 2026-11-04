@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040733
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040737
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -231,7 +231,7 @@ function gerarCabecalhoGrupo(cobranca, cliente, origem = 'cobranca') {
 👤 *${nome}* (#${codigo})
 📞 ${telefone}
 🏢 ${obterEmpresa(cobranca.centro_custo)}
-💵 R$ ${cobranca.valor.toFixed(2)} (Vence: ${vencimento})
+💵 R$ ${parseFloat(cobranca.valor).toFixed(2)} (Vence: ${vencimento})
 
 💬 Abaixo a mensagem do cliente 👇`
 }
