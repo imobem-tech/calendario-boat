@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040727
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040733
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -183,30 +183,28 @@ function gerarUrlCobranca(idAsaas) {
 
 /**
  * Gera mensagem de retorno ao cliente
+ * SEMPRE usa "mensagem" (seja texto ou áudio)
  */
 function gerarMensagemRetorno(empresa, ehAudio = false) {
-  const tipo = ehAudio ? 'áudio' : 'mensagem'
-
   return `Olá! 👋
 
 Aqui é o 🤖 atendente digital da ${empresa}!
 
-Sua ${tipo} foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
+Sua mensagem foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
 
 Obrigado!`
 }
 
 /**
  * Gera mensagem genérica (sem empresa identificada)
+ * SEMPRE usa "mensagem" (seja texto ou áudio)
  */
 function gerarMensagemGenericaCliente(empresa = 'ALLMAX', ehAudio = false) {
-  const tipo = ehAudio ? 'áudio' : 'mensagem'
-
   return `Olá! 👋
 
 Aqui é o 🤖 atendente digital da ${empresa}!
 
-Sua ${tipo} foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
+Sua mensagem foi recebida e encaminhada para nossa equipe de atendimento, que retornará em breve.
 
 Obrigado!`
 }
