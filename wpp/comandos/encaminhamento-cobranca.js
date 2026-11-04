@@ -1,6 +1,10 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611040751
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040826
 // Encaminhamento de respostas sobre cobranças
+// FILTRO STATUS (04/11 08:26): Ignora interações com Status/Stories
+//              - Adicionado filtro para status@broadcast
+//              - Status/Stories não são mensagens diretas de clientes
+//              - Evita falsos positivos no sistema de encaminhamento
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
 // MUDANÇA (04/11 07:15): SEMPRE responde + SEMPRE encaminha
@@ -373,6 +377,12 @@ function obterGrupoResponsavel(centroCusto) {
 export async function processarRespostaCobranca(sock, pool, mensagem) {
   try {
     const remetente = mensagem.key.remoteJid
+
+    // 🚫 FILTRO: Ignora interações com Status/Stories
+    if (remetente === 'status@broadcast') {
+      console.log(`📱 Ignorando interação com Status/Story (status@broadcast)`)
+      return false // Ignora status
+    }
 
     // 🚫 BLOQUEIO: Números na lista negra
     if (numeroEstaBloqueado(remetente)) {
