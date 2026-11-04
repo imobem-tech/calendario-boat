@@ -1,5 +1,5 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611030654
+// wpp/comandos/encaminhamento-cobranca.js — V.2611040655
 // Encaminhamento de respostas sobre cobranças
 // BLOQUEIO ANTI-SPAM (01/11 15:43):
 // - Lista de números bloqueados (spam/bots)
@@ -9,9 +9,10 @@
 // - Busca contas próximas vencimento (não só avisos_historico)
 // - Encaminha para ambos grupos se não identificar empresa
 // - Layout melhorado: cabeçalho + forward nativo + rodapé
-// FIX CRÍTICO (03/11 06:54): Corrigido erro "column ah.centro_custo does not exist"
-//              - avisos_historico NÃO TEM centro_custo
-//              - Restaurado JOIN com Cliente para buscar Centro_Custo
+// FIX CRÍTICO (04/11 06:55): Corrigido erro "column c.Centro_Custo does not exist"
+//              - Centro_Custo NÃO existe em Cliente, está em Contas_Receber
+//              - Adicionado JOIN com Contas_Receber para buscar Centro_Custo correto
+//              - Query agora busca cr."Centro_Custo" usando ah.id_conta_receber
 // AJUSTE: Mensagem ao cliente mais genérica ("equipe de atendimento")
 //         Empresa dinâmica em mensagem genérica
 // REVERT: Removida formatação de número - mostra JID original
@@ -82,13 +83,14 @@ setInterval(() => {
 
 /**
  * Busca última cobrança enviada (avisos_historico)
- * IMPORTANTE: centro_custo NÃO existe em avisos_historico!
- *             Precisa buscar com JOIN da tabela Cliente
+ * IMPORTANTE: centro_custo NÃO existe em avisos_historico nem em Cliente!
+ *             Centro_Custo está em Contas_Receber
+ *             Precisa JOIN com Contas_Receber usando id_conta_receber
  */
 async function buscarUltimaCobranca(pool, celular) {
   const celularLimpo = celular.replace(/\D/g, '')
 
-  // Buscar cobrança com JOIN para pegar centro_custo do Cliente
+  // Buscar cobrança com JOIN em Contas_Receber para pegar Centro_Custo
   const query = `
     SELECT
       ah.id_asaas,
@@ -98,8 +100,9 @@ async function buscarUltimaCobranca(pool, celular) {
       ah.data_vencimento,
       ah.data_envio,
       c."Cliente_Nome" as nome_cliente,
-      c."Centro_Custo" as centro_custo
+      cr."Centro_Custo" as centro_custo
     FROM public.avisos_historico ah
+    INNER JOIN public."Contas_Receber" cr ON ah.id_conta_receber = cr."ID"
     INNER JOIN public."Cliente" c ON ah.codigo_cliente = c."Codigo"
     WHERE
       c."Cliente_Telefone_Celular" LIKE '%${celularLimpo.slice(-9)}%'
