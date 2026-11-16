@@ -408,6 +408,13 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
   try {
     const remetente = mensagem.key.remoteJid
 
+    // 🔍 LOG COMPLETO: Todo retorno da mensagem recebida
+    console.log('\n════════════════════════════════════════════')
+    console.log('📥 MENSAGEM RECEBIDA - DUMP COMPLETO:')
+    console.log('════════════════════════════════════════════')
+    console.log(JSON.stringify(mensagem, null, 2))
+    console.log('════════════════════════════════════════════\n')
+
     // 🚫 FILTRO: Ignora interações com Status/Stories
     if (remetente === 'status@broadcast') {
       console.log(`📱 Ignorando interação com Status/Story (status@broadcast)`)
