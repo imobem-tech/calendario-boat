@@ -1122,7 +1122,20 @@ app.post('/enviar-jid', async (req, res) => {
     }
 
     const sentMsg = await sock.sendMessage(jidFinal, { text: mensagem })
-    res.json({ sucesso: true, destino: jidFinal, messageKey: sentMsg.key })
+
+    // Log para debug: verificar se sentMsg contém JID real diferente
+    console.log(`[enviar-jid] Enviado para: ${jidFinal}`)
+    console.log(`[enviar-jid] sentMsg.key.remoteJid: ${sentMsg.key?.remoteJid}`)
+
+    // Verificar se o JID da confirmação é diferente do enviado
+    const jidConfirmado = sentMsg.key?.remoteJid || jidFinal
+
+    res.json({
+      sucesso: true,
+      destino: jidFinal,
+      jid_confirmado: jidConfirmado,  // ← Novo campo!
+      messageKey: sentMsg.key
+    })
   } catch (err) {
     res.status(500).json({ erro: err.message })
   }
