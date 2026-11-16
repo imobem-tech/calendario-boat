@@ -1076,7 +1076,8 @@ app.post('/fila', async (req, res) => {
     const { grupo_id, mensagem } = req.body
     if (!grupo_id || !mensagem) return res.status(400).json({ erro: 'grupo_id e mensagem são obrigatórios' })
     await pool.query(
-      `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status) VALUES ($1, $2, 'pendente')`,
+      `INSERT INTO public.wpp_fila_agenda (grupo_id, mensagem, status, criado_em)
+       VALUES ($1, $2, 'pendente', NOW() AT TIME ZONE 'America/Sao_Paulo')`,
       [grupo_id, mensagem]
     )
     res.json({ sucesso: true })
