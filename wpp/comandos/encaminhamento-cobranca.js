@@ -1,7 +1,12 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611161132
+// wpp/comandos/encaminhamento-cobranca.js — V.2611161152
 // Encaminhamento de respostas sobre cobranças
-// MELHORIA CRÍTICA (16/11 11:32): Captura JID em TODA resposta ao cliente
+// FIX CRÍTICO (16/11 11:52): Salva JID REAL da mensagem (não normalizado)
+//              - API /enviar-jid normaliza JID (@lid → @s.whatsapp.net)
+//              - Agora salva o JID que VEIO na mensagem (remetente)
+//              - Preserva @lid se cliente responder com @lid
+//              - Preserva qualquer formato original do WhatsApp
+// MELHORIA (16/11 11:32): Captura JID em TODA resposta ao cliente
 //              - Resposta ao cliente agora via endpoint /enviar-jid
 //              - Captura JID real mesmo de clientes novos/não identificados
 //              - Registra JID automaticamente quando identifica cliente
@@ -489,14 +494,16 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
       if (!cobranca) {
         console.log('   ⚠️  Encaminhando para AMBOS grupos (cliente/conta não identificados)')
 
-        // Responder ao cliente (genérico) VIA API para capturar JID real
+        // Responder ao cliente (genérico) VIA API
         const respostaGenerica = gerarMensagemGenericaCliente('ALLMAX', ehAudio)
-        const jidRealCapturado = await enviarMensagemComCapturaJID(remetente, respostaGenerica)
-        console.log('   ✅ Resposta genérica enviada - JID capturado:', jidRealCapturado)
+        await enviarMensagemComCapturaJID(remetente, respostaGenerica)
+        console.log('   ✅ Resposta genérica enviada')
 
-        // Se conseguiu identificar cliente depois, registra JID
+        // Registrar JID do REMETENTE (não o normalizado da API!)
+        // remetente = JID REAL que veio na mensagem (@lid se for o caso)
         if (cliente && cliente.codigo) {
-          await registrarJID(pool, cliente.codigo, jidRealCapturado)
+          await registrarJID(pool, cliente.codigo, remetente)
+          console.log(`   📝 JID registrado: ${remetente}`)
         }
 
         // NOVO LAYOUT: cabeçalho + forward
@@ -524,14 +531,16 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
     const empresa = obterEmpresa(cobranca.centro_custo)
     const grupoResponsavel = obterGrupoResponsavel(cobranca.centro_custo)
 
-    // SEMPRE responde ao cliente (TODA mensagem) VIA API para capturar JID real
+    // SEMPRE responde ao cliente (TODA mensagem) VIA API
     const respostaCliente = gerarMensagemRetorno(empresa, ehAudio)
-    const jidRealCapturado = await enviarMensagemComCapturaJID(remetente, respostaCliente)
-    console.log(`   ✅ Resposta enviada - JID capturado:`, jidRealCapturado)
+    await enviarMensagemComCapturaJID(remetente, respostaCliente)
+    console.log(`   ✅ Resposta enviada`)
 
-    // Registrar JID REAL capturado (cliente já identificado)
+    // Registrar JID do REMETENTE (não o normalizado da API!)
+    // remetente = JID REAL que veio na mensagem (@lid se for o caso)
     if (cliente && cliente.codigo) {
-      await registrarJID(pool, cliente.codigo, jidRealCapturado)
+      await registrarJID(pool, cliente.codigo, remetente)
+      console.log(`   📝 JID registrado: ${remetente}`)
     }
 
     // SEMPRE encaminha para grupo (TODA mensagem)
