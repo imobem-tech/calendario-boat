@@ -1,6 +1,11 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611161221
+// wpp/comandos/encaminhamento-cobranca.js — V.2611161239
 // Encaminhamento de respostas sobre cobranças
+// FIX CRÍTICO (16/11 12:39): Busca com E SEM o 9º dígito!
+//              - JID Alt pode vir COM ou SEM o 9 (depende do cadastro WhatsApp)
+//              - 1ª tentativa: busca como veio
+//              - 2ª tentativa: se 12 dígitos → adiciona 9 / se 13 → remove 9
+//              - Garante encontrar cliente independente do formato
 // 🎉 SOLUÇÃO COMPLETA (16/11 12:21): remoteJidAlt com número REAL!
 //              - Captura remoteJidAlt (campo com número REAL!)
 //              - Busca cliente pelo NÚMERO extraído do JID Alt
@@ -494,7 +499,9 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
       console.log(`   🔍 Tentando buscar por JID Alt (contém número real)`)
 
       // Extrair número do JID Alt (ex: 556384887445@s.whatsapp.net → 556384887445)
-      const numeroExtraido = remetenteAlt.split('@')[0]
+      let numeroExtraido = remetenteAlt.split('@')[0]
+
+      console.log(`   📞 Número extraído: ${numeroExtraido} (${numeroExtraido.length} dígitos)`)
 
       // Buscar cliente por número de telefone
       const queryPorNumero = `
@@ -509,12 +516,38 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
         LIMIT 1
       `
 
-      const resultNumero = await pool.query(queryPorNumero, [numeroExtraido.slice(-11)]) // últimos 11 dígitos
+      // 1ª TENTATIVA: Buscar com número como veio
+      let resultNumero = await pool.query(queryPorNumero, [numeroExtraido.slice(-11)]) // últimos 11 dígitos
 
       if (resultNumero.rowCount > 0) {
         cliente = resultNumero.rows[0]
         cliente.telefone_formatado = formatarTelefone(cliente.telefone)
-        console.log(`   ✅ Cliente encontrado por NÚMERO (via JID Alt): ${cliente.codigo}`)
+        console.log(`   ✅ Cliente encontrado (1ª tentativa - como veio): ${cliente.codigo}`)
+      } else {
+        // 2ª TENTATIVA: Se não encontrou, tentar com/sem o 9
+        let numeroAlternativo = null
+
+        if (numeroExtraido.length === 12) {
+          // FALTA O 9 → Adicionar 9 após DDD
+          numeroAlternativo = numeroExtraido.slice(0, 4) + '9' + numeroExtraido.slice(4)
+          console.log(`   ⚠️ Número SEM 9 detectado (12 dígitos)`)
+          console.log(`   🔄 Tentando com 9: ${numeroAlternativo}`)
+        } else if (numeroExtraido.length === 13) {
+          // TEM O 9 → Remover 9 após DDD
+          numeroAlternativo = numeroExtraido.slice(0, 4) + numeroExtraido.slice(5)
+          console.log(`   ⚠️ Número COM 9 detectado (13 dígitos)`)
+          console.log(`   🔄 Tentando sem 9: ${numeroAlternativo}`)
+        }
+
+        if (numeroAlternativo) {
+          resultNumero = await pool.query(queryPorNumero, [numeroAlternativo.slice(-11)])
+
+          if (resultNumero.rowCount > 0) {
+            cliente = resultNumero.rows[0]
+            cliente.telefone_formatado = formatarTelefone(cliente.telefone)
+            console.log(`   ✅ Cliente encontrado (2ª tentativa - com/sem 9): ${cliente.codigo}`)
+          }
+        }
       }
     }
 
