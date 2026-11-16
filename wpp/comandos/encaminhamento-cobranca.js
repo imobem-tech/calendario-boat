@@ -319,26 +319,39 @@ function gerarRodape(cobranca) {
  * Formata para exibição legível
  */
 function formatarNumeroWhatsApp(jid) {
-  // Remove sufixos do WhatsApp (@s.whatsapp.net, @lid, @c.us, etc)
-  const numero = jid.split('@')[0]
+  // ⚠️ IMPORTANTE: @lid NÃO contém número de telefone real!
+  // É um ID aleatório do WhatsApp
+
+  // Detectar sufixo
+  const partes = jid.split('@')
+  const numero = partes[0]
+  const sufixo = partes[1] || ''
 
   // Se não tem dígitos, retorna original
   if (!/^\d+$/.test(numero)) return jid
 
-  // Formatar conforme tamanho
-  if (numero.length === 13) {
-    // Formato: +55 11 99999-9999 (Brasil com 9)
-    return `+${numero.slice(0, 2)} ${numero.slice(2, 4)} ${numero.slice(4, 9)}-${numero.slice(9)}`
-  } else if (numero.length === 12) {
-    // Formato: +55 11 9999-9999 (Brasil sem 9)
-    return `+${numero.slice(0, 2)} ${numero.slice(2, 4)} ${numero.slice(4, 8)}-${numero.slice(8)}`
-  } else if (numero.length > 10) {
-    // Formato genérico internacional
-    return `+${numero.slice(0, 2)} ${numero.slice(2)}`
-  } else {
-    // Retorna como está
-    return numero
+  // Se for @lid: NÃO formatar como telefone (não é!)
+  if (sufixo === 'lid') {
+    return `${jid} (ID interno WhatsApp)`
   }
+
+  // Se for @s.whatsapp.net ou @c.us: formatar como telefone
+  if (sufixo === 's.whatsapp.net' || sufixo === 'c.us') {
+    // Formatar conforme tamanho
+    if (numero.length === 13) {
+      // Formato: +55 11 99999-9999 (Brasil com 9)
+      return `+${numero.slice(0, 2)} (${numero.slice(2, 4)}) ${numero.slice(4, 9)}-${numero.slice(9)}`
+    } else if (numero.length === 12) {
+      // Formato: +55 11 9999-9999 (Brasil sem 9)
+      return `+${numero.slice(0, 2)} (${numero.slice(2, 4)}) ${numero.slice(4, 8)}-${numero.slice(8)}`
+    } else if (numero.length > 10) {
+      // Formato genérico internacional
+      return `+${numero.slice(0, 2)} ${numero.slice(2)}`
+    }
+  }
+
+  // Fallback: retorna JID completo
+  return jid
 }
 
 // REMOVIDA: extrairNumeroDaJID() não é mais necessária
