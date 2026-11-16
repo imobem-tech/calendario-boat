@@ -1,6 +1,10 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611161246
+// wpp/comandos/encaminhamento-cobranca.js — V.2611161255
 // Encaminhamento de respostas sobre cobranças
+// FIX CRÍTICO (16/11 12:55): Corrige nome de coluna Data_Baixa → Data_Pagamento
+//              - Função buscarContasProximasVencimento usava coluna inexistente
+//              - Tabela Contas_Receber tem "Data_Pagamento", não "Data_Baixa"
+//              - Erro: "column cr.Data_Baixa does not exist"
 // FIX CRÍTICO (16/11 12:46): Query remove "+" do telefone no banco!
 //              - Tabela Cliente tem telefone com "+" (ex: +5563984887445)
 //              - JID vem sem "+" (ex: 5563984887445)
@@ -236,7 +240,7 @@ async function buscarContasProximasVencimento(pool, codigoCliente) {
     WHERE
       cr."Codigo" = $1
       AND cr."Data_Vencimento" BETWEEN (CURRENT_DATE - 30) AND (CURRENT_DATE + 30)
-      AND cr."Data_Baixa" IS NULL
+      AND cr."Data_Pagamento" IS NULL
     ORDER BY cr."Data_Vencimento" DESC
     LIMIT 1
   `
