@@ -1,6 +1,11 @@
 // ============================================================
-// wpp/comandos/encaminhamento-cobranca.js — V.2611161239
+// wpp/comandos/encaminhamento-cobranca.js — V.2611161246
 // Encaminhamento de respostas sobre cobranças
+// FIX CRÍTICO (16/11 12:46): Query remove "+" do telefone no banco!
+//              - Tabela Cliente tem telefone com "+" (ex: +5563984887445)
+//              - JID vem sem "+" (ex: 5563984887445)
+//              - Query agora remove: +, espaços, hífens, parênteses
+//              - REPLACE cascateado: + → ' ' → - → ( → )
 // FIX CRÍTICO (16/11 12:39): Busca com E SEM o 9º dígito!
 //              - JID Alt pode vir COM ou SEM o 9 (depende do cadastro WhatsApp)
 //              - 1ª tentativa: busca como veio
@@ -503,7 +508,7 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
 
       console.log(`   📞 Número extraído: ${numeroExtraido} (${numeroExtraido.length} dígitos)`)
 
-      // Buscar cliente por número de telefone
+      // Buscar cliente por número de telefone (remove +, espaços, hífens, parênteses)
       const queryPorNumero = `
         SELECT
           "Codigo" as codigo,
@@ -512,7 +517,7 @@ export async function processarRespostaCobranca(sock, pool, mensagem) {
           "WhatsApp_JID" as whatsapp_jid,
           "WhatsApp_JID_2" as whatsapp_jid_2
         FROM public."Cliente"
-        WHERE REPLACE(REPLACE(REPLACE(REPLACE("Cliente_Telefone_Celular", ' ', ''), '-', ''), '(', ''), ')', '') LIKE '%' || $1
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("Cliente_Telefone_Celular", '+', ''), ' ', ''), '-', ''), '(', ''), ')', '') LIKE '%' || $1
         LIMIT 1
       `
 
